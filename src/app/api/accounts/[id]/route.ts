@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
+import { verifyCompanyAccess } from '@/lib/verify-access';
+import { computeAuditHash } from '@/lib/journal-hash';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -82,6 +84,12 @@ export async function PUT(
         { error: 'Account not found' },
         { status: 404 }
       );
+    }
+
+    // Verify admin access
+    const access = await verifyCompanyAccess(userId, existing.companyId, 'admin');
+    if (!access.ok) {
+      return NextResponse.json({ error: access.error }, { status: 403 });
     }
 
     // Build update data with only provided fields
@@ -192,6 +200,25 @@ export async function PUT(
       },
     });
 
+    // Audit log with HMAC chain
+    const lastAudit = await db.auditLog.findFirst({
+      where: { hash: { not: null } },
+      orderBy: { createdAt: 'desc' },
+      select: { hash: true },
+    });
+    const auditDetails = JSON.stringify({ id, changes: updateData });
+    const createdAudit = await db.auditLog.create({
+      data: {
+        companyId: existing.companyId, userId, action: 'update_account', entity: 'GlAccount',
+        entityId: id, details: auditDetails, previousHash: lastAudit?.hash ?? null,
+      },
+    });
+    const auditHash = computeAuditHash({
+      id: createdAudit.id, companyId: existing.companyId, userId, action: 'update_account', entity: 'GlAccount',
+      entityId: id, details: auditDetails, previousHash: lastAudit?.hash ?? null,
+    });
+    await db.auditLog.update({ where: { id: createdAudit.id }, data: { hash: auditHash } });
+
     return NextResponse.json({ account });
   } catch (error) {
     console.error('[ACCOUNT UPDATE ERROR]', error);
@@ -231,6 +258,12 @@ export async function DELETE(
       );
     }
 
+    // Verify admin access
+    const access = await verifyCompanyAccess(userId, account.companyId, 'admin');
+    if (!access.ok) {
+      return NextResponse.json({ error: access.error }, { status: 403 });
+    }
+
     // Cannot delete system accounts
     if (account.isSystem) {
       return NextResponse.json(
@@ -268,6 +301,25 @@ export async function DELETE(
         },
       },
     });
+
+    // Audit log with HMAC chain
+    const lastAudit = await db.auditLog.findFirst({
+      where: { hash: { not: null } },
+      orderBy: { createdAt: 'desc' },
+      select: { hash: true },
+    });
+    const auditDetails = JSON.stringify({ id, code: account.code, name: account.name });
+    const createdAudit = await db.auditLog.create({
+      data: {
+        companyId: account.companyId, userId, action: 'deactivate_account', entity: 'GlAccount',
+        entityId: id, details: auditDetails, previousHash: lastAudit?.hash ?? null,
+      },
+    });
+    const auditHash = computeAuditHash({
+      id: createdAudit.id, companyId: account.companyId, userId, action: 'deactivate_account', entity: 'GlAccount',
+      entityId: id, details: auditDetails, previousHash: lastAudit?.hash ?? null,
+    });
+    await db.auditLog.update({ where: { id: createdAudit.id }, data: { hash: auditHash } });
 
     return NextResponse.json({ account: updated });
   } catch (error) {

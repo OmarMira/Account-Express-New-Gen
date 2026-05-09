@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import type { Prisma } from '@prisma/client';
+import { getSessionUserId } from '@/lib/sessions';
+import { verifyCompanyAccess } from '@/lib/verify-access';
+import { roundMoney } from '@/lib/money';
 
 export async function GET(request: NextRequest) {
   try {
+    const userId = await getSessionUserId(request);
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const companyId = searchParams.get('companyId');
     const fromDate = searchParams.get('fromDate');
@@ -15,6 +23,11 @@ export async function GET(request: NextRequest) {
         { error: 'companyId is required' },
         { status: 400 }
       );
+    }
+
+    const access = await verifyCompanyAccess(userId, companyId);
+    if (!access.ok) {
+      return NextResponse.json({ error: access.error }, { status: 403 });
     }
 
     // Build where clause
@@ -104,6 +117,10 @@ export async function GET(request: NextRequest) {
         totalDebits += line.debit;
         totalCredits += line.credit;
 
+        // Apply rounding to each line's amounts
+        line.debit = roundMoney(line.debit);
+        line.credit = roundMoney(line.credit);
+
         // By account
         const acctKey = line.glAccountId;
         const existing = accountMap.get(acctKey);
@@ -148,7 +165,9 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const netMovement = totalDebits - totalCredits;
+    totalDebits = roundMoney(totalDebits);
+    totalCredits = roundMoney(totalCredits);
+    const netMovement = roundMoney(totalDebits - totalCredits);
 
     // Sort by account code
     const byAccount = Array.from(accountMap.values()).sort((a, b) =>
@@ -158,7 +177,9 @@ export async function GET(request: NextRequest) {
     // Add net to byAccount
     const byAccountWithNet = byAccount.map((a) => ({
       ...a,
-      net: a.debits - a.credits,
+      debits: roundMoney(a.debits),
+      credits: roundMoney(a.credits),
+      net: roundMoney(a.debits - a.credits),
     }));
 
     // Sort by type in logical GAAP order

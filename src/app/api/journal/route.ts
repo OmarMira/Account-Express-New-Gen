@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
-import { computeEntryHash } from '@/lib/journal-hash';
+import { computeEntryHash, computeAuditHash } from '@/lib/journal-hash';
 import { verifyCompanyAccess } from '@/lib/verify-access';
+import { isDateInLockedPeriod } from '@/lib/fiscal-period';
 
 // ─── GET /api/journal ───────────────────────────────────────────────
 // List journal entries for a company.
@@ -116,10 +117,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fail-Fast: Verify user has access
-    const access = await verifyCompanyAccess(userId, companyId);
+    // Fail-Fast: Verify user has admin access
+    const access = await verifyCompanyAccess(userId, companyId, 'admin');
     if (!access.ok) {
       return NextResponse.json({ error: access.error }, { status: 403 });
+    }
+
+    // Check fiscal period lock
+    const entryDate = new Date(date);
+    const dateLocked = await isDateInLockedPeriod(companyId, entryDate);
+    if (dateLocked) {
+      return NextResponse.json(
+        { error: 'Cannot create journal entries in a locked fiscal period' },
+        { status: 403 }
+      );
     }
 
     // Validate lines
@@ -260,6 +271,25 @@ export async function POST(request: NextRequest) {
 
       return newEntry;
     });
+
+    // Audit log with HMAC chain
+    const lastAudit = await db.auditLog.findFirst({
+      where: { hash: { not: null } },
+      orderBy: { createdAt: 'desc' },
+      select: { hash: true },
+    });
+    const auditDetails = JSON.stringify({ journalEntryId: entry.id, date, description, status, lineCount: entry.lines.length });
+    const createdAudit = await db.auditLog.create({
+      data: {
+        companyId, userId, action: 'create_journal_entry', entity: 'JournalEntry',
+        entityId: entry.id, details: auditDetails, previousHash: lastAudit?.hash ?? null,
+      },
+    });
+    const auditHash = computeAuditHash({
+      id: createdAudit.id, companyId, userId, action: 'create_journal_entry', entity: 'JournalEntry',
+      entityId: entry.id, details: auditDetails, previousHash: lastAudit?.hash ?? null,
+    });
+    await db.auditLog.update({ where: { id: createdAudit.id }, data: { hash: auditHash } });
 
     return NextResponse.json(
       {

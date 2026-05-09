@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
-import { computeEntryHash } from '@/lib/journal-hash';
+import { computeEntryHash, computeAuditHash } from '@/lib/journal-hash';
 import { verifyCompanyAccess } from '@/lib/verify-access';
+import { isDateInLockedPeriod } from '@/lib/fiscal-period';
 
 // ─── GET /api/journal/[id] ──────────────────────────────────────────
 // Get a single journal entry with all lines and GL account info.
@@ -86,8 +87,8 @@ export async function PUT(
       );
     }
 
-    // Verify access — Fail-Fast
-    const access = await verifyCompanyAccess(userId, existing.companyId);
+    // Verify access — Fail-Fast (admin required for updates)
+    const access = await verifyCompanyAccess(userId, existing.companyId, 'admin');
     if (!access.ok) {
       return NextResponse.json({ error: access.error }, { status: 403 });
     }
@@ -234,8 +235,8 @@ export async function POST(
       return NextResponse.json({ error: 'Entry not found' }, { status: 404 });
     }
 
-    // Verify access — Fail-Fast
-    const postAccess = await verifyCompanyAccess(userId, entry.companyId);
+    // Verify access — Fail-Fast (admin required for post/void)
+    const postAccess = await verifyCompanyAccess(userId, entry.companyId, 'admin');
     if (!postAccess.ok) {
       return NextResponse.json({ error: postAccess.error }, { status: 403 });
     }
@@ -248,6 +249,15 @@ export async function POST(
         return NextResponse.json(
           { error: 'Only draft entries can be posted' },
           { status: 400 }
+        );
+      }
+
+      // Check fiscal period lock
+      const dateLockedPost = await isDateInLockedPeriod(entry.companyId, entry.date);
+      if (dateLockedPost) {
+        return NextResponse.json(
+          { error: 'Cannot post journal entries in a locked fiscal period' },
+          { status: 403 }
         );
       }
 
@@ -300,6 +310,25 @@ export async function POST(
         });
       });
 
+      // Audit log for post action
+      const lastPostAudit = await db.auditLog.findFirst({
+        where: { hash: { not: null } },
+        orderBy: { createdAt: 'desc' },
+        select: { hash: true },
+      });
+      const postAuditDetails = JSON.stringify({ journalEntryId: id, action: 'post', date: entry.date.toISOString(), description: entry.description });
+      const createdPostAudit = await db.auditLog.create({
+        data: {
+          companyId: entry.companyId, userId, action: 'post_journal_entry', entity: 'JournalEntry',
+          entityId: id, details: postAuditDetails, previousHash: lastPostAudit?.hash ?? null,
+        },
+      });
+      const postAuditHash = computeAuditHash({
+        id: createdPostAudit.id, companyId: entry.companyId, userId, action: 'post_journal_entry', entity: 'JournalEntry',
+        entityId: id, details: postAuditDetails, previousHash: lastPostAudit?.hash ?? null,
+      });
+      await db.auditLog.update({ where: { id: createdPostAudit.id }, data: { hash: postAuditHash } });
+
       return NextResponse.json({
         ...updated,
         date: updated.date.toISOString(),
@@ -335,6 +364,25 @@ export async function POST(
           },
         },
       });
+
+      // Audit log for void action
+      const lastVoidAudit = await db.auditLog.findFirst({
+        where: { hash: { not: null } },
+        orderBy: { createdAt: 'desc' },
+        select: { hash: true },
+      });
+      const voidAuditDetails = JSON.stringify({ journalEntryId: id, action: 'void', date: entry.date.toISOString(), description: entry.description });
+      const createdVoidAudit = await db.auditLog.create({
+        data: {
+          companyId: entry.companyId, userId, action: 'void_journal_entry', entity: 'JournalEntry',
+          entityId: id, details: voidAuditDetails, previousHash: lastVoidAudit?.hash ?? null,
+        },
+      });
+      const voidAuditHash = computeAuditHash({
+        id: createdVoidAudit.id, companyId: entry.companyId, userId, action: 'void_journal_entry', entity: 'JournalEntry',
+        entityId: id, details: voidAuditDetails, previousHash: lastVoidAudit?.hash ?? null,
+      });
+      await db.auditLog.update({ where: { id: createdVoidAudit.id }, data: { hash: voidAuditHash } });
 
       return NextResponse.json({
         ...updated,

@@ -4,6 +4,8 @@ import { getSessionUserId } from '@/lib/sessions';
 import { parseCSV } from '@/lib/csv-parser';
 import { parseOFX } from '@/lib/ofx-parser';
 import { parsePDF } from '@/lib/pdf-parser';
+import { verifyCompanyAccess } from '@/lib/verify-access';
+import { computeAuditHash } from '@/lib/journal-hash';
 
 // ─── POST /api/import ─────────────────────────────────────────────────
 // Accepts multipart/form-data with a "file" field (single) or "files" field (multiple).
@@ -26,14 +28,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify membership
-    console.log('[IMPORT] Verifying membership for user', userId, 'company', companyId);
-    const membership = await db.companyMember.findUnique({
-      where: { userId_companyId: { userId, companyId } },
-    });
-    if (!membership) {
-      console.error('[IMPORT] Membership not found for user', userId, 'company', companyId);
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    // Verify admin access
+    console.log('[IMPORT] Verifying admin access for user', userId, 'company', companyId);
+    const access = await verifyCompanyAccess(userId, companyId, 'admin');
+    if (!access.ok) {
+      console.error('[IMPORT] Access denied for user', userId, 'company', companyId);
+      return NextResponse.json({ error: access.error }, { status: 403 });
     }
 
     // Check for multiple files ("files" field) or single file ("file" field)
@@ -87,6 +87,25 @@ export async function POST(request: NextRequest) {
       const successResults = results.filter((r) => r.success);
       const totalTransactions = successResults.reduce((sum, r) => sum + (r.transactionCount || 0), 0);
 
+      // Audit log for multi-file import
+      const lastImportAudit = await db.auditLog.findFirst({
+        where: { hash: { not: null } },
+        orderBy: { createdAt: 'desc' },
+        select: { hash: true },
+      });
+      const importAuditDetails = JSON.stringify({ fileCount: results.length, totalTransactions, successCount: successResults.length });
+      const createdImportAudit = await db.auditLog.create({
+        data: {
+          companyId, userId, action: 'import_transactions', entity: 'BankStatement',
+          entityId: null, details: importAuditDetails, previousHash: lastImportAudit?.hash ?? null,
+        },
+      });
+      const importAuditHash = computeAuditHash({
+        id: createdImportAudit.id, companyId, userId, action: 'import_transactions', entity: 'BankStatement',
+        entityId: null, details: importAuditDetails, previousHash: lastImportAudit?.hash ?? null,
+      });
+      await db.auditLog.update({ where: { id: createdImportAudit.id }, data: { hash: importAuditHash } });
+
       return NextResponse.json({
         results,
         totalTransactions,
@@ -110,6 +129,25 @@ export async function POST(request: NextRequest) {
       const result = await processOneFile(singleFile, companyId, bankAccountId);
       console.log('[IMPORT] Import successful:', result.transactionCount, 'transactions');
 
+      // Audit log for single-file import
+      const lastImportAuditSingle = await db.auditLog.findFirst({
+        where: { hash: { not: null } },
+        orderBy: { createdAt: 'desc' },
+        select: { hash: true },
+      });
+      const importAuditDetailsSingle = JSON.stringify({ fileName: singleFile.name, transactionCount: result.transactionCount, statementId: result.statementId });
+      const createdImportAuditSingle = await db.auditLog.create({
+        data: {
+          companyId, userId, action: 'import_transactions', entity: 'BankStatement',
+          entityId: result.statementId, details: importAuditDetailsSingle, previousHash: lastImportAuditSingle?.hash ?? null,
+        },
+      });
+      const importAuditHashSingle = computeAuditHash({
+        id: createdImportAuditSingle.id, companyId, userId, action: 'import_transactions', entity: 'BankStatement',
+        entityId: result.statementId, details: importAuditDetailsSingle, previousHash: lastImportAuditSingle?.hash ?? null,
+      });
+      await db.auditLog.update({ where: { id: createdImportAuditSingle.id }, data: { hash: importAuditHashSingle } });
+
       return NextResponse.json({
         statementId: result.statementId,
         transactionCount: result.transactionCount,
@@ -119,18 +157,26 @@ export async function POST(request: NextRequest) {
         bankAccountName: result.bankAccountName,
       });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Unknown error';
-      console.error('[IMPORT] Import failed:', msg);
-      return NextResponse.json({ error: msg }, { status: 400 });
+      console.error('[IMPORT] Import failed:', err);
+      return NextResponse.json({ error: 'Failed to import bank statement' }, { status: 400 });
     }
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    console.error('[IMPORT ERROR]', msg, error);
+    console.error('[IMPORT ERROR]', error);
     return NextResponse.json(
-      { error: `Failed to import bank statement: ${msg}` },
+      { error: 'Failed to import bank statement' },
       { status: 500 }
     );
   }
+}
+
+// ─── Helper: Sanitize CSV fields against injection ───────────────────
+
+function sanitizeCsvField(value: string): string {
+  // Prevent CSV injection by escaping leading dangerous characters
+  if (/^[=+\-@\t\r]/.test(value)) {
+    return "'" + value;
+  }
+  return value;
 }
 
 // ─── Helper: Process one file ─────────────────────────────────────────
@@ -216,6 +262,11 @@ async function processOneFile(
     console.log('[IMPORT] Using CSV parser for', fileName);
     const transactions = parseCSV(content);
     console.log(`[IMPORT] CSV parsed: ${transactions.length} raw transactions`);
+
+    // Sanitize transaction descriptions to prevent CSV injection
+    for (const txn of transactions) {
+      txn.description = sanitizeCsvField(txn.description);
+    }
 
     const bankName = extractBankNameFromFilename(fileName);
     console.log('[IMPORT] Detected bank name:', bankName);

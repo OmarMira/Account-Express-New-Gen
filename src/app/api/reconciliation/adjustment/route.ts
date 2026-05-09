@@ -4,6 +4,7 @@ import { getSessionUserId } from '@/lib/sessions';
 import { recalculateBankAccountBalance } from '@/lib/reconciliation';
 import { computeEntryHash, computeAuditHash } from '@/lib/journal-hash';
 import { verifyCompanyAccess } from '@/lib/verify-access';
+import { isDateInLockedPeriod } from '@/lib/fiscal-period';
 
 // ─── POST /api/reconciliation/adjustment ──────────────────────────
 // Create an adjusting journal entry from the reconciliation screen.
@@ -56,6 +57,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Bank account not found' },
         { status: 404 }
+      );
+    }
+
+    // Check fiscal period lock
+    const adjustmentDateLocked = await isDateInLockedPeriod(companyId, new Date(date));
+    if (adjustmentDateLocked) {
+      return NextResponse.json(
+        { error: 'Cannot create adjustments in a locked fiscal period' },
+        { status: 403 }
       );
     }
 

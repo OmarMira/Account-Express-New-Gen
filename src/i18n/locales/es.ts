@@ -453,6 +453,11 @@ const es = {
     systemBackup: 'Respaldos del Sistema',
     aiRuleGenerator: 'Generador de Reglas IA',
     diagnosticsTab: 'Diagnóstico',
+    passwordTab: 'Contraseña',
+    passwordSecurityDesc: 'Mantén tu cuenta segura actualizando tu contraseña regularmente.',
+    passwordWeak: 'Débil',
+    passwordMedium: 'Media',
+    passwordStrong: 'Fuerte',
     backup: {
       createBackup: 'Crear Respaldo',
       createBackupDesc: 'Genera una copia de seguridad completa de todos los datos de la empresa.',

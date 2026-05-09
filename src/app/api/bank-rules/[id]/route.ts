@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
+import { verifyCompanyAccess } from '@/lib/verify-access';
+import { computeAuditHash } from '@/lib/journal-hash';
 
 // Helper: check if a transaction matches a rule
 function transactionMatchesRule(
@@ -65,11 +67,9 @@ export async function GET(
   }
 
   // Verify user has access
-  const membership = await db.companyMember.findUnique({
-    where: { userId_companyId: { userId, companyId: rule.companyId } },
-  });
-  if (!membership) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const access = await verifyCompanyAccess(userId, rule.companyId);
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: 403 });
   }
 
   return NextResponse.json({
@@ -110,12 +110,10 @@ export async function PUT(
       return NextResponse.json({ error: 'Rule not found' }, { status: 404 });
     }
 
-    // Verify access
-    const membership = await db.companyMember.findUnique({
-      where: { userId_companyId: { userId, companyId: existing.companyId } },
-    });
-    if (!membership) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    // Verify admin access
+    const access = await verifyCompanyAccess(userId, existing.companyId, 'admin');
+    if (!access.ok) {
+      return NextResponse.json({ error: access.error }, { status: 403 });
     }
 
     // Validate fields if provided
@@ -192,6 +190,25 @@ export async function PUT(
       },
     });
 
+    // Audit log with HMAC chain
+    const lastAudit = await db.auditLog.findFirst({
+      where: { hash: { not: null } },
+      orderBy: { createdAt: 'desc' },
+      select: { hash: true },
+    });
+    const auditDetails = JSON.stringify({ ruleId: id, changes: updateData });
+    const createdAudit = await db.auditLog.create({
+      data: {
+        companyId: existing.companyId, userId, action: 'update_bank_rule', entity: 'BankRule',
+        entityId: id, details: auditDetails, previousHash: lastAudit?.hash ?? null,
+      },
+    });
+    const auditHash = computeAuditHash({
+      id: createdAudit.id, companyId: existing.companyId, userId, action: 'update_bank_rule', entity: 'BankRule',
+      entityId: id, details: auditDetails, previousHash: lastAudit?.hash ?? null,
+    });
+    await db.auditLog.update({ where: { id: createdAudit.id }, data: { hash: auditHash } });
+
     return NextResponse.json({
       ...rule,
       createdAt: rule.createdAt.toISOString(),
@@ -225,12 +242,10 @@ export async function DELETE(
       return NextResponse.json({ error: 'Rule not found' }, { status: 404 });
     }
 
-    // Verify access
-    const membership = await db.companyMember.findUnique({
-      where: { userId_companyId: { userId, companyId: existing.companyId } },
-    });
-    if (!membership) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    // Verify admin access
+    const access = await verifyCompanyAccess(userId, existing.companyId, 'admin');
+    if (!access.ok) {
+      return NextResponse.json({ error: access.error }, { status: 403 });
     }
 
     // Clear matchedRuleId from transactions that reference this rule
@@ -240,6 +255,25 @@ export async function DELETE(
     });
 
     await db.bankRule.delete({ where: { id } });
+
+    // Audit log with HMAC chain
+    const lastAudit = await db.auditLog.findFirst({
+      where: { hash: { not: null } },
+      orderBy: { createdAt: 'desc' },
+      select: { hash: true },
+    });
+    const auditDetails = JSON.stringify({ ruleId: id, name: existing.name });
+    const createdAudit = await db.auditLog.create({
+      data: {
+        companyId: existing.companyId, userId, action: 'delete_bank_rule', entity: 'BankRule',
+        entityId: id, details: auditDetails, previousHash: lastAudit?.hash ?? null,
+      },
+    });
+    const auditHash = computeAuditHash({
+      id: createdAudit.id, companyId: existing.companyId, userId, action: 'delete_bank_rule', entity: 'BankRule',
+      entityId: id, details: auditDetails, previousHash: lastAudit?.hash ?? null,
+    });
+    await db.auditLog.update({ where: { id: createdAudit.id }, data: { hash: auditHash } });
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -290,12 +324,10 @@ export async function POST(
       );
     }
 
-    // Verify access
-    const membership = await db.companyMember.findUnique({
-      where: { userId_companyId: { userId, companyId: rule.companyId } },
-    });
-    if (!membership) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    // Verify admin access
+    const access = await verifyCompanyAccess(userId, rule.companyId, 'admin');
+    if (!access.ok) {
+      return NextResponse.json({ error: access.error }, { status: 403 });
     }
 
     // Find all unmatched transactions for this company (via statements)
@@ -328,6 +360,25 @@ export async function POST(
         },
       });
     }
+
+    // Audit log with HMAC chain
+    const lastAudit = await db.auditLog.findFirst({
+      where: { hash: { not: null } },
+      orderBy: { createdAt: 'desc' },
+      select: { hash: true },
+    });
+    const auditDetails = JSON.stringify({ ruleId: id, ruleName: rule.name, matchedCount: matchedIds.length });
+    const createdAudit = await db.auditLog.create({
+      data: {
+        companyId: rule.companyId, userId, action: 'apply_bank_rule', entity: 'BankRule',
+        entityId: id, details: auditDetails, previousHash: lastAudit?.hash ?? null,
+      },
+    });
+    const auditHash = computeAuditHash({
+      id: createdAudit.id, companyId: rule.companyId, userId, action: 'apply_bank_rule', entity: 'BankRule',
+      entityId: id, details: auditDetails, previousHash: lastAudit?.hash ?? null,
+    });
+    await db.auditLog.update({ where: { id: createdAudit.id }, data: { hash: auditHash } });
 
     return NextResponse.json({
       success: true,

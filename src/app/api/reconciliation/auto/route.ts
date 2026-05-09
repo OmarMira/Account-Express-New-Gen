@@ -4,6 +4,7 @@ import { getSessionUserId } from '@/lib/sessions';
 import { recalculateBankAccountBalance } from '@/lib/reconciliation';
 import { computeEntryHash, computeAuditHash } from '@/lib/journal-hash';
 import { verifyCompanyAccess } from '@/lib/verify-access';
+import { isDateInLockedPeriod } from '@/lib/fiscal-period';
 
 // Helper: check if a transaction matches a rule
 function transactionMatchesRule(
@@ -226,6 +227,10 @@ export async function POST(request: NextRequest) {
 
         // Create journal entry only for rule-matched, not amount-matched (those already have entries)
         if (createJournalEntries && match.ruleId) {
+          // Check fiscal period lock for this transaction date
+          const autoDateLocked = await isDateInLockedPeriod(companyId, transaction.date);
+          if (autoDateLocked) continue; // Skip locked period transactions
+
           const amount = Math.abs(transaction.amount);
           const debitAccountId = transaction.amount > 0
             ? bankAccount.glAccountId

@@ -453,6 +453,11 @@ const en = {
     systemBackup: 'System Backups',
     aiRuleGenerator: 'AI Rule Generator',
     diagnosticsTab: 'Diagnostics',
+    passwordTab: 'Password',
+    passwordSecurityDesc: 'Keep your account secure by updating your password regularly.',
+    passwordWeak: 'Weak',
+    passwordMedium: 'Medium',
+    passwordStrong: 'Strong',
     backup: {
       createBackup: 'Create Backup',
       createBackupDesc: 'Generate a complete backup of all company data.',

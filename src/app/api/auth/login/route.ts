@@ -2,10 +2,21 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { verifyPassword } from '@/lib/auth';
 import { createSession } from '@/lib/sessions';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 // ─── POST /api/auth/login ─────────────────────────────────────────────
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting before password check
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';
+    const rateResult = checkRateLimit(ip, 'login');
+    if (!rateResult.allowed) {
+      return NextResponse.json(
+        { error: 'Too many login attempts. Please try again later.', retryAfterMs: rateResult.retryAfterMs },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
     const { email, password } = body;
 
@@ -71,7 +82,7 @@ export async function POST(request: NextRequest) {
     // Set httpOnly cookie
     response.cookies.set('session', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: true,
       sameSite: 'lax',
       path: '/',
       maxAge: 7 * 24 * 60 * 60, // 7 days

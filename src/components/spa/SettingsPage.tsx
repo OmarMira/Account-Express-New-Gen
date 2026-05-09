@@ -10,6 +10,7 @@ import {
   Database,
   Zap,
   Activity,
+  KeyRound,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLanguageStore } from '@/store/language-store';
@@ -24,6 +25,7 @@ import { FiscalPeriodsTab } from './settings/FiscalPeriodsTab';
 import { BackupTab } from './settings/BackupTab';
 import { AIRulesGeneratorTab } from './settings/AIRulesGeneratorTab';
 import { DiagnosticsTab } from './settings/DiagnosticsTab';
+import { PasswordTab } from './settings/PasswordTab';
 
 /* ─── Navigation Items ───────────────────────────────────────── */
 
@@ -41,6 +43,7 @@ const navItems: NavItem[] = [
   { id: 'backup', labelKey: 'settings.systemBackup', icon: Database },
   { id: 'ai-rules', labelKey: 'settings.aiRuleGenerator', icon: Zap },
   { id: 'diagnostics', labelKey: 'settings.diagnosticsTab', icon: Activity },
+  { id: 'password', labelKey: 'settings.passwordTab', icon: KeyRound },
 ];
 
 /* ─── Animation Variants ──────────────────────────────────────── */
@@ -87,6 +90,8 @@ export function SettingsPage() {
         return <AIRulesGeneratorTab />;
       case 'diagnostics':
         return <DiagnosticsTab />;
+      case 'password':
+        return <PasswordTab />;
       default:
         return <CompanyDataTab />;
     }

@@ -4,6 +4,7 @@ import { getSessionUserId } from '@/lib/sessions';
 import { recalculateBankAccountBalance } from '@/lib/reconciliation';
 import { computeEntryHash, computeAuditHash } from '@/lib/journal-hash';
 import { verifyCompanyAccess } from '@/lib/verify-access';
+import { isDateInLockedPeriod } from '@/lib/fiscal-period';
 
 // Balance validation tolerance
 const BALANCE_TOLERANCE = 0.01;
@@ -334,6 +335,10 @@ export async function POST(request: NextRequest) {
 
         // Create journal entry if requested
         if (createJournalEntries) {
+          // Check fiscal period lock for this transaction date
+          const txDateLocked = await isDateInLockedPeriod(companyId, bankTx.date);
+          if (txDateLocked) continue; // Skip locked period transactions
+
           const targetGlId = txn.glAccountId || bankTx.glAccountId;
           if (targetGlId) {
             const amount = Math.abs(bankTx.amount);
