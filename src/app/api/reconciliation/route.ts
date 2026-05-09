@@ -34,12 +34,10 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Verify access
-  const membership = await db.companyMember.findUnique({
-    where: { userId_companyId: { userId, companyId } },
-  });
-  if (!membership) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  // Fail-Fast: Verify access
+  const access = await verifyCompanyAccess(userId, companyId);
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: 403 });
   }
 
   // Get bank account with GL account info

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
 import { recalculateBankAccountBalance } from '@/lib/reconciliation';
+import { computeAuditHash } from '@/lib/journal-hash';
+import { verifyCompanyAccess } from '@/lib/verify-access';
 
 // ─── POST /api/reconciliation/unreconcile ─────────────────────────
 // Undo reconciliation for selected transactions.
@@ -30,12 +32,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify access
-    const membership = await db.companyMember.findUnique({
-      where: { userId_companyId: { userId, companyId } },
-    });
-    if (!membership) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    // Fail-Fast: Verify access
+    const access = await verifyCompanyAccess(userId, companyId);
+    if (!access.ok) {
+      return NextResponse.json({ error: access.error }, { status: 403 });
     }
 
     // Verify bank account
@@ -68,33 +68,60 @@ export async function POST(request: NextRequest) {
 
     const idsToUpdate = reconciledTxs.map((t) => t.id);
 
-    // Update transactions
-    const result = await db.bankTransaction.updateMany({
-      where: { id: { in: idsToUpdate } },
-      data: {
-        isReconciled: false,
-        reconciledAt: null,
-        reconciliationPeriodId: null,
-        journalEntryId: null,
-      },
+    // Update transactions in a transaction
+    const result = await db.$transaction(async (tx) => {
+      return tx.bankTransaction.updateMany({
+        where: { id: { in: idsToUpdate } },
+        data: {
+          isReconciled: false,
+          reconciledAt: null,
+          reconciliationPeriodId: null,
+          journalEntryId: null,
+        },
+      });
     });
 
     // Recalculate bank account balance after unreconciliation
     await recalculateBankAccountBalance(bankAccountId);
 
-    // Audit log
-    await db.auditLog.create({
+    // Audit log with HMAC chain
+    const lastAudit = await db.auditLog.findFirst({
+      where: { hash: { not: null } },
+      orderBy: { createdAt: 'desc' },
+      select: { hash: true },
+    });
+
+    const auditDetails = JSON.stringify({
+      bankAccountId,
+      transactionIds: idsToUpdate,
+      count: result.count,
+    });
+
+    const createdAudit = await db.auditLog.create({
       data: {
         companyId,
         userId,
         action: 'unreconcile_transactions',
         entity: 'BankTransaction',
-        details: JSON.stringify({
-          bankAccountId,
-          transactionIds: idsToUpdate,
-          count: result.count,
-        }),
+        details: auditDetails,
+        previousHash: lastAudit?.hash ?? null,
       },
+    });
+
+    const auditHash = computeAuditHash({
+      id: createdAudit.id,
+      companyId,
+      userId,
+      action: 'unreconcile_transactions',
+      entity: 'BankTransaction',
+      entityId: null,
+      details: auditDetails,
+      previousHash: lastAudit?.hash ?? null,
+    });
+
+    await db.auditLog.update({
+      where: { id: createdAudit.id },
+      data: { hash: auditHash },
     });
 
     return NextResponse.json({

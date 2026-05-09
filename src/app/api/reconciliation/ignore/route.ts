@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
+import { computeAuditHash } from '@/lib/journal-hash';
+import { verifyCompanyAccess } from '@/lib/verify-access';
 
 // ─── PATCH /api/reconciliation/ignore ──────────────────────────────
 // Toggle ignore status for transactions.
@@ -36,12 +38,10 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    // Verify access
-    const membership = await db.companyMember.findUnique({
-      where: { userId_companyId: { userId, companyId } },
-    });
-    if (!membership) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    // Fail-Fast: Verify access
+    const access = await verifyCompanyAccess(userId, companyId);
+    if (!access.ok) {
+      return NextResponse.json({ error: access.error }, { status: 403 });
     }
 
     // If ignoring, ensure transactions are not already reconciled
@@ -88,19 +88,45 @@ export async function PATCH(request: NextRequest) {
       data: { isIgnored: ignore },
     });
 
-    // Audit log
-    await db.auditLog.create({
+    // Audit log with HMAC chain
+    const lastAudit = await db.auditLog.findFirst({
+      where: { hash: { not: null } },
+      orderBy: { createdAt: 'desc' },
+      select: { hash: true },
+    });
+
+    const actionName = ignore ? 'ignore_transactions' : 'unignore_transactions';
+    const auditDetails = JSON.stringify({
+      transactionIds: validIds,
+      count: result.count,
+      ignore,
+    });
+
+    const createdAudit = await db.auditLog.create({
       data: {
         companyId,
         userId,
-        action: ignore ? 'ignore_transactions' : 'unignore_transactions',
+        action: actionName,
         entity: 'BankTransaction',
-        details: JSON.stringify({
-          transactionIds: validIds,
-          count: result.count,
-          ignore,
-        }),
+        details: auditDetails,
+        previousHash: lastAudit?.hash ?? null,
       },
+    });
+
+    const auditHash = computeAuditHash({
+      id: createdAudit.id,
+      companyId,
+      userId,
+      action: actionName,
+      entity: 'BankTransaction',
+      entityId: null,
+      details: auditDetails,
+      previousHash: lastAudit?.hash ?? null,
+    });
+
+    await db.auditLog.update({
+      where: { id: createdAudit.id },
+      data: { hash: auditHash },
     });
 
     return NextResponse.json({

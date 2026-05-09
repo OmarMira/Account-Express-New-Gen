@@ -41,12 +41,10 @@ export async function GET(
     return NextResponse.json({ error: 'Entry not found' }, { status: 404 });
   }
 
-  // Verify user has access
-  const membership = await db.companyMember.findUnique({
-    where: { userId_companyId: { userId, companyId: entry.companyId } },
-  });
-  if (!membership) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  // Fail-Fast: Verify access
+  const access = await verifyCompanyAccess(userId, entry.companyId);
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: 403 });
   }
 
   return NextResponse.json({
