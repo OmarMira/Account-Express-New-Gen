@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
 import { verifyCompanyAccess } from '@/lib/verify-access';
 import { computeAuditHash } from '@/lib/journal-hash';
+import { toCents, toDollars } from '@/lib/money';
 
 // ─── GET /api/banks?companyId=xxx ──────────────────────────────────────
 export async function GET(request: NextRequest) {
@@ -41,7 +42,7 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
     });
 
-    return NextResponse.json({ accounts });
+    return NextResponse.json({ accounts: accounts.map(a => ({ ...a, balance: toDollars(a.balance) })) });
   } catch (error) {
     console.error('[BANKS LIST ERROR]', error);
     return NextResponse.json(
@@ -116,7 +117,7 @@ export async function POST(request: NextRequest) {
         accountNo: accountNo?.trim() || null,
         routingNo: routingNo?.trim() || null,
         glAccountId,
-        balance: parseFloat(balance) || 0,
+        balance: toCents(parseFloat(balance) || 0),
         currency: currency || 'USD',
         isActive: true,
       },
@@ -146,7 +147,7 @@ export async function POST(request: NextRequest) {
     });
     await db.auditLog.update({ where: { id: createdAudit.id }, data: { hash: auditHash } });
 
-    return NextResponse.json({ account }, { status: 201 });
+    return NextResponse.json({ account: { ...account, balance: toDollars(account.balance) } }, { status: 201 });
   } catch (error) {
     console.error('[BANKS CREATE ERROR]', error);
     return NextResponse.json(

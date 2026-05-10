@@ -92,7 +92,7 @@ model BankAccount {
   accountNo   String?
   routingNo   String?
   glAccountId String
-  balance     Float    @default(0)
+  balance     Int      @default(0)
   currency    String   @default("USD")
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
@@ -110,10 +110,10 @@ model BankStatement {
   bankAccountId String
   startDate     DateTime
   endDate       DateTime
-  openingBalance Float
-  closingBalance Float
-  totalCredits  Float    @default(0)
-  totalDebits   Float    @default(0)
+  openingBalance Int
+  closingBalance Int
+  totalCredits  Int      @default(0)
+  totalDebits   Int      @default(0)
   format        String   // csv | ofx | qfx | pdf
   fileName      String?
   createdAt     DateTime @default(now())
@@ -128,7 +128,7 @@ model BankTransaction {
   statementId     String
   date            DateTime
   description     String
-  amount          Float
+  amount          Int
   reference       String?
   isReconciled    Boolean   @default(false)
   isIgnored       Boolean   @default(false)
@@ -152,9 +152,9 @@ model ReconciliationPeriod {
   companyId       String
   bankAccountId   String
   userId          String
-  statementBalance Float   @default(0)
-  bookBalance     Float    @default(0)
-  difference      Float    @default(0)
+  statementBalance Int    @default(0)
+  bookBalance     Int     @default(0)
+  difference      Int     @default(0)
   status          String   @default("open") // open | completed | cancelled
   startedAt       DateTime @default(now())
   completedAt     DateTime?
@@ -212,8 +212,8 @@ model JournalLine {
   entryId     String
   glAccountId String
   description String?
-  debit       Float    @default(0)
-  credit      Float    @default(0)
+  debit       Int      @default(0)
+  credit      Int      @default(0)
 
   entry     JournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
   glAccount GlAccount    @relation(fields: [glAccountId], references: [id])

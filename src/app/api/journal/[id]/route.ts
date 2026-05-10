@@ -4,6 +4,7 @@ import { getSessionUserId } from '@/lib/sessions';
 import { computeEntryHash, computeAuditHash } from '@/lib/journal-hash';
 import { verifyCompanyAccess } from '@/lib/verify-access';
 import { isDateInLockedPeriod } from '@/lib/fiscal-period';
+import { toCents, toDollars, isBalanced } from '@/lib/money';
 
 // ─── GET /api/journal/[id] ──────────────────────────────────────────
 // Get a single journal entry with all lines and GL account info.
@@ -53,6 +54,11 @@ export async function GET(
     date: entry.date.toISOString(),
     createdAt: entry.createdAt.toISOString(),
     updatedAt: entry.updatedAt.toISOString(),
+    lines: entry.lines.map(l => ({
+      ...l,
+      debit: toDollars(l.debit),
+      credit: toDollars(l.credit),
+    })),
   });
 }
 
@@ -132,12 +138,12 @@ export async function PUT(
         }
       }
 
-      const totalDebits = lines.reduce((sum: number, l: { debit: number }) => sum + l.debit, 0);
-      const totalCredits = lines.reduce((sum: number, l: { credit: number }) => sum + l.credit, 0);
+      const totalDebitCents = lines.reduce((sum: number, l: { debit: number }) => sum + toCents(l.debit), 0);
+      const totalCreditCents = lines.reduce((sum: number, l: { credit: number }) => sum + toCents(l.credit), 0);
 
-      if (Math.abs(totalDebits - totalCredits) > 0.005) {
+      if (!isBalanced(totalDebitCents, totalCreditCents)) {
         return NextResponse.json(
-          { error: `Entry must balance. Total debits (${totalDebits.toFixed(2)}) must equal total credits (${totalCredits.toFixed(2)})` },
+          { error: `Entry must balance. Total debits ($${toDollars(totalDebitCents).toFixed(2)}) must equal total credits ($${toDollars(totalCreditCents).toFixed(2)})` },
           { status: 400 }
         );
       }
@@ -170,8 +176,8 @@ export async function PUT(
               create: lines.map((l: { glAccountId: string; description?: string; debit: number; credit: number }) => ({
                 glAccountId: l.glAccountId,
                 description: l.description || null,
-                debit: l.debit,
-                credit: l.credit,
+                debit: toCents(l.debit),
+                credit: toCents(l.credit),
               })),
             },
           }),
@@ -201,6 +207,11 @@ export async function PUT(
       date: updated.date.toISOString(),
       createdAt: updated.createdAt.toISOString(),
       updatedAt: updated.updatedAt.toISOString(),
+      lines: updated.lines.map(l => ({
+        ...l,
+        debit: toDollars(l.debit),
+        credit: toDollars(l.credit),
+      })),
     });
   } catch (error) {
     console.error('[JOURNAL UPDATE ERROR]', error);
@@ -334,6 +345,11 @@ export async function POST(
         date: updated.date.toISOString(),
         createdAt: updated.createdAt.toISOString(),
         updatedAt: updated.updatedAt.toISOString(),
+        lines: updated.lines.map(l => ({
+          ...l,
+          debit: toDollars(l.debit),
+          credit: toDollars(l.credit),
+        })),
       });
     }
 
@@ -389,6 +405,11 @@ export async function POST(
         date: updated.date.toISOString(),
         createdAt: updated.createdAt.toISOString(),
         updatedAt: updated.updatedAt.toISOString(),
+        lines: updated.lines.map(l => ({
+          ...l,
+          debit: toDollars(l.debit),
+          credit: toDollars(l.credit),
+        })),
       });
     }
 

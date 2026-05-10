@@ -29,8 +29,8 @@ export function computeEntryHash(payload: {
     payload.description,
     payload.reference ?? '',
     payload.status,
-    payload.totalDebit.toFixed(2),
-    payload.totalCredit.toFixed(2),
+    String(payload.totalDebit),
+    String(payload.totalCredit),
     payload.previousHash ?? '',
   ].join('|');
 

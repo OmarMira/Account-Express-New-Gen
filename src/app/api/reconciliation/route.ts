@@ -5,9 +5,7 @@ import { recalculateBankAccountBalance } from '@/lib/reconciliation';
 import { computeEntryHash, computeAuditHash } from '@/lib/journal-hash';
 import { verifyCompanyAccess } from '@/lib/verify-access';
 import { isDateInLockedPeriod } from '@/lib/fiscal-period';
-
-// Balance validation tolerance
-const BALANCE_TOLERANCE = 0.01;
+import { toDollars } from '@/lib/money';
 
 // ─── GET /api/reconciliation ───────────────────────────────────────
 // Get reconciliation data for a bank account with filters.
@@ -197,17 +195,19 @@ export async function GET(request: NextRequest) {
       id: bankAccount.id,
       accountName: bankAccount.accountName,
       bankName: bankAccount.bankName,
-      balance: updatedBankAccount?.balance ?? bankAccount.balance,
+      balance: toDollars(updatedBankAccount?.balance ?? bankAccount.balance),
       currency: bankAccount.currency,
       glAccount: bankAccount.glAccount,
     },
     latestStatement: latestStatement
-      ? { ...latestStatement, endDate: latestStatement.endDate.toISOString() }
+      ? { ...latestStatement, endDate: latestStatement.endDate.toISOString(), closingBalance: toDollars(latestStatement.closingBalance) }
       : null,
     statements: statements.map((s) => ({
       ...s,
       startDate: s.startDate.toISOString(),
       endDate: s.endDate.toISOString(),
+      openingBalance: toDollars(s.openingBalance),
+      closingBalance: toDollars(s.closingBalance),
     })),
     openPeriod,
     recentPeriods: recentPeriods.map((p) => ({
@@ -216,25 +216,27 @@ export async function GET(request: NextRequest) {
       completedAt: p.completedAt?.toISOString() ?? null,
     })),
     summary: {
-      statementBalance,
-      bookBalance,
-      difference,
+      statementBalance: toDollars(statementBalance),
+      bookBalance: toDollars(bookBalance),
+      difference: toDollars(difference),
       totalTransactions,
       reconciledCount,
       ignoredCount,
       unreconciledCount: totalTransactions - reconciledCount,
-      depositsTotal,
-      paymentsTotal,
+      depositsTotal: toDollars(depositsTotal),
+      paymentsTotal: toDollars(paymentsTotal),
       filteredCount: transactions.length,
     },
     deposits: deposits.map((tx) => ({
       ...tx,
+      amount: toDollars(tx.amount),
       date: tx.date.toISOString(),
       createdAt: tx.createdAt.toISOString(),
       reconciledAt: tx.reconciledAt?.toISOString() ?? null,
     })),
     payments: payments.map((tx) => ({
       ...tx,
+      amount: toDollars(tx.amount),
       date: tx.date.toISOString(),
       createdAt: tx.createdAt.toISOString(),
       reconciledAt: tx.reconciledAt?.toISOString() ?? null,
@@ -348,11 +350,6 @@ export async function POST(request: NextRequest) {
             const creditAccountId = bankTx.amount > 0
               ? targetGlId
               : bankAccount.glAccountId;
-
-            // Validate debits = credits
-            if (Math.abs(amount - amount) > BALANCE_TOLERANCE) {
-              throw new Error(`Journal entry balance mismatch: debit=${amount}, credit=${amount}`);
-            }
 
             const description = `Reconciliation: ${bankTx.description}`;
 

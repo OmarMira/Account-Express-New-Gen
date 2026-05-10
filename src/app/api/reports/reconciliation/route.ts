@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
+import { toDollars } from '@/lib/money';
 
 export async function GET(request: NextRequest) {
   try {
@@ -73,15 +74,15 @@ export async function GET(request: NextRequest) {
         id: bankAccount.id,
         accountName: bankAccount.accountName,
         bankName: bankAccount.bankName,
-        balance: bankAccount.balance,
+        balance: toDollars(bankAccount.balance),
         currency: bankAccount.currency,
       },
       summary: {
         totalTransactions: transactions.length,
         reconciledCount: reconciled.length,
         unreconciledCount: unreconciled.length,
-        reconciledTotal: Math.round(reconciledTotal * 100) / 100,
-        unreconciledTotal: Math.round(unreconciledTotal * 100) / 100,
+        reconciledTotal: toDollars(reconciledTotal),
+        unreconciledTotal: toDollars(unreconciledTotal),
         reconciledPercentage:
           transactions.length > 0
             ? Math.round((reconciled.length / transactions.length) * 100)
@@ -91,7 +92,7 @@ export async function GET(request: NextRequest) {
         id: t.id,
         date: t.date.toISOString(),
         description: t.description,
-        amount: t.amount,
+        amount: toDollars(t.amount),
         reference: t.reference,
         glAccount: t.glAccount
           ? { id: t.glAccount.id, code: t.glAccount.code, name: t.glAccount.name }
@@ -101,7 +102,7 @@ export async function GET(request: NextRequest) {
         id: t.id,
         date: t.date.toISOString(),
         description: t.description,
-        amount: t.amount,
+        amount: toDollars(t.amount),
         reference: t.reference,
         glAccount: t.glAccount
           ? { id: t.glAccount.id, code: t.glAccount.code, name: t.glAccount.name }

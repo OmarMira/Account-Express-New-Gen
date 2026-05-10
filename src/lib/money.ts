@@ -1,16 +1,32 @@
 /**
- * Money rounding and balance-checking utilities for accounting.
+ * Money utilities for accounting — Integer Cents Architecture
+ *
+ * ALL monetary values in the database are stored as integers (cents).
+ * This eliminates floating-point precision errors entirely.
+ *
+ * Conversion happens ONLY at the API boundary:
+ *   - Request (frontend → API): toCents(dollars)
+ *   - Response (API → frontend): toDollars(cents)
+ *
+ * Internal computations stay in cents — sums, differences, and comparisons
+ * are all exact integer arithmetic. No rounding, no tolerance, no patches.
  */
 
-/** Round a number to exactly 2 decimal places (cents). */
-export function roundMoney(value: number): number {
-  return Math.round(value * 100) / 100;
+/** Convert a dollar amount to cents for database storage. */
+export function toCents(dollars: number): number {
+  return Math.round(dollars * 100);
 }
 
-/** Tolerance for debit/credit balance comparison. */
-export const BALANCE_TOLERANCE = 0.005;
+/** Convert cents from the database to dollars for API responses. */
+export function toDollars(cents: number): number {
+  return cents / 100;
+}
 
-/** Check whether total debits and credits are balanced within tolerance. */
-export function isBalanced(debit: number, credit: number): boolean {
-  return Math.abs(debit - credit) < BALANCE_TOLERANCE;
+/**
+ * Check whether total debits and credits are balanced.
+ * With integer cents, this is an EXACT comparison — no tolerance needed.
+ * Returns true only when debitCents === creditCents.
+ */
+export function isBalanced(debitCents: number, creditCents: number): boolean {
+  return debitCents === creditCents;
 }

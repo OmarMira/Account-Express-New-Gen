@@ -6,6 +6,7 @@ import { parseOFX } from '@/lib/ofx-parser';
 import { parsePDF } from '@/lib/pdf-parser';
 import { verifyCompanyAccess } from '@/lib/verify-access';
 import { computeAuditHash } from '@/lib/journal-hash';
+import { toCents, toDollars } from '@/lib/money';
 
 // ─── POST /api/import ─────────────────────────────────────────────────
 // Accepts multipart/form-data with a "file" field (single) or "files" field (multiple).
@@ -481,9 +482,10 @@ async function importTransactions(
   });
 
   // Build a set of unique keys for duplicate checking: date+amount+description(first 30 chars)
+  // et.amount is in cents from DB; convert to dollars to match parser output
   const existingKeys = new Set<string>();
   for (const et of existingTransactions) {
-    const key = `${et.date.toISOString().split('T')[0]}|${et.amount}|${et.description.substring(0, 30).toUpperCase()}`;
+    const key = `${et.date.toISOString().split('T')[0]}|${toDollars(et.amount)}|${et.description.substring(0, 30).toUpperCase()}`;
     existingKeys.add(key);
   }
 
@@ -509,13 +511,15 @@ async function importTransactions(
     };
   }
 
-  // Calculate totals (from unique only)
-  const totalCredits = uniqueTransactions
+  // Calculate totals (from unique only) — in dollars, will be converted to cents for DB
+  const totalCreditsDollars = uniqueTransactions
     .filter((t) => t.amount > 0)
     .reduce((s, t) => s + t.amount, 0);
-  const totalDebits = uniqueTransactions
+  const totalDebitsDollars = uniqueTransactions
     .filter((t) => t.amount < 0)
     .reduce((s, t) => s + Math.abs(t.amount), 0);
+  const totalCredits = toCents(totalCreditsDollars);
+  const totalDebits = toCents(totalDebitsDollars);
 
   // Load bank rules for auto-categorization
   const bankRules = await db.bankRule.findMany({
@@ -536,8 +540,8 @@ async function importTransactions(
         bankAccountId,
         startDate,
         endDate,
-        openingBalance,
-        closingBalance: closingBalance || openingBalance + totalCredits - totalDebits,
+        openingBalance: toCents(openingBalance),
+        closingBalance: toCents(closingBalance || (openingBalance + totalCreditsDollars - totalDebitsDollars)),
         totalCredits,
         totalDebits,
         format,
@@ -562,7 +566,7 @@ async function importTransactions(
           statementId: statement.id,
           date: txn.date,
           description: txn.description,
-          amount: txn.amount,
+          amount: toCents(txn.amount),
           reference: txn.reference || null,
           isReconciled: false,
           glAccountId: glAccountId || null,
@@ -576,7 +580,7 @@ async function importTransactions(
       where: { id: bankAccountId },
       data: {
         balance: {
-          increment: totalCredits - totalDebits,
+          increment: toCents(totalCreditsDollars - totalDebitsDollars),
         },
       },
     });

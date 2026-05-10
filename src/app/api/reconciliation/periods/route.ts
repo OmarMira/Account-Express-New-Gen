@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
 import { computeAuditHash } from '@/lib/journal-hash';
 import { verifyCompanyAccess } from '@/lib/verify-access';
+import { toDollars } from '@/lib/money';
 
 // Helper to create HMAC-chained audit log
 async function createChainedAuditLog(data: {
@@ -146,7 +147,12 @@ export async function POST(request: NextRequest) {
           details: JSON.stringify({ bankAccountId, statementBalance: stmtBalance, bookBalance, difference: stmtBalance - bookBalance }),
         });
 
-        return NextResponse.json({ success: true, period });
+        return NextResponse.json({ success: true, period: {
+          ...period,
+          statementBalance: toDollars(period.statementBalance),
+          bookBalance: toDollars(period.bookBalance),
+          difference: toDollars(period.difference),
+        } });
       }
 
       case 'complete': {
@@ -208,7 +214,12 @@ export async function POST(request: NextRequest) {
           details: JSON.stringify({ statementBalance: stmtBalance, bookBalance, difference: stmtBalance - bookBalance }),
         });
 
-        return NextResponse.json({ success: true, period: updated });
+        return NextResponse.json({ success: true, period: {
+          ...updated,
+          statementBalance: toDollars(updated.statementBalance),
+          bookBalance: toDollars(updated.bookBalance),
+          difference: toDollars(updated.difference),
+        } });
       }
 
       case 'cancel': {
@@ -243,7 +254,12 @@ export async function POST(request: NextRequest) {
           details: null,
         });
 
-        return NextResponse.json({ success: true, period: updated });
+        return NextResponse.json({ success: true, period: {
+          ...updated,
+          statementBalance: toDollars(updated.statementBalance),
+          bookBalance: toDollars(updated.bookBalance),
+          difference: toDollars(updated.difference),
+        } });
       }
 
       default:
@@ -302,6 +318,9 @@ export async function GET(request: NextRequest) {
       ...p,
       startedAt: p.startedAt.toISOString(),
       completedAt: p.completedAt?.toISOString() ?? null,
+      statementBalance: toDollars(p.statementBalance),
+      bookBalance: toDollars(p.bookBalance),
+      difference: toDollars(p.difference),
       transactionCount: p.transactions.length,
       transactions: undefined,
     })),

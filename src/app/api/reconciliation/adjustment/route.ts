@@ -5,6 +5,7 @@ import { recalculateBankAccountBalance } from '@/lib/reconciliation';
 import { computeEntryHash, computeAuditHash } from '@/lib/journal-hash';
 import { verifyCompanyAccess } from '@/lib/verify-access';
 import { isDateInLockedPeriod } from '@/lib/fiscal-period';
+import { toCents } from '@/lib/money';
 
 // ─── POST /api/reconciliation/adjustment ──────────────────────────
 // Create an adjusting journal entry from the reconciliation screen.
@@ -98,14 +99,14 @@ export async function POST(request: NextRequest) {
               {
                 glAccountId: debitAccountId,
                 description,
-                debit: amount,
+                debit: toCents(amount),
                 credit: 0,
               },
               {
                 glAccountId: creditAccountId,
                 description,
                 debit: 0,
-                credit: amount,
+                credit: toCents(amount),
               },
             ],
           },
@@ -131,8 +132,8 @@ export async function POST(request: NextRequest) {
         description: `[Reconciliation Adjustment] ${description}`,
         reference: ref,
         status: 'posted',
-        totalDebit: amount,
-        totalCredit: amount,
+        totalDebit: toCents(amount),
+        totalCredit: toCents(amount),
         previousHash: lastPosted?.hash ?? null,
       });
 

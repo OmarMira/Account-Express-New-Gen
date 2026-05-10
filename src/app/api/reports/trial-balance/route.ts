@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
+import { toDollars } from '@/lib/money';
 
 export async function GET(request: NextRequest) {
   try {
@@ -117,15 +118,15 @@ export async function GET(request: NextRequest) {
           : entry.creditTotal - entry.debitTotal;
 
       // Skip zero-balance accounts
-      if (Math.abs(netBalance) < 0.005) continue;
+      if (Math.abs(netBalance) < 1) continue;
 
       accounts.push({
         code: entry.code,
         name: entry.name,
         accountType: entry.accountType,
-        debit: Math.round(entry.debitTotal * 100) / 100,
-        credit: Math.round(entry.creditTotal * 100) / 100,
-        balance: Math.round(netBalance * 100) / 100,
+        debit: toDollars(entry.debitTotal),
+        credit: toDollars(entry.creditTotal),
+        balance: toDollars(netBalance),
       });
 
       totalDebits += entry.debitTotal;
@@ -134,8 +135,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       accounts,
-      totalDebits: Math.round(totalDebits * 100) / 100,
-      totalCredits: Math.round(totalCredits * 100) / 100,
+      totalDebits: toDollars(totalDebits),
+      totalCredits: toDollars(totalCredits),
       asOfDate: asOfDate.toISOString(),
     });
   } catch (error) {

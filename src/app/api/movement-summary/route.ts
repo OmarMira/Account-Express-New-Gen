@@ -3,7 +3,7 @@ import { db } from '@/lib/db';
 import type { Prisma } from '@prisma/client';
 import { getSessionUserId } from '@/lib/sessions';
 import { verifyCompanyAccess } from '@/lib/verify-access';
-import { roundMoney } from '@/lib/money';
+import { toDollars } from '@/lib/money';
 
 export async function GET(request: NextRequest) {
   try {
@@ -117,10 +117,6 @@ export async function GET(request: NextRequest) {
         totalDebits += line.debit;
         totalCredits += line.credit;
 
-        // Apply rounding to each line's amounts
-        line.debit = roundMoney(line.debit);
-        line.credit = roundMoney(line.credit);
-
         // By account
         const acctKey = line.glAccountId;
         const existing = accountMap.get(acctKey);
@@ -165,9 +161,17 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    totalDebits = roundMoney(totalDebits);
-    totalCredits = roundMoney(totalCredits);
-    const netMovement = roundMoney(totalDebits - totalCredits);
+    // Convert recent movements from cents to dollars
+    const recentMovementsConverted = recentMovements.map(line => ({
+      ...line,
+      debit: toDollars(line.debit),
+      credit: toDollars(line.credit),
+    }));
+
+    // Convert cents to dollars for response (compute net before converting)
+    const netMovement = toDollars(totalDebits - totalCredits);
+    totalDebits = toDollars(totalDebits);
+    totalCredits = toDollars(totalCredits);
 
     // Sort by account code
     const byAccount = Array.from(accountMap.values()).sort((a, b) =>
@@ -177,9 +181,9 @@ export async function GET(request: NextRequest) {
     // Add net to byAccount
     const byAccountWithNet = byAccount.map((a) => ({
       ...a,
-      debits: roundMoney(a.debits),
-      credits: roundMoney(a.credits),
-      net: roundMoney(a.debits - a.credits),
+      debits: toDollars(a.debits),
+      credits: toDollars(a.credits),
+      net: toDollars(a.debits - a.credits),
     }));
 
     // Sort by type in logical GAAP order
@@ -192,11 +196,11 @@ export async function GET(request: NextRequest) {
       })
       .map((item) => ({
         ...item,
-        net: item.debits - item.credits,
+        net: toDollars(item.debits - item.credits),
       }));
 
     // Limit recent movements to 50 and only those with non-zero amounts
-    const filteredRecent = recentMovements
+    const filteredRecent = recentMovementsConverted
       .filter((m) => m.debit > 0 || m.credit > 0)
       .slice(0, 50);
 

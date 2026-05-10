@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
 import { verifyCompanyAccess } from '@/lib/verify-access';
 import { computeAuditHash } from '@/lib/journal-hash';
+import { toCents, toDollars } from '@/lib/money';
 
 // ─── GET /api/banks/[id]?companyId=xxx ──────────────────────────────────
 export async function GET(
@@ -69,7 +70,11 @@ export async function GET(
     return NextResponse.json({
       account: {
         ...account,
-        recentTransactions,
+        balance: toDollars(account.balance),
+        recentTransactions: recentTransactions.map(tx => ({
+          ...tx,
+          amount: toDollars(tx.amount),
+        })),
       },
     });
   } catch (error) {
@@ -159,7 +164,7 @@ export async function PUT(
     if (accountNo !== undefined) updateData.accountNo = accountNo?.trim() || null;
     if (routingNo !== undefined) updateData.routingNo = routingNo?.trim() || null;
     if (glAccountId !== undefined) updateData.glAccountId = glAccountId;
-    if (balance !== undefined) updateData.balance = parseFloat(balance) || 0;
+    if (balance !== undefined) updateData.balance = toCents(parseFloat(balance) || 0);
     if (currency !== undefined) updateData.currency = currency;
     if (isActive !== undefined) updateData.isActive = isActive;
 
@@ -192,7 +197,7 @@ export async function PUT(
     });
     await db.auditLog.update({ where: { id: createdAudit.id }, data: { hash: auditHash } });
 
-    return NextResponse.json({ account });
+    return NextResponse.json({ account: { ...account, balance: toDollars(account.balance) } });
   } catch (error) {
     console.error('[BANK UPDATE ERROR]', error);
     return NextResponse.json(

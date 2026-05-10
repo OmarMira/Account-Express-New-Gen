@@ -5,6 +5,7 @@ import { recalculateBankAccountBalance } from '@/lib/reconciliation';
 import { computeEntryHash, computeAuditHash } from '@/lib/journal-hash';
 import { verifyCompanyAccess } from '@/lib/verify-access';
 import { isDateInLockedPeriod } from '@/lib/fiscal-period';
+import { toCents, toDollars } from '@/lib/money';
 
 // Helper: check if a transaction matches a rule
 function transactionMatchesRule(
@@ -31,9 +32,9 @@ function transactionMatchesRule(
     case 'equals':
       return desc === val;
     case 'amount_greater':
-      return Math.abs(tx.amount) > Number(rule.conditionValue);
+      return Math.abs(tx.amount) > toCents(Number(rule.conditionValue));
     case 'amount_less':
-      return Math.abs(tx.amount) < Number(rule.conditionValue);
+      return Math.abs(tx.amount) < toCents(Number(rule.conditionValue));
     default:
       return false;
   }
@@ -184,7 +185,7 @@ export async function POST(request: NextRequest) {
         const txAmount = tx.amount;
 
         for (const [entryId, jeInfo] of journalEntryMap) {
-          if (Math.abs(jeInfo.amount - txAmount) < 0.01 && jeInfo.date === txDate) {
+          if (jeInfo.amount === txAmount && jeInfo.date === txDate) {
             matchedTxIds.add(tx.id);
             matchMap.set(tx.id, {
               ruleId: '',

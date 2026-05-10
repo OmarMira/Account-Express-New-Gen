@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
+import { toDollars } from '@/lib/money';
 
 // ─── GET /api/reconciliation/report ────────────────────────────────
 // Get structured reconciliation report.
@@ -128,10 +129,10 @@ export async function GET(request: NextRequest) {
       glAccount: bankAccount.glAccount,
     },
     report: {
-      balancePerBooks: Math.round(balancePerBooks * 100) / 100,
-      balancePerStatement: Math.round(balancePerStatement * 100) / 100,
-      difference: Math.round(difference * 100) / 100,
-      isBalanced: Math.abs(difference) < 0.01,
+      balancePerBooks: toDollars(balancePerBooks),
+      balancePerStatement: toDollars(balancePerStatement),
+      difference: toDollars(difference),
+      isBalanced: difference === 0,
       generatedAt: new Date().toISOString(),
     },
     counts: {
@@ -144,7 +145,7 @@ export async function GET(request: NextRequest) {
       id: tx.id,
       date: tx.date.toISOString(),
       description: tx.description,
-      amount: tx.amount,
+      amount: toDollars(tx.amount),
       reference: tx.reference,
       glAccount: tx.glAccount,
       journalEntryId: tx.journalEntryId,
@@ -155,7 +156,7 @@ export async function GET(request: NextRequest) {
       id: tx.id,
       date: tx.date.toISOString(),
       description: tx.description,
-      amount: tx.amount,
+      amount: toDollars(tx.amount),
       reference: tx.reference,
       glAccount: tx.glAccount,
     })),
@@ -163,7 +164,7 @@ export async function GET(request: NextRequest) {
       id: tx.id,
       date: tx.date.toISOString(),
       description: tx.description,
-      amount: tx.amount,
+      amount: toDollars(tx.amount),
       reference: tx.reference,
     })),
   });

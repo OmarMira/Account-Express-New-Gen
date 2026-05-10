@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
+import { toDollars } from '@/lib/money';
 
 // ─── GET /api/dashboard?companyId=xxx ──────────────────────────────
 export async function GET(request: NextRequest) {
@@ -162,28 +163,28 @@ export async function GET(request: NextRequest) {
     const accountBalances = Object.entries(typeBalances).map(
       ([accountType, balance]) => ({
         accountType,
-        balance: Math.round(balance * 100) / 100,
+        balance: toDollars(balance),
       })
     );
 
     return NextResponse.json({
-      totalBankBalance: Math.round(totalBankBalance * 100) / 100,
+      totalBankBalance: toDollars(totalBankBalance),
       bankAccountCount: bankAccounts.length,
-      totalAssets: Math.round(typeBalances.asset * 100) / 100,
-      totalLiabilities: Math.round(typeBalances.liability * 100) / 100,
-      totalEquity: Math.round(typeBalances.equity * 100) / 100,
-      totalRevenue: Math.round(typeBalances.revenue * 100) / 100,
-      totalExpenses: Math.round(typeBalances.expense * 100) / 100,
+      totalAssets: toDollars(typeBalances.asset),
+      totalLiabilities: toDollars(typeBalances.liability),
+      totalEquity: toDollars(typeBalances.equity),
+      totalRevenue: toDollars(typeBalances.revenue),
+      totalExpenses: toDollars(typeBalances.expense),
       postedEntries,
       reconciledCount,
       unreconciledCount,
-      recentTransactions,
+      recentTransactions: recentTransactions.map(tx => ({ ...tx, amount: toDollars(tx.amount) })),
       accountBalances,
       bankAccounts: bankAccounts.map((a) => ({
         id: a.id,
         accountName: a.accountName,
         bankName: a.bankName,
-        balance: Math.round(a.balance * 100) / 100,
+        balance: toDollars(a.balance),
         currency: a.currency,
       })),
       upcomingPeriodEnds: upcomingPeriods.map((p) => ({

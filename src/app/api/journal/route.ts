@@ -4,6 +4,7 @@ import { getSessionUserId } from '@/lib/sessions';
 import { computeEntryHash, computeAuditHash } from '@/lib/journal-hash';
 import { verifyCompanyAccess } from '@/lib/verify-access';
 import { isDateInLockedPeriod } from '@/lib/fiscal-period';
+import { toCents, toDollars, isBalanced } from '@/lib/money';
 
 // ─── GET /api/journal ───────────────────────────────────────────────
 // List journal entries for a company.
@@ -75,14 +76,19 @@ export async function GET(request: NextRequest) {
     db.journalEntry.count({ where }),
   ]);
 
-  // Calculate totals per entry
+  // Calculate totals per entry (convert cents to dollars for frontend)
   const entriesWithTotals = entries.map((entry) => ({
     ...entry,
     date: entry.date.toISOString(),
     createdAt: entry.createdAt.toISOString(),
     updatedAt: entry.updatedAt.toISOString(),
-    _totalDebit: entry.lines.reduce((sum, l) => sum + l.debit, 0),
-    _totalCredit: entry.lines.reduce((sum, l) => sum + l.credit, 0),
+    lines: entry.lines.map(l => ({
+      ...l,
+      debit: toDollars(l.debit),
+      credit: toDollars(l.credit),
+    })),
+    _totalDebit: toDollars(entry.lines.reduce((sum, l) => sum + l.debit, 0)),
+    _totalCredit: toDollars(entry.lines.reduce((sum, l) => sum + l.credit, 0)),
   }));
 
   return NextResponse.json({
@@ -163,13 +169,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Validate balanced entry
-    const totalDebits = lines.reduce((sum: number, l: { debit: number }) => sum + l.debit, 0);
-    const totalCredits = lines.reduce((sum: number, l: { credit: number }) => sum + l.credit, 0);
+    // Validate balanced entry (convert to cents for exact integer comparison)
+    const totalDebitCents = lines.reduce((sum: number, l: { debit: number }) => sum + toCents(l.debit), 0);
+    const totalCreditCents = lines.reduce((sum: number, l: { credit: number }) => sum + toCents(l.credit), 0);
 
-    if (Math.abs(totalDebits - totalCredits) > 0.005) {
+    if (!isBalanced(totalDebitCents, totalCreditCents)) {
       return NextResponse.json(
-        { error: `Entry must balance. Total debits (${totalDebits.toFixed(2)}) must equal total credits (${totalCredits.toFixed(2)})` },
+        { error: `Entry must balance. Total debits ($${toDollars(totalDebitCents).toFixed(2)}) must equal total credits ($${toDollars(totalCreditCents).toFixed(2)})` },
         { status: 400 }
       );
     }
@@ -216,8 +222,8 @@ export async function POST(request: NextRequest) {
             create: lines.map((l: { glAccountId: string; description?: string; debit: number; credit: number }) => ({
               glAccountId: l.glAccountId,
               description: l.description || null,
-              debit: l.debit,
-              credit: l.credit,
+              debit: toCents(l.debit),
+              credit: toCents(l.credit),
             })),
           },
         },
@@ -245,6 +251,7 @@ export async function POST(request: NextRequest) {
           select: { hash: true },
         });
 
+        // Hash uses cents directly — values are already Int from DB
         const totalDebit = newEntry.lines.reduce((s, l) => s + l.debit, 0);
         const totalCredit = newEntry.lines.reduce((s, l) => s + l.credit, 0);
 
@@ -297,6 +304,11 @@ export async function POST(request: NextRequest) {
         date: entry.date.toISOString(),
         createdAt: entry.createdAt.toISOString(),
         updatedAt: entry.updatedAt.toISOString(),
+        lines: entry.lines.map(l => ({
+          ...l,
+          debit: toDollars(l.debit),
+          credit: toDollars(l.credit),
+        })),
       },
       { status: 201 }
     );
