@@ -30,6 +30,9 @@ export function SelectCompanyPage() {
           if (data.companies) {
             setCompanies(data.companies);
           }
+          if (data.user) {
+            useAuthStore.setState({ user: data.user });
+          }
         }
       } catch {
         // ignore
@@ -122,14 +125,25 @@ export function SelectCompanyPage() {
               )}
 
               {user?.role === 'super_admin' && (
-                <Button
-                  variant="outline"
-                  className="w-full gap-2 mt-4 border-indigo-600/30 text-indigo-600 hover:bg-indigo-600/5 dark:border-indigo-400/30 dark:text-indigo-400 dark:hover:bg-indigo-400/5 font-semibold transition-all duration-200"
-                  onClick={() => setCurrentView('admin-dashboard')}
-                >
-                  <Building2 className="size-4" />
-                  Gestión de Empresas
-                </Button>
+                <div className="mt-6 pt-4 border-t border-dashed border-border">
+                  <button
+                    onClick={() => setCurrentView('admin-dashboard')}
+                    className="flex w-full items-center gap-3 rounded-xl border border-indigo-500/20 bg-indigo-500/5 hover:bg-indigo-500/10 dark:border-indigo-400/20 dark:bg-indigo-400/5 dark:hover:bg-indigo-400/10 p-4 text-left transition-all duration-300 group hover:shadow-lg hover:shadow-indigo-500/5 hover:border-indigo-500/40 cursor-pointer"
+                  >
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 group-hover:scale-105 transition-transform duration-300">
+                      <Building2 className="size-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm text-indigo-600 dark:text-indigo-400">
+                        Consola de Administración
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Gestionar empresas, accesos de usuarios y bitácoras
+                      </p>
+                    </div>
+                    <ChevronRight className="size-4 text-indigo-500/60 group-hover:text-indigo-500 group-hover:translate-x-1 transition-all" />
+                  </button>
+                </div>
               )}
 
               <div className="pt-4 border-t">
