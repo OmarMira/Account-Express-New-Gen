@@ -1,4 +1,3 @@
-import { pathToFileURL } from 'url';
 import path from 'path';
 
 if (typeof global !== 'undefined') {
@@ -20,10 +19,10 @@ export interface ParsedTransaction {
  * Parses a PDF bank statement buffer and extracts transactions.
  */
 export async function parsePDF(buffer: Buffer): Promise<ParsedTransaction[]> {
-  // Configure pdfjs worker dynamically at runtime to completely prevent webpack compilation/pre-rendering errors
-  const workerPath = path.join(process.cwd(), 'node_modules', 'pdfjs-dist', 'legacy', 'build', 'pdf.worker.mjs');
-  const workerUrl = pathToFileURL(workerPath).href;
-  PDFParse.setWorker(workerUrl);
+  // Retrieve the self-contained base64 worker data URL dynamically using eval("require") to completely hide it from Turbopack/Webpack static analysis
+  const workerModulePath = path.join(process.cwd(), 'node_modules', 'pdf-parse', 'dist', 'worker', 'cjs', 'index.cjs');
+  const workerModule = eval("require")(workerModulePath);
+  PDFParse.setWorker(workerModule.getData());
 
   const parser = new PDFParse(new Uint8Array(buffer));
   const data = await parser.getText();
