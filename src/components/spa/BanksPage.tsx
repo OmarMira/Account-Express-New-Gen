@@ -585,8 +585,11 @@ export function BanksPage() {
             {activeAccounts.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <Button variant="outline" onClick={() => setCurrentView('import')}>
-          <Upload className="size-4 mr-1" />
+        <Button 
+          onClick={() => setCurrentView('import')}
+          className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-600 text-white border-none shadow-sm hover:shadow transition-all"
+        >
+          <Upload className="size-4 mr-1.5" />
           {t('banks.uploadStatement')}
         </Button>
         <Button onClick={openCreateModal}>

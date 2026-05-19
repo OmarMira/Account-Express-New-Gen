@@ -657,7 +657,11 @@ export function ReconciliationPage() {
           <p className="text-sm text-muted-foreground mt-1">{t('reconciliation.reconciliationSubtitle')}</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => setCurrentView('import')} className="gap-2">
+          <Button 
+            size="sm" 
+            onClick={() => setCurrentView('import')} 
+            className="gap-2 bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-600 text-white border-none shadow-sm hover:shadow transition-all"
+          >
             <Upload className="size-4" />
             {t('banks.uploadStatement')}
           </Button>
