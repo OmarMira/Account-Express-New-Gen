@@ -587,7 +587,7 @@ export function BanksPage() {
         </div>
         <Button 
           onClick={() => setCurrentView('import')}
-          className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-600 text-white border-none shadow-sm hover:shadow transition-all"
+          className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-700 dark:hover:bg-indigo-600 text-white border-none shadow-sm hover:shadow transition-all"
         >
           <Upload className="size-4 mr-1.5" />
           {t('banks.uploadStatement')}
