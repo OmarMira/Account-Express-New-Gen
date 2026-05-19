@@ -1,3 +1,6 @@
+import { pathToFileURL } from 'url';
+import path from 'path';
+
 if (typeof global !== 'undefined') {
   if (!(global as any).DOMMatrix) (global as any).DOMMatrix = class {};
   if (!(global as any).ImageData) (global as any).ImageData = class {};
@@ -5,9 +8,6 @@ if (typeof global !== 'undefined') {
 }
 
 const { PDFParse } = require('pdf-parse');
-
-// Configure pdfjs worker to resolve from official jsdelivr CDN, bypassing webpack bundling issues
-PDFParse.setWorker('https://cdn.jsdelivr.net/npm/pdf-parse@latest/dist/pdf-parse/web/pdf.worker.mjs');
 
 export interface ParsedTransaction {
   date: Date;
@@ -20,6 +20,11 @@ export interface ParsedTransaction {
  * Parses a PDF bank statement buffer and extracts transactions.
  */
 export async function parsePDF(buffer: Buffer): Promise<ParsedTransaction[]> {
+  // Configure pdfjs worker dynamically at runtime to completely prevent webpack compilation/pre-rendering errors
+  const workerPath = path.join(process.cwd(), 'node_modules', 'pdfjs-dist', 'legacy', 'build', 'pdf.worker.mjs');
+  const workerUrl = pathToFileURL(workerPath).href;
+  PDFParse.setWorker(workerUrl);
+
   const parser = new PDFParse(new Uint8Array(buffer));
   const data = await parser.getText();
   const text = data.text || '';
