@@ -4,7 +4,7 @@ if (typeof global !== 'undefined') {
   if (!(global as any).Path2D) (global as any).Path2D = class {};
 }
 
-const pdfParse = require('pdf-parse');
+const { PDFParse } = require('pdf-parse');
 
 export interface ParsedTransaction {
   date: Date;
@@ -17,7 +17,8 @@ export interface ParsedTransaction {
  * Parses a PDF bank statement buffer and extracts transactions.
  */
 export async function parsePDF(buffer: Buffer): Promise<ParsedTransaction[]> {
-  const data = await pdfParse(buffer);
+  const parser = new PDFParse(new Uint8Array(buffer));
+  const data = await parser.getText();
   const text = data.text || '';
   const lines = text.split('\n');
   const transactions: ParsedTransaction[] = [];
