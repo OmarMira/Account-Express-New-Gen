@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
 import { parseCSV } from '@/lib/csv-parser';
 import { parseOFX } from '@/lib/ofx-parser';
+import { parsePDF } from '@/lib/pdf-parser';
 
 // ─── POST /api/import ─────────────────────────────────────────────────
 // Accepts multipart/form-data with a file field.
@@ -55,16 +56,48 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(await file.arrayBuffer());
     const content = buffer.toString('utf-8');
 
-    // ─── PDF: not fully implemented ──────────────────────────────────
+    // ─── PDF parsing ──────────────────────────────────────────────────
     if (extension === 'pdf') {
-      return NextResponse.json(
-        {
-          error:
-            'PDF import requires OCR processing and is not yet fully implemented. Please export your bank statement as CSV or OFX format.',
-          supportedFormats: ['csv', 'ofx', 'qfx'],
-        },
-        { status: 400 }
+      let transactions: Awaited<ReturnType<typeof parsePDF>>;
+      let bankName = '';
+
+      try {
+        transactions = await parsePDF(buffer);
+        bankName = extractBankNameFromFilename(fileName);
+      } catch (parseError) {
+        const msg =
+          parseError instanceof Error
+            ? parseError.message
+            : 'Failed to parse PDF file';
+        return NextResponse.json({ error: msg }, { status: 400 });
+      }
+
+      // Find or create bank account
+      const bankAccount = await findOrCreateBankAccount(
+        companyId,
+        bankAccountId,
+        bankName,
+        transactions
       );
+      const newAccountCreated = !bankAccountId;
+
+      // Create statement + transactions
+      const result = await importTransactions(
+        companyId,
+        bankAccount.id,
+        transactions,
+        'pdf',
+        fileName
+      );
+
+      return NextResponse.json({
+        statementId: result.statementId,
+        transactionCount: result.transactionCount,
+        autoCategorizedCount: result.autoCategorizedCount,
+        duplicatesSkipped: result.duplicatesSkipped,
+        newAccountCreated,
+        bankAccountName: bankAccount.accountName,
+      });
     }
 
     // ─── CSV parsing ─────────────────────────────────────────────────
