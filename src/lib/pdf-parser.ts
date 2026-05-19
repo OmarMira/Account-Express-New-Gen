@@ -6,6 +6,9 @@ if (typeof global !== 'undefined') {
 
 const { PDFParse } = require('pdf-parse');
 
+// Configure pdfjs worker to resolve from official jsdelivr CDN, bypassing webpack bundling issues
+PDFParse.setWorker('https://cdn.jsdelivr.net/npm/pdf-parse@latest/dist/pdf-parse/web/pdf.worker.mjs');
+
 export interface ParsedTransaction {
   date: Date;
   description: string;
