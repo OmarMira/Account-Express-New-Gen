@@ -53,6 +53,7 @@ import { ExportPage } from '@/components/spa/ExportPage';
 import { MovementSummaryPage } from '@/components/spa/MovementSummaryPage';
 import { SettingsPage } from '@/components/spa/SettingsPage';
 import { UsersPage } from '@/components/spa/UsersPage';
+import { SelectCompanyPage } from '@/components/spa/SelectCompanyPage';
 import { AIAssistantModal } from '@/components/spa/AIAssistantModal';
 import { useLanguageStore } from '@/store/language-store';
 import { useAuthStore, type ViewName } from '@/store/auth-store';
@@ -273,6 +274,7 @@ export function AppShell() {
   }, [logout]);
 
   const handleChangeCompany = useCallback(() => {
+    useAuthStore.getState().setActiveCompany(null as any);
     useAuthStore.getState().setCurrentView('select-company');
   }, []);
 
@@ -438,6 +440,9 @@ function PlaceholderView({ view }: { view: ViewName }) {
   }
   if (view === 'users') {
     return <UsersPage />;
+  }
+  if (view === 'select-company') {
+    return <SelectCompanyPage />;
   }
 
   // Map views to their title keys
