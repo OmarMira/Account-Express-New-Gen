@@ -192,7 +192,7 @@ export function JournalPage() {
       if (startDate) params.set('startDate', startDate);
       if (endDate) params.set('endDate', endDate);
 
-      const res = await fetch(`/api/journal?${params.toString()}`, { credentials: 'include' });
+      const res = await fetch(`/api/journal?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
         setEntries(data.data);
@@ -209,8 +209,7 @@ export function JournalPage() {
     if (!activeCompany) return;
     try {
       const res = await fetch(
-        `/api/journal/accounts?companyId=${activeCompany.id}`,
-        { credentials: 'include' }
+        `/api/journal/accounts?companyId=${activeCompany.id}`
       );
       if (res.ok) {
         const data = await res.json();
@@ -341,7 +340,6 @@ export function JournalPage() {
 
       const res = await fetch(url, {
         method,
-        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
@@ -379,7 +377,6 @@ export function JournalPage() {
     try {
       const res = await fetch(`/api/journal/${confirmTarget}`, {
         method: 'POST',
-        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: confirmAction }),
       });
@@ -413,7 +410,7 @@ export function JournalPage() {
   async function refreshDetail() {
     if (!selectedEntry) return;
     try {
-      const res = await fetch(`/api/journal/${selectedEntry.id}`, { credentials: 'include' });
+      const res = await fetch(`/api/journal/${selectedEntry.id}`);
       if (res.ok) {
         const data = await res.json();
         setSelectedEntry(data);

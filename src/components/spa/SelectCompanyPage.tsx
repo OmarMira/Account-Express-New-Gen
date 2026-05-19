@@ -121,6 +121,17 @@ export function SelectCompanyPage() {
                 </div>
               )}
 
+              {user?.role === 'super_admin' && (
+                <Button
+                  variant="outline"
+                  className="w-full gap-2 mt-4 border-indigo-600/30 text-indigo-600 hover:bg-indigo-600/5 dark:border-indigo-400/30 dark:text-indigo-400 dark:hover:bg-indigo-400/5 font-semibold transition-all duration-200"
+                  onClick={() => setCurrentView('admin-dashboard')}
+                >
+                  <Building2 className="size-4" />
+                  Gestión de Empresas
+                </Button>
+              )}
+
               <div className="pt-4 border-t">
                 <Button
                   variant="outline"

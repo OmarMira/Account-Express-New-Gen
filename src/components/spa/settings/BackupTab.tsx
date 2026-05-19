@@ -63,27 +63,8 @@ export function BackupTab() {
   const [restoring, setRestoring] = useState(false);
   const [restoreProgress, setRestoreProgress] = useState(0);
 
-  // Mock backup history
-  const [backups] = useState<BackupRecord[]>([
-    {
-      id: '1',
-      date: new Date(Date.now() - 3600000 * 2).toISOString(),
-      size: '156KB',
-      type: 'manual',
-    },
-    {
-      id: '2',
-      date: new Date(Date.now() - 86400000).toISOString(),
-      size: '148KB',
-      type: 'automatic',
-    },
-    {
-      id: '3',
-      date: new Date(Date.now() - 86400000 * 3).toISOString(),
-      size: '142KB',
-      type: 'manual',
-    },
-  ]);
+  // Backup history loaded from API (empty until real data exists)
+  const [backups, setBackups] = useState<BackupRecord[]>([]);
 
   async function handleCreateBackup() {
     setCreating(true);
@@ -101,7 +82,7 @@ export function BackupTab() {
     }, 300);
 
     try {
-      const res = await fetch('/api/backup', { method: 'POST', credentials: 'include' });
+      const res = await fetch('/api/backup', { method: 'POST' });
       if (res.ok) {
         toast.success(t('settings.backup.backupCreated'));
       } else {
@@ -145,7 +126,6 @@ export function BackupTab() {
         formData.append('file', file);
         const res = await fetch('/api/backup/restore', {
           method: 'POST',
-          credentials: 'include',
           body: formData,
         });
         if (res.ok) {

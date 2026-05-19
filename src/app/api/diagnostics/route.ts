@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
-import { verifyJournalChain, verifyAuditChain } from '@/lib/journal-hash';
 import fs from 'fs';
 import path from 'path';
 
@@ -10,7 +9,7 @@ import path from 'path';
  */
 export async function GET(request: Request) {
   try {
-    const userId = await getSessionUserId(request as unknown as import('next/server').NextRequest);
+    const userId = getSessionUserId(request as unknown as import('next/server').NextRequest);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -74,26 +73,6 @@ export async function GET(request: Request) {
     const hours = Math.floor((uptimeMs % 86400) / 3600);
     const uptimeStr = days > 0 ? `${days}d ${hours}h` : `${hours}h`;
 
-    // Get list of companies for integrity check
-    const companies = await db.company.findMany({
-      select: { id: true, legalName: true },
-    });
-
-    // Run integrity verification
-    const companyIntegrity: Record<string, { valid: boolean; totalChecked: number; breakEntry: string | null }> = {};
-    for (const company of companies) {
-      const result = await verifyJournalChain(company.id);
-      companyIntegrity[company.id] = {
-        valid: result.valid,
-        totalChecked: result.totalChecked,
-        breakEntry: result.firstBreak?.description ?? null,
-      };
-    }
-
-    const auditIntegrity = await verifyAuditChain();
-
-    const allIntegrityValid = Object.values(companyIntegrity).every((c) => c.valid) && auditIntegrity.valid;
-
     return NextResponse.json({
       database: {
         status: 'connected',
@@ -123,17 +102,7 @@ export async function GET(request: Request) {
       },
       system: {
         uptime: uptimeStr,
-        version: '1.1.0',
-      },
-      integrity: {
-        journalChainValid: allIntegrityValid,
-        auditChainValid: auditIntegrity.valid,
-        companies: companyIntegrity,
-        auditLog: {
-          valid: auditIntegrity.valid,
-          totalChecked: auditIntegrity.totalChecked,
-          breakEntry: auditIntegrity.firstBreak?.description ?? null,
-        },
+        version: '1.0.0',
       },
     });
   } catch (error) {

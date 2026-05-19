@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
-import { verifyCompanyAccess } from '@/lib/verify-access';
-import { computeAuditHash } from '@/lib/journal-hash';
 
 // ─── GET /api/bank-rules ───────────────────────────────────────────
 // List bank rules for a company, sorted by priority. Includes GL account info.
 export async function GET(request: NextRequest) {
-  const userId = await getSessionUserId(request);
+  const userId = getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -23,9 +21,11 @@ export async function GET(request: NextRequest) {
   }
 
   // Verify user has access to this company
-  const access = await verifyCompanyAccess(userId, companyId);
-  if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: 403 });
+  const membership = await db.companyMember.findUnique({
+    where: { userId_companyId: { userId, companyId } },
+  });
+  if (!membership) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   const rules = await db.bankRule.findMany({
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
 // Create a new bank rule.
 // Body: { companyId, name, conditionType, conditionValue, transactionDirection?, glAccountId, priority?, isActive? }
 export async function POST(request: NextRequest) {
-  const userId = await getSessionUserId(request);
+  const userId = getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -118,10 +118,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify admin access
-    const access = await verifyCompanyAccess(userId, companyId, 'admin');
-    if (!access.ok) {
-      return NextResponse.json({ error: access.error }, { status: 403 });
+    // Verify company access
+    const membership = await db.companyMember.findUnique({
+      where: { userId_companyId: { userId, companyId } },
+    });
+    if (!membership) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     // Verify GL account exists in company
@@ -172,25 +174,6 @@ export async function POST(request: NextRequest) {
         },
       },
     });
-
-    // Audit log with HMAC chain
-    const lastAudit = await db.auditLog.findFirst({
-      where: { hash: { not: null } },
-      orderBy: { createdAt: 'desc' },
-      select: { hash: true },
-    });
-    const auditDetails = JSON.stringify({ ruleId: rule.id, name: rule.name, conditionType, conditionValue: rule.conditionValue, glAccountId, priority: p });
-    const createdAudit = await db.auditLog.create({
-      data: {
-        companyId, userId, action: 'create_bank_rule', entity: 'BankRule',
-        entityId: rule.id, details: auditDetails, previousHash: lastAudit?.hash ?? null,
-      },
-    });
-    const auditHash = computeAuditHash({
-      id: createdAudit.id, companyId, userId, action: 'create_bank_rule', entity: 'BankRule',
-      entityId: rule.id, details: auditDetails, previousHash: lastAudit?.hash ?? null,
-    });
-    await db.auditLog.update({ where: { id: createdAudit.id }, data: { hash: auditHash } });
 
     return NextResponse.json(
       {

@@ -262,7 +262,7 @@ export function AccountsPage() {
       if (filterType !== 'all') params.set('accountType', filterType);
       if (search.trim()) params.set('search', search.trim());
 
-      const res = await fetch(`/api/accounts?${params}`, { credentials: 'include' });
+      const res = await fetch(`/api/accounts?${params}`);
       if (!res.ok) throw new Error('Failed to fetch');
       const data = await res.json();
       setAccounts(data.accounts);
@@ -407,14 +407,12 @@ export function AccountsPage() {
       if (editingAccount) {
         res = await fetch(`/api/accounts/${editingAccount.id}`, {
           method: 'PUT',
-          credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         });
       } else {
         res = await fetch('/api/accounts', {
           method: 'POST',
-          credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         });
@@ -442,7 +440,7 @@ export function AccountsPage() {
     setDeleteError('');
 
     try {
-      const res = await fetch(`/api/accounts/${deleteTarget.id}`, { method: 'DELETE', credentials: 'include' });
+      const res = await fetch(`/api/accounts/${deleteTarget.id}`, { method: 'DELETE' });
       if (!res.ok) {
         const data = await res.json();
         setDeleteError(data.error || t('common.error'));

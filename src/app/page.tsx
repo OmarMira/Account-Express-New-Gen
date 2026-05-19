@@ -8,6 +8,7 @@ import { LoginPage } from '@/components/spa/LoginPage';
 import { RegisterPage } from '@/components/spa/RegisterPage';
 import { SelectCompanyPage } from '@/components/spa/SelectCompanyPage';
 import { AppShell } from '@/components/spa/AppShell';
+import SuperAdminDashboardPage from '@/components/spa/admin/SuperAdminDashboardPage';
 
 /* ── Loading Spinner ── */
 function LoadingScreen() {
@@ -53,12 +54,20 @@ function AppContent() {
     return <UnauthView view={currentView} />;
   }
 
-  // Authenticated but no company selected
-  if (!activeCompany) {
-    if (currentView === 'select-company') {
-      return <SelectCompanyPage />;
-    }
-    // Force to select-company if no active company
+  // Authenticated but no company selected, or switching companies
+  const isAdminView = [
+    'admin-companies',
+    'admin-company-detail',
+    'admin-users',
+    'admin-audit-logs',
+    'admin-dashboard',
+  ].includes(currentView);
+
+  if (isAdminView) {
+    return <SuperAdminDashboardPage />;
+  }
+
+  if ((currentView === 'select-company' || !activeCompany) && !isAdminView) {
     return <SelectCompanyPage />;
   }
 

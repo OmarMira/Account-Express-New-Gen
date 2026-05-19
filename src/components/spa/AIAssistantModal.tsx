@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useAuthStore, type PendingRule } from '@/store/auth-store';
+import { useAuthStore } from '@/store/auth-store';
 import { useLanguageStore } from '@/store/language-store';
 import { cn } from '@/lib/utils';
 
@@ -45,7 +45,7 @@ const overlayVariants = {
   hidden: { opacity: 0 },
   visible: { opacity: 1 },
   exit: { opacity: 0 },
-};
+} as const;
 
 const modalVariants = {
   hidden: { opacity: 0, scale: 0.92, y: 20 },
@@ -61,12 +61,12 @@ const modalVariants = {
     y: 10,
     transition: { duration: 0.15 },
   },
-};
+} as const;
 
 const messageVariants = {
   hidden: { opacity: 0, y: 8 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.2 } },
-};
+} as const;
 
 /* ─── Component ───────────────────────────────────────────────────── */
 export function AIAssistantModal() {
@@ -74,8 +74,6 @@ export function AIAssistantModal() {
   const activeCompany = useAuthStore((s) => s.activeCompany);
   const aiAssistantOpen = useAuthStore((s) => s.aiAssistantOpen);
   const setAiAssistantOpen = useAuthStore((s) => s.setAiAssistantOpen);
-  const setPendingRule = useAuthStore((s) => s.setPendingRule);
-  const setCurrentView = useAuthStore((s) => s.setCurrentView);
 
   const [mode, setMode] = useState<AssistantMode>('chat');
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -138,7 +136,6 @@ export function AIAssistantModal() {
     try {
       const res = await fetch('/api/ai-assistant', {
         method: 'POST',
-        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: trimmed, mode: 'chat' }),
       });
@@ -178,7 +175,6 @@ export function AIAssistantModal() {
     try {
       const res = await fetch('/api/ai-assistant', {
         method: 'POST',
-        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: trimmed, mode: 'create-rule' }),
       });
@@ -201,23 +197,69 @@ export function AIAssistantModal() {
     }
   }, [ruleInput, isLoading, t]);
 
-  /* ─── Save Rule → Navigate to BankRules page with pre-filled data ─── */
-  const handleSaveRule = useCallback(() => {
-    if (!parsedRule) return;
+  /* ─── Save Rule ───────────────────────────────────────────────── */
+  const handleSaveRule = useCallback(async () => {
+    if (!parsedRule || !activeCompany) return;
 
-    const pending: PendingRule = {
-      name: parsedRule.name,
-      conditionType: parsedRule.conditionType,
-      conditionValue: parsedRule.conditionValue,
-      transactionDirection: parsedRule.transactionDirection,
-      glAccountName: parsedRule.glAccountName,
-      priority: parsedRule.priority,
-    };
+    setIsLoading(true);
+    setError('');
 
-    setPendingRule(pending);
-    setAiAssistantOpen(false);
-    setCurrentView('bank-rules');
-  }, [parsedRule, setPendingRule, setAiAssistantOpen, setCurrentView]);
+    try {
+      // First, find the GL account by name
+      const accountsRes = await fetch(
+        `/api/accounts?companyId=${activeCompany.id}`
+      );
+      if (!accountsRes.ok) {
+        setError(t('aiAssistant.error'));
+        setIsLoading(false);
+        return;
+      }
+
+      const accountsData = await accountsRes.json();
+      const accounts = accountsData.data ?? accountsData ?? [];
+      const glAccount = accounts.find(
+        (a: { name: string }) =>
+          a.name.toLowerCase() === parsedRule.glAccountName.toLowerCase()
+      );
+
+      if (!glAccount) {
+        setError(
+          `No se encontró la cuenta "${parsedRule.glAccountName}". Por favor, verifica el nombre en tu Plan de Cuentas.`
+        );
+        setIsLoading(false);
+        return;
+      }
+
+      // Create the rule via bank-rules API
+      const ruleRes = await fetch('/api/bank-rules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId: activeCompany.id,
+          name: parsedRule.name,
+          conditionType: parsedRule.conditionType,
+          conditionValue: parsedRule.conditionValue,
+          transactionDirection: parsedRule.transactionDirection,
+          glAccountId: glAccount.id,
+          priority: parsedRule.priority,
+          isActive: true,
+        }),
+      });
+
+      if (ruleRes.ok || ruleRes.status === 201) {
+        setParsedRule(null);
+        setRuleInput('');
+        setRuleReply(t('aiAssistant.ruleCreated'));
+      } else {
+        const errData = await ruleRes.json();
+        setError(errData.error || t('aiAssistant.error'));
+      }
+    } catch {
+      setError(t('aiAssistant.error'));
+    } finally {
+      setIsLoading(false);
+    }
+  }, [parsedRule, activeCompany, t]);
 
   /* ─── Key Handlers ────────────────────────────────────────────── */
   const handleChatKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -627,9 +669,14 @@ function RuleView({
               <div className="border-t border-white/10 px-4 py-3">
                 <Button
                   onClick={handleSaveRule}
-                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-white gap-2"
+                  disabled={isLoading}
+                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-white"
                 >
-                  <FilePlus2 className="size-4" />
+                  {isLoading ? (
+                    <Loader2 className="size-4 animate-spin mr-2" />
+                  ) : (
+                    <Save className="size-4 mr-2" />
+                  )}
                   {t('aiAssistant.saveRuleButton')}
                 </Button>
               </div>

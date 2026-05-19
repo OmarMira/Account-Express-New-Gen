@@ -21,7 +21,6 @@ model User {
   companyMemberships    CompanyMember[]
   reconciliationPeriods ReconciliationPeriod[] @relation("ReconUser")
   auditLogs             AuditLog[]
-  sessions              Session[]
 }
 
 model Company {
@@ -92,7 +91,7 @@ model BankAccount {
   accountNo   String?
   routingNo   String?
   glAccountId String
-  balance     Int      @default(0)
+  balance     Float    @default(0)
   currency    String   @default("USD")
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
@@ -110,10 +109,10 @@ model BankStatement {
   bankAccountId String
   startDate     DateTime
   endDate       DateTime
-  openingBalance Int
-  closingBalance Int
-  totalCredits  Int      @default(0)
-  totalDebits   Int      @default(0)
+  openingBalance Float
+  closingBalance Float
+  totalCredits  Float    @default(0)
+  totalDebits   Float    @default(0)
   format        String   // csv | ofx | qfx | pdf
   fileName      String?
   createdAt     DateTime @default(now())
@@ -128,13 +127,11 @@ model BankTransaction {
   statementId     String
   date            DateTime
   description     String
-  amount          Int
+  amount          Float
   reference       String?
   isReconciled    Boolean   @default(false)
-  isIgnored       Boolean   @default(false)
   glAccountId     String?
   matchedRuleId   String?
-  journalEntryId  String?
   reconciledAt    DateTime?
   reconciliationPeriodId String?
   createdAt       DateTime  @default(now())
@@ -143,7 +140,6 @@ model BankTransaction {
   statement             BankStatement          @relation(fields: [statementId], references: [id], onDelete: Cascade)
   glAccount             GlAccount?             @relation(fields: [glAccountId], references: [id])
   matchedRule           BankRule?              @relation(fields: [matchedRuleId], references: [id])
-  journalEntry          JournalEntry?          @relation(fields: [journalEntryId], references: [id])
   reconciliationPeriod  ReconciliationPeriod?  @relation(fields: [reconciliationPeriodId], references: [id])
 }
 
@@ -152,9 +148,9 @@ model ReconciliationPeriod {
   companyId       String
   bankAccountId   String
   userId          String
-  statementBalance Int    @default(0)
-  bookBalance     Int     @default(0)
-  difference      Int     @default(0)
+  statementBalance Float   @default(0)
+  bookBalance     Float    @default(0)
+  difference      Float    @default(0)
   status          String   @default("open") // open | completed | cancelled
   startedAt       DateTime @default(now())
   completedAt     DateTime?
@@ -194,15 +190,12 @@ model JournalEntry {
   date        DateTime
   description String
   reference   String?
-  status        String   @default("draft") // draft | posted | void
-  hash          String?
-  previousHash  String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  status      String   @default("draft") // draft | posted | void
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   company Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
   lines   JournalLine[]
-  transactions BankTransaction[]
 
   @@index([companyId, date])
 }
@@ -212,8 +205,8 @@ model JournalLine {
   entryId     String
   glAccountId String
   description String?
-  debit       Int      @default(0)
-  credit      Int      @default(0)
+  debit       Float    @default(0)
+  credit      Float    @default(0)
 
   entry     JournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
   glAccount GlAccount    @relation(fields: [glAccountId], references: [id])
@@ -240,26 +233,12 @@ model AuditLog {
   action    String
   entity    String
   entityId  String?
-  details       String?
-  hash          String?
-  previousHash  String?
-  createdAt     DateTime @default(now())
+  details   String?
+  createdAt DateTime @default(now())
 
   company Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
   user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([companyId])
   @@index([createdAt])
-}
-
-model Session {
-  id        String   @id @default(cuid())
-  token     String   @unique
-  userId    String
-  createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([token])
-  @@index([userId])
 }

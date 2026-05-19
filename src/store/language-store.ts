@@ -14,11 +14,7 @@ export const useLanguageStore = create<LanguageState>()(
     (set, get) => ({
       language: 'es' as Locale,
 
-      setLanguage: (lang: Locale) => {
-        const localeTranslations = translations[lang] as Record<string, unknown>;
-        const newT = (key: string): string => getTranslation(localeTranslations, key, key);
-        set({ language: lang, t: newT });
-      },
+      setLanguage: (lang: Locale) => set({ language: lang }),
 
       t: (key: string): string => {
         const { language } = get();

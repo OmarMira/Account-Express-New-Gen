@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
-import { toDollars } from '@/lib/money';
 
 /**
  * GET /api/export/pdf?type=trial_balance|transactions|reconciliation&companyId=xxx&...
@@ -10,7 +9,7 @@ import { toDollars } from '@/lib/money';
  */
 export async function GET(request: NextRequest) {
   try {
-    const userId = await getSessionUserId(request);
+    const userId = getSessionUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -231,15 +230,15 @@ async function generateTrialBalanceHTML(
           ? entry.debitTotal - entry.creditTotal
           : entry.creditTotal - entry.debitTotal;
 
-      if (Math.abs(netBalance) < 1) continue;
+      if (Math.abs(netBalance) < 0.005) continue;
 
       rows += `<tr>
         <td><code>${entry.code}</code></td>
         <td>${entry.name}</td>
         <td>${entry.accountType}</td>
-        <td class="num">${toDollars(entry.debitTotal).toFixed(2)}</td>
-        <td class="num">${toDollars(entry.creditTotal).toFixed(2)}</td>
-        <td class="num">${toDollars(netBalance).toFixed(2)}</td>
+        <td class="num">${entry.debitTotal.toFixed(2)}</td>
+        <td class="num">${entry.creditTotal.toFixed(2)}</td>
+        <td class="num">${netBalance.toFixed(2)}</td>
       </tr>`;
       totalDebit += entry.debitTotal;
       totalCredit += entry.creditTotal;
@@ -247,8 +246,8 @@ async function generateTrialBalanceHTML(
 
     rows += `<tr class="total-row">
       <td></td><td></td><td>TOTALS</td>
-      <td class="num">${toDollars(totalDebit).toFixed(2)}</td>
-      <td class="num">${toDollars(totalCredit).toFixed(2)}</td>
+      <td class="num">${totalDebit.toFixed(2)}</td>
+      <td class="num">${totalCredit.toFixed(2)}</td>
       <td></td>
     </tr>`;
   }
@@ -309,8 +308,8 @@ async function generateTransactionsHTML(
           <td><code>${line.glAccount.code}</code></td>
           <td>${line.glAccount.name}</td>
           <td>${line.description || '—'}</td>
-          <td class="num">${toDollars(line.debit || 0).toFixed(2)}</td>
-          <td class="num">${toDollars(line.credit || 0).toFixed(2)}</td>
+          <td class="num">${(line.debit || 0).toFixed(2)}</td>
+          <td class="num">${(line.credit || 0).toFixed(2)}</td>
         </tr>`;
       }
     }
@@ -376,7 +375,7 @@ async function generateReconciliationHTML(
       rows += `<tr>
         <td>${t.date.toISOString().split('T')[0]}</td>
         <td>${t.description}</td>
-        <td class="num">${toDollars(t.amount).toFixed(2)}</td>
+        <td class="num">${t.amount.toFixed(2)}</td>
         <td>${t.reference || '—'}</td>
         <td>${t.glAccount ? `${t.glAccount.code} — ${t.glAccount.name}` : '—'}</td>
         <td><span class="badge ${badgeClass}">${badgeText}</span></td>
@@ -392,12 +391,12 @@ async function generateReconciliationHTML(
     <div style="background: #d1fae5; padding: 1rem; border-radius: 0.5rem; flex: 1;">
       <div style="font-size: 0.75rem; color: #065f46;">Reconciled</div>
       <div style="font-size: 1.5rem; font-weight: 700; color: #065f46;">${reconciled.length}</div>
-      <div style="font-size: 0.75rem; color: #065f46;">$${toDollars(reconciledTotal).toFixed(2)}</div>
+      <div style="font-size: 0.75rem; color: #065f46;">$${reconciledTotal.toFixed(2)}</div>
     </div>
     <div style="background: #fee2e2; padding: 1rem; border-radius: 0.5rem; flex: 1;">
       <div style="font-size: 0.75rem; color: #991b1b;">Unreconciled</div>
       <div style="font-size: 1.5rem; font-weight: 700; color: #991b1b;">${unreconciled.length}</div>
-      <div style="font-size: 0.75rem; color: #991b1b;">$${toDollars(unreconciledTotal).toFixed(2)}</div>
+      <div style="font-size: 0.75rem; color: #991b1b;">$${unreconciledTotal.toFixed(2)}</div>
     </div>
   </div>`;
 

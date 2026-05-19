@@ -1,59 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
-import { computeAuditHash } from '@/lib/journal-hash';
-import { verifyCompanyAccess } from '@/lib/verify-access';
-import { toDollars } from '@/lib/money';
-
-// Helper to create HMAC-chained audit log
-async function createChainedAuditLog(data: {
-  companyId: string;
-  userId: string;
-  action: string;
-  entity: string;
-  entityId: string | null;
-  details: string | null;
-}) {
-  const lastAudit = await db.auditLog.findFirst({
-    where: { hash: { not: null } },
-    orderBy: { createdAt: 'desc' },
-    select: { hash: true },
-  });
-
-  const createdAudit = await db.auditLog.create({
-    data: {
-      companyId: data.companyId,
-      userId: data.userId,
-      action: data.action,
-      entity: data.entity,
-      entityId: data.entityId,
-      details: data.details,
-      previousHash: lastAudit?.hash ?? null,
-    },
-  });
-
-  const auditHash = computeAuditHash({
-    id: createdAudit.id,
-    companyId: data.companyId,
-    userId: data.userId,
-    action: data.action,
-    entity: data.entity,
-    entityId: data.entityId,
-    details: data.details,
-    previousHash: lastAudit?.hash ?? null,
-  });
-
-  await db.auditLog.update({
-    where: { id: createdAudit.id },
-    data: { hash: auditHash },
-  });
-}
 
 // ─── POST /api/reconciliation/periods ─────────────────────────────
 // Create, complete, or cancel a reconciliation period.
 // Body: { companyId, bankAccountId, action: 'start'|'complete'|'cancel', periodId?, notes? }
 export async function POST(request: NextRequest) {
-  const userId = await getSessionUserId(request);
+  const userId = getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -69,10 +22,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fail-Fast: Verify access
-    const access = await verifyCompanyAccess(userId, companyId);
-    if (!access.ok) {
-      return NextResponse.json({ error: access.error }, { status: 403 });
+    // Verify access
+    const membership = await db.companyMember.findUnique({
+      where: { userId_companyId: { userId, companyId } },
+    });
+    if (!membership) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     // Verify bank account
@@ -138,21 +93,18 @@ export async function POST(request: NextRequest) {
           },
         });
 
-        await createChainedAuditLog({
-          companyId,
-          userId,
-          action: 'start_reconciliation_period',
-          entity: 'ReconciliationPeriod',
-          entityId: period.id,
-          details: JSON.stringify({ bankAccountId, statementBalance: stmtBalance, bookBalance, difference: stmtBalance - bookBalance }),
+        await db.auditLog.create({
+          data: {
+            companyId,
+            userId,
+            action: 'start_reconciliation_period',
+            entity: 'ReconciliationPeriod',
+            entityId: period.id,
+            details: JSON.stringify({ bankAccountId, statementBalance: stmtBalance, bookBalance, difference: stmtBalance - bookBalance }),
+          },
         });
 
-        return NextResponse.json({ success: true, period: {
-          ...period,
-          statementBalance: toDollars(period.statementBalance),
-          bookBalance: toDollars(period.bookBalance),
-          difference: toDollars(period.difference),
-        } });
+        return NextResponse.json({ success: true, period });
       }
 
       case 'complete': {
@@ -205,21 +157,18 @@ export async function POST(request: NextRequest) {
           },
         });
 
-        await createChainedAuditLog({
-          companyId,
-          userId,
-          action: 'complete_reconciliation_period',
-          entity: 'ReconciliationPeriod',
-          entityId: periodId,
-          details: JSON.stringify({ statementBalance: stmtBalance, bookBalance, difference: stmtBalance - bookBalance }),
+        await db.auditLog.create({
+          data: {
+            companyId,
+            userId,
+            action: 'complete_reconciliation_period',
+            entity: 'ReconciliationPeriod',
+            entityId: periodId,
+            details: JSON.stringify({ statementBalance: stmtBalance, bookBalance, difference: stmtBalance - bookBalance }),
+          },
         });
 
-        return NextResponse.json({ success: true, period: {
-          ...updated,
-          statementBalance: toDollars(updated.statementBalance),
-          bookBalance: toDollars(updated.bookBalance),
-          difference: toDollars(updated.difference),
-        } });
+        return NextResponse.json({ success: true, period: updated });
       }
 
       case 'cancel': {
@@ -245,21 +194,17 @@ export async function POST(request: NextRequest) {
           data: { status: 'cancelled', completedAt: new Date() },
         });
 
-        await createChainedAuditLog({
-          companyId,
-          userId,
-          action: 'cancel_reconciliation_period',
-          entity: 'ReconciliationPeriod',
-          entityId: periodId,
-          details: null,
+        await db.auditLog.create({
+          data: {
+            companyId,
+            userId,
+            action: 'cancel_reconciliation_period',
+            entity: 'ReconciliationPeriod',
+            entityId: periodId,
+          },
         });
 
-        return NextResponse.json({ success: true, period: {
-          ...updated,
-          statementBalance: toDollars(updated.statementBalance),
-          bookBalance: toDollars(updated.bookBalance),
-          difference: toDollars(updated.difference),
-        } });
+        return NextResponse.json({ success: true, period: updated });
       }
 
       default:
@@ -280,7 +225,7 @@ export async function POST(request: NextRequest) {
 // ─── GET /api/reconciliation/periods ──────────────────────────────
 // Get reconciliation history for a bank account.
 export async function GET(request: NextRequest) {
-  const userId = await getSessionUserId(request);
+  const userId = getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -296,10 +241,11 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Fail-Fast: Verify access
-  const access = await verifyCompanyAccess(userId, companyId);
-  if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: 403 });
+  const membership = await db.companyMember.findUnique({
+    where: { userId_companyId: { userId, companyId } },
+  });
+  if (!membership) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   const periods = await db.reconciliationPeriod.findMany({
@@ -318,9 +264,6 @@ export async function GET(request: NextRequest) {
       ...p,
       startedAt: p.startedAt.toISOString(),
       completedAt: p.completedAt?.toISOString() ?? null,
-      statementBalance: toDollars(p.statementBalance),
-      bookBalance: toDollars(p.bookBalance),
-      difference: toDollars(p.difference),
       transactionCount: p.transactions.length,
       transactions: undefined,
     })),

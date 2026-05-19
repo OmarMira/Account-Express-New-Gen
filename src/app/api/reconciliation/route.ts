@@ -1,18 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
-import { recalculateBankAccountBalance } from '@/lib/reconciliation';
-import { computeEntryHash, computeAuditHash } from '@/lib/journal-hash';
-import { verifyCompanyAccess } from '@/lib/verify-access';
-import { isDateInLockedPeriod } from '@/lib/fiscal-period';
-import { toDollars } from '@/lib/money';
 
 // ─── GET /api/reconciliation ───────────────────────────────────────
 // Get reconciliation data for a bank account with filters.
 // Query params: bankAccountId (required), companyId (required)
 // Optional: startDate, endDate, status (all|unreconciled|reconciled), search, statementId, showReconciled
 export async function GET(request: NextRequest) {
-  const userId = await getSessionUserId(request);
+  const userId = getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -33,10 +28,12 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Fail-Fast: Verify access
-  const access = await verifyCompanyAccess(userId, companyId);
-  if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: 403 });
+  // Verify access
+  const membership = await db.companyMember.findUnique({
+    where: { userId_companyId: { userId, companyId } },
+  });
+  if (!membership) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   // Get bank account with GL account info
@@ -79,14 +76,10 @@ export async function GET(request: NextRequest) {
   // Status filter
   if (statusFilter === 'unreconciled') {
     txWhere.isReconciled = false;
-    txWhere.isIgnored = false;
   } else if (statusFilter === 'reconciled') {
     txWhere.isReconciled = true;
-    txWhere.isIgnored = false;
-  } else if (statusFilter === 'ignored') {
-    txWhere.isIgnored = true;
   }
-  // 'all' = no filter (shows everything including ignored)
+  // 'all' = no filter
 
   // Statement filter
   if (statementId) {
@@ -125,15 +118,12 @@ export async function GET(request: NextRequest) {
     },
   });
 
-  // Get overall counts (all statements, no date/search filter, excluding ignored)
+  // Get overall counts (all statements, no date/search filter)
   const reconciledCount = await db.bankTransaction.count({
-    where: { statementId: { in: statementIds }, isReconciled: true, isIgnored: false },
-  });
-  const ignoredCount = await db.bankTransaction.count({
-    where: { statementId: { in: statementIds }, isIgnored: true },
+    where: { statementId: { in: statementIds }, isReconciled: true },
   });
   const totalTransactions = await db.bankTransaction.count({
-    where: { statementId: { in: statementIds }, isIgnored: false },
+    where: { statementId: { in: statementIds } },
   });
 
   // Calculate book balance from GL account journal lines
@@ -155,17 +145,8 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Recalculate bank account balance from reconciled transactions
-  await recalculateBankAccountBalance(bankAccountId);
-
-  // Re-fetch bank account to get updated balance
-  const updatedBankAccount = await db.bankAccount.findUnique({
-    where: { id: bankAccountId },
-    select: { balance: true },
-  });
-
-  // Statement balance = bank account balance (running balance of reconciled transactions)
-  const statementBalance = updatedBankAccount?.balance ?? 0;
+  // Statement balance
+  const statementBalance = latestStatement?.closingBalance ?? bankAccount.balance;
   const difference = statementBalance - bookBalance;
 
   // Categorize transactions
@@ -195,19 +176,17 @@ export async function GET(request: NextRequest) {
       id: bankAccount.id,
       accountName: bankAccount.accountName,
       bankName: bankAccount.bankName,
-      balance: toDollars(updatedBankAccount?.balance ?? bankAccount.balance),
+      balance: bankAccount.balance,
       currency: bankAccount.currency,
       glAccount: bankAccount.glAccount,
     },
     latestStatement: latestStatement
-      ? { ...latestStatement, endDate: latestStatement.endDate.toISOString(), closingBalance: toDollars(latestStatement.closingBalance) }
+      ? { ...latestStatement, endDate: latestStatement.endDate.toISOString() }
       : null,
     statements: statements.map((s) => ({
       ...s,
       startDate: s.startDate.toISOString(),
       endDate: s.endDate.toISOString(),
-      openingBalance: toDollars(s.openingBalance),
-      closingBalance: toDollars(s.closingBalance),
     })),
     openPeriod,
     recentPeriods: recentPeriods.map((p) => ({
@@ -216,27 +195,24 @@ export async function GET(request: NextRequest) {
       completedAt: p.completedAt?.toISOString() ?? null,
     })),
     summary: {
-      statementBalance: toDollars(statementBalance),
-      bookBalance: toDollars(bookBalance),
-      difference: toDollars(difference),
+      statementBalance,
+      bookBalance,
+      difference,
       totalTransactions,
       reconciledCount,
-      ignoredCount,
       unreconciledCount: totalTransactions - reconciledCount,
-      depositsTotal: toDollars(depositsTotal),
-      paymentsTotal: toDollars(paymentsTotal),
+      depositsTotal,
+      paymentsTotal,
       filteredCount: transactions.length,
     },
     deposits: deposits.map((tx) => ({
       ...tx,
-      amount: toDollars(tx.amount),
       date: tx.date.toISOString(),
       createdAt: tx.createdAt.toISOString(),
       reconciledAt: tx.reconciledAt?.toISOString() ?? null,
     })),
     payments: payments.map((tx) => ({
       ...tx,
-      amount: toDollars(tx.amount),
       date: tx.date.toISOString(),
       createdAt: tx.createdAt.toISOString(),
       reconciledAt: tx.reconciledAt?.toISOString() ?? null,
@@ -249,7 +225,7 @@ export async function GET(request: NextRequest) {
 // Can optionally create journal entries.
 // Body: { companyId, bankAccountId, transactions: [{ id, glAccountId }], createJournalEntries?: boolean, periodId?: string }
 export async function POST(request: NextRequest) {
-  const userId = await getSessionUserId(request);
+  const userId = getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -278,10 +254,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fail-Fast: Verify access
-    const access = await verifyCompanyAccess(userId, companyId);
-    if (!access.ok) {
-      return NextResponse.json({ error: access.error }, { status: 403 });
+    // Verify access
+    const membership = await db.companyMember.findUnique({
+      where: { userId_companyId: { userId, companyId } },
+    });
+    if (!membership) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     // Verify bank account with GL account info
@@ -317,12 +295,17 @@ export async function POST(request: NextRequest) {
           reconciledAt: new Date(),
         };
 
-        if (txn.glAccountId) {
+        // If splits are provided, we use the first split's GL account as the main one for the bank transaction record
+        const mainGlId = txn.splits && txn.splits.length > 0 
+          ? txn.splits[0].glAccountId 
+          : txn.glAccountId;
+
+        if (mainGlId) {
           const glAccount = await tx.glAccount.findFirst({
-            where: { id: txn.glAccountId, companyId },
+            where: { id: mainGlId, companyId },
           });
           if (glAccount) {
-            updateData.glAccountId = txn.glAccountId;
+            updateData.glAccountId = mainGlId;
           }
         }
 
@@ -337,23 +320,50 @@ export async function POST(request: NextRequest) {
 
         // Create journal entry if requested
         if (createJournalEntries) {
-          // Check fiscal period lock for this transaction date
-          const txDateLocked = await isDateInLockedPeriod(companyId, bankTx.date);
-          if (txDateLocked) continue; // Skip locked period transactions
+          const amount = Math.abs(bankTx.amount);
+          const isDeposit = bankTx.amount > 0;
+          const description = `Reconciliation: ${bankTx.description}`;
 
-          const targetGlId = txn.glAccountId || bankTx.glAccountId;
-          if (targetGlId) {
-            const amount = Math.abs(bankTx.amount);
-            const debitAccountId = bankTx.amount > 0
-              ? bankAccount.glAccountId
-              : targetGlId;
-            const creditAccountId = bankTx.amount > 0
-              ? targetGlId
-              : bankAccount.glAccountId;
+          // Case 1: Splits provided
+          if (txn.splits && txn.splits.length > 0) {
+            const lines = [];
+            
+            // The bank side line
+            lines.push({
+              glAccountId: bankAccount.glAccountId,
+              description,
+              debit: isDeposit ? amount : 0,
+              credit: isDeposit ? 0 : amount,
+            });
 
-            const description = `Reconciliation: ${bankTx.description}`;
+            // The split side lines
+            for (const split of txn.splits) {
+              const splitAmount = Math.abs(split.amount);
+              lines.push({
+                glAccountId: split.glAccountId,
+                description: split.description || description,
+                debit: isDeposit ? 0 : splitAmount,
+                credit: isDeposit ? splitAmount : 0,
+              });
+            }
 
-            const journalEntry = await tx.journalEntry.create({
+            await tx.journalEntry.create({
+              data: {
+                companyId,
+                date: bankTx.date,
+                description,
+                status: 'posted',
+                lines: { create: lines },
+              },
+            });
+            journalEntriesCreated++;
+          } 
+          // Case 2: No splits, but glAccountId provided
+          else if (mainGlId) {
+            const debitAccountId = isDeposit ? bankAccount.glAccountId : mainGlId;
+            const creditAccountId = isDeposit ? mainGlId : bankAccount.glAccountId;
+
+            await tx.journalEntry.create({
               data: {
                 companyId,
                 date: bankTx.date,
@@ -367,42 +377,6 @@ export async function POST(request: NextRequest) {
                 },
               },
             });
-
-            // HMAC hash for the journal entry
-            const lastPostedRecon = await tx.journalEntry.findFirst({
-              where: {
-                companyId,
-                status: 'posted',
-                createdAt: { lt: journalEntry.createdAt },
-                hash: { not: null },
-              },
-              orderBy: { createdAt: 'desc' },
-              select: { hash: true },
-            });
-
-            const entryHash = computeEntryHash({
-              id: journalEntry.id,
-              companyId,
-              date: bankTx.date.toISOString(),
-              description,
-              reference: null,
-              status: 'posted',
-              totalDebit: amount,
-              totalCredit: amount,
-              previousHash: lastPostedRecon?.hash ?? null,
-            });
-
-            await tx.journalEntry.update({
-              where: { id: journalEntry.id },
-              data: { hash: entryHash, previousHash: lastPostedRecon?.hash ?? null },
-            });
-
-            // Save journal entry ID back to the transaction
-            await tx.bankTransaction.update({
-              where: { id: txn.id },
-              data: { journalEntryId: journalEntry.id },
-            });
-
             journalEntriesCreated++;
           }
         }
@@ -422,49 +396,20 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    // Recalculate bank account balance after reconciliation
-    await recalculateBankAccountBalance(bankAccountId);
-
-    // Audit log with HMAC chain
-    const lastAudit = await db.auditLog.findFirst({
-      where: { hash: { not: null } },
-      orderBy: { createdAt: 'desc' },
-      select: { hash: true },
-    });
-
-    const auditDetails = JSON.stringify({
-      bankAccountId,
-      count: reconciledCount,
-      journalEntriesCreated,
-      periodId,
-    });
-
-    const createdAudit = await db.auditLog.create({
+    // Audit log
+    await db.auditLog.create({
       data: {
         companyId,
         userId,
         action: 'reconcile_transactions',
         entity: 'BankTransaction',
-        details: auditDetails,
-        previousHash: lastAudit?.hash ?? null,
+        details: JSON.stringify({
+          bankAccountId,
+          count: reconciledCount,
+          journalEntriesCreated,
+          periodId,
+        }),
       },
-    });
-
-    // Compute hash with actual ID and update
-    const auditHash = computeAuditHash({
-      id: createdAudit.id,
-      companyId,
-      userId,
-      action: 'reconcile_transactions',
-      entity: 'BankTransaction',
-      entityId: null,
-      details: auditDetails,
-      previousHash: lastAudit?.hash ?? null,
-    });
-
-    await db.auditLog.update({
-      where: { id: createdAudit.id },
-      data: { hash: auditHash },
     });
 
     return NextResponse.json({

@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { verifyPassword, hashPassword } from '@/lib/auth';
 import { getSessionUserId } from '@/lib/sessions';
-import { computeAuditHash } from '@/lib/journal-hash';
 
 /**
  * POST /api/settings/password — Change user password
@@ -10,7 +9,7 @@ import { computeAuditHash } from '@/lib/journal-hash';
  */
 export async function POST(request: NextRequest) {
   try {
-    const userId = await getSessionUserId(request);
+    const userId = getSessionUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -58,20 +57,15 @@ export async function POST(request: NextRequest) {
       data: { passwordHash: newHash },
     });
 
-    // Log audit (HMAC-chained)
-    const lastAudit = await db.auditLog.findFirst({
-      where: { hash: { not: null } },
-      orderBy: { createdAt: 'desc' },
-      select: { hash: true },
+    // Log audit
+    await db.auditLog.create({
+      data: {
+        userId,
+        action: 'change_password',
+        entity: 'User',
+        entityId: userId,
+      },
     });
-    const auditDetails = 'Password changed';
-    const createdAudit = await db.auditLog.create({
-      data: { userId, action: 'change_password', entity: 'User', entityId: userId, details: auditDetails, previousHash: lastAudit?.hash ?? null },
-    });
-    const auditHash = computeAuditHash({
-      id: createdAudit.id, companyId: null, userId, action: 'change_password', entity: 'User', entityId: userId, details: auditDetails, previousHash: lastAudit?.hash ?? null,
-    });
-    await db.auditLog.update({ where: { id: createdAudit.id }, data: { hash: auditHash } });
 
     return NextResponse.json({ message: 'Password changed successfully' });
   } catch (error) {

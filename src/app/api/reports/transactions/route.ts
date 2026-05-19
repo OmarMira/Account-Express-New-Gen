@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
-import { toDollars } from '@/lib/money';
 
 export async function GET(request: NextRequest) {
   try {
-    const userId = await getSessionUserId(request);
+    const userId = getSessionUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -104,11 +103,11 @@ export async function GET(request: NextRequest) {
           accountName: l.glAccount.name,
           accountType: l.glAccount.accountType,
           description: l.description,
-          debit: toDollars(l.debit),
-          credit: toDollars(l.credit),
+          debit: l.debit,
+          credit: l.credit,
         })),
-        _totalDebit: toDollars(totalDebit),
-        _totalCredit: toDollars(totalCredit),
+        _totalDebit: Math.round(totalDebit * 100) / 100,
+        _totalCredit: Math.round(totalCredit * 100) / 100,
       };
     });
 

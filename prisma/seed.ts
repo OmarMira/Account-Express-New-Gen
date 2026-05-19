@@ -165,8 +165,8 @@ async function seedSampleJournalEntries(companyId: string, accountIdMap: Map<str
       reference: 'JE-001',
       status: 'posted',
       lines: [
-        { accountCode: '1010', debit: 5000000, credit: 0 },
-        { accountCode: '3010', debit: 0, credit: 5000000 },
+        { accountCode: '1010', debit: 50000, credit: 0 },
+        { accountCode: '3010', debit: 0, credit: 50000 },
       ],
     },
     {
@@ -175,8 +175,8 @@ async function seedSampleJournalEntries(companyId: string, accountIdMap: Map<str
       reference: 'JE-002',
       status: 'posted',
       lines: [
-        { accountCode: '6010', debit: 250000, credit: 0 },
-        { accountCode: '1010', debit: 0, credit: 250000 },
+        { accountCode: '6010', debit: 2500, credit: 0 },
+        { accountCode: '1010', debit: 0, credit: 2500 },
       ],
     },
     {
@@ -185,8 +185,8 @@ async function seedSampleJournalEntries(companyId: string, accountIdMap: Map<str
       reference: 'JE-003',
       status: 'posted',
       lines: [
-        { accountCode: '1010', debit: 1250000, credit: 0 },
-        { accountCode: '4010', debit: 0, credit: 1250000 },
+        { accountCode: '1010', debit: 12500, credit: 0 },
+        { accountCode: '4010', debit: 0, credit: 12500 },
       ],
     },
     {
@@ -195,8 +195,8 @@ async function seedSampleJournalEntries(companyId: string, accountIdMap: Map<str
       reference: 'JE-004',
       status: 'posted',
       lines: [
-        { accountCode: '1110', debit: 350000, credit: 0 },
-        { accountCode: '1010', debit: 0, credit: 350000 },
+        { accountCode: '1110', debit: 3500, credit: 0 },
+        { accountCode: '1010', debit: 0, credit: 3500 },
       ],
     },
     {
@@ -205,10 +205,10 @@ async function seedSampleJournalEntries(companyId: string, accountIdMap: Map<str
       reference: 'JE-005',
       status: 'posted',
       lines: [
-        { accountCode: '6030', debit: 800000, credit: 0 },
-        { accountCode: '6040', debit: 61200, credit: 0 },
-        { accountCode: '2120', debit: 0, credit: 61200 },
-        { accountCode: '1010', debit: 0, credit: 800000 },
+        { accountCode: '6030', debit: 8000, credit: 0 },
+        { accountCode: '6040', debit: 612, credit: 0 },
+        { accountCode: '2120', debit: 0, credit: 612 },
+        { accountCode: '1010', debit: 0, credit: 8000 },
       ],
     },
     {
@@ -217,8 +217,8 @@ async function seedSampleJournalEntries(companyId: string, accountIdMap: Map<str
       reference: 'JE-006',
       status: 'posted',
       lines: [
-        { accountCode: '1010', debit: 750000, credit: 0 },
-        { accountCode: '1020', debit: 0, credit: 750000 },
+        { accountCode: '1010', debit: 7500, credit: 0 },
+        { accountCode: '1020', debit: 0, credit: 7500 },
       ],
     },
   ];

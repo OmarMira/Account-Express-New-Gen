@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
-import { computeEntryHash, computeAuditHash } from '@/lib/journal-hash';
-import { verifyCompanyAccess } from '@/lib/verify-access';
-import { isDateInLockedPeriod } from '@/lib/fiscal-period';
-import { toCents, toDollars, isBalanced } from '@/lib/money';
 
 // ─── GET /api/journal/[id] ──────────────────────────────────────────
 // Get a single journal entry with all lines and GL account info.
@@ -12,7 +8,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const userId = await getSessionUserId(request);
+  const userId = getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -43,10 +39,12 @@ export async function GET(
     return NextResponse.json({ error: 'Entry not found' }, { status: 404 });
   }
 
-  // Fail-Fast: Verify access
-  const access = await verifyCompanyAccess(userId, entry.companyId);
-  if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: 403 });
+  // Verify user has access
+  const membership = await db.companyMember.findUnique({
+    where: { userId_companyId: { userId, companyId: entry.companyId } },
+  });
+  if (!membership) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   return NextResponse.json({
@@ -54,11 +52,6 @@ export async function GET(
     date: entry.date.toISOString(),
     createdAt: entry.createdAt.toISOString(),
     updatedAt: entry.updatedAt.toISOString(),
-    lines: entry.lines.map(l => ({
-      ...l,
-      debit: toDollars(l.debit),
-      credit: toDollars(l.credit),
-    })),
   });
 }
 
@@ -68,7 +61,7 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const userId = await getSessionUserId(request);
+  const userId = getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -93,10 +86,12 @@ export async function PUT(
       );
     }
 
-    // Verify access — Fail-Fast (admin required for updates)
-    const access = await verifyCompanyAccess(userId, existing.companyId, 'admin');
-    if (!access.ok) {
-      return NextResponse.json({ error: access.error }, { status: 403 });
+    // Verify access
+    const membership = await db.companyMember.findUnique({
+      where: { userId_companyId: { userId, companyId: existing.companyId } },
+    });
+    if (!membership) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const body = await request.json();
@@ -138,12 +133,12 @@ export async function PUT(
         }
       }
 
-      const totalDebitCents = lines.reduce((sum: number, l: { debit: number }) => sum + toCents(l.debit), 0);
-      const totalCreditCents = lines.reduce((sum: number, l: { credit: number }) => sum + toCents(l.credit), 0);
+      const totalDebits = lines.reduce((sum: number, l: { debit: number }) => sum + l.debit, 0);
+      const totalCredits = lines.reduce((sum: number, l: { credit: number }) => sum + l.credit, 0);
 
-      if (!isBalanced(totalDebitCents, totalCreditCents)) {
+      if (Math.abs(totalDebits - totalCredits) > 0.005) {
         return NextResponse.json(
-          { error: `Entry must balance. Total debits ($${toDollars(totalDebitCents).toFixed(2)}) must equal total credits ($${toDollars(totalCreditCents).toFixed(2)})` },
+          { error: `Entry must balance. Total debits (${totalDebits.toFixed(2)}) must equal total credits (${totalCredits.toFixed(2)})` },
           { status: 400 }
         );
       }
@@ -176,8 +171,8 @@ export async function PUT(
               create: lines.map((l: { glAccountId: string; description?: string; debit: number; credit: number }) => ({
                 glAccountId: l.glAccountId,
                 description: l.description || null,
-                debit: toCents(l.debit),
-                credit: toCents(l.credit),
+                debit: l.debit,
+                credit: l.credit,
               })),
             },
           }),
@@ -207,11 +202,6 @@ export async function PUT(
       date: updated.date.toISOString(),
       createdAt: updated.createdAt.toISOString(),
       updatedAt: updated.updatedAt.toISOString(),
-      lines: updated.lines.map(l => ({
-        ...l,
-        debit: toDollars(l.debit),
-        credit: toDollars(l.credit),
-      })),
     });
   } catch (error) {
     console.error('[JOURNAL UPDATE ERROR]', error);
@@ -229,7 +219,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const userId = await getSessionUserId(request);
+  const userId = getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -246,10 +236,12 @@ export async function POST(
       return NextResponse.json({ error: 'Entry not found' }, { status: 404 });
     }
 
-    // Verify access — Fail-Fast (admin required for post/void)
-    const postAccess = await verifyCompanyAccess(userId, entry.companyId, 'admin');
-    if (!postAccess.ok) {
-      return NextResponse.json({ error: postAccess.error }, { status: 403 });
+    // Verify access
+    const membership = await db.companyMember.findUnique({
+      where: { userId_companyId: { userId, companyId: entry.companyId } },
+    });
+    if (!membership) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const body = await request.json();
@@ -263,93 +255,31 @@ export async function POST(
         );
       }
 
-      // Check fiscal period lock
-      const dateLockedPost = await isDateInLockedPeriod(entry.companyId, entry.date);
-      if (dateLockedPost) {
-        return NextResponse.json(
-          { error: 'Cannot post journal entries in a locked fiscal period' },
-          { status: 403 }
-        );
-      }
-
-      // Post with HMAC in transaction
-      const updated = await db.$transaction(async (tx) => {
-        const lastPosted = await tx.journalEntry.findFirst({
-          where: {
-            companyId: entry.companyId,
-            status: 'posted',
-            createdAt: { lt: entry.createdAt },
-            hash: { not: null },
-          },
-          orderBy: { createdAt: 'desc' },
-          select: { hash: true },
-        });
-
-        const totalDebit = entry.lines.reduce((s, l) => s + l.debit, 0);
-        const totalCredit = entry.lines.reduce((s, l) => s + l.credit, 0);
-
-        const hash = computeEntryHash({
-          id: entry.id,
-          companyId: entry.companyId,
-          date: entry.date.toISOString(),
-          description: entry.description,
-          reference: entry.reference,
-          status: 'posted',
-          totalDebit,
-          totalCredit,
-          previousHash: lastPosted?.hash ?? null,
-        });
-
-        return tx.journalEntry.update({
-          where: { id },
-          data: { status: 'posted', hash, previousHash: lastPosted?.hash ?? null },
-          include: {
-            lines: {
-              include: {
-                glAccount: {
-                  select: {
-                    id: true,
-                    code: true,
-                    name: true,
-                    accountType: true,
-                    normalBalance: true,
-                  },
+      const updated = await db.journalEntry.update({
+        where: { id },
+        data: { status: 'posted' },
+        include: {
+          lines: {
+            include: {
+              glAccount: {
+                select: {
+                  id: true,
+                  code: true,
+                  name: true,
+                  accountType: true,
+                  normalBalance: true,
                 },
               },
             },
           },
-        });
-      });
-
-      // Audit log for post action
-      const lastPostAudit = await db.auditLog.findFirst({
-        where: { hash: { not: null } },
-        orderBy: { createdAt: 'desc' },
-        select: { hash: true },
-      });
-      const postAuditDetails = JSON.stringify({ journalEntryId: id, action: 'post', date: entry.date.toISOString(), description: entry.description });
-      const createdPostAudit = await db.auditLog.create({
-        data: {
-          companyId: entry.companyId, userId, action: 'post_journal_entry', entity: 'JournalEntry',
-          entityId: id, details: postAuditDetails, previousHash: lastPostAudit?.hash ?? null,
         },
       });
-      const postAuditHash = computeAuditHash({
-        id: createdPostAudit.id, companyId: entry.companyId, userId, action: 'post_journal_entry', entity: 'JournalEntry',
-        entityId: id, details: postAuditDetails, previousHash: lastPostAudit?.hash ?? null,
-      });
-      await db.auditLog.update({ where: { id: createdPostAudit.id }, data: { hash: postAuditHash } });
 
       return NextResponse.json({
         ...updated,
         date: updated.date.toISOString(),
         createdAt: updated.createdAt.toISOString(),
         updatedAt: updated.updatedAt.toISOString(),
-        lines: updated.lines.map(l => ({
-          ...l,
-          debit: toDollars(l.debit),
-          credit: toDollars(l.credit),
-        })),
       });
     }
 
@@ -381,35 +311,11 @@ export async function POST(
         },
       });
 
-      // Audit log for void action
-      const lastVoidAudit = await db.auditLog.findFirst({
-        where: { hash: { not: null } },
-        orderBy: { createdAt: 'desc' },
-        select: { hash: true },
-      });
-      const voidAuditDetails = JSON.stringify({ journalEntryId: id, action: 'void', date: entry.date.toISOString(), description: entry.description });
-      const createdVoidAudit = await db.auditLog.create({
-        data: {
-          companyId: entry.companyId, userId, action: 'void_journal_entry', entity: 'JournalEntry',
-          entityId: id, details: voidAuditDetails, previousHash: lastVoidAudit?.hash ?? null,
-        },
-      });
-      const voidAuditHash = computeAuditHash({
-        id: createdVoidAudit.id, companyId: entry.companyId, userId, action: 'void_journal_entry', entity: 'JournalEntry',
-        entityId: id, details: voidAuditDetails, previousHash: lastVoidAudit?.hash ?? null,
-      });
-      await db.auditLog.update({ where: { id: createdVoidAudit.id }, data: { hash: voidAuditHash } });
-
       return NextResponse.json({
         ...updated,
         date: updated.date.toISOString(),
         createdAt: updated.createdAt.toISOString(),
         updatedAt: updated.updatedAt.toISOString(),
-        lines: updated.lines.map(l => ({
-          ...l,
-          debit: toDollars(l.debit),
-          credit: toDollars(l.credit),
-        })),
       });
     }
 

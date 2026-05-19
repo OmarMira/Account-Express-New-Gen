@@ -1,22 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { hashPassword } from '@/lib/auth';
-import { createSession } from '@/lib/sessions';
-import { checkRateLimit } from '@/lib/rate-limit';
+import { sessionStore } from '@/lib/sessions';
 
 // ─── POST /api/auth/register ──────────────────────────────────────────
 export async function POST(request: NextRequest) {
   try {
-    // Rate limiting
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';
-    const rateResult = checkRateLimit(ip, 'register');
-    if (!rateResult.allowed) {
-      return NextResponse.json(
-        { error: 'Too many registration attempts. Please try again later.', retryAfterMs: rateResult.retryAfterMs },
-        { status: 429 }
-      );
-    }
-
     const body = await request.json();
     const { email, password, firstName, lastName, companyName, taxId } = body;
 
@@ -91,7 +80,8 @@ export async function POST(request: NextRequest) {
     });
 
     // Create session token
-    const token = await createSession(result.user.id);
+    const token = crypto.randomUUID();
+    sessionStore.set(token, { userId: result.user.id, createdAt: Date.now() });
 
     const response = NextResponse.json({
       user: {
@@ -113,7 +103,7 @@ export async function POST(request: NextRequest) {
     // Set httpOnly cookie
     response.cookies.set('session', token, {
       httpOnly: true,
-      secure: true,
+      secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       path: '/',
       maxAge: 7 * 24 * 60 * 60, // 7 days

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
-import { toDollars } from '@/lib/money';
 
 /**
  * GET /api/export/csv?type=trial_balance|transactions|reconciliation&companyId=xxx&...
@@ -9,7 +8,7 @@ import { toDollars } from '@/lib/money';
  */
 export async function GET(request: NextRequest) {
   try {
-    const userId = await getSessionUserId(request);
+    const userId = getSessionUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -120,15 +119,15 @@ async function generateTrialBalanceCSV(
         ? entry.debitTotal - entry.creditTotal
         : entry.creditTotal - entry.debitTotal;
 
-    if (Math.abs(netBalance) < 1) continue;
+    if (Math.abs(netBalance) < 0.005) continue;
 
     rows.push([
       entry.code,
       `"${entry.name}"`,
       entry.accountType,
-      toDollars(entry.debitTotal).toFixed(2),
-      toDollars(entry.creditTotal).toFixed(2),
-      toDollars(netBalance).toFixed(2),
+      entry.debitTotal.toFixed(2),
+      entry.creditTotal.toFixed(2),
+      netBalance.toFixed(2),
     ]);
 
     totalDebit += entry.debitTotal;
@@ -136,7 +135,7 @@ async function generateTrialBalanceCSV(
   }
 
   rows.push([]);
-  rows.push(['', 'TOTALS', '', toDollars(totalDebit).toFixed(2), toDollars(totalCredit).toFixed(2), '']);
+  rows.push(['', 'TOTALS', '', totalDebit.toFixed(2), totalCredit.toFixed(2), '']);
 
   const dateStr = asOfDate.toISOString().split('T')[0];
   return {
@@ -187,8 +186,8 @@ async function generateTransactionsCSV(
         line.glAccount.code,
         `"${line.glAccount.name}"`,
         line.description ? `"${line.description}"` : '',
-        toDollars(line.debit || 0).toFixed(2),
-        toDollars(line.credit || 0).toFixed(2),
+        (line.debit || 0).toFixed(2),
+        (line.credit || 0).toFixed(2),
       ]);
     }
   }
@@ -228,7 +227,7 @@ async function generateReconciliationCSV(
     rows.push([
       t.date.toISOString().split('T')[0],
       `"${t.description}"`,
-      toDollars(t.amount).toFixed(2),
+      t.amount.toFixed(2),
       t.reference || '',
       t.glAccount ? `${t.glAccount.code} - ${t.glAccount.name}` : '',
       t.isReconciled ? 'Yes' : 'No',

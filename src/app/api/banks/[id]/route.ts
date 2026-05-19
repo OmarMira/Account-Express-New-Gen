@@ -1,16 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
-import { verifyCompanyAccess } from '@/lib/verify-access';
-import { computeAuditHash } from '@/lib/journal-hash';
-import { toCents, toDollars } from '@/lib/money';
 
 // ─── GET /api/banks/[id]?companyId=xxx ──────────────────────────────────
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const userId = await getSessionUserId(request);
+  const userId = getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -24,12 +21,6 @@ export async function GET(
       { error: 'companyId is required' },
       { status: 400 }
     );
-  }
-
-  // Verify access
-  const access = await verifyCompanyAccess(userId, companyId);
-  if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: 403 });
   }
 
   try {
@@ -70,11 +61,7 @@ export async function GET(
     return NextResponse.json({
       account: {
         ...account,
-        balance: toDollars(account.balance),
-        recentTransactions: recentTransactions.map(tx => ({
-          ...tx,
-          amount: toDollars(tx.amount),
-        })),
+        recentTransactions,
       },
     });
   } catch (error) {
@@ -91,7 +78,7 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const userId = await getSessionUserId(request);
+  const userId = getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -119,10 +106,12 @@ export async function PUT(
       );
     }
 
-    // Verify admin access
-    const access = await verifyCompanyAccess(userId, companyId, 'admin');
-    if (!access.ok) {
-      return NextResponse.json({ error: access.error }, { status: 403 });
+    // Verify membership
+    const membership = await db.companyMember.findUnique({
+      where: { userId_companyId: { userId, companyId } },
+    });
+    if (!membership) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     // Check account exists
@@ -164,7 +153,7 @@ export async function PUT(
     if (accountNo !== undefined) updateData.accountNo = accountNo?.trim() || null;
     if (routingNo !== undefined) updateData.routingNo = routingNo?.trim() || null;
     if (glAccountId !== undefined) updateData.glAccountId = glAccountId;
-    if (balance !== undefined) updateData.balance = toCents(parseFloat(balance) || 0);
+    if (balance !== undefined) updateData.balance = parseFloat(balance) || 0;
     if (currency !== undefined) updateData.currency = currency;
     if (isActive !== undefined) updateData.isActive = isActive;
 
@@ -178,26 +167,7 @@ export async function PUT(
       },
     });
 
-    // Audit log with HMAC chain
-    const lastAudit = await db.auditLog.findFirst({
-      where: { hash: { not: null } },
-      orderBy: { createdAt: 'desc' },
-      select: { hash: true },
-    });
-    const auditDetails = JSON.stringify({ bankAccountId: id, changes: updateData });
-    const createdAudit = await db.auditLog.create({
-      data: {
-        companyId, userId, action: 'update_bank_account', entity: 'BankAccount',
-        entityId: id, details: auditDetails, previousHash: lastAudit?.hash ?? null,
-      },
-    });
-    const auditHash = computeAuditHash({
-      id: createdAudit.id, companyId, userId, action: 'update_bank_account', entity: 'BankAccount',
-      entityId: id, details: auditDetails, previousHash: lastAudit?.hash ?? null,
-    });
-    await db.auditLog.update({ where: { id: createdAudit.id }, data: { hash: auditHash } });
-
-    return NextResponse.json({ account: { ...account, balance: toDollars(account.balance) } });
+    return NextResponse.json({ account });
   } catch (error) {
     console.error('[BANK UPDATE ERROR]', error);
     return NextResponse.json(
@@ -212,7 +182,7 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const userId = await getSessionUserId(request);
+  const userId = getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -230,10 +200,12 @@ export async function DELETE(
       );
     }
 
-    // Verify admin access
-    const access = await verifyCompanyAccess(userId, companyId, 'admin');
-    if (!access.ok) {
-      return NextResponse.json({ error: access.error }, { status: 403 });
+    // Verify membership
+    const membership = await db.companyMember.findUnique({
+      where: { userId_companyId: { userId, companyId } },
+    });
+    if (!membership) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     // Soft delete: set isActive = false
@@ -252,25 +224,6 @@ export async function DELETE(
       where: { id },
       data: { isActive: false },
     });
-
-    // Audit log with HMAC chain
-    const lastAudit = await db.auditLog.findFirst({
-      where: { hash: { not: null } },
-      orderBy: { createdAt: 'desc' },
-      select: { hash: true },
-    });
-    const auditDetails = JSON.stringify({ bankAccountId: id, accountName: account.accountName, bankName: account.bankName });
-    const createdAudit = await db.auditLog.create({
-      data: {
-        companyId, userId, action: 'deactivate_bank_account', entity: 'BankAccount',
-        entityId: id, details: auditDetails, previousHash: lastAudit?.hash ?? null,
-      },
-    });
-    const auditHash = computeAuditHash({
-      id: createdAudit.id, companyId, userId, action: 'deactivate_bank_account', entity: 'BankAccount',
-      entityId: id, details: auditDetails, previousHash: lastAudit?.hash ?? null,
-    });
-    await db.auditLog.update({ where: { id: createdAudit.id }, data: { hash: auditHash } });
 
     return NextResponse.json({ success: true });
   } catch (error) {

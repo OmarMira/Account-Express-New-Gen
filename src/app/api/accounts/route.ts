@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
-import { verifyCompanyAccess } from '@/lib/verify-access';
-import { computeAuditHash } from '@/lib/journal-hash';
 
 // ─── GET /api/accounts?companyId=xxx&accountType=xxx&search=xxx ─────────
 export async function GET(request: NextRequest) {
-  const userId = await getSessionUserId(request);
+  const userId = getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -62,7 +60,7 @@ export async function GET(request: NextRequest) {
 
 // ─── POST /api/accounts ────────────────────────────────────────────────
 export async function POST(request: NextRequest) {
-  const userId = await getSessionUserId(request);
+  const userId = getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -77,12 +75,6 @@ export async function POST(request: NextRequest) {
         { error: 'companyId, code, name, accountType, and normalBalance are required' },
         { status: 400 }
       );
-    }
-
-    // Verify admin access
-    const access = await verifyCompanyAccess(userId, companyId, 'admin');
-    if (!access.ok) {
-      return NextResponse.json({ error: access.error }, { status: 403 });
     }
 
     // Validate accountType
@@ -152,25 +144,6 @@ export async function POST(request: NextRequest) {
         },
       },
     });
-
-    // Audit log with HMAC chain
-    const lastAudit = await db.auditLog.findFirst({
-      where: { hash: { not: null } },
-      orderBy: { createdAt: 'desc' },
-      select: { hash: true },
-    });
-    const auditDetails = JSON.stringify({ code: account.code, name: account.name, accountType, normalBalance, parentId: parentId || null });
-    const createdAudit = await db.auditLog.create({
-      data: {
-        companyId, userId, action: 'create_account', entity: 'GlAccount',
-        entityId: account.id, details: auditDetails, previousHash: lastAudit?.hash ?? null,
-      },
-    });
-    const auditHash = computeAuditHash({
-      id: createdAudit.id, companyId, userId, action: 'create_account', entity: 'GlAccount',
-      entityId: account.id, details: auditDetails, previousHash: lastAudit?.hash ?? null,
-    });
-    await db.auditLog.update({ where: { id: createdAudit.id }, data: { hash: auditHash } });
 
     return NextResponse.json({ account }, { status: 201 });
   } catch (error) {

@@ -33,16 +33,13 @@ export type ViewName =
   | 'users'
   | 'onboarding'
   | 'movement-summary'
-  | 'backup';
-
-export interface PendingRule {
-  name: string;
-  conditionType: string;
-  conditionValue: string;
-  transactionDirection: string;
-  glAccountName: string;
-  priority: number;
-}
+  | 'financial-dashboard'
+  | 'backup'
+  | 'admin-companies'
+  | 'admin-company-detail'
+  | 'admin-users'
+  | 'admin-audit-logs'
+  | 'admin-dashboard';
 
 interface AuthState {
   user: User | null;
@@ -51,14 +48,14 @@ interface AuthState {
   currentView: ViewName;
   sidebarOpen: boolean;
   aiAssistantOpen: boolean;
-  pendingRule: PendingRule | null;
+  adminSelectedCompanyId: string | null;
   login: (user: User) => void;
   logout: () => void;
   setActiveCompany: (company: Company) => void;
   setCurrentView: (view: ViewName) => void;
   setSidebarOpen: (open: boolean) => void;
   setAiAssistantOpen: (open: boolean) => void;
-  setPendingRule: (rule: PendingRule | null) => void;
+  setAdminSelectedCompanyId: (id: string | null) => void;
   hydrate: () => Promise<void>;
 }
 
@@ -71,7 +68,7 @@ export const useAuthStore = create<AuthState>()(
       currentView: 'landing' as ViewName,
       sidebarOpen: true,
       aiAssistantOpen: false,
-      pendingRule: null,
+      adminSelectedCompanyId: null,
 
       login: (user: User) =>
         set({
@@ -88,7 +85,7 @@ export const useAuthStore = create<AuthState>()(
           currentView: 'landing',
           sidebarOpen: true,
           aiAssistantOpen: false,
-          pendingRule: null,
+          adminSelectedCompanyId: null,
         }),
 
       setActiveCompany: (company: Company) =>
@@ -100,7 +97,8 @@ export const useAuthStore = create<AuthState>()(
 
       setAiAssistantOpen: (open: boolean) => set({ aiAssistantOpen: open }),
 
-      setPendingRule: (rule: PendingRule | null) => set({ pendingRule: rule }),
+      setAdminSelectedCompanyId: (id: string | null) =>
+        set({ adminSelectedCompanyId: id }),
 
       hydrate: async () => {
         try {
@@ -131,6 +129,7 @@ export const useAuthStore = create<AuthState>()(
         activeCompany: state.activeCompany,
         currentView: state.currentView,
         sidebarOpen: state.sidebarOpen,
+        adminSelectedCompanyId: state.adminSelectedCompanyId,
       }),
     }
   )

@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
-import { toDollars } from '@/lib/money';
 
 export async function GET(request: NextRequest) {
   try {
-    const userId = await getSessionUserId(request);
+    const userId = getSessionUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -74,15 +73,15 @@ export async function GET(request: NextRequest) {
         id: bankAccount.id,
         accountName: bankAccount.accountName,
         bankName: bankAccount.bankName,
-        balance: toDollars(bankAccount.balance),
+        balance: bankAccount.balance,
         currency: bankAccount.currency,
       },
       summary: {
         totalTransactions: transactions.length,
         reconciledCount: reconciled.length,
         unreconciledCount: unreconciled.length,
-        reconciledTotal: toDollars(reconciledTotal),
-        unreconciledTotal: toDollars(unreconciledTotal),
+        reconciledTotal: Math.round(reconciledTotal * 100) / 100,
+        unreconciledTotal: Math.round(unreconciledTotal * 100) / 100,
         reconciledPercentage:
           transactions.length > 0
             ? Math.round((reconciled.length / transactions.length) * 100)
@@ -92,7 +91,7 @@ export async function GET(request: NextRequest) {
         id: t.id,
         date: t.date.toISOString(),
         description: t.description,
-        amount: toDollars(t.amount),
+        amount: t.amount,
         reference: t.reference,
         glAccount: t.glAccount
           ? { id: t.glAccount.id, code: t.glAccount.code, name: t.glAccount.name }
@@ -102,7 +101,7 @@ export async function GET(request: NextRequest) {
         id: t.id,
         date: t.date.toISOString(),
         description: t.description,
-        amount: toDollars(t.amount),
+        amount: t.amount,
         reference: t.reference,
         glAccount: t.glAccount
           ? { id: t.glAccount.id, code: t.glAccount.code, name: t.glAccount.name }

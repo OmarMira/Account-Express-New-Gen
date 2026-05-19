@@ -54,7 +54,7 @@ import {
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLanguageStore } from '@/store/language-store';
-import { useAuthStore, type PendingRule } from '@/store/auth-store';
+import { useAuthStore } from '@/store/auth-store';
 import { AccountSelector, type GlAccountOption } from '@/components/spa/journal/AccountSelector';
 
 /* ─── Types ─── */
@@ -186,8 +186,6 @@ function getConditionPreview(form: RuleForm, t: (k: string) => string): string {
 export function BankRulesPage() {
   const t = useLanguageStore((s) => s.t);
   const activeCompany = useAuthStore((s) => s.activeCompany);
-  const pendingRule = useAuthStore((s) => s.pendingRule);
-  const setPendingRule = useAuthStore((s) => s.setPendingRule);
 
   const [rules, setRules] = useState<BankRule[]>([]);
   const [loading, setLoading] = useState(true);
@@ -215,8 +213,7 @@ export function BankRulesPage() {
     if (!activeCompany?.id) return;
     try {
       const res = await fetch(
-        `/api/journal/accounts?companyId=${activeCompany.id}`,
-        { credentials: 'include' }
+        `/api/journal/accounts?companyId=${activeCompany.id}`
       );
       if (res.ok) {
         const data = await res.json();
@@ -232,7 +229,9 @@ export function BankRulesPage() {
     if (!activeCompany?.id) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/bank-rules?companyId=${activeCompany.id}`, { credentials: 'include' });
+      const res = await fetch(
+        `/api/bank-rules?companyId=${activeCompany.id}`
+      );
       if (res.ok) {
         const data = await res.json();
         setRules(data.data ?? []);
@@ -248,27 +247,6 @@ export function BankRulesPage() {
     fetchAccounts();
     fetchRules();
   }, [fetchAccounts, fetchRules]);
-
-  // Open create modal pre-filled from AI assistant
-  useEffect(() => {
-    if (pendingRule && accounts.length > 0) {
-      const matchedAccount = accounts.find(
-        (a) => a.name.toLowerCase() === pendingRule.glAccountName.toLowerCase()
-      );
-      setForm({
-        name: pendingRule.name,
-        conditionType: pendingRule.conditionType || 'contains',
-        conditionValue: pendingRule.conditionValue,
-        transactionDirection: pendingRule.transactionDirection || 'any',
-        glAccountId: matchedAccount?.id ?? null,
-        priority: pendingRule.priority ?? 10,
-        isActive: true,
-      });
-      setEditingRule(null);
-      setModalOpen(true);
-      setPendingRule(null);
-    }
-  }, [pendingRule, accounts, setPendingRule]);
 
   // Toggle sort direction
   const toggleSort = () => {
@@ -315,7 +293,6 @@ export function BankRulesPage() {
 
       const res = await fetch(url, {
         method,
-        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
@@ -337,7 +314,6 @@ export function BankRulesPage() {
     try {
       await fetch(`/api/bank-rules/${rule.id}`, {
         method: 'PUT',
-        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isActive: !rule.isActive }),
       });
@@ -354,7 +330,6 @@ export function BankRulesPage() {
     try {
       const res = await fetch(`/api/bank-rules/${deletingRule.id}`, {
         method: 'DELETE',
-        credentials: 'include',
       });
       if (res.ok) {
         setDeleteDialogOpen(false);
@@ -376,7 +351,6 @@ export function BankRulesPage() {
     try {
       const res = await fetch('/api/bank-rules/apply-all', {
         method: 'POST',
-        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ companyId: activeCompany.id }),
       });

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Users,
   UserPlus,
@@ -106,36 +106,32 @@ export function UsersPage() {
   const companyId = activeCompany?.id;
   const isAdmin = user?.role === 'super_admin' || user?.role === 'company_admin';
 
-  useEffect(() => {
+  const fetchUsers = useCallback(async () => {
     if (!isAdmin) {
-      // Defer setState to avoid synchronous setState in effect
-      const id = requestAnimationFrame(() => {
-        setAccessDenied(true);
-        setLoading(false);
-      });
-      return () => cancelAnimationFrame(id);
+      setAccessDenied(true);
+      setLoading(false);
+      return;
     }
     if (!companyId) {
-      const id = requestAnimationFrame(() => setLoading(false));
-      return () => cancelAnimationFrame(id);
+      setLoading(false);
+      return;
     }
-    let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
-    (async () => {
-      try {
-        const res = await fetch(`/api/users?companyId=${companyId}`, { credentials: 'include' });
-        if (res.ok && !cancelled) {
-          const data = await res.json();
-          setUsers(data.users || []);
-        } else if (res.status === 403 && !cancelled) {
-          setAccessDenied(true);
-        }
-      } catch { /* ignore */ }
-      if (!cancelled) setLoading(false);
-    })();
-    return () => { cancelled = true; };
+    try {
+      const res = await fetch(`/api/users?companyId=${companyId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setUsers(data.users || []);
+      } else if (res.status === 403) {
+        setAccessDenied(true);
+      }
+    } catch { /* ignore */ }
+    setLoading(false);
   }, [companyId, isAdmin]);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
 
   async function handleInvite() {
     if (!activeCompany?.id) return;
@@ -158,7 +154,6 @@ export function UsersPage() {
     try {
       const res = await fetch('/api/users', {
         method: 'POST',
-        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           companyId: activeCompany.id,

@@ -16,12 +16,13 @@ import {
   CheckCircle2,
   XCircle,
   Loader2,
+  Activity,
 } from 'lucide-react';
 import {
   Bar,
   BarChart,
-  Line,
-  LineChart,
+  Area,
+  AreaChart,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -87,59 +88,26 @@ interface DashboardData {
     name: string;
     endDate: string;
   }[];
+  monthlyTrend?: { month: string; income: number; expenses: number }[];
 }
 
-/* ─── Demo / fallback data ─── */
-const DEMO_DATA: DashboardData = {
-  totalBankBalance: 48750.0,
-  bankAccountCount: 3,
-  totalAssets: 128500.0,
-  totalLiabilities: 32000.0,
-  totalEquity: 96500.0,
-  totalRevenue: 85400.0,
-  totalExpenses: 52300.0,
-  postedEntries: 42,
-  reconciledCount: 156,
-  unreconciledCount: 23,
-  recentTransactions: [
-    { id: '1', date: '2026-07-08T00:00:00Z', description: 'Client Payment - ABC Corp', amount: 12500, reference: 'TXN-001', isReconciled: true, glAccount: { name: 'Accounts Receivable' } },
-    { id: '2', date: '2026-07-07T00:00:00Z', description: 'Office Rent - July', amount: -3500, reference: 'TXN-002', isReconciled: true, glAccount: { name: 'Rent Expense' } },
-    { id: '3', date: '2026-07-06T00:00:00Z', description: 'Software Subscription', amount: -299, reference: 'TXN-003', isReconciled: false, glAccount: null },
-    { id: '4', date: '2026-07-05T00:00:00Z', description: 'Invoice #1042 - DEF LLC', amount: 8750, reference: 'TXN-004', isReconciled: true, glAccount: { name: 'Service Revenue' } },
-    { id: '5', date: '2026-07-04T00:00:00Z', description: 'Payroll - Biweekly', amount: -15000, reference: 'TXN-005', isReconciled: true, glAccount: { name: 'Salary Expense' } },
-    { id: '6', date: '2026-07-03T00:00:00Z', description: 'Utility Bill', amount: -450, reference: 'TXN-006', isReconciled: false, glAccount: { name: 'Utilities Expense' } },
-    { id: '7', date: '2026-07-02T00:00:00Z', description: 'Equipment Purchase', amount: -4200, reference: 'TXN-007', isReconciled: true, glAccount: { name: 'Equipment' } },
-    { id: '8', date: '2026-07-01T00:00:00Z', description: 'Client Retainer - GHI Inc', amount: 5000, reference: 'TXN-008', isReconciled: false, glAccount: null },
-    { id: '9', date: '2026-06-30T00:00:00Z', description: 'Bank Transfer', amount: -10000, reference: 'TXN-009', isReconciled: true, glAccount: { name: 'Cash' } },
-    { id: '10', date: '2026-06-29T00:00:00Z', description: 'Consulting Revenue', amount: 6800, reference: 'TXN-010', isReconciled: true, glAccount: { name: 'Consulting Revenue' } },
-  ],
-  accountBalances: [
-    { accountType: 'asset', balance: 128500 },
-    { accountType: 'liability', balance: -32000 },
-    { accountType: 'equity', balance: 96500 },
-    { accountType: 'revenue', balance: 85400 },
-    { accountType: 'expense', balance: -52300 },
-  ],
-  bankAccounts: [
-    { id: 'ba1', accountName: 'Operating Account', bankName: 'Chase Bank', balance: 32500, currency: 'USD' },
-    { id: 'ba2', accountName: 'Savings Account', bankName: 'Chase Bank', balance: 12500, currency: 'USD' },
-    { id: 'ba3', accountName: 'Payroll Account', bankName: 'Wells Fargo', balance: 3750, currency: 'USD' },
-  ],
-  upcomingPeriodEnds: [
-    { id: 'fp1', name: 'Q3 2026', endDate: '2026-09-30T23:59:59Z' },
-  ],
+/* ─── Empty fallback data ─── */
+const EMPTY_DATA: DashboardData = {
+  totalBankBalance: 0,
+  bankAccountCount: 0,
+  totalAssets: 0,
+  totalLiabilities: 0,
+  totalEquity: 0,
+  totalRevenue: 0,
+  totalExpenses: 0,
+  postedEntries: 0,
+  reconciledCount: 0,
+  unreconciledCount: 0,
+  recentTransactions: [],
+  accountBalances: [],
+  bankAccounts: [],
+  upcomingPeriodEnds: [],
 };
-
-// Monthly cash flow sample data
-const monthlyCashFlowData = [
-  { month: 'Jan', inflow: 42000, outflow: 35000 },
-  { month: 'Feb', inflow: 38000, outflow: 31000 },
-  { month: 'Mar', inflow: 55000, outflow: 40000 },
-  { month: 'Apr', inflow: 47000, outflow: 38000 },
-  { month: 'May', inflow: 51000, outflow: 42000 },
-  { month: 'Jun', inflow: 49000, outflow: 36000 },
-  { month: 'Jul', inflow: 53000, outflow: 44000 },
-];
 
 /* ─── Animation variants ─── */
 const containerVariants = {
@@ -148,30 +116,26 @@ const containerVariants = {
     opacity: 1,
     transition: { staggerChildren: 0.08 },
   },
-};
+} as const;
 
 const itemVariants = {
   hidden: { opacity: 0, y: 20 },
   show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: 'easeOut' } },
+} as const;
+
+/* ─── Chart configs ─── */
+const balanceChartConfig: ChartConfig = {
+  asset: { label: 'Assets', color: 'hsl(160, 60%, 45%)' },
+  liability: { label: 'Liabilities', color: 'hsl(38, 92%, 50%)' },
+  equity: { label: 'Equity', color: 'hsl(170, 60%, 41%)' },
+  revenue: { label: 'Revenue', color: 'hsl(152, 69%, 38%)' },
+  expense: { label: 'Expenses', color: 'hsl(350, 80%, 55%)' },
 };
 
-/* ─── Chart config helpers (labels set inside component via t()) ─── */
-function makeBalanceChartConfig(t: (k: string) => string): ChartConfig {
-  return {
-    asset: { label: t('accounts.assets'), color: 'hsl(160, 60%, 45%)' },
-    liability: { label: t('accounts.liabilities'), color: 'hsl(38, 92%, 50%)' },
-    equity: { label: t('accounts.equity'), color: 'hsl(170, 60%, 41%)' },
-    revenue: { label: t('accounts.revenue'), color: 'hsl(152, 69%, 38%)' },
-    expense: { label: t('accounts.expense'), color: 'hsl(350, 80%, 55%)' },
-  };
-}
-
-function makeCashFlowChartConfig(t: (k: string) => string): ChartConfig {
-  return {
-    inflow: { label: t('dashboard.inflow'), color: 'hsl(160, 60%, 45%)' },
-    outflow: { label: t('dashboard.outflow'), color: 'hsl(350, 80%, 55%)' },
-  };
-}
+const cashFlowChartConfig: ChartConfig = {
+  income: { label: 'Ingresos', color: 'hsl(217, 91%, 60%)' },
+  expenses: { label: 'Gastos', color: 'hsl(350, 80%, 55%)' },
+};
 
 /* ─── Stat Card ─── */
 interface StatCardProps {
@@ -181,10 +145,9 @@ interface StatCardProps {
   iconBg: string;
   trend?: 'up' | 'down';
   loading?: boolean;
-  vsLastPeriodLabel: string;
 }
 
-function StatCard({ title, value, icon, iconBg, trend, loading, vsLastPeriodLabel }: StatCardProps) {
+function StatCard({ title, value, icon, iconBg, trend, loading }: StatCardProps) {
   return (
     <motion.div variants={itemVariants}>
       <Card className="relative overflow-hidden">
@@ -218,7 +181,7 @@ function StatCard({ title, value, icon, iconBg, trend, loading, vsLastPeriodLabe
               >
                 {trend === 'up' ? '+' : '-'}12.5%
               </span>
-              <span className="text-muted-foreground">{vsLastPeriodLabel}</span>
+              <span className="text-muted-foreground">vs last period</span>
             </div>
           )}
         </CardContent>
@@ -254,8 +217,7 @@ export function DashboardPage() {
       }
     } catch {
       setError(true);
-      // Use demo data as fallback
-      setData(DEMO_DATA);
+      setData(EMPTY_DATA);
     } finally {
       setLoading(false);
     }
@@ -265,7 +227,7 @@ export function DashboardPage() {
     fetchDashboard();
   }, [fetchDashboard]);
 
-  const d = data ?? DEMO_DATA;
+  const d = data ?? EMPTY_DATA;
 
   // Transform account balances for the bar chart
   const balanceChartData = d.accountBalances.map((ab) => ({
@@ -297,7 +259,7 @@ export function DashboardPage() {
         {error && !loading && (
           <Badge variant="secondary" className="w-fit gap-1 text-amber-600 border-amber-300">
             <AlertTriangle className="size-3" />
-            {t('common.warning')} — {t('dashboard.demoData')}
+            {t('common.warning')} — Demo data
           </Badge>
         )}
       </motion.div>
@@ -311,7 +273,6 @@ export function DashboardPage() {
           iconBg="bg-emerald-100 dark:bg-emerald-950"
           trend="up"
           loading={loading}
-          vsLastPeriodLabel={t('dashboard.vsLastPeriod')}
         />
         <StatCard
           title={t('dashboard.totalLiabilities')}
@@ -320,7 +281,6 @@ export function DashboardPage() {
           iconBg="bg-amber-100 dark:bg-amber-950"
           trend="down"
           loading={loading}
-          vsLastPeriodLabel={t('dashboard.vsLastPeriod')}
         />
         <StatCard
           title={t('dashboard.currentRevenue')}
@@ -329,7 +289,6 @@ export function DashboardPage() {
           iconBg="bg-teal-100 dark:bg-teal-950"
           trend="up"
           loading={loading}
-          vsLastPeriodLabel={t('dashboard.vsLastPeriod')}
         />
         <StatCard
           title={t('dashboard.currentExpenses')}
@@ -337,7 +296,6 @@ export function DashboardPage() {
           icon={<ArrowDownRight className="size-5 text-rose-700" />}
           iconBg="bg-rose-100 dark:bg-rose-950"
           loading={loading}
-          vsLastPeriodLabel={t('dashboard.vsLastPeriod')}
         />
       </div>
 
@@ -401,7 +359,7 @@ export function DashboardPage() {
               {loading ? (
                 <Skeleton className="h-[280px] w-full" />
               ) : (
-                <ChartContainer config={makeBalanceChartConfig(t)} className="h-[280px] w-full">
+                <ChartContainer config={balanceChartConfig} className="h-[280px] w-full">
                   <BarChart data={balanceChartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="type" tickLine={false} axisLine={false} fontSize={12} />
@@ -419,37 +377,78 @@ export function DashboardPage() {
           </Card>
         </motion.div>
 
-        {/* Monthly Cash Flow */}
+        {/* Monthly Trend */}
         <motion.div variants={itemVariants}>
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('dashboard.monthlyTrend')}</CardTitle>
+          <Card className="border-primary/10 shadow-xl">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-7">
+              <CardTitle className="text-base font-bold">{t('dashboard.monthlyTrend')}</CardTitle>
+              <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                <div className="flex items-center gap-1.5">
+                  <div className="size-2 rounded-full bg-[#0071c5]" /> Ingresos
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="size-2 rounded-full bg-[#f43f5e]" /> Gastos
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              <ChartContainer config={makeCashFlowChartConfig(t)} className="h-[280px] w-full">
-                <LineChart data={monthlyCashFlowData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={12} />
-                  <YAxis tickLine={false} axisLine={false} fontSize={12} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Line
-                    type="monotone"
-                    dataKey="inflow"
-                    stroke="hsl(160, 60%, 45%)"
-                    strokeWidth={2}
-                    dot={{ r: 4 }}
-                    activeDot={{ r: 6 }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="outflow"
-                    stroke="hsl(350, 80%, 55%)"
-                    strokeWidth={2}
-                    dot={{ r: 4 }}
-                    activeDot={{ r: 6 }}
-                  />
-                </LineChart>
+              {d.monthlyTrend && d.monthlyTrend.length > 0 ? (
+              <ChartContainer config={cashFlowChartConfig} className="h-[280px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={d.monthlyTrend} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#0071c5" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#0071c5" stopOpacity={0}/>
+                      </linearGradient>
+                      <linearGradient id="colorExpenses" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#f43f5e" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--muted-foreground))" strokeOpacity={0.1} />
+                    <XAxis 
+                      dataKey="month" 
+                      tickLine={false} 
+                      axisLine={false} 
+                      fontSize={10} 
+                      fontWeight={600}
+                      tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                      dy={10}
+                    />
+                    <YAxis 
+                      tickLine={false} 
+                      axisLine={false} 
+                      fontSize={10} 
+                      fontWeight={600}
+                      tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                      tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} 
+                    />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Area
+                      type="monotone"
+                      dataKey="income"
+                      stroke="#0071c5"
+                      strokeWidth={3}
+                      fillOpacity={1}
+                      fill="url(#colorIncome)"
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="expenses"
+                      stroke="#f43f5e"
+                      strokeWidth={3}
+                      fillOpacity={1}
+                      fill="url(#colorExpenses)"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
               </ChartContainer>
+              ) : (
+                <div className="flex h-[280px] items-center justify-center text-sm text-muted-foreground">
+                  {t('common.noData') ?? 'Sin datos disponibles para el período'}
+                </div>
+              )}
             </CardContent>
           </Card>
         </motion.div>

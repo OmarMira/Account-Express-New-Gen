@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
-import { toDollars } from '@/lib/money';
 
 // ─── GET /api/import/history?companyId=xxx ────────────────────────────
 // List all bank statements (import history) for a company
 export async function GET(request: NextRequest) {
-  const userId = await getSessionUserId(request);
+  const userId = getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -64,10 +63,10 @@ export async function GET(request: NextRequest) {
           bankAccount: stmt.bankAccount,
           startDate: stmt.startDate,
           endDate: stmt.endDate,
-          openingBalance: toDollars(stmt.openingBalance),
-          closingBalance: toDollars(stmt.closingBalance),
-          totalCredits: toDollars(stmt.totalCredits),
-          totalDebits: toDollars(stmt.totalDebits),
+          openingBalance: stmt.openingBalance,
+          closingBalance: stmt.closingBalance,
+          totalCredits: stmt.totalCredits,
+          totalDebits: stmt.totalDebits,
           format: stmt.format,
           fileName: stmt.fileName,
           createdAt: stmt.createdAt,

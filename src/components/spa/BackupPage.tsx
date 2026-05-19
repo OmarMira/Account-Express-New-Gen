@@ -126,7 +126,7 @@ export function BackupPage() {
   const fetchBackups = useCallback(async () => {
     if (!companyId || !mountedRef.current) return;
     try {
-      const res = await fetch(`/api/backup?companyId=${companyId}`, { credentials: 'include' });
+      const res = await fetch(`/api/backup?companyId=${companyId}`);
       if (res.ok && mountedRef.current) {
         const data = await res.json();
         setBackups(data.backups || []);
@@ -151,7 +151,6 @@ export function BackupPage() {
     try {
       const res = await fetch('/api/backup', {
         method: 'POST',
-        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ companyId }),
       });
@@ -159,7 +158,7 @@ export function BackupPage() {
       if (res.ok) {
         const data = await res.json();
         toast.success(t('settings.backup.backupCreated'), {
-          description: `${formatFileSize(data.size)} — ${Object.values(data.recordCounts).reduce((a: number, b: number) => a + b, 0)} ${t('settings.backup.records')}`,
+          description: `${formatFileSize(data.size)} — ${(Object.values(data.recordCounts) as number[]).reduce((a, b) => a + b, 0)} ${t('settings.backup.records')}`,
         });
 
         // Auto-download the backup
@@ -195,8 +194,7 @@ export function BackupPage() {
     setDownloading(backup.id);
     try {
       const res = await fetch(
-        `/api/backup/${encodeURIComponent(backup.filename)}?companyId=${companyId}`,
-        { credentials: 'include' }
+        `/api/backup/${encodeURIComponent(backup.filename)}?companyId=${companyId}`
       );
       if (res.ok) {
         const data = await res.json();
@@ -226,7 +224,6 @@ export function BackupPage() {
     try {
       const res = await fetch('/api/backup', {
         method: 'DELETE',
-        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ companyId, filename }),
       });
@@ -259,7 +256,6 @@ export function BackupPage() {
       setRestoreProgress(50);
       const res = await fetch('/api/backup/restore', {
         method: 'POST',
-        credentials: 'include',
         body: formData,
       });
 
@@ -268,8 +264,8 @@ export function BackupPage() {
 
       if (res.ok) {
         setRestoreProgress(100);
-        const totalRecords = Object.values(data.restoredCounts).reduce(
-          (a: number, b: number) => a + b,
+        const totalRecords = (Object.values(data.restoredCounts) as number[]).reduce(
+          (a, b) => a + b,
           0
         );
         toast.success(t('settings.backup.restoreSuccess'), {
@@ -649,8 +645,8 @@ function BackupItem({
   onDelete: () => void;
   t: (key: string) => string;
 }) {
-  const totalRecords = Object.values(backup.recordCounts).reduce(
-    (a: number, b: number) => a + b,
+  const totalRecords = (Object.values(backup.recordCounts) as number[]).reduce(
+    (a, b) => a + b,
     0
   );
 

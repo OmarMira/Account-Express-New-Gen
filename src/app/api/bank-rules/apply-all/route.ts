@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
-import { verifyCompanyAccess } from '@/lib/verify-access';
-import { computeAuditHash } from '@/lib/journal-hash';
-import { toCents } from '@/lib/money';
 
 // Helper: check if a transaction matches a rule
 function transactionMatchesRule(
@@ -31,9 +28,9 @@ function transactionMatchesRule(
     case 'equals':
       return desc === val;
     case 'amount_greater':
-      return Math.abs(tx.amount) > toCents(Number(rule.conditionValue));
+      return Math.abs(tx.amount) > Number(rule.conditionValue);
     case 'amount_less':
-      return Math.abs(tx.amount) < toCents(Number(rule.conditionValue));
+      return Math.abs(tx.amount) < Number(rule.conditionValue);
     default:
       return false;
   }
@@ -45,7 +42,7 @@ function transactionMatchesRule(
 // First match wins per transaction.
 // Body: { companyId }
 export async function POST(request: NextRequest) {
-  const userId = await getSessionUserId(request);
+  const userId = getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -61,10 +58,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify admin access
-    const access = await verifyCompanyAccess(userId, companyId, 'admin');
-    if (!access.ok) {
-      return NextResponse.json({ error: access.error }, { status: 403 });
+    // Verify access
+    const membership = await db.companyMember.findUnique({
+      where: { userId_companyId: { userId, companyId } },
+    });
+    if (!membership) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     // Get all active rules sorted by priority
@@ -128,25 +127,6 @@ export async function POST(request: NextRequest) {
         });
       }
     }
-
-    // Audit log with HMAC chain
-    const lastAudit = await db.auditLog.findFirst({
-      where: { hash: { not: null } },
-      orderBy: { createdAt: 'desc' },
-      select: { hash: true },
-    });
-    const auditDetails = JSON.stringify({ totalMatched, total: unmatchedTransactions.length, rulesApplied: matchResults });
-    const createdAudit = await db.auditLog.create({
-      data: {
-        companyId, userId, action: 'apply_all_bank_rules', entity: 'BankRule',
-        entityId: null, details: auditDetails, previousHash: lastAudit?.hash ?? null,
-      },
-    });
-    const auditHash = computeAuditHash({
-      id: createdAudit.id, companyId, userId, action: 'apply_all_bank_rules', entity: 'BankRule',
-      entityId: null, details: auditDetails, previousHash: lastAudit?.hash ?? null,
-    });
-    await db.auditLog.update({ where: { id: createdAudit.id }, data: { hash: auditHash } });
 
     return NextResponse.json({
       success: true,

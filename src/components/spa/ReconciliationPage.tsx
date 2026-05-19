@@ -14,11 +14,11 @@ import {
   PlusCircle,
   FileText,
   Calendar,
-  Filter,
-  History,
-  BookOpen,
   X,
-  EyeOff,
+  Scissors,
+  History as HistoryIcon,
+  BookOpen,
+  Filter,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatCurrency, formatDate } from '@/lib/format';
@@ -115,7 +115,6 @@ interface ReconciliationSummary {
   totalTransactions: number;
   reconciledCount: number;
   unreconciledCount: number;
-  ignoredCount: number;
   depositsTotal: number;
   paymentsTotal: number;
   filteredCount: number;
@@ -170,7 +169,7 @@ export function ReconciliationPage() {
   const [loadingData, setLoadingData] = useState(false);
 
   // Filters
-  const [statusFilter, setStatusFilter] = useState<'unreconciled' | 'reconciled' | 'ignored' | 'all'>('unreconciled');
+  const [statusFilter, setStatusFilter] = useState<'unreconciled' | 'reconciled' | 'all'>('unreconciled');
   const [search, setSearch] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -182,6 +181,7 @@ export function ReconciliationPage() {
   // Selected transactions for reconciliation
   const [selectedTxIds, setSelectedTxIds] = useState<Set<string>>(new Set());
   const [txGlAssignments, setTxGlAssignments] = useState<Record<string, string>>({});
+  const [txSplits, setTxSplits] = useState<Record<string, { glAccountId: string; amount: number; description: string }[]>>({});
 
   // Dialogs
   const [autoMatchDialogOpen, setAutoMatchDialogOpen] = useState(false);
@@ -212,6 +212,10 @@ export function ReconciliationPage() {
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [historyPeriods, setHistoryPeriods] = useState<ReconPeriod[]>([]);
 
+  const [splitDialogOpen, setSplitDialogOpen] = useState(false);
+  const [splittingTx, setSplittingTx] = useState<Transaction | null>(null);
+  const [currentSplits, setCurrentSplits] = useState<{ glAccountId: string; amount: number; description: string }[]>([]);
+
   // Build query params
   const queryParams = useMemo(() => {
     const params = new URLSearchParams();
@@ -230,25 +234,23 @@ export function ReconciliationPage() {
     if (!activeCompany?.id) return;
     setLoadingAccounts(true);
     try {
-      const res = await fetch(`/api/banks?companyId=${activeCompany.id}`, {
-        credentials: 'include',
+      const res = await fetch('/api/dashboard', {
+        headers: { 'Content-Type': 'application/json' },
       });
       if (res.ok) {
         const data = await res.json();
-        const rawAccounts = data.accounts || [];
-        // Filter to active accounts only
-        const accounts = rawAccounts
-          .filter((ba: { isActive?: boolean }) => ba.isActive !== false)
-          .map((ba: { id: string; accountName: string; bankName: string }) => ({
+        if (data.bankAccounts) {
+          const accounts = data.bankAccounts.map((ba: { id: string; accountName: string; bankName: string }) => ({
             id: ba.id,
             accountName: ba.accountName,
             bankName: ba.bankName,
           }));
-        setBankAccounts(accounts);
-        // Auto-select the first bank account if none selected yet
-        if (initialAutoSelect && accounts.length > 0 && !selectedAccountId) {
-          setSelectedAccountId(accounts[0].id);
-          setInitialAutoSelect(false);
+          setBankAccounts(accounts);
+          // Auto-select the first bank account if none selected yet
+          if (initialAutoSelect && accounts.length > 0 && !selectedAccountId) {
+            setSelectedAccountId(accounts[0].id);
+            setInitialAutoSelect(false);
+          }
         }
       }
     } catch { /* ignore */ } finally {
@@ -260,7 +262,7 @@ export function ReconciliationPage() {
   const fetchAccounts = useCallback(async () => {
     if (!activeCompany?.id) return;
     try {
-      const res = await fetch(`/api/journal/accounts?companyId=${activeCompany.id}`, { credentials: 'include' });
+      const res = await fetch(`/api/journal/accounts?companyId=${activeCompany.id}`);
       if (res.ok) {
         const data = await res.json();
         setAccounts(data.data ?? data);
@@ -275,7 +277,7 @@ export function ReconciliationPage() {
     setSelectedTxIds(new Set());
     setTxGlAssignments({});
     try {
-      const res = await fetch(`/api/reconciliation?${queryParams}`, { credentials: 'include' });
+      const res = await fetch(`/api/reconciliation?${queryParams}`);
       if (res.ok) {
         const data = await res.json();
         setBankAccountInfo(data.bankAccount);
@@ -338,6 +340,12 @@ export function ReconciliationPage() {
       }
       return { ...prev, [txId]: glId };
     });
+    // Remove splits if manual GL is selected
+    setTxSplits((prev) => {
+      const next = { ...prev };
+      delete next[txId];
+      return next;
+    });
   };
 
   // Auto-match
@@ -348,7 +356,6 @@ export function ReconciliationPage() {
     try {
       const res = await fetch('/api/reconciliation/auto', {
         method: 'POST',
-        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           companyId: activeCompany.id,
@@ -377,10 +384,10 @@ export function ReconciliationPage() {
       const transactions = Array.from(selectedTxIds).map((id) => ({
         id,
         glAccountId: txGlAssignments[id] || undefined,
+        splits: txSplits[id] || undefined,
       }));
       const res = await fetch('/api/reconciliation', {
         method: 'POST',
-        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           companyId: activeCompany.id,
@@ -411,7 +418,6 @@ export function ReconciliationPage() {
     try {
       const res = await fetch('/api/reconciliation/unreconcile', {
         method: 'POST',
-        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           companyId: activeCompany.id,
@@ -437,7 +443,6 @@ export function ReconciliationPage() {
     try {
       const res = await fetch('/api/reconciliation/adjustment', {
         method: 'POST',
-        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           companyId: activeCompany.id,
@@ -463,7 +468,6 @@ export function ReconciliationPage() {
     try {
       const res = await fetch('/api/reconciliation/periods', {
         method: 'POST',
-        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           companyId: activeCompany.id,
@@ -482,39 +486,12 @@ export function ReconciliationPage() {
   const fetchHistory = async () => {
     if (!activeCompany?.id || !selectedAccountId) return;
     try {
-      const res = await fetch(`/api/reconciliation/periods?bankAccountId=${selectedAccountId}&companyId=${activeCompany.id}`, { credentials: 'include' });
+      const res = await fetch(`/api/reconciliation/periods?bankAccountId=${selectedAccountId}&companyId=${activeCompany.id}`);
       if (res.ok) {
         const data = await res.json();
         setHistoryPeriods(data.periods ?? []);
       }
     } catch { /* ignore */ }
-  };
-
-  // Ignore/unignore selected transactions
-  const handleIgnore = async (ignore: boolean) => {
-    if (!activeCompany?.id || !selectedAccountId || selectedTxIds.size === 0) return;
-    try {
-      const res = await fetch('/api/reconciliation/ignore', {
-        method: 'PATCH',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          companyId: activeCompany.id,
-          transactionIds: Array.from(selectedTxIds),
-          ignore,
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        toast.success(ignore ? `${data.updated} transaction(s) ignored` : `${data.updated} transaction(s) restored`);
-        fetchReconciliation();
-      } else {
-        const errData = await res.json().catch(() => ({}));
-        toast.error(errData.error || 'Failed to update transactions');
-      }
-    } catch {
-      toast.error('Failed to update transactions');
-    }
   };
 
   // Export
@@ -555,8 +532,37 @@ export function ReconciliationPage() {
   };
 
   const isReconciledView = statusFilter === 'reconciled' || statusFilter === 'all';
-  const isIgnoredView = statusFilter === 'ignored';
-  const isPendingView = statusFilter === 'unreconciled';
+
+  // Split management
+  const openSplitDialog = (tx: Transaction) => {
+    setSplittingTx(tx);
+    const existingSplits = txSplits[tx.id];
+    if (existingSplits) {
+      setCurrentSplits([...existingSplits]);
+    } else {
+      setCurrentSplits([
+        { glAccountId: tx.glAccountId || '', amount: Math.abs(tx.amount), description: tx.description }
+      ]);
+    }
+    setSplitDialogOpen(true);
+  };
+
+  const saveSplits = () => {
+    if (!splittingTx) return;
+    const totalSplit = currentSplits.reduce((sum, s) => sum + s.amount, 0);
+    if (Math.abs(totalSplit - Math.abs(splittingTx.amount)) > 0.01) {
+      toast.error(t('reconciliation.splitAmountMismatch') || 'Total splits must equal transaction amount');
+      return;
+    }
+    setTxSplits(prev => ({ ...prev, [splittingTx.id]: currentSplits }));
+    setTxGlAssignments(prev => {
+      const next = { ...prev };
+      delete next[splittingTx.id];
+      return next;
+    });
+    setSelectedTxIds(prev => new Set(prev).add(splittingTx.id));
+    setSplitDialogOpen(false);
+  };
 
   // Transaction row component
   const TxRow = ({ tx, type }: { tx: Transaction; type: 'deposit' | 'payment' }) => {
@@ -616,7 +622,18 @@ export function ReconciliationPage() {
             <span className="text-xs text-muted-foreground">—</span>
           )}
         </TableCell>
-        <TableCell className="w-[100px]">
+        <TableCell className="w-[100px] text-right">
+          {!isReconciled && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn("size-8", txSplits[tx.id] ? "text-primary" : "text-muted-foreground")}
+              onClick={() => openSplitDialog(tx)}
+              title={t('reconciliation.splitTransaction') || "Split Transaction"}
+            >
+              <Scissors className="size-4" />
+            </Button>
+          )}
           {isReconciled && tx.reconciledAt && (
             <Badge variant="outline" className="text-xs gap-1 border-emerald-300 text-emerald-600">
               <Check className="size-3" />
@@ -641,7 +658,7 @@ export function ReconciliationPage() {
           {selectedAccountId && (
             <>
               <Button variant="outline" size="sm" onClick={() => { fetchHistory(); setHistoryDialogOpen(true); }} className="gap-2">
-                <History className="size-4" />
+                <HistoryIcon className="size-4" />
                 {t('reconciliation.history')}
               </Button>
               <Button variant="outline" size="sm" onClick={handleExport} disabled={loadingData} className="gap-2">
@@ -762,9 +779,6 @@ export function ReconciliationPage() {
                   <TabsList className="h-8">
                     <TabsTrigger value="unreconciled" className="text-xs px-3 h-6">{t('reconciliation.showUnreconciled')} ({summary.unreconciledCount})</TabsTrigger>
                     <TabsTrigger value="reconciled" className="text-xs px-3 h-6">{t('reconciliation.showReconciled')} ({summary.reconciledCount})</TabsTrigger>
-                    {(summary.ignoredCount ?? 0) > 0 && (
-                      <TabsTrigger value="ignored" className="text-xs px-3 h-6">Ignored ({summary.ignoredCount})</TabsTrigger>
-                    )}
                     <TabsTrigger value="all" className="text-xs px-3 h-6">{t('reconciliation.showAll')} ({summary.totalTransactions})</TabsTrigger>
                   </TabsList>
                 </Tabs>
@@ -813,7 +827,7 @@ export function ReconciliationPage() {
 
               {/* Action Bar */}
               <div className="flex items-center gap-2 flex-wrap">
-                {isPendingView && (
+                {!isReconciledView && (
                   <>
                     <Button variant="outline" size="sm" onClick={() => { setAutoMatchResult(null); setAutoMatchDialogOpen(true); }} className="gap-2">
                       <Play className="size-4" />
@@ -823,22 +837,12 @@ export function ReconciliationPage() {
                       <ArrowLeftRight className="size-4" />
                       {t('reconciliation.reconcileSelected')} ({selectedTxIds.size})
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => handleIgnore(true)} disabled={selectedTxIds.size === 0} className="gap-2">
-                      <EyeOff className="size-4" />
-                      Ignore ({selectedTxIds.size})
-                    </Button>
                   </>
                 )}
                 {isReconciledView && (
                   <Button variant="outline" size="sm" onClick={() => { setUnreconcileResult(null); setUnreconcileDialogOpen(true); }} disabled={selectedTxIds.size === 0} className="gap-2">
                     <Undo2 className="size-4" />
                     {t('reconciliation.unreconcileSelected')} ({selectedTxIds.size})
-                  </Button>
-                )}
-                {isIgnoredView && (
-                  <Button variant="outline" size="sm" onClick={() => handleIgnore(false)} disabled={selectedTxIds.size === 0} className="gap-2">
-                    <Undo2 className="size-4" />
-                    Restore ({selectedTxIds.size})
                   </Button>
                 )}
                 <Button variant="outline" size="sm" onClick={() => setAdjustmentDialogOpen(true)} className="gap-2">
@@ -861,6 +865,108 @@ export function ReconciliationPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Split Transaction Dialog */}
+          <Dialog open={splitDialogOpen} onOpenChange={setSplitDialogOpen}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>{t('reconciliation.splitTransaction') || "Distribuir Transacción"}</DialogTitle>
+                <DialogDescription>
+                  Divide el monto de <strong>{formatCurrency(splittingTx?.amount || 0)}</strong> en múltiples cuentas.
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="space-y-4 py-4">
+                <div className="max-h-[300px] overflow-y-auto space-y-3 pr-2">
+                  {currentSplits.map((split, index) => (
+                    <div key={index} className="flex items-start gap-3 p-3 rounded-xl border bg-muted/30">
+                      <div className="flex-1 space-y-2">
+                        <Label className="text-[10px] uppercase font-bold text-muted-foreground">Cuenta Contable</Label>
+                        <AccountSelector
+                          accounts={accounts}
+                          value={split.glAccountId}
+                          onChange={(id) => {
+                            const next = [...currentSplits];
+                            next[index].glAccountId = id || '';
+                            setCurrentSplits(next);
+                          }}
+                        />
+                      </div>
+                      <div className="w-32 space-y-2">
+                        <Label className="text-[10px] uppercase font-bold text-muted-foreground">Monto</Label>
+                        <Input
+                          type="number"
+                          value={split.amount}
+                          onChange={(e) => {
+                            const next = [...currentSplits];
+                            next[index].amount = parseFloat(e.target.value) || 0;
+                            setCurrentSplits(next);
+                          }}
+                          className="h-10 text-right font-mono"
+                        />
+                      </div>
+                      <div className="flex-1 space-y-2">
+                        <Label className="text-[10px] uppercase font-bold text-muted-foreground">Descripción</Label>
+                        <Input
+                          value={split.description}
+                          onChange={(e) => {
+                            const next = [...currentSplits];
+                            next[index].description = e.target.value;
+                            setCurrentSplits(next);
+                          }}
+                          className="h-10"
+                        />
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="mt-6 text-rose-500 hover:text-rose-600 hover:bg-rose-50"
+                        onClick={() => {
+                          if (currentSplits.length > 1) {
+                            setCurrentSplits(currentSplits.filter((_, i) => i !== index));
+                          }
+                        }}
+                      >
+                        <X className="size-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full gap-2 border-dashed"
+                  onClick={() => {
+                    setCurrentSplits([...currentSplits, { glAccountId: '', amount: 0, description: splittingTx?.description || '' }]);
+                  }}
+                >
+                  <PlusCircle className="size-4" />
+                  Agregar Distribución
+                </Button>
+
+                <div className="flex items-center justify-between p-4 rounded-xl bg-primary/5 border border-primary/10">
+                  <div className="text-sm">
+                    <p className="text-muted-foreground">Total Distribuido</p>
+                    <p className="font-bold text-lg">{formatCurrency(currentSplits.reduce((sum, s) => sum + s.amount, 0))}</p>
+                  </div>
+                  <div className="text-right text-sm">
+                    <p className="text-muted-foreground">Diferencia Pendiente</p>
+                    <p className={cn("font-bold text-lg", Math.abs(Math.abs(splittingTx?.amount || 0) - currentSplits.reduce((sum, s) => sum + s.amount, 0)) < 0.01 ? "text-emerald-600" : "text-rose-600")}>
+                      {formatCurrency(Math.abs(splittingTx?.amount || 0) - currentSplits.reduce((sum, s) => sum + s.amount, 0))}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setSplitDialogOpen(false)}>Cancelar</Button>
+                <Button onClick={saveSplits} disabled={Math.abs(Math.abs(splittingTx?.amount || 0) - currentSplits.reduce((sum, s) => sum + s.amount, 0)) > 0.01}>
+                  Confirmar Distribución
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           {/* Deposits / Credits */}
           <Card>
@@ -961,7 +1067,7 @@ export function ReconciliationPage() {
             <Card>
               <CardContent className="p-4">
                 <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                  <History className="size-4" />
+                  <HistoryIcon className="size-4" />
                   Recent Reconciliations
                 </h3>
                 <div className="space-y-2">
@@ -1144,11 +1250,11 @@ export function ReconciliationPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-sm">{t('reconciliation.adjustmentDebitAccount')}</Label>
-                <AccountSelector accounts={accounts} value={adjustForm.debitAccountId || null} onChange={(id) => setAdjustForm({ ...adjustForm, debitAccountId: id ?? '' })} placeholder="Select debit account" />
+                <AccountSelector accounts={accounts} value={adjustForm.debitAccountId} onChange={(id) => setAdjustForm({ ...adjustForm, debitAccountId: id ?? '' })} placeholder="Select debit account" />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-sm">{t('reconciliation.adjustmentCreditAccount')}</Label>
-                <AccountSelector accounts={accounts} value={adjustForm.creditAccountId || null} onChange={(id) => setAdjustForm({ ...adjustForm, creditAccountId: id ?? '' })} placeholder="Select credit account" />
+                <AccountSelector accounts={accounts} value={adjustForm.creditAccountId} onChange={(id) => setAdjustForm({ ...adjustForm, creditAccountId: id ?? '' })} placeholder="Select credit account" />
               </div>
             </div>
             <div className="space-y-1.5">
@@ -1172,7 +1278,7 @@ export function ReconciliationPage() {
         <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <History className="size-5" />
+              <HistoryIcon className="size-5" />
               {t('reconciliation.historyTitle')}
             </DialogTitle>
           </DialogHeader>

@@ -3,24 +3,28 @@ import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
 import { parseCSV } from '@/lib/csv-parser';
 import { parseOFX } from '@/lib/ofx-parser';
-import { parsePDF } from '@/lib/pdf-parser';
-import { verifyCompanyAccess } from '@/lib/verify-access';
-import { computeAuditHash } from '@/lib/journal-hash';
-import { toCents, toDollars } from '@/lib/money';
 
 // ─── POST /api/import ─────────────────────────────────────────────────
-// Accepts multipart/form-data with a "file" field (single) or "files" field (multiple).
-// Supports CSV, OFX, QFX, and PDF formats.
+// Accepts multipart/form-data with a file field.
+// Supports CSV, OFX, QFX formats. PDF returns a placeholder message.
 export async function POST(request: NextRequest) {
-  const userId = await getSessionUserId(request);
+  const userId = getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
     const formData = await request.formData();
+    const file = formData.get('file') as File | null;
     const companyId = formData.get('companyId') as string | null;
     const bankAccountId = formData.get('bankAccountId') as string | null;
+
+    if (!file) {
+      return NextResponse.json(
+        { error: 'No file uploaded. Provide a "file" field.' },
+        { status: 400 }
+      );
+    }
 
     if (!companyId) {
       return NextResponse.json(
@@ -29,138 +33,143 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify admin access
-    console.log('[IMPORT] Verifying admin access for user', userId, 'company', companyId);
-    const access = await verifyCompanyAccess(userId, companyId, 'admin');
-    if (!access.ok) {
-      console.error('[IMPORT] Access denied for user', userId, 'company', companyId);
-      return NextResponse.json({ error: access.error }, { status: 403 });
+    // Verify membership
+    const membership = await db.companyMember.findUnique({
+      where: { userId_companyId: { userId, companyId } },
+    });
+    if (!membership) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // Check for multiple files ("files" field) or single file ("file" field)
-    const multiFiles = formData.getAll('files').filter((f) => f instanceof File) as File[];
-    const singleFile = formData.get('file') as File | null;
-
-    if (multiFiles.length > 0) {
-      // ─── Multi-file import ────────────────────────────────────────
-      console.log('[IMPORT] Multi-file import: processing', multiFiles.length, 'files');
-
-      const results: {
-        fileName: string;
-        success: boolean;
-        transactionCount?: number;
-        autoCategorizedCount?: number;
-        duplicatesSkipped?: number;
-        newAccountCreated?: boolean;
-        bankAccountName?: string;
-        statementId?: string;
-        error?: string;
-      }[] = [];
-
-      for (let i = 0; i < multiFiles.length; i++) {
-        const file = multiFiles[i];
-        console.log(`[IMPORT] Processing file ${i + 1}/${multiFiles.length}: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`);
-
-        try {
-          const result = await processOneFile(file, companyId, bankAccountId);
-          console.log(`[IMPORT] File "${file.name}" succeeded: ${result.transactionCount} transactions`);
-          results.push({
-            fileName: file.name,
-            success: true,
-            transactionCount: result.transactionCount,
-            autoCategorizedCount: result.autoCategorizedCount,
-            duplicatesSkipped: result.duplicatesSkipped,
-            newAccountCreated: result.newAccountCreated,
-            bankAccountName: result.bankAccountName,
-            statementId: result.statementId,
-          });
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : 'Unknown error';
-          console.error(`[IMPORT] File "${file.name}" failed: ${msg}`);
-          results.push({
-            fileName: file.name,
-            success: false,
-            error: msg,
-          });
-        }
-      }
-
-      const successResults = results.filter((r) => r.success);
-      const totalTransactions = successResults.reduce((sum, r) => sum + (r.transactionCount || 0), 0);
-
-      // Audit log for multi-file import
-      const lastImportAudit = await db.auditLog.findFirst({
-        where: { hash: { not: null } },
-        orderBy: { createdAt: 'desc' },
-        select: { hash: true },
-      });
-      const importAuditDetails = JSON.stringify({ fileCount: results.length, totalTransactions, successCount: successResults.length });
-      const createdImportAudit = await db.auditLog.create({
-        data: {
-          companyId, userId, action: 'import_transactions', entity: 'BankStatement',
-          entityId: null, details: importAuditDetails, previousHash: lastImportAudit?.hash ?? null,
-        },
-      });
-      const importAuditHash = computeAuditHash({
-        id: createdImportAudit.id, companyId, userId, action: 'import_transactions', entity: 'BankStatement',
-        entityId: null, details: importAuditDetails, previousHash: lastImportAudit?.hash ?? null,
-      });
-      await db.auditLog.update({ where: { id: createdImportAudit.id }, data: { hash: importAuditHash } });
-
-      return NextResponse.json({
-        results,
-        totalTransactions,
-        totalFiles: results.length,
-        successCount: successResults.length,
-        failCount: results.length - successResults.length,
-      });
-    }
-
-    if (!singleFile) {
+    // Validate file size (max 10 MB)
+    const MAX_SIZE = 10 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
       return NextResponse.json(
-        { error: 'No file uploaded. Provide a "file" or "files" field.' },
+        { error: 'File too large. Maximum size is 10 MB.' },
         { status: 400 }
       );
     }
 
-    // ─── Single-file import (backward compatible) ────────────────────
-    console.log('[IMPORT] Single-file import:', singleFile.name, `(${(singleFile.size / 1024).toFixed(1)} KB)`);
+    const fileName = file.name;
+    const extension = fileName.split('.').pop()?.toLowerCase() || '';
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const content = buffer.toString('utf-8');
 
-    try {
-      const result = await processOneFile(singleFile, companyId, bankAccountId);
-      console.log('[IMPORT] Import successful:', result.transactionCount, 'transactions');
-
-      // Audit log for single-file import
-      const lastImportAuditSingle = await db.auditLog.findFirst({
-        where: { hash: { not: null } },
-        orderBy: { createdAt: 'desc' },
-        select: { hash: true },
-      });
-      const importAuditDetailsSingle = JSON.stringify({ fileName: singleFile.name, transactionCount: result.transactionCount, statementId: result.statementId });
-      const createdImportAuditSingle = await db.auditLog.create({
-        data: {
-          companyId, userId, action: 'import_transactions', entity: 'BankStatement',
-          entityId: result.statementId, details: importAuditDetailsSingle, previousHash: lastImportAuditSingle?.hash ?? null,
+    // ─── PDF: not fully implemented ──────────────────────────────────
+    if (extension === 'pdf') {
+      return NextResponse.json(
+        {
+          error:
+            'PDF import requires OCR processing and is not yet fully implemented. Please export your bank statement as CSV or OFX format.',
+          supportedFormats: ['csv', 'ofx', 'qfx'],
         },
-      });
-      const importAuditHashSingle = computeAuditHash({
-        id: createdImportAuditSingle.id, companyId, userId, action: 'import_transactions', entity: 'BankStatement',
-        entityId: result.statementId, details: importAuditDetailsSingle, previousHash: lastImportAuditSingle?.hash ?? null,
-      });
-      await db.auditLog.update({ where: { id: createdImportAuditSingle.id }, data: { hash: importAuditHashSingle } });
+        { status: 400 }
+      );
+    }
+
+    // ─── CSV parsing ─────────────────────────────────────────────────
+    if (extension === 'csv' || extension === 'tsv' || extension === 'txt') {
+      let transactions: Awaited<ReturnType<typeof parseCSV>>;
+      let bankName = '';
+
+      try {
+        transactions = parseCSV(content);
+        // Try to extract bank name from first description or filename
+        bankName = extractBankNameFromFilename(fileName);
+      } catch (parseError) {
+        const msg =
+          parseError instanceof Error
+            ? parseError.message
+            : 'Failed to parse CSV file';
+        return NextResponse.json({ error: msg }, { status: 400 });
+      }
+
+      // Find or create bank account
+      const bankAccount = await findOrCreateBankAccount(
+        companyId,
+        bankAccountId,
+        bankName,
+        transactions
+      );
+      const newAccountCreated = !bankAccountId;
+
+      // Create statement + transactions
+      const result = await importTransactions(
+        companyId,
+        bankAccount.id,
+        transactions,
+        'csv',
+        fileName
+      );
 
       return NextResponse.json({
         statementId: result.statementId,
         transactionCount: result.transactionCount,
         autoCategorizedCount: result.autoCategorizedCount,
         duplicatesSkipped: result.duplicatesSkipped,
-        newAccountCreated: result.newAccountCreated,
-        bankAccountName: result.bankAccountName,
+        newAccountCreated,
+        bankAccountName: bankAccount.accountName,
       });
-    } catch (err) {
-      console.error('[IMPORT] Import failed:', err);
-      return NextResponse.json({ error: 'Failed to import bank statement' }, { status: 400 });
     }
+
+    // ─── OFX/QFX parsing ─────────────────────────────────────────────
+    if (extension === 'ofx' || extension === 'qfx') {
+      let parsed: Awaited<ReturnType<typeof parseOFX>>;
+
+      try {
+        parsed = parseOFX(content);
+      } catch (parseError) {
+        const msg =
+          parseError instanceof Error
+            ? parseError.message
+            : 'Failed to parse OFX/QFX file';
+        return NextResponse.json({ error: msg }, { status: 400 });
+      }
+
+      const bankName = parsed.bankName;
+
+      // Find or create bank account
+      const bankAccount = await findOrCreateBankAccount(
+        companyId,
+        bankAccountId,
+        bankName,
+        parsed.transactions,
+        parsed.accountNumber
+      );
+      const newAccountCreated = !bankAccountId;
+
+      // Create statement + transactions
+      const result = await importTransactions(
+        companyId,
+        bankAccount.id,
+        parsed.transactions,
+        extension as 'ofx' | 'qfx',
+        fileName,
+        {
+          startDate: parsed.startDate,
+          endDate: parsed.endDate,
+          openingBalance: parsed.openingBalance,
+          closingBalance: parsed.closingBalance,
+        }
+      );
+
+      return NextResponse.json({
+        statementId: result.statementId,
+        transactionCount: result.transactionCount,
+        autoCategorizedCount: result.autoCategorizedCount,
+        duplicatesSkipped: result.duplicatesSkipped,
+        newAccountCreated,
+        bankAccountName: bankAccount.accountName,
+      });
+    }
+
+    // ─── Unsupported format ──────────────────────────────────────────
+    return NextResponse.json(
+      {
+        error: `Unsupported file format: .${extension}. Supported formats: .csv, .ofx, .qfx`,
+      },
+      { status: 400 }
+    );
   } catch (error) {
     console.error('[IMPORT ERROR]', error);
     return NextResponse.json(
@@ -168,182 +177,6 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-// ─── Helper: Sanitize CSV fields against injection ───────────────────
-
-function sanitizeCsvField(value: string): string {
-  // Prevent CSV injection by escaping leading dangerous characters
-  if (/^[=+\-@\t\r]/.test(value)) {
-    return "'" + value;
-  }
-  return value;
-}
-
-// ─── Helper: Process one file ─────────────────────────────────────────
-
-interface ProcessedFileResult {
-  statementId: string;
-  transactionCount: number;
-  autoCategorizedCount: number;
-  duplicatesSkipped: number;
-  newAccountCreated: boolean;
-  bankAccountName: string;
-}
-
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
-const SUPPORTED_EXTENSIONS = ['csv', 'tsv', 'txt', 'ofx', 'qfx', 'pdf'];
-
-async function processOneFile(
-  file: File,
-  companyId: string,
-  bankAccountId: string | null
-): Promise<ProcessedFileResult> {
-  // Validate file size
-  if (file.size > MAX_FILE_SIZE) {
-    throw new Error(`File too large (${(file.size / (1024 * 1024)).toFixed(1)} MB). Maximum size is 10 MB.`);
-  }
-
-  const fileName = file.name;
-  const extension = fileName.split('.').pop()?.toLowerCase() || '';
-
-  if (!SUPPORTED_EXTENSIONS.includes(extension)) {
-    throw new Error(`Unsupported file format: .${extension}. Supported formats: .csv, .tsv, .txt, .ofx, .qfx, .pdf`);
-  }
-
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const content = buffer.toString('utf-8');
-
-  console.log(`[IMPORT] Parsing file "${fileName}" as .${extension}`);
-
-  // ─── PDF parsing ──────────────────────────────────────────────
-  if (extension === 'pdf') {
-    console.log('[IMPORT] Using PDF parser for', fileName);
-    const parsed = await parsePDF(buffer, fileName);
-    console.log(`[IMPORT] PDF parsed: ${parsed.transactions.length} raw transactions`);
-
-    const bankName = parsed.bankName;
-    console.log('[IMPORT] Detected bank name:', bankName || '(none)');
-
-    const bankAccount = await findOrCreateBankAccount(
-      companyId,
-      bankAccountId,
-      bankName,
-      parsed.transactions
-    );
-    const newAccountCreated = !bankAccountId;
-    console.log('[IMPORT] Using bank account:', bankAccount.accountName, bankAccount.id);
-
-    const result = await importTransactions(
-      companyId,
-      bankAccount.id,
-      parsed.transactions,
-      'pdf',
-      fileName,
-      {
-        startDate: parsed.startDate || new Date(),
-        endDate: parsed.endDate || new Date(),
-        openingBalance: parsed.openingBalance ?? 0,
-        closingBalance: parsed.closingBalance ?? 0,
-      }
-    );
-
-    return {
-      statementId: result.statementId,
-      transactionCount: result.transactionCount,
-      autoCategorizedCount: result.autoCategorizedCount,
-      duplicatesSkipped: result.duplicatesSkipped,
-      newAccountCreated,
-      bankAccountName: bankAccount.accountName,
-    };
-  }
-
-  // ─── CSV parsing ─────────────────────────────────────────────────
-  if (extension === 'csv' || extension === 'tsv' || extension === 'txt') {
-    console.log('[IMPORT] Using CSV parser for', fileName);
-    const transactions = parseCSV(content);
-    console.log(`[IMPORT] CSV parsed: ${transactions.length} raw transactions`);
-
-    // Sanitize transaction descriptions to prevent CSV injection
-    for (const txn of transactions) {
-      txn.description = sanitizeCsvField(txn.description);
-    }
-
-    const bankName = extractBankNameFromFilename(fileName);
-    console.log('[IMPORT] Detected bank name:', bankName);
-
-    const bankAccount = await findOrCreateBankAccount(
-      companyId,
-      bankAccountId,
-      bankName,
-      transactions
-    );
-    const newAccountCreated = !bankAccountId;
-    console.log('[IMPORT] Using bank account:', bankAccount.accountName, bankAccount.id);
-
-    const result = await importTransactions(
-      companyId,
-      bankAccount.id,
-      transactions,
-      'csv',
-      fileName
-    );
-
-    return {
-      statementId: result.statementId,
-      transactionCount: result.transactionCount,
-      autoCategorizedCount: result.autoCategorizedCount,
-      duplicatesSkipped: result.duplicatesSkipped,
-      newAccountCreated,
-      bankAccountName: bankAccount.accountName,
-    };
-  }
-
-  // ─── OFX/QFX parsing ─────────────────────────────────────────────
-  if (extension === 'ofx' || extension === 'qfx') {
-    console.log('[IMPORT] Using OFX parser for', fileName);
-    const parsed = parseOFX(content);
-    console.log(`[IMPORT] OFX parsed: ${parsed.transactions.length} raw transactions`);
-
-    const bankName = parsed.bankName;
-    console.log('[IMPORT] Detected bank name:', bankName || '(none)');
-
-    const bankAccount = await findOrCreateBankAccount(
-      companyId,
-      bankAccountId,
-      bankName,
-      parsed.transactions,
-      parsed.accountNumber
-    );
-    const newAccountCreated = !bankAccountId;
-    console.log('[IMPORT] Using bank account:', bankAccount.accountName, bankAccount.id);
-
-    const result = await importTransactions(
-      companyId,
-      bankAccount.id,
-      parsed.transactions,
-      extension as 'ofx' | 'qfx',
-      fileName,
-      {
-        startDate: parsed.startDate || new Date(),
-        endDate: parsed.endDate || new Date(),
-        openingBalance: parsed.openingBalance ?? 0,
-        closingBalance: parsed.closingBalance ?? 0,
-      }
-    );
-
-    return {
-      statementId: result.statementId,
-      transactionCount: result.transactionCount,
-      autoCategorizedCount: result.autoCategorizedCount,
-      duplicatesSkipped: result.duplicatesSkipped,
-      newAccountCreated,
-      bankAccountName: bankAccount.accountName,
-    };
-  }
-
-  // Should never reach here due to extension check above
-  throw new Error(`Unsupported file format: .${extension}`);
 }
 
 // ─── Helper: Find or Create Bank Account ──────────────────────────────
@@ -357,7 +190,6 @@ async function findOrCreateBankAccount(
 ) {
   // If a specific bank account was provided, use it
   if (bankAccountId) {
-    console.log('[IMPORT] Looking for specific bank account:', bankAccountId);
     const account = await db.bankAccount.findFirst({
       where: { id: bankAccountId, companyId },
     });
@@ -369,37 +201,27 @@ async function findOrCreateBankAccount(
 
   // Try to match existing account by bank name
   if (bankName) {
-    console.log('[IMPORT] Searching for existing bank account by name:', bankName);
     const existing = await db.bankAccount.findFirst({
       where: { companyId, bankName, isActive: true },
     });
-    if (existing) {
-      console.log('[IMPORT] Found existing bank account:', existing.id);
-      return existing;
-    }
+    if (existing) return existing;
   }
 
   // Try to match by account number
   if (accountNumber) {
-    console.log('[IMPORT] Searching for existing bank account by number:', accountNumber);
     const existing = await db.bankAccount.findFirst({
       where: { companyId, accountNo: accountNumber, isActive: true },
     });
-    if (existing) {
-      console.log('[IMPORT] Found existing bank account by number:', existing.id);
-      return existing;
-    }
+    if (existing) return existing;
   }
 
   // Create new account — find the default cash GL account
-  console.log('[IMPORT] No existing bank account found, creating new one');
   const cashAccount = await db.glAccount.findFirst({
     where: { companyId, code: '1010', isActive: true },
   });
 
-  let glAccount;
   if (!cashAccount) {
-    console.log('[IMPORT] No GL account with code 1010, searching for any asset account');
+    // Fallback to any asset account
     const anyAsset = await db.glAccount.findFirst({
       where: { companyId, accountType: 'asset', isActive: true },
     });
@@ -408,12 +230,11 @@ async function findOrCreateBankAccount(
         'No asset-type GL account found. Please create one before importing statements.'
       );
     }
-    glAccount = anyAsset;
-    console.log('[IMPORT] Using asset GL account:', glAccount.id);
-  } else {
-    glAccount = cashAccount;
-    console.log('[IMPORT] Using cash GL account:', glAccount.id);
   }
+
+  const glAccount = cashAccount! || (await db.glAccount.findFirst({
+    where: { companyId, accountType: 'asset', isActive: true },
+  }))!;
 
   const displayName = bankName || 'Imported Bank Account';
 
@@ -454,10 +275,8 @@ async function importTransactions(
   }
 ): Promise<ImportResult> {
   if (transactions.length === 0) {
-    throw new Error('No valid transactions found in the file');
+    throw new Error('No transactions to import');
   }
-
-  console.log(`[IMPORT] Importing ${transactions.length} transactions for bank account ${bankAccountId}`);
 
   // Sort by date ascending
   const sorted = [...transactions].sort(
@@ -470,7 +289,7 @@ async function importTransactions(
   const closingBalance = balanceInfo?.closingBalance ?? 0;
 
   // ── Duplicate detection ──
-  console.log('[IMPORT] Checking for duplicates...');
+  // Get existing transactions for this bank account (from all its statements)
   const existingStatements = await db.bankStatement.findMany({
     where: { bankAccountId },
     select: { id: true },
@@ -482,10 +301,9 @@ async function importTransactions(
   });
 
   // Build a set of unique keys for duplicate checking: date+amount+description(first 30 chars)
-  // et.amount is in cents from DB; convert to dollars to match parser output
   const existingKeys = new Set<string>();
   for (const et of existingTransactions) {
-    const key = `${et.date.toISOString().split('T')[0]}|${toDollars(et.amount)}|${et.description.substring(0, 30).toUpperCase()}`;
+    const key = `${et.date.toISOString().split('T')[0]}|${et.amount}|${et.description.substring(0, 30).toUpperCase()}`;
     existingKeys.add(key);
   }
 
@@ -497,12 +315,7 @@ async function importTransactions(
 
   const duplicatesSkipped = sorted.length - uniqueTransactions.length;
 
-  if (duplicatesSkipped > 0) {
-    console.log(`[IMPORT] Skipped ${duplicatesSkipped} duplicate transactions`);
-  }
-
   if (uniqueTransactions.length === 0) {
-    console.log('[IMPORT] All transactions were duplicates, nothing new to import');
     return {
       statementId: '',
       transactionCount: 0,
@@ -511,15 +324,13 @@ async function importTransactions(
     };
   }
 
-  // Calculate totals (from unique only) — in dollars, will be converted to cents for DB
-  const totalCreditsDollars = uniqueTransactions
+  // Calculate totals (from unique only)
+  const totalCredits = uniqueTransactions
     .filter((t) => t.amount > 0)
     .reduce((s, t) => s + t.amount, 0);
-  const totalDebitsDollars = uniqueTransactions
+  const totalDebits = uniqueTransactions
     .filter((t) => t.amount < 0)
     .reduce((s, t) => s + Math.abs(t.amount), 0);
-  const totalCredits = toCents(totalCreditsDollars);
-  const totalDebits = toCents(totalDebitsDollars);
 
   // Load bank rules for auto-categorization
   const bankRules = await db.bankRule.findMany({
@@ -529,10 +340,8 @@ async function importTransactions(
       glAccount: { select: { id: true } },
     },
   });
-  console.log(`[IMPORT] Loaded ${bankRules.length} bank rules for auto-categorization`);
 
   // Create statement + transactions in a transaction
-  console.log(`[IMPORT] Creating statement and ${uniqueTransactions.length} transactions in DB transaction...`);
   const result = await db.$transaction(async (tx) => {
     const statement = await tx.bankStatement.create({
       data: {
@@ -540,15 +349,14 @@ async function importTransactions(
         bankAccountId,
         startDate,
         endDate,
-        openingBalance: toCents(openingBalance),
-        closingBalance: toCents(closingBalance || (openingBalance + totalCreditsDollars - totalDebitsDollars)),
+        openingBalance,
+        closingBalance: closingBalance || openingBalance + totalCredits - totalDebits,
         totalCredits,
         totalDebits,
         format,
         fileName,
       },
     });
-    console.log('[IMPORT] Statement created:', statement.id);
 
     let autoCategorizedCount = 0;
 
@@ -566,7 +374,7 @@ async function importTransactions(
           statementId: statement.id,
           date: txn.date,
           description: txn.description,
-          amount: toCents(txn.amount),
+          amount: txn.amount,
           reference: txn.reference || null,
           isReconciled: false,
           glAccountId: glAccountId || null,
@@ -580,12 +388,11 @@ async function importTransactions(
       where: { id: bankAccountId },
       data: {
         balance: {
-          increment: toCents(totalCreditsDollars - totalDebitsDollars),
+          increment: totalCredits - totalDebits,
         },
       },
     });
 
-    console.log(`[IMPORT] DB transaction complete. Auto-categorized: ${autoCategorizedCount}`);
     return { statementId: statement.id, autoCategorizedCount };
   });
 
@@ -602,7 +409,7 @@ async function importTransactions(
 function applyBankRule(
   description: string,
   amount: number,
-  rules: { id: string; conditionType: string; conditionValue: string; transactionDirection: string; glAccount: { id: string }; isActive: boolean; priority: number }[]
+  rules: { id: string; conditionType: string; conditionValue: string; transactionDirection: string; glAccountId: string; isActive: boolean; priority: number }[]
 ): { matchedRuleId: string | null; glAccountId: string | null } {
   const desc = description.toUpperCase();
   const isCredit = amount > 0;
@@ -620,7 +427,7 @@ function applyBankRule(
         if (desc.includes(condValue)) {
           return {
             matchedRuleId: rule.id,
-            glAccountId: rule.glAccount.id,
+            glAccountId: rule.glAccountId.id,
           };
         }
         break;
@@ -628,7 +435,7 @@ function applyBankRule(
         if (desc.startsWith(condValue)) {
           return {
             matchedRuleId: rule.id,
-            glAccountId: rule.glAccount.id,
+            glAccountId: rule.glAccountId.id,
           };
         }
         break;
@@ -636,7 +443,7 @@ function applyBankRule(
         if (desc.endsWith(condValue)) {
           return {
             matchedRuleId: rule.id,
-            glAccountId: rule.glAccount.id,
+            glAccountId: rule.glAccountId.id,
           };
         }
         break;
@@ -644,7 +451,7 @@ function applyBankRule(
         if (desc === condValue) {
           return {
             matchedRuleId: rule.id,
-            glAccountId: rule.glAccount.id,
+            glAccountId: rule.glAccountId.id,
           };
         }
         break;
@@ -652,7 +459,7 @@ function applyBankRule(
         if (Math.abs(amount) > parseFloat(rule.conditionValue)) {
           return {
             matchedRuleId: rule.id,
-            glAccountId: rule.glAccount.id,
+            glAccountId: rule.glAccountId.id,
           };
         }
         break;
@@ -660,7 +467,7 @@ function applyBankRule(
         if (Math.abs(amount) < parseFloat(rule.conditionValue)) {
           return {
             matchedRuleId: rule.id,
-            glAccountId: rule.glAccount.id,
+            glAccountId: rule.glAccountId.id,
           };
         }
         break;

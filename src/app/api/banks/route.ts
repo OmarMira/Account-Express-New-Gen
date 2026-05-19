@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
-import { verifyCompanyAccess } from '@/lib/verify-access';
-import { computeAuditHash } from '@/lib/journal-hash';
-import { toCents, toDollars } from '@/lib/money';
+import { hasCompanyAccess } from '@/lib/auth';
+
 
 // ─── GET /api/banks?companyId=xxx ──────────────────────────────────────
 export async function GET(request: NextRequest) {
-  const userId = await getSessionUserId(request);
+  const userId = getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -23,9 +22,9 @@ export async function GET(request: NextRequest) {
   }
 
   // Verify access
-  const access = await verifyCompanyAccess(userId, companyId);
-  if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: 403 });
+  const hasAccess = await hasCompanyAccess(userId, companyId);
+  if (!hasAccess) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   try {
@@ -42,7 +41,7 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
     });
 
-    return NextResponse.json({ accounts: accounts.map(a => ({ ...a, balance: toDollars(a.balance) })) });
+    return NextResponse.json({ accounts });
   } catch (error) {
     console.error('[BANKS LIST ERROR]', error);
     return NextResponse.json(
@@ -54,7 +53,7 @@ export async function GET(request: NextRequest) {
 
 // ─── POST /api/banks ──────────────────────────────────────────────────
 export async function POST(request: NextRequest) {
-  const userId = await getSessionUserId(request);
+  const userId = getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -83,10 +82,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify admin access
-    const access = await verifyCompanyAccess(userId, companyId, 'admin');
-    if (!access.ok) {
-      return NextResponse.json({ error: access.error }, { status: 403 });
+    // Verify access
+    const hasAccess = await hasCompanyAccess(userId, companyId);
+    if (!hasAccess) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     // Validate GL account exists, belongs to company, and is asset type
@@ -117,7 +116,7 @@ export async function POST(request: NextRequest) {
         accountNo: accountNo?.trim() || null,
         routingNo: routingNo?.trim() || null,
         glAccountId,
-        balance: toCents(parseFloat(balance) || 0),
+        balance: parseFloat(balance) || 0,
         currency: currency || 'USD',
         isActive: true,
       },
@@ -128,26 +127,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Audit log with HMAC chain
-    const lastAudit = await db.auditLog.findFirst({
-      where: { hash: { not: null } },
-      orderBy: { createdAt: 'desc' },
-      select: { hash: true },
-    });
-    const auditDetails = JSON.stringify({ bankAccountId: account.id, accountName: account.accountName, bankName: account.bankName, glAccountId });
-    const createdAudit = await db.auditLog.create({
-      data: {
-        companyId, userId, action: 'create_bank_account', entity: 'BankAccount',
-        entityId: account.id, details: auditDetails, previousHash: lastAudit?.hash ?? null,
-      },
-    });
-    const auditHash = computeAuditHash({
-      id: createdAudit.id, companyId, userId, action: 'create_bank_account', entity: 'BankAccount',
-      entityId: account.id, details: auditDetails, previousHash: lastAudit?.hash ?? null,
-    });
-    await db.auditLog.update({ where: { id: createdAudit.id }, data: { hash: auditHash } });
-
-    return NextResponse.json({ account: { ...account, balance: toDollars(account.balance) } }, { status: 201 });
+    return NextResponse.json({ account }, { status: 201 });
   } catch (error) {
     console.error('[BANKS CREATE ERROR]', error);
     return NextResponse.json(

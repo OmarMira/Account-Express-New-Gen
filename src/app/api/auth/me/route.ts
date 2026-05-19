@@ -4,7 +4,7 @@ import { getSessionUserId } from '@/lib/sessions';
 
 // ─── GET /api/auth/me ─────────────────────────────────────────────────
 export async function GET(request: NextRequest) {
-  const userId = await getSessionUserId(request);
+  const userId = getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -33,7 +33,16 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const companies = user.companyMemberships.map((m) => m.company);
+  let companies;
+  if (user.role === 'super_admin') {
+    companies = await db.company.findMany({
+      where: { isActive: true },
+      select: { id: true, legalName: true, taxId: true, isActive: true },
+      orderBy: { legalName: 'asc' },
+    });
+  } else {
+    companies = user.companyMemberships.map((m) => m.company);
+  }
 
   return NextResponse.json({
     user: {

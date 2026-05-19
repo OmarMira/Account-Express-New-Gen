@@ -12,6 +12,7 @@ import {
 import { motion } from 'framer-motion';
 import { useLanguageStore } from '@/store/language-store';
 import { useAuthStore } from '@/store/auth-store';
+import { toast } from 'sonner';
 import {
   Card,
   CardContent,
@@ -63,7 +64,6 @@ export function AIRulesGeneratorTab() {
     try {
       const res = await fetch('/api/ai-assistant', {
         method: 'POST',
-        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mode: 'detect-patterns',

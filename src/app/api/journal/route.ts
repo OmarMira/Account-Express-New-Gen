@@ -1,16 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
-import { computeEntryHash, computeAuditHash } from '@/lib/journal-hash';
-import { verifyCompanyAccess } from '@/lib/verify-access';
-import { isDateInLockedPeriod } from '@/lib/fiscal-period';
-import { toCents, toDollars, isBalanced } from '@/lib/money';
 
 // ─── GET /api/journal ───────────────────────────────────────────────
 // List journal entries for a company.
 // Query params: companyId, status, startDate, endDate, page, limit, search
 export async function GET(request: NextRequest) {
-  const userId = await getSessionUserId(request);
+  const userId = getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -76,19 +72,14 @@ export async function GET(request: NextRequest) {
     db.journalEntry.count({ where }),
   ]);
 
-  // Calculate totals per entry (convert cents to dollars for frontend)
+  // Calculate totals per entry
   const entriesWithTotals = entries.map((entry) => ({
     ...entry,
     date: entry.date.toISOString(),
     createdAt: entry.createdAt.toISOString(),
     updatedAt: entry.updatedAt.toISOString(),
-    lines: entry.lines.map(l => ({
-      ...l,
-      debit: toDollars(l.debit),
-      credit: toDollars(l.credit),
-    })),
-    _totalDebit: toDollars(entry.lines.reduce((sum, l) => sum + l.debit, 0)),
-    _totalCredit: toDollars(entry.lines.reduce((sum, l) => sum + l.credit, 0)),
+    _totalDebit: entry.lines.reduce((sum, l) => sum + l.debit, 0),
+    _totalCredit: entry.lines.reduce((sum, l) => sum + l.credit, 0),
   }));
 
   return NextResponse.json({
@@ -106,7 +97,7 @@ export async function GET(request: NextRequest) {
 // Create a new journal entry with lines.
 // Body: { companyId, date, description, reference?, status?, lines: [{ glAccountId, description?, debit, credit }] }
 export async function POST(request: NextRequest) {
-  const userId = await getSessionUserId(request);
+  const userId = getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -123,20 +114,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fail-Fast: Verify user has admin access
-    const access = await verifyCompanyAccess(userId, companyId, 'admin');
-    if (!access.ok) {
-      return NextResponse.json({ error: access.error }, { status: 403 });
-    }
-
-    // Check fiscal period lock
-    const entryDate = new Date(date);
-    const dateLocked = await isDateInLockedPeriod(companyId, entryDate);
-    if (dateLocked) {
-      return NextResponse.json(
-        { error: 'Cannot create journal entries in a locked fiscal period' },
-        { status: 403 }
-      );
+    // Verify user has access
+    const membership = await db.companyMember.findUnique({
+      where: { userId_companyId: { userId, companyId } },
+    });
+    if (!membership) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     // Validate lines
@@ -169,13 +152,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Validate balanced entry (convert to cents for exact integer comparison)
-    const totalDebitCents = lines.reduce((sum: number, l: { debit: number }) => sum + toCents(l.debit), 0);
-    const totalCreditCents = lines.reduce((sum: number, l: { credit: number }) => sum + toCents(l.credit), 0);
+    // Validate balanced entry
+    const totalDebits = lines.reduce((sum: number, l: { debit: number }) => sum + l.debit, 0);
+    const totalCredits = lines.reduce((sum: number, l: { credit: number }) => sum + l.credit, 0);
 
-    if (!isBalanced(totalDebitCents, totalCreditCents)) {
+    if (Math.abs(totalDebits - totalCredits) > 0.005) {
       return NextResponse.json(
-        { error: `Entry must balance. Total debits ($${toDollars(totalDebitCents).toFixed(2)}) must equal total credits ($${toDollars(totalCreditCents).toFixed(2)})` },
+        { error: `Entry must balance. Total debits (${totalDebits.toFixed(2)}) must equal total credits (${totalCredits.toFixed(2)})` },
         { status: 400 }
       );
     }
@@ -222,8 +205,8 @@ export async function POST(request: NextRequest) {
             create: lines.map((l: { glAccountId: string; description?: string; debit: number; credit: number }) => ({
               glAccountId: l.glAccountId,
               description: l.description || null,
-              debit: toCents(l.debit),
-              credit: toCents(l.credit),
+              debit: l.debit,
+              credit: l.credit,
             })),
           },
         },
@@ -238,65 +221,8 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // If posted, compute HMAC hash for audit chain
-      if (status === 'posted') {
-        const lastPosted = await tx.journalEntry.findFirst({
-          where: {
-            companyId,
-            status: 'posted',
-            createdAt: { lt: newEntry.createdAt },
-            hash: { not: null },
-          },
-          orderBy: { createdAt: 'desc' },
-          select: { hash: true },
-        });
-
-        // Hash uses cents directly — values are already Int from DB
-        const totalDebit = newEntry.lines.reduce((s, l) => s + l.debit, 0);
-        const totalCredit = newEntry.lines.reduce((s, l) => s + l.credit, 0);
-
-        const hash = computeEntryHash({
-          id: newEntry.id,
-          companyId,
-          date: newEntry.date.toISOString(),
-          description,
-          reference: reference || null,
-          status: 'posted',
-          totalDebit,
-          totalCredit,
-          previousHash: lastPosted?.hash ?? null,
-        });
-
-        await tx.journalEntry.update({
-          where: { id: newEntry.id },
-          data: { hash, previousHash: lastPosted?.hash ?? null },
-        });
-
-        newEntry.hash = hash;
-        newEntry.previousHash = lastPosted?.hash ?? null;
-      }
-
       return newEntry;
     });
-
-    // Audit log with HMAC chain
-    const lastAudit = await db.auditLog.findFirst({
-      where: { hash: { not: null } },
-      orderBy: { createdAt: 'desc' },
-      select: { hash: true },
-    });
-    const auditDetails = JSON.stringify({ journalEntryId: entry.id, date, description, status, lineCount: entry.lines.length });
-    const createdAudit = await db.auditLog.create({
-      data: {
-        companyId, userId, action: 'create_journal_entry', entity: 'JournalEntry',
-        entityId: entry.id, details: auditDetails, previousHash: lastAudit?.hash ?? null,
-      },
-    });
-    const auditHash = computeAuditHash({
-      id: createdAudit.id, companyId, userId, action: 'create_journal_entry', entity: 'JournalEntry',
-      entityId: entry.id, details: auditDetails, previousHash: lastAudit?.hash ?? null,
-    });
-    await db.auditLog.update({ where: { id: createdAudit.id }, data: { hash: auditHash } });
 
     return NextResponse.json(
       {
@@ -304,11 +230,6 @@ export async function POST(request: NextRequest) {
         date: entry.date.toISOString(),
         createdAt: entry.createdAt.toISOString(),
         updatedAt: entry.updatedAt.toISOString(),
-        lines: entry.lines.map(l => ({
-          ...l,
-          debit: toDollars(l.debit),
-          credit: toDollars(l.credit),
-        })),
       },
       { status: 201 }
     );

@@ -1,17 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
-import { recalculateBankAccountBalance } from '@/lib/reconciliation';
-import { computeEntryHash, computeAuditHash } from '@/lib/journal-hash';
-import { verifyCompanyAccess } from '@/lib/verify-access';
-import { isDateInLockedPeriod } from '@/lib/fiscal-period';
-import { toCents } from '@/lib/money';
 
 // ─── POST /api/reconciliation/adjustment ──────────────────────────
 // Create an adjusting journal entry from the reconciliation screen.
 // Body: { companyId, bankAccountId, date, description, debitAccountId, creditAccountId, amount, notes? }
 export async function POST(request: NextRequest) {
-  const userId = await getSessionUserId(request);
+  const userId = getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -43,10 +38,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fail-Fast: Verify access
-    const access = await verifyCompanyAccess(userId, companyId);
-    if (!access.ok) {
-      return NextResponse.json({ error: access.error }, { status: 403 });
+    // Verify access
+    const membership = await db.companyMember.findUnique({
+      where: { userId_companyId: { userId, companyId } },
+    });
+    if (!membership) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     // Verify bank account
@@ -58,15 +55,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Bank account not found' },
         { status: 404 }
-      );
-    }
-
-    // Check fiscal period lock
-    const adjustmentDateLocked = await isDateInLockedPeriod(companyId, new Date(date));
-    if (adjustmentDateLocked) {
-      return NextResponse.json(
-        { error: 'Cannot create adjustments in a locked fiscal period' },
-        { status: 403 }
       );
     }
 
@@ -85,111 +73,50 @@ export async function POST(request: NextRequest) {
 
     const ref = `RECON-ADJ-${new Date().toISOString().split('T')[0]}`;
 
-    // Create journal entry with HMAC hash in a transaction
-    const entry = await db.$transaction(async (tx) => {
-      const journalEntry = await tx.journalEntry.create({
-        data: {
-          companyId,
-          date: new Date(date),
-          description: `[Reconciliation Adjustment] ${description}`,
-          reference: ref,
-          status: 'posted',
-          lines: {
-            create: [
-              {
-                glAccountId: debitAccountId,
-                description,
-                debit: toCents(amount),
-                credit: 0,
-              },
-              {
-                glAccountId: creditAccountId,
-                description,
-                debit: 0,
-                credit: toCents(amount),
-              },
-            ],
-          },
-        },
-      });
-
-      // HMAC hash for the journal entry
-      const lastPosted = await tx.journalEntry.findFirst({
-        where: {
-          companyId,
-          status: 'posted',
-          createdAt: { lt: journalEntry.createdAt },
-          hash: { not: null },
-        },
-        orderBy: { createdAt: 'desc' },
-        select: { hash: true },
-      });
-
-      const entryHash = computeEntryHash({
-        id: journalEntry.id,
+    // Create journal entry
+    const entry = await db.journalEntry.create({
+      data: {
         companyId,
-        date: new Date(date).toISOString(),
+        date: new Date(date),
         description: `[Reconciliation Adjustment] ${description}`,
         reference: ref,
         status: 'posted',
-        totalDebit: toCents(amount),
-        totalCredit: toCents(amount),
-        previousHash: lastPosted?.hash ?? null,
-      });
-
-      await tx.journalEntry.update({
-        where: { id: journalEntry.id },
-        data: { hash: entryHash, previousHash: lastPosted?.hash ?? null },
-      });
-
-      return journalEntry;
+        lines: {
+          create: [
+            {
+              glAccountId: debitAccountId,
+              description,
+              debit: amount,
+              credit: 0,
+            },
+            {
+              glAccountId: creditAccountId,
+              description,
+              debit: 0,
+              credit: amount,
+            },
+          ],
+        },
+      },
     });
 
-    // Recalculate bank account balance after adjustment
-    await recalculateBankAccountBalance(bankAccountId);
-
-    // Audit log with HMAC chain
-    const lastAudit = await db.auditLog.findFirst({
-      where: { hash: { not: null } },
-      orderBy: { createdAt: 'desc' },
-      select: { hash: true },
-    });
-
-    const auditDetails = JSON.stringify({
-      bankAccountId,
-      journalEntryId: entry.id,
-      debitAccountId,
-      creditAccountId,
-      amount,
-      notes,
-    });
-
-    const createdAudit = await db.auditLog.create({
+    // Audit log
+    await db.auditLog.create({
       data: {
         companyId,
         userId,
         action: 'reconciliation_adjustment',
         entity: 'JournalEntry',
         entityId: entry.id,
-        details: auditDetails,
-        previousHash: lastAudit?.hash ?? null,
+        details: JSON.stringify({
+          bankAccountId,
+          journalEntryId: entry.id,
+          debitAccountId,
+          creditAccountId,
+          amount,
+          notes,
+        }),
       },
-    });
-
-    const auditHash = computeAuditHash({
-      id: createdAudit.id,
-      companyId,
-      userId,
-      action: 'reconciliation_adjustment',
-      entity: 'JournalEntry',
-      entityId: entry.id,
-      details: auditDetails,
-      previousHash: lastAudit?.hash ?? null,
-    });
-
-    await db.auditLog.update({
-      where: { id: createdAudit.id },
-      data: { hash: auditHash },
     });
 
     return NextResponse.json({

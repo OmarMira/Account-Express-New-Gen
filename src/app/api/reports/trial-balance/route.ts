@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
-import { toDollars } from '@/lib/money';
 
 export async function GET(request: NextRequest) {
   try {
-    const userId = await getSessionUserId(request);
+    const userId = getSessionUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -118,15 +117,15 @@ export async function GET(request: NextRequest) {
           : entry.creditTotal - entry.debitTotal;
 
       // Skip zero-balance accounts
-      if (Math.abs(netBalance) < 1) continue;
+      if (Math.abs(netBalance) < 0.005) continue;
 
       accounts.push({
         code: entry.code,
         name: entry.name,
         accountType: entry.accountType,
-        debit: toDollars(entry.debitTotal),
-        credit: toDollars(entry.creditTotal),
-        balance: toDollars(netBalance),
+        debit: Math.round(entry.debitTotal * 100) / 100,
+        credit: Math.round(entry.creditTotal * 100) / 100,
+        balance: Math.round(netBalance * 100) / 100,
       });
 
       totalDebits += entry.debitTotal;
@@ -135,8 +134,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       accounts,
-      totalDebits: toDollars(totalDebits),
-      totalCredits: toDollars(totalCredits),
+      totalDebits: Math.round(totalDebits * 100) / 100,
+      totalCredits: Math.round(totalCredits * 100) / 100,
       asOfDate: asOfDate.toISOString(),
     });
   } catch (error) {

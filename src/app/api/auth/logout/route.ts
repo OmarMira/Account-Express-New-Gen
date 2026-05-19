@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { destroySession } from '@/lib/sessions';
+import { destroySession, getSessionToken } from '@/lib/sessions';
 
 // ─── POST /api/auth/logout ────────────────────────────────────────────
 export async function POST(request: NextRequest) {
-  await destroySession(request);
+  const token = getSessionToken(request);
+  if (token) {
+    destroySession(token);
+  }
 
   const response = NextResponse.json({ success: true });
 

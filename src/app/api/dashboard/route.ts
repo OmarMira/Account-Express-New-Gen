@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
-import { toDollars } from '@/lib/money';
+import { hasCompanyAccess } from '@/lib/auth';
+
 
 // ─── GET /api/dashboard?companyId=xxx ──────────────────────────────
 export async function GET(request: NextRequest) {
   try {
     // Auth check
-    const userId = await getSessionUserId(request);
+    const userId = getSessionUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -22,14 +23,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Verify the user belongs to this company
-    const membership = await db.companyMember.findUnique({
-      where: {
-        userId_companyId: { userId, companyId },
-      },
-    });
-
-    if (!membership) {
+    // Verify the user has access to this company
+    const hasAccess = await hasCompanyAccess(userId, companyId);
+    if (!hasAccess) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -159,32 +155,66 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    // ── Monthly trend (last 12 months from bank transactions) ──
+    const twelveMonthsAgo = new Date(now);
+    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 11);
+    twelveMonthsAgo.setDate(1);
+    twelveMonthsAgo.setHours(0, 0, 0, 0);
+
+    const trendTxs = await db.bankTransaction.findMany({
+      where: {
+        statement: { bankAccount: { companyId } },
+        date: { gte: twelveMonthsAgo },
+      },
+      select: { date: true, amount: true },
+    });
+
+    const monthMap: Record<string, { income: number; expenses: number }> = {};
+    const MONTH_NAMES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+    for (const tx of trendTxs) {
+      const d = new Date(tx.date);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (!monthMap[key]) monthMap[key] = { income: 0, expenses: 0 };
+      if (tx.amount > 0) monthMap[key].income += tx.amount;
+      else monthMap[key].expenses += Math.abs(tx.amount);
+    }
+
+    const monthlyTrend = Object.entries(monthMap)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, val]) => ({
+        month: MONTH_NAMES[parseInt(key.split('-')[1]) - 1],
+        income: Math.round(val.income * 100) / 100,
+        expenses: Math.round(val.expenses * 100) / 100,
+      }));
+
     // ── Build response ──
     const accountBalances = Object.entries(typeBalances).map(
       ([accountType, balance]) => ({
         accountType,
-        balance: toDollars(balance),
+        balance: Math.round(balance * 100) / 100,
       })
     );
 
     return NextResponse.json({
-      totalBankBalance: toDollars(totalBankBalance),
+      totalBankBalance: Math.round(totalBankBalance * 100) / 100,
       bankAccountCount: bankAccounts.length,
-      totalAssets: toDollars(typeBalances.asset),
-      totalLiabilities: toDollars(typeBalances.liability),
-      totalEquity: toDollars(typeBalances.equity),
-      totalRevenue: toDollars(typeBalances.revenue),
-      totalExpenses: toDollars(typeBalances.expense),
+      totalAssets: Math.round(typeBalances.asset * 100) / 100,
+      totalLiabilities: Math.round(typeBalances.liability * 100) / 100,
+      totalEquity: Math.round(typeBalances.equity * 100) / 100,
+      totalRevenue: Math.round(typeBalances.revenue * 100) / 100,
+      totalExpenses: Math.round(typeBalances.expense * 100) / 100,
       postedEntries,
       reconciledCount,
       unreconciledCount,
-      recentTransactions: recentTransactions.map(tx => ({ ...tx, amount: toDollars(tx.amount) })),
+      recentTransactions,
       accountBalances,
+      monthlyTrend,
       bankAccounts: bankAccounts.map((a) => ({
         id: a.id,
         accountName: a.accountName,
         bankName: a.bankName,
-        balance: toDollars(a.balance),
+        balance: Math.round(a.balance * 100) / 100,
         currency: a.currency,
       })),
       upcomingPeriodEnds: upcomingPeriods.map((p) => ({
