@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Building2, ChevronRight, LogOut } from 'lucide-react';
+import { Building2, ChevronRight, LogOut, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Card,
   CardContent,
@@ -20,6 +22,41 @@ export function SelectCompanyPage() {
   const t = useLanguageStore((s) => s.t);
   const { user, setActiveCompany, setCurrentView, logout } = useAuthStore();
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [legalName, setLegalName] = useState('');
+  const [taxId, setTaxId] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState('');
+
+  async function handleCreateCompany(e: React.FormEvent) {
+    e.preventDefault();
+    if (!legalName.trim()) return;
+
+    setCreating(true);
+    setError('');
+
+    try {
+      const res = await fetch('/api/companies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ legalName, taxId }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || 'Error al crear la empresa');
+        return;
+      }
+
+      const newCompany: Company = data.company;
+      setActiveCompany(newCompany);
+      setCurrentView('dashboard');
+    } catch {
+      setError('Error de conexión al servidor');
+    } finally {
+      setCreating(false);
+    }
+  }
 
   useEffect(() => {
     async function fetchCompanies() {
@@ -91,9 +128,47 @@ export function SelectCompanyPage() {
               )}
 
               {companies.length === 0 ? (
-                <p className="py-8 text-center text-sm text-muted-foreground">
-                  {t('auth.noCompanies')}
-                </p>
+                <div className="space-y-4">
+                  <div className="rounded-xl border border-dashed border-amber-500/20 bg-amber-500/5 p-4 text-center">
+                    <p className="text-sm text-amber-600 dark:text-amber-400 font-medium">
+                      No tienes empresas asociadas
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Crea tu primera empresa a continuación para comenzar
+                    </p>
+                  </div>
+
+                  <form onSubmit={handleCreateCompany} className="space-y-4 pt-2">
+                    {error && (
+                      <div className="rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                        {error}
+                      </div>
+                    )}
+                    <div className="space-y-1.5">
+                      <Label htmlFor="create-legalName">Nombre de la Empresa</Label>
+                      <Input
+                        id="create-legalName"
+                        value={legalName}
+                        onChange={(e) => setLegalName(e.target.value)}
+                        required
+                        placeholder="Ej. Mi Negocio S.A."
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="create-taxId">RFC / NIT (Opcional)</Label>
+                      <Input
+                        id="create-taxId"
+                        value={taxId}
+                        onChange={(e) => setTaxId(e.target.value)}
+                        placeholder="Ej. RFC123456789"
+                      />
+                    </div>
+                    <Button type="submit" className="w-full mt-2" disabled={creating}>
+                      {creating && <Loader2 className="size-4 animate-spin mr-2" />}
+                      Crear Empresa y Continuar
+                    </Button>
+                  </form>
+                </div>
               ) : (
                 <div className="space-y-2">
                   {companies.map((company, i) => (
