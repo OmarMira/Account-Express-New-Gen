@@ -187,7 +187,7 @@ export function ImportPage() {
 
   // Upload state
   const [isDragging, setIsDragging] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState('');
@@ -268,39 +268,51 @@ export function ImportPage() {
 
     const files = e.dataTransfer.files;
     if (files.length > 0) {
-      validateAndSetFile(files[0]);
+      validateAndAddFiles(Array.from(files));
     }
   }
 
   function handleFileInput(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (files && files.length > 0) {
-      validateAndSetFile(files[0]);
+      validateAndAddFiles(Array.from(files));
     }
   }
 
-  function validateAndSetFile(file: File) {
-    const ext = '.' + (file.name.split('.').pop()?.toLowerCase() || '');
-    if (!ACCEPTED_TYPES.includes(ext)) {
-      setUploadError(
-        `${t('common.type')}: "${ext}" — ${t('banks.supportedFormats')}`
-      );
-      setSelectedFile(null);
-      return;
+  function validateAndAddFiles(files: File[]) {
+    const validFiles: File[] = [];
+    let errorMsg = '';
+
+    for (const file of files) {
+      const ext = '.' + (file.name.split('.').pop()?.toLowerCase() || '');
+      if (!ACCEPTED_TYPES.includes(ext)) {
+        errorMsg = `${t('common.type')}: "${ext}" — ${t('banks.supportedFormats')}`;
+        continue;
+      }
+      if (file.size > MAX_FILE_SIZE) {
+        errorMsg = `${t('common.type')}: ${formatFileSize(file.size)} — ${t('banks.supportedFormats')}`;
+        continue;
+      }
+      validFiles.push(file);
     }
-    if (file.size > MAX_FILE_SIZE) {
-      setUploadError(
-        `${t('common.type')}: ${formatFileSize(file.size)} — ${t('banks.supportedFormats')}`
-      );
-      setSelectedFile(null);
-      return;
+
+    if (validFiles.length > 0) {
+      setSelectedFiles((prev) => [...prev, ...validFiles]);
     }
-    setSelectedFile(file);
-    setUploadError('');
+    if (errorMsg) {
+      setUploadError(errorMsg);
+    }
   }
 
-  function clearFile() {
-    setSelectedFile(null);
+  function removeFile(index: number) {
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }
+
+  function clearFiles() {
+    setSelectedFiles([]);
     setUploadError('');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -310,52 +322,70 @@ export function ImportPage() {
   // ─── Upload ───────────────────────────────────────────────────────
 
   async function handleUpload() {
-    if (!selectedFile || !activeCompany) return;
+    if (selectedFiles.length === 0 || !activeCompany) return;
 
     setUploading(true);
-    setUploadProgress(10);
+    setUploadProgress(5);
     setUploadError('');
 
     try {
-      // Simulate progress
-      const progressInterval = setInterval(() => {
-        setUploadProgress((prev) => {
-          if (prev >= 90) {
-            clearInterval(progressInterval);
-            return 90;
-          }
-          return prev + Math.random() * 15;
+      let totalTransactions = 0;
+      let totalAutoCategorized = 0;
+      let totalDuplicatesSkipped = 0;
+      let newAccountCreated = false;
+      let bankAccountName = '';
+      let statementId = '';
+
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i];
+        
+        // Progress weight for each file
+        const startProgress = (i / selectedFiles.length) * 100;
+        const endProgress = ((i + 1) / selectedFiles.length) * 100;
+        setUploadProgress(startProgress + 5);
+
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('companyId', activeCompany.id);
+        if (selectedBankAccountId) {
+          formData.append('bankAccountId', selectedBankAccountId);
+        }
+
+        const res = await fetch('/api/import', {
+          method: 'POST',
+          body: formData,
         });
-      }, 200);
 
-      const formData = new FormData();
-      formData.append('file', selectedFile);
-      formData.append('companyId', activeCompany.id);
-      if (selectedBankAccountId) {
-        formData.append('bankAccountId', selectedBankAccountId);
-      }
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || `${file.name}: ${t('banks.importFailed')}`);
+        }
 
-      const res = await fetch('/api/import', {
-        method: 'POST',
-        body: formData,
-      });
-
-      clearInterval(progressInterval);
-      setUploadProgress(100);
-
-      if (res.ok) {
         const data: ImportResult = await res.json();
-        setImportResult(data);
-        setResultOpen(true);
-        clearFile();
-        fetchBankAccounts();
-        fetchHistory();
-      } else {
-        const err = await res.json();
-        setUploadError(err.error || t('banks.importFailed'));
+        statementId = data.statementId;
+        totalTransactions += data.transactionCount;
+        totalAutoCategorized += data.autoCategorizedCount;
+        totalDuplicatesSkipped += data.duplicatesSkipped;
+        if (data.newAccountCreated) newAccountCreated = true;
+        bankAccountName = data.bankAccountName;
+
+        setUploadProgress(endProgress);
       }
-    } catch {
-      setUploadError(t('banks.importFailed'));
+
+      setImportResult({
+        statementId,
+        transactionCount: totalTransactions,
+        autoCategorizedCount: totalAutoCategorized,
+        duplicatesSkipped: totalDuplicatesSkipped,
+        newAccountCreated,
+        bankAccountName,
+      });
+      setResultOpen(true);
+      clearFiles();
+      fetchBankAccounts();
+      fetchHistory();
+    } catch (err: any) {
+      setUploadError(err.message || t('banks.importFailed'));
     } finally {
       setUploading(false);
       setUploadProgress(0);
@@ -386,7 +416,7 @@ export function ImportPage() {
                 'relative rounded-xl border-2 border-dashed p-8 text-center transition-all cursor-pointer',
                 isDragging
                   ? 'border-primary bg-primary/5 scale-[1.01]'
-                  : selectedFile
+                  : selectedFiles.length > 0
                     ? 'border-emerald-300 dark:border-emerald-700 bg-emerald-50/50 dark:bg-emerald-950/20'
                     : 'border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/50',
                 uploading && 'pointer-events-none opacity-60'
@@ -394,27 +424,54 @@ export function ImportPage() {
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
-              onClick={() =>
-                !selectedFile && !uploading && fileInputRef.current?.click()
-              }
+              onClick={(e) => {
+                if (uploading) return;
+                // Only click if we clicked the dropzone itself, not children buttons
+                if ((e.target as HTMLElement).tagName === 'BUTTON' || (e.target as HTMLElement).closest('button')) {
+                  return;
+                }
+                fileInputRef.current?.click();
+              }}
             >
               <input
                 ref={fileInputRef}
                 type="file"
                 className="hidden"
                 accept=".csv,.tsv,.txt,.ofx,.qfx,.pdf"
+                multiple
                 onChange={handleFileInput}
               />
 
-              {selectedFile ? (
-                /* Selected file preview */
-                <div className="flex flex-col items-center gap-3">
-                  {getFileIcon(selectedFile.name)}
-                  <div>
-                    <p className="text-sm font-medium">{selectedFile.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatFileSize(selectedFile.size)}
-                    </p>
+              {selectedFiles.length > 0 ? (
+                /* Selected files preview */
+                <div className="flex flex-col items-center gap-4 w-full max-w-md mx-auto">
+                  <div className="w-full space-y-2 max-h-[200px] overflow-y-auto pr-1">
+                    {selectedFiles.map((file, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-2 rounded-lg border bg-background text-left">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          {getFileIcon(file.name)}
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium truncate max-w-[200px]">{file.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatFileSize(file.size)}
+                            </p>
+                          </div>
+                        </div>
+                        {!uploading && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-8 text-muted-foreground hover:text-red-600 shrink-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeFile(idx);
+                            }}
+                          >
+                            <X className="size-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
                   </div>
                   {!uploading && (
                     <Button
@@ -423,11 +480,11 @@ export function ImportPage() {
                       className="text-muted-foreground hover:text-red-600"
                       onClick={(e) => {
                         e.stopPropagation();
-                        clearFile();
+                        clearFiles();
                       }}
                     >
                       <X className="size-3.5 mr-1" />
-                      {t('common.delete')}
+                      {t('common.delete')} Todo
                     </Button>
                   )}
                 </div>
@@ -501,7 +558,7 @@ export function ImportPage() {
             <div className="flex items-center gap-3">
               <Button
                 onClick={handleUpload}
-                disabled={!selectedFile || uploading}
+                disabled={selectedFiles.length === 0 || uploading}
                 className="w-full sm:w-auto h-10 px-6 text-sm font-semibold"
                 size="lg"
               >
