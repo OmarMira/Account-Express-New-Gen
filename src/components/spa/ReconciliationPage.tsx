@@ -19,6 +19,7 @@ import {
   History as HistoryIcon,
   BookOpen,
   Filter,
+  Upload,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatCurrency, formatDate } from '@/lib/format';
@@ -148,6 +149,7 @@ interface ReconPeriod {
 export function ReconciliationPage() {
   const t = useLanguageStore((s) => s.t);
   const activeCompany = useAuthStore((s) => s.activeCompany);
+  const setCurrentView = useAuthStore((s) => s.setCurrentView);
 
   // Bank account selector - auto-select first account
   const [bankAccounts, setBankAccounts] = useState<BankAccountOption[]>([]);
@@ -655,6 +657,10 @@ export function ReconciliationPage() {
           <p className="text-sm text-muted-foreground mt-1">{t('reconciliation.reconciliationSubtitle')}</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setCurrentView('import')} className="gap-2">
+            <Upload className="size-4" />
+            {t('banks.uploadStatement')}
+          </Button>
           {selectedAccountId && (
             <>
               <Button variant="outline" size="sm" onClick={() => { fetchHistory(); setHistoryDialogOpen(true); }} className="gap-2">
