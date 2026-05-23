@@ -1,12 +1,4 @@
-import path from 'path';
-
-if (typeof global !== 'undefined') {
-  if (!(global as any).DOMMatrix) (global as any).DOMMatrix = class {};
-  if (!(global as any).ImageData) (global as any).ImageData = class {};
-  if (!(global as any).Path2D) (global as any).Path2D = class {};
-}
-
-const { PDFParse } = require('pdf-parse');
+import { PDFParse } from 'pdf-parse';
 
 export interface ParsedTransaction {
   date: Date;
@@ -15,19 +7,27 @@ export interface ParsedTransaction {
   reference?: string;
 }
 
-/**
- * Parses a PDF bank statement buffer and extracts transactions.
- */
-export async function parsePDF(buffer: Buffer): Promise<ParsedTransaction[]> {
-  // Retrieve the self-contained base64 worker data URL dynamically using eval("require") to completely hide it from Turbopack/Webpack static analysis
-  const workerModulePath = path.join(process.cwd(), 'node_modules', 'pdf-parse', 'dist', 'worker', 'cjs', 'index.cjs');
-  const workerModule = eval("require")(workerModulePath);
-  PDFParse.setWorker(workerModule.getData());
+export interface ParsedPDFResult {
+  transactions: ParsedTransaction[];
+  bankName?: string;
+  accountNo?: string;
+  openingBalance?: number;
+  closingBalance?: number;
+  startDate?: Date;
+  endDate?: Date;
+}
 
-  const parser = new PDFParse(new Uint8Array(buffer));
-  const data = await parser.getText();
-  const text = data.text || '';
-  const lines = text.split('\n');
+export async function parsePDF(buffer: Buffer): Promise<ParsedPDFResult> {
+  const parser = new PDFParse({ data: new Uint8Array(buffer) });
+  let fullText = '';
+  try {
+    const data = await parser.getText();
+    fullText = data.text || '';
+  } finally {
+    await parser.destroy().catch(() => {});
+  }
+
+  const lines = fullText.split('\n');
   const transactions: ParsedTransaction[] = [];
 
   // Regex to match a date
@@ -40,7 +40,11 @@ export async function parsePDF(buffer: Buffer): Promise<ParsedTransaction[]> {
     const line = rawLine.trim();
     if (!line) continue;
 
-    // Check if the line contains a date and ends with an amount
+    // Skip balance summary lines so they aren't parsed as transactions
+    if (/balance/i.test(line) && (/(?:beginning|ending|starting|opening|closing|previous|new)/i.test(line))) {
+      continue;
+    }
+
     const dateMatch = line.match(dateRegex);
     const amountMatch = line.match(amountRegex);
 
@@ -48,14 +52,11 @@ export async function parsePDF(buffer: Buffer): Promise<ParsedTransaction[]> {
       const matchedDateStr = dateMatch[1];
       const matchedAmountStr = amountMatch[1];
 
-      // Extract the description (text between date and amount)
       const dateIndex = line.indexOf(matchedDateStr);
       const amountIndex = line.lastIndexOf(matchedAmountStr);
 
       if (dateIndex !== -1 && amountIndex !== -1 && amountIndex > dateIndex + matchedDateStr.length) {
         const descRaw = line.substring(dateIndex + matchedDateStr.length, amountIndex).trim();
-        
-        // Clean description (remove extra spaces, dashes, etc.)
         const description = descRaw.replace(/^[-_\s\:\.\,]+|[-_\s\:\.\,]+$/g, '').trim();
 
         if (description.length > 1) {
@@ -63,18 +64,14 @@ export async function parsePDF(buffer: Buffer): Promise<ParsedTransaction[]> {
           const amount = parseAmount(matchedAmountStr);
 
           if (date && !isNaN(date.getTime()) && !isNaN(amount)) {
-            transactions.push({
-              date,
-              description,
-              amount,
-            });
+            transactions.push({ date, description, amount });
           }
         }
       }
     }
   }
 
-  // Fallback / standard seeding of transactions if no lines were extracted to ensure a graceful end-to-end flow
+  // Fallback mock data if no transactions were extracted
   if (transactions.length === 0) {
     const mockDate = new Date();
     transactions.push(
@@ -85,7 +82,60 @@ export async function parsePDF(buffer: Buffer): Promise<ParsedTransaction[]> {
     );
   }
 
-  return transactions;
+  // Extract metadata
+  let bankName: string | undefined;
+  if (/Bank of America/i.test(fullText)) {
+    bankName = 'Bank of America';
+  } else if (/Chase/i.test(fullText)) {
+    bankName = 'Chase Bank';
+  } else if (/Wells Fargo/i.test(fullText)) {
+    bankName = 'Wells Fargo';
+  }
+
+  let accountNo: string | undefined;
+  const accMatch = fullText.match(/(?:Account number|Account\s*#|Account\s*no\.?|Account\s*Number):\s*([0-9\s\-]+)/i);
+  if (accMatch) {
+    accountNo = accMatch[1].trim().replace(/\s+/g, ' ');
+  }
+
+  let openingBalance: number | undefined;
+  let closingBalance: number | undefined;
+  let startDate: Date | undefined;
+  let endDate: Date | undefined;
+
+  const startBalMatch = fullText.match(/Beginning balance on ([A-Za-z]+ \d+, \d{4})\s+\$?([0-9,.-]+)/i);
+  if (startBalMatch) {
+    openingBalance = parseAmount(startBalMatch[2]);
+    const d = parseDate(startBalMatch[1]);
+    if (d) startDate = d;
+  } else {
+    const fallbackStart = fullText.match(/(?:Beginning|Starting|Opening|Previous) balance\s+\$?([0-9,.-]+)/i);
+    if (fallbackStart) {
+      openingBalance = parseAmount(fallbackStart[1]);
+    }
+  }
+
+  const endBalMatch = fullText.match(/Ending balance on ([A-Za-z]+ \d+, \d{4})\s+\$?([0-9,.-]+)/i);
+  if (endBalMatch) {
+    closingBalance = parseAmount(endBalMatch[2]);
+    const d = parseDate(endBalMatch[1]);
+    if (d) endDate = d;
+  } else {
+    const fallbackEnd = fullText.match(/(?:Ending|Closing|New) balance\s+\$?([0-9,.-]+)/i);
+    if (fallbackEnd) {
+      closingBalance = parseAmount(fallbackEnd[1]);
+    }
+  }
+
+  return {
+    transactions,
+    bankName,
+    accountNo,
+    openingBalance,
+    closingBalance,
+    startDate,
+    endDate,
+  };
 }
 
 function parseDate(val: string): Date | null {
@@ -104,16 +154,12 @@ function parseDate(val: string): Date | null {
     const b = Number(slashMatch[2]);
     const year = Number(slashMatch[3]);
 
-    if (a > 12) {
-      return new Date(year, b - 1, a);
-    }
-    if (b > 12) {
-      return new Date(year, a - 1, b);
-    }
+    if (a > 12) return new Date(year, b - 1, a);
+    if (b > 12) return new Date(year, a - 1, b);
     return new Date(year, a - 1, b);
   }
 
-  // Try DD Mon YYYY (e.g., 15 Jan 2026)
+  // Try DD Mon YYYY
   const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
   const textMatch = dateStr.match(/^(\d{1,2})\s+([a-zA-Z]+)\s+(\d{4})$/);
   if (textMatch) {
@@ -128,7 +174,7 @@ function parseDate(val: string): Date | null {
 }
 
 function parseAmount(val: string): number {
-  let cleaned = val.replace(/[^0-9.,()\-+]/g, '');
+  let cleaned = val.replace(/[^0-9.,()+\\-]/g, '');
 
   if (cleaned.startsWith('(') && cleaned.endsWith(')')) {
     cleaned = '-' + cleaned.slice(1, -1);
@@ -139,6 +185,8 @@ function parseAmount(val: string): number {
     const lastDot = cleaned.lastIndexOf('.');
     if (lastComma > lastDot) {
       cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+    } else {
+      cleaned = cleaned.replace(/,/g, '');
     }
   } else if (cleaned.endsWith(',')) {
     cleaned = cleaned.slice(0, -1);

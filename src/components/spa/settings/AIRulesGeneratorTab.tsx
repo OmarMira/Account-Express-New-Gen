@@ -8,8 +8,11 @@ import {
   Loader2,
   Brain,
   ArrowRight,
+  Eye,
+  X,
+  Save,
 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useLanguageStore } from '@/store/language-store';
 import { useAuthStore } from '@/store/auth-store';
 import { toast } from 'sonner';
@@ -40,8 +43,187 @@ interface DetectedPattern {
   id: string;
   description: string;
   occurrences: number;
+  direction: 'debit' | 'credit';
+  averageAmount: number;
   suggestedAccount: string;
   suggestedAccountCode: string;
+  suggestedAccountId: string;
+}
+
+/* ─── EditableRule (state inside modal) ───────────────────────── */
+
+interface EditableRule {
+  name: string;
+  conditionType: 'contains' | 'starts_with' | 'ends_with' | 'equals';
+  conditionValue: string;
+  transactionDirection: 'debit' | 'credit' | 'any';
+  glAccountName: string;
+  glAccountCode: string;
+  glAccountId?: string;
+  priority: number;
+}
+
+/* ─── RuleModal ───────────────────────────────────────────────── */
+
+function RuleModal({
+  pattern,
+  onClose,
+  onSave,
+}: {
+  pattern: DetectedPattern;
+  onClose: () => void;
+  onSave: (rule: EditableRule) => Promise<void>;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [rule, setRule] = useState<EditableRule>({
+    name: pattern.description,
+    conditionType: 'contains',
+    conditionValue: pattern.description,
+    transactionDirection: pattern.direction ?? 'any',
+    glAccountName: pattern.suggestedAccount,
+    glAccountCode: pattern.suggestedAccountCode,
+    priority: 10,
+  });
+
+  function field(key: keyof EditableRule, value: string | number) {
+    setRule((prev) => ({ ...prev, [key]: value }));
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    await onSave(rule);
+    setSaving(false);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 12 }}
+        transition={{ duration: 0.18 }}
+        className="bg-background border rounded-xl shadow-2xl w-full max-w-lg"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b">
+          <div>
+            <h3 className="font-semibold text-base flex items-center gap-2">
+              <Eye className="size-4 text-violet-500" />
+              Ver / Editar Regla
+            </h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {pattern.occurrences} ocurrencias detectadas
+            </p>
+          </div>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
+            <X className="size-5" />
+          </button>
+        </div>
+
+        {/* Fields */}
+        <div className="px-6 py-5 space-y-4">
+          {/* Name */}
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-1 block">Nombre de la Regla</label>
+            <input
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+              value={rule.name}
+              onChange={(e) => field('name', e.target.value)}
+            />
+          </div>
+
+          {/* Condition */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Tipo de Condición</label>
+              <select
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                value={rule.conditionType}
+                onChange={(e) => field('conditionType', e.target.value)}
+              >
+                <option value="contains">Contiene</option>
+                <option value="starts_with">Empieza con</option>
+                <option value="ends_with">Termina con</option>
+                <option value="equals">Igual a</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Valor</label>
+              <input
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                value={rule.conditionValue}
+                onChange={(e) => field('conditionValue', e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Direction */}
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-1 block">Dirección</label>
+            <select
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+              value={rule.transactionDirection}
+              onChange={(e) => field('transactionDirection', e.target.value)}
+            >
+              <option value="debit">Débito (egreso)</option>
+              <option value="credit">Crédito (ingreso)</option>
+              <option value="any">Ambos</option>
+            </select>
+          </div>
+
+          {/* GL Account */}
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Código GL</label>
+              <input
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                value={rule.glAccountCode}
+                onChange={(e) => field('glAccountCode', e.target.value)}
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Cuenta GL</label>
+              <input
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                value={rule.glAccountName}
+                onChange={(e) => field('glAccountName', e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Priority */}
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-1 block">
+              Prioridad: <span className="text-foreground font-semibold">{rule.priority}</span>
+            </label>
+            <input
+              type="range"
+              min={0}
+              max={20}
+              value={rule.priority}
+              onChange={(e) => field('priority', Number(e.target.value))}
+              className="w-full accent-violet-500"
+            />
+            <div className="flex justify-between text-xs text-muted-foreground mt-0.5">
+              <span>0 (menor)</span>
+              <span>20 (mayor)</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-end gap-2 px-6 py-4 border-t">
+          <Button variant="outline" size="sm" onClick={onClose} disabled={saving}>
+            Cancelar
+          </Button>
+          <Button size="sm" onClick={handleSave} disabled={saving} className="gap-1.5">
+            {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
+            Guardar Regla
+          </Button>
+        </div>
+      </motion.div>
+    </div>
+  );
 }
 
 /* ─── AIRulesGeneratorTab ─────────────────────────────────────── */
@@ -54,6 +236,8 @@ export function AIRulesGeneratorTab() {
   const [scanning, setScanning] = useState(false);
   const [scanned, setScanned] = useState(false);
   const [savingRules, setSavingRules] = useState<string[]>([]);
+  const [isSavingAll, setIsSavingAll] = useState(false);
+  const [viewingPattern, setViewingPattern] = useState<DetectedPattern | null>(null);
 
   async function handleScan() {
     if (!activeCompany?.id) return;
@@ -62,20 +246,19 @@ export function AIRulesGeneratorTab() {
     setScanned(false);
 
     try {
-      const res = await fetch('/api/ai-assistant', {
+      const res = await fetch('/api/ai-rules/scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          mode: 'detect-patterns',
-          companyId: activeCompany.id,
-        }),
+        body: JSON.stringify({ companyId: activeCompany.id }),
       });
 
       if (res.ok) {
-        const data = await res.json();
+        const data = await res.json() as { patterns?: DetectedPattern[] };
         setPatterns(data.patterns || []);
         setScanned(true);
-        toast?.success?.(t('settings.aiRules.scanComplete'));
+        if ((data.patterns || []).length > 0) {
+          toast?.success?.(t('settings.aiRules.scanComplete'));
+        }
       } else {
         setPatterns([]);
         setScanned(true);
@@ -88,152 +271,242 @@ export function AIRulesGeneratorTab() {
     setScanning(false);
   }
 
+  async function saveRule(patternId: string, rule: EditableRule) {
+    if (!activeCompany?.id) return;
+    setSavingRules((prev) => [...prev, patternId]);
+    try {
+      const res = await fetch('/api/bank-rules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId: activeCompany.id,
+          name: rule.name,
+          conditionType: rule.conditionType,
+          conditionValue: rule.conditionValue,
+          transactionDirection: rule.transactionDirection,
+          glAccountCode: rule.glAccountCode,
+          glAccountId: rule.glAccountId,
+          priority: rule.priority,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      toast?.success?.(`Regla guardada: ${rule.name}`);
+      setPatterns((prev) => prev.filter((p) => p.id !== patternId));
+    } catch {
+      toast?.error?.('No se pudo guardar la regla. Verifique que la cuenta GL exista.');
+      throw new Error('Save failed');
+    } finally {
+      setSavingRules((prev) => prev.filter((id) => id !== patternId));
+    }
+  }
+
   async function handleSaveRule(pattern: DetectedPattern) {
-    setSavingRules((prev) => [...prev, pattern.id]);
-    // Simulate save delay
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setSavingRules((prev) => prev.filter((id) => id !== pattern.id));
+    if (!pattern.suggestedAccountCode && !pattern.suggestedAccountId) {
+      setViewingPattern(pattern);
+      toast?.error?.('Debe seleccionar una cuenta GL antes de guardar.');
+      return;
+    }
+    try {
+      await saveRule(pattern.id, {
+        name: pattern.description,
+        conditionType: 'contains',
+        conditionValue: pattern.description,
+        transactionDirection: pattern.direction ?? 'any',
+        glAccountName: pattern.suggestedAccount,
+        glAccountCode: pattern.suggestedAccountCode,
+        glAccountId: pattern.suggestedAccountId,
+        priority: 10,
+      });
+    } catch {
+      // error handled in saveRule
+    }
   }
 
   async function handleSaveAll() {
-    const ids = patterns.map((p) => p.id);
-    setSavingRules(ids);
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    setSavingRules([]);
+    setIsSavingAll(true);
+    const list = [...patterns];
+    for (const pattern of list) {
+      if (!pattern.suggestedAccountCode && !pattern.suggestedAccountId) {
+        continue; // Skip rules without an account
+      }
+      try {
+        await handleSaveRule(pattern);
+      } catch (err) {
+        console.error("Error saving pattern rule:", pattern.description, err);
+      }
+    }
+    setIsSavingAll(false);
+  }
+
+  async function handleModalSave(rule: EditableRule) {
+    if (!viewingPattern) return;
+    await saveRule(viewingPattern.id, rule);
+    setViewingPattern(null);
   }
 
   return (
-    <motion.div
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-      className="space-y-6"
-    >
-      {/* Header */}
-      <motion.div variants={itemVariants}>
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-semibold flex items-center gap-2">
-              <Brain className="size-5 text-violet-500" />
-              {t('settings.aiRules.title')}
-            </h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              {t('settings.aiRules.subtitle')}
-            </p>
-          </div>
-          {scanned && patterns.length > 0 && (
-            <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 border-0 self-start">
-              <CheckCircle2 className="size-3 mr-1" />
-              {patterns.length} {t('settings.aiRules.created')}
-            </Badge>
-          )}
-        </div>
-      </motion.div>
+    <>
+      {/* Modal */}
+      <AnimatePresence>
+        {viewingPattern && (
+          <RuleModal
+            pattern={viewingPattern}
+            onClose={() => setViewingPattern(null)}
+            onSave={handleModalSave}
+          />
+        )}
+      </AnimatePresence>
 
-      {/* Scan Button */}
-      <motion.div variants={itemVariants}>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">{t('settings.aiRules.title')}</CardTitle>
-            <CardDescription>{t('settings.aiRules.subtitle')}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={handleScan} disabled={scanning} className="gap-2">
-              {scanning ? (
-                <>
-                  <Loader2 className="size-4 animate-spin" />
-                  {t('settings.aiRules.scanning')}
-                </>
-              ) : (
-                <>
-                  <Search className="size-4" />
-                  {t('settings.aiRules.scanTransactions')}
-                </>
-              )}
-            </Button>
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* Empty State */}
-      {scanned && patterns.length === 0 && !scanning && (
-        <motion.div
-          variants={itemVariants}
-          className="text-center py-16"
-        >
-          <div className="flex flex-col items-center gap-3">
-            <div className="flex items-center justify-center size-16 rounded-full bg-emerald-100 dark:bg-emerald-900/30">
-              <CheckCircle2 className="size-8 text-emerald-500" />
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="space-y-6"
+      >
+        {/* Header */}
+        <motion.div variants={itemVariants}>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <Brain className="size-5 text-violet-500" />
+                {t('settings.aiRules.title')}
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                {t('settings.aiRules.subtitle')}
+              </p>
             </div>
-            <p className="text-sm text-muted-foreground max-w-md">
-              {t('settings.aiRules.noPatterns')}
-            </p>
+            {scanned && patterns.length > 0 && (
+              <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 border-0 self-start">
+                <CheckCircle2 className="size-3 mr-1" />
+                {patterns.length} {t('settings.aiRules.created')}
+              </Badge>
+            )}
           </div>
         </motion.div>
-      )}
 
-      {/* Detected Patterns */}
-      {patterns.length > 0 && (
+        {/* Scan Button */}
         <motion.div variants={itemVariants}>
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Zap className="size-4 text-amber-500" />
-                  {t('settings.aiRules.patternFound')}
-                </CardTitle>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleSaveAll}
-                  disabled={savingRules.length === patterns.length}
-                >
-                  {savingRules.length === patterns.length ? (
-                    <Loader2 className="size-3.5 mr-1 animate-spin" />
-                  ) : (
-                    <CheckCircle2 className="size-3.5 mr-1" />
-                  )}
-                  {t('settings.aiRules.saveAllRules')}
-                </Button>
-              </div>
+              <CardTitle className="text-base">{t('settings.aiRules.title')}</CardTitle>
+              <CardDescription>{t('settings.aiRules.subtitle')}</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {patterns.map((pattern) => (
-                <motion.div
-                  key={pattern.id}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  className="rounded-lg border p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                >
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium">{pattern.description}</p>
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                      <span>{pattern.occurrences} {t('settings.aiRules.occurrences')}</span>
-                      <span className="flex items-center gap-1">
-                        <ArrowRight className="size-3" />
-                        {t('settings.aiRules.suggestedAccount')}: {pattern.suggestedAccountCode} - {pattern.suggestedAccount}
-                      </span>
-                    </div>
-                  </div>
+            <CardContent>
+              <Button onClick={handleScan} disabled={scanning} className="gap-2">
+                {scanning ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" />
+                    {t('settings.aiRules.scanning')}
+                  </>
+                ) : (
+                  <>
+                    <Search className="size-4" />
+                    {t('settings.aiRules.scanTransactions')}
+                  </>
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Empty State */}
+        {scanned && patterns.length === 0 && !scanning && (
+          <motion.div
+            variants={itemVariants}
+            className="text-center py-16"
+          >
+            <div className="flex flex-col items-center gap-3">
+              <div className="flex items-center justify-center size-16 rounded-full bg-emerald-100 dark:bg-emerald-900/30">
+                <CheckCircle2 className="size-8 text-emerald-500" />
+              </div>
+              <p className="text-sm text-muted-foreground max-w-md">
+                {t('settings.aiRules.noPatterns')}
+              </p>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Detected Patterns */}
+        {patterns.length > 0 && (
+          <motion.div variants={itemVariants}>
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Zap className="size-4 text-amber-500" />
+                    {t('settings.aiRules.patternFound')}
+                  </CardTitle>
                   <Button
-                    size="sm"
                     variant="outline"
-                    onClick={() => handleSaveRule(pattern)}
-                    disabled={savingRules.includes(pattern.id)}
+                    size="sm"
+                    onClick={handleSaveAll}
+                    disabled={isSavingAll || patterns.length === 0}
                   >
-                    {savingRules.includes(pattern.id) ? (
+                    {isSavingAll ? (
                       <Loader2 className="size-3.5 mr-1 animate-spin" />
                     ) : (
                       <CheckCircle2 className="size-3.5 mr-1" />
                     )}
-                    {t('settings.aiRules.saveRule')}
+                    {t('settings.aiRules.saveAllRules')}
                   </Button>
-                </motion.div>
-              ))}
-            </CardContent>
-          </Card>
-        </motion.div>
-      )}
-    </motion.div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {patterns.map((pattern) => (
+                  <motion.div
+                    key={pattern.id}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 10 }}
+                    className="rounded-lg border p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                  >
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium">{pattern.description}</p>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <span>{pattern.occurrences} {t('settings.aiRules.occurrences')}</span>
+                        <span className="flex items-center gap-1">
+                          <ArrowRight className="size-3" />
+                          {t('settings.aiRules.suggestedAccount')}: {pattern.suggestedAccountCode} - {pattern.suggestedAccount}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {/* Ver Regla */}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setViewingPattern(pattern)}
+                        className="gap-1.5"
+                      >
+                        <Eye className="size-3.5" />
+                        Ver Regla
+                      </Button>
+
+                      {/* Guardar Regla */}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleSaveRule(pattern)}
+                        disabled={savingRules.includes(pattern.id)}
+                        className="gap-1.5"
+                      >
+                        {savingRules.includes(pattern.id) ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="size-3.5" />
+                        )}
+                        {t('settings.aiRules.saveRule')}
+                      </Button>
+                    </div>
+                  </motion.div>
+                ))}
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+      </motion.div>
+    </>
   );
 }

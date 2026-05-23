@@ -235,6 +235,9 @@ function parseAmount(val: string): number {
     if (lastComma > lastDot) {
       // European: 1.234,56
       cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+    } else {
+      // US: 1,234.56
+      cleaned = cleaned.replace(/,/g, '');
     }
   } else if (cleaned.endsWith(',')) {
     // Trailing comma as decimal separator: 1234,

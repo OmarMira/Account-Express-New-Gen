@@ -363,7 +363,10 @@ function TransactionListingTab({ companyId }: { companyId?: string }) {
     if (!companyId) return;
     fetch(`/api/journal/accounts?companyId=${companyId}`)
       .then((r) => r.ok ? r.json() : [])
-      .then((accounts) => setGlAccounts(accounts))
+      .then((json) => {
+        const list = Array.isArray(json) ? json : (json.data ?? []);
+        setGlAccounts(list);
+      })
       .catch(() => {});
   }, [companyId]);
 

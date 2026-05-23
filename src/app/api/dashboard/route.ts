@@ -60,6 +60,11 @@ export async function GET(request: NextRequest) {
             normalBalance: true,
           },
         },
+        entry: {
+          select: {
+            description: true,
+          },
+        },
       },
     });
 
@@ -84,6 +89,64 @@ export async function GET(request: NextRequest) {
       } else {
         typeBalances[aType] -= net;
       }
+    }
+
+    // Include reconciled bank transactions that didn't generate journal entries
+    const reconciledTxs = await db.bankTransaction.findMany({
+      where: {
+        statement: { bankAccount: { companyId } },
+        isReconciled: true,
+        glAccountId: { not: null },
+      },
+      select: {
+        amount: true,
+        description: true,
+        glAccount: {
+          select: {
+            accountType: true,
+            normalBalance: true,
+          },
+        },
+      },
+    });
+
+    // Create a set of journal entry descriptions to prevent double counting
+    const journalDescSet = new Set(journalLines.map((l) => l.entry?.description));
+
+    for (const tx of reconciledTxs) {
+      if (!tx.glAccount) continue;
+      // If a journal entry was created for this reconciliation, it will have this exact description prefix
+      if (journalDescSet.has(`Reconciliation: ${tx.description}`)) {
+        continue;
+      }
+
+      const aType = tx.glAccount.accountType;
+      if (!(aType in typeBalances)) continue;
+
+      // For BankTransactions: amount > 0 is a deposit (increases asset, credits assigned account)
+      // amount < 0 is a payment (decreases asset, debits assigned account)
+      const isDeposit = tx.amount > 0;
+      const absAmount = Math.abs(tx.amount);
+
+      // We affect the assigned account
+      let netDebit = isDeposit ? 0 : absAmount;
+      let netCredit = isDeposit ? absAmount : 0;
+      let net = netDebit - netCredit;
+
+      if (tx.glAccount.normalBalance === 'debit') {
+        typeBalances[aType] += net;
+      } else {
+        typeBalances[aType] -= net;
+      }
+
+      // We also affect the bank asset account implicitly if we wanted to balance,
+      // but the totalBankBalance is already calculated accurately from BankAccount.balance.
+      // However, if typeBalances.asset is used to show total assets, we should add the bank balance impact?
+      // Wait, typeBalances.asset includes the JournalLine of the bank account. 
+      // If the bank transaction is NOT in JournalLine, the bank asset balance in typeBalances.asset is missing it!
+      // So we should also update typeBalances.asset
+      const bankAssetNet = isDeposit ? absAmount : -absAmount;
+      typeBalances.asset += bankAssetNet;
     }
 
     // ── Posted journal entries count (current period) ──

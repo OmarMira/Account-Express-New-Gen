@@ -62,13 +62,14 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const {
+    let {
       companyId,
       name,
       conditionType,
       conditionValue,
       transactionDirection = 'any',
       glAccountId,
+      glAccountCode,
       priority = 10,
       isActive = true,
     } = body;
@@ -79,6 +80,15 @@ export async function POST(request: NextRequest) {
         { error: 'companyId and name are required' },
         { status: 400 }
       );
+    }
+
+    if (!glAccountId && glAccountCode) {
+      const dbAcc = await db.glAccount.findFirst({
+        where: { code: String(glAccountCode), companyId }
+      });
+      if (dbAcc) {
+        glAccountId = dbAcc.id;
+      }
     }
 
     const validConditionTypes = [

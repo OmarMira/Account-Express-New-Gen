@@ -175,10 +175,10 @@ export function ReconciliationPage() {
   const [search, setSearch] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [selectedStatementId, setSelectedStatementId] = useState<string>('');
+  const [selectedStatementId, setSelectedStatementId] = useState<string>('all');
 
   // Options
-  const [createJournalEntries, setCreateJournalEntries] = useState(false);
+  const [createJournalEntries, setCreateJournalEntries] = useState(true);
 
   // Selected transactions for reconciliation
   const [selectedTxIds, setSelectedTxIds] = useState<Set<string>>(new Set());
@@ -227,7 +227,7 @@ export function ReconciliationPage() {
     if (search) params.set('search', search);
     if (startDate) params.set('startDate', startDate);
     if (endDate) params.set('endDate', endDate);
-    if (selectedStatementId) params.set('statementId', selectedStatementId);
+    if (selectedStatementId && selectedStatementId !== 'all') params.set('statementId', selectedStatementId);
     return params.toString();
   }, [selectedAccountId, activeCompany?.id, statusFilter, search, startDate, endDate, selectedStatementId]);
 
@@ -236,7 +236,7 @@ export function ReconciliationPage() {
     if (!activeCompany?.id) return;
     setLoadingAccounts(true);
     try {
-      const res = await fetch('/api/dashboard', {
+      const res = await fetch(`/api/dashboard?companyId=${activeCompany.id}`, {
         headers: { 'Content-Type': 'application/json' },
       });
       if (res.ok) {
@@ -824,7 +824,7 @@ export function ReconciliationPage() {
                       <SelectValue placeholder={t('reconciliation.allStatements')} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">{t('reconciliation.allStatements')}</SelectItem>
+                      <SelectItem value="all">{t('reconciliation.allStatements')}</SelectItem>
                       {statements.map((s) => (
                         <SelectItem key={s.id} value={s.id}>
                           {formatDate(s.startDate)} {t('reconciliation.endDateFrom')} {formatDate(s.endDate)}

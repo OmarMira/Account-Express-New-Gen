@@ -58,12 +58,23 @@ export async function POST(request: NextRequest) {
 
     // ─── PDF parsing ──────────────────────────────────────────────────
     if (extension === 'pdf') {
-      let transactions: Awaited<ReturnType<typeof parsePDF>>;
+      let transactions: any[] = [];
       let bankName = '';
+      let accountNo: string | undefined;
+      let openingBalance: number | undefined;
+      let closingBalance: number | undefined;
+      let startDate: Date | undefined;
+      let endDate: Date | undefined;
 
       try {
-        transactions = await parsePDF(buffer);
-        bankName = extractBankNameFromFilename(fileName);
+        const parsed = await parsePDF(buffer);
+        transactions = parsed.transactions;
+        bankName = parsed.bankName || extractBankNameFromFilename(fileName);
+        accountNo = parsed.accountNo;
+        openingBalance = parsed.openingBalance;
+        closingBalance = parsed.closingBalance;
+        startDate = parsed.startDate;
+        endDate = parsed.endDate;
       } catch (parseError) {
         const msg =
           parseError instanceof Error
@@ -77,9 +88,16 @@ export async function POST(request: NextRequest) {
         companyId,
         bankAccountId,
         bankName,
-        transactions
+        transactions,
+        accountNo
       );
       const newAccountCreated = !bankAccountId;
+
+      const balanceInfo: any = {};
+      if (startDate) balanceInfo.startDate = startDate;
+      if (endDate) balanceInfo.endDate = endDate;
+      if (openingBalance !== undefined) balanceInfo.openingBalance = openingBalance;
+      if (closingBalance !== undefined) balanceInfo.closingBalance = closingBalance;
 
       // Create statement + transactions
       const result = await importTransactions(
@@ -87,7 +105,8 @@ export async function POST(request: NextRequest) {
         bankAccount.id,
         transactions,
         'pdf',
-        fileName
+        fileName,
+        balanceInfo
       );
 
       return NextResponse.json({
@@ -417,12 +436,20 @@ async function importTransactions(
     }
 
     // Update bank account balance (only for unique/new transactions)
+    const currentAccount = await tx.bankAccount.findUnique({
+      where: { id: bankAccountId },
+      select: { balance: true, createdAt: true, updatedAt: true }
+    });
+
+    const isNew = currentAccount && (currentAccount.createdAt.getTime() === currentAccount.updatedAt.getTime() || currentAccount.balance === 0);
+    const netChange = Number((totalCredits - totalDebits).toFixed(2));
+
     await tx.bankAccount.update({
       where: { id: bankAccountId },
       data: {
-        balance: {
-          increment: totalCredits - totalDebits,
-        },
+        balance: isNew
+          ? Number((openingBalance + netChange).toFixed(2))
+          : { increment: netChange }
       },
     });
 
@@ -460,7 +487,7 @@ function applyBankRule(
         if (desc.includes(condValue)) {
           return {
             matchedRuleId: rule.id,
-            glAccountId: rule.glAccountId.id,
+            glAccountId: rule.glAccountId,
           };
         }
         break;
@@ -468,7 +495,7 @@ function applyBankRule(
         if (desc.startsWith(condValue)) {
           return {
             matchedRuleId: rule.id,
-            glAccountId: rule.glAccountId.id,
+            glAccountId: rule.glAccountId,
           };
         }
         break;
@@ -476,7 +503,7 @@ function applyBankRule(
         if (desc.endsWith(condValue)) {
           return {
             matchedRuleId: rule.id,
-            glAccountId: rule.glAccountId.id,
+            glAccountId: rule.glAccountId,
           };
         }
         break;
@@ -484,7 +511,7 @@ function applyBankRule(
         if (desc === condValue) {
           return {
             matchedRuleId: rule.id,
-            glAccountId: rule.glAccountId.id,
+            glAccountId: rule.glAccountId,
           };
         }
         break;
@@ -492,7 +519,7 @@ function applyBankRule(
         if (Math.abs(amount) > parseFloat(rule.conditionValue)) {
           return {
             matchedRuleId: rule.id,
-            glAccountId: rule.glAccountId.id,
+            glAccountId: rule.glAccountId,
           };
         }
         break;
@@ -500,7 +527,7 @@ function applyBankRule(
         if (Math.abs(amount) < parseFloat(rule.conditionValue)) {
           return {
             matchedRuleId: rule.id,
-            glAccountId: rule.glAccountId.id,
+            glAccountId: rule.glAccountId,
           };
         }
         break;

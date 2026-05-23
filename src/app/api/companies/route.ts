@@ -92,27 +92,7 @@ async function seedChartOfAccounts(tx: any, companyId: string) {
   }
 }
 
-async function seedFiscalPeriods(tx: any, companyId: string) {
-  const year = new Date().getFullYear();
-  const periods = [
-    { name: `Q1 ${year}`, start: `${year}-01-01`, end: `${year}-03-31` },
-    { name: `Q2 ${year}`, start: `${year}-04-01`, end: `${year}-06-30` },
-    { name: `Q3 ${year}`, start: `${year}-07-01`, end: `${year}-09-30` },
-    { name: `Q4 ${year}`, start: `${year}-10-01`, end: `${year}-12-31` },
-  ];
 
-  for (const period of periods) {
-    await tx.fiscalPeriod.create({
-      data: {
-        companyId,
-        name: period.name,
-        startDate: new Date(period.start + 'T00:00:00.000Z'),
-        endDate: new Date(period.end + 'T23:59:59.999Z'),
-        isLocked: false,
-      },
-    });
-  }
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -150,8 +130,7 @@ export async function POST(request: NextRequest) {
       // 3. Seed accounts
       await seedChartOfAccounts(tx, newCompany.id);
 
-      // 4. Seed fiscal periods
-      await seedFiscalPeriods(tx, newCompany.id);
+
 
       // 5. Create audit log
       await tx.auditLog.create({

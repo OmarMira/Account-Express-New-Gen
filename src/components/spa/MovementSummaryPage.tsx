@@ -583,26 +583,12 @@ export function MovementSummaryPage() {
                     dataKey={t('movementSummary.debit')}
                     fill="#0891b2"
                     radius={[4, 4, 0, 0]}
-                  >
-                    {chartData.map((entry, index) => (
-                      <Cell
-                        key={`debit-${index}`}
-                        fill={TYPE_COLORS[entry.type]?.debit ?? TYPE_CHART_COLORS[index % TYPE_CHART_COLORS.length]}
-                      />
-                    ))}
-                  </Bar>
+                  />
                   <Bar
                     dataKey={t('movementSummary.credit')}
                     fill="#f59e0b"
                     radius={[4, 4, 0, 0]}
-                  >
-                    {chartData.map((entry, index) => (
-                      <Cell
-                        key={`credit-${index}`}
-                        fill={TYPE_COLORS[entry.type]?.credit ?? TYPE_CHART_COLORS[index % TYPE_CHART_COLORS.length]}
-                      />
-                    ))}
-                  </Bar>
+                  />
                 </BarChart>
               </ResponsiveContainer>
             ) : (

@@ -1,26 +1,17 @@
 'use client';
 
 import { useTheme } from 'next-themes';
-import { useSyncExternalStore } from 'react';
+import { useState, useEffect } from 'react';
 import { Sun, Moon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-function getMountedSnapshot() {
-  return true;
-}
-
-function getServerSnapshot() {
-  return false;
-}
-
-function subscribeToMount(callback: () => void) {
-  callback();
-  return () => {};
-}
-
 export function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme();
-  const mounted = useSyncExternalStore(subscribeToMount, getMountedSnapshot, getServerSnapshot);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   if (!mounted) {
     return (

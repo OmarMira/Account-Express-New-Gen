@@ -809,8 +809,8 @@ export function BanksPage() {
             </DialogTitle>
             <DialogDescription>
               {editingAccount
-                ? 'Update bank account information'
-                : 'Add a new bank account for your company'}
+                ? t('banks.editAccountDesc')
+                : t('banks.newAccountDesc')}
             </DialogDescription>
           </DialogHeader>
 
@@ -875,7 +875,7 @@ export function BanksPage() {
                 placeholder="Select asset account"
               />
               <p className="text-xs text-muted-foreground">
-                Bank accounts must be linked to an asset-type GL account
+                {t('banks.linkedAccountHelp')}
               </p>
             </div>
 
@@ -883,7 +883,7 @@ export function BanksPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <label className="text-sm font-medium">
-                  Starting Balance
+                  {t('banks.startingBalance')}
                 </label>
                 <Input
                   type="number"
@@ -895,7 +895,7 @@ export function BanksPage() {
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-medium">Currency</label>
+                <label className="text-sm font-medium">{t('banks.currency')}</label>
                 <Select value={formCurrency} onValueChange={setFormCurrency}>
                   <SelectTrigger className="h-9">
                     <SelectValue />
@@ -933,11 +933,11 @@ export function BanksPage() {
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Deactivate Bank Account</AlertDialogTitle>
+            <AlertDialogTitle>{t('banks.deactivateTitle')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to deactivate &quot;{deleteTarget?.accountName}&quot; at{' '}
-              &quot;{deleteTarget?.bankName}&quot;? This will mark the account as inactive.
-              Existing statements and transactions will be preserved.
+              {t('banks.deactivateDesc')
+                .replace('{name}', deleteTarget?.accountName || '')
+                .replace('{bank}', deleteTarget?.bankName || '')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -950,7 +950,7 @@ export function BanksPage() {
               className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
             >
               {deleting && <Loader2 className="size-4 mr-1 animate-spin" />}
-              Deactivate
+              {t('banks.deactivateAction')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -56,6 +56,50 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    const realDescSet = new Set(journalLines.map(l => l.entry?.description).filter(Boolean));
+
+    // Fetch virtual entries from reconciled bank transactions
+    const bankTxWhere: any = {
+      statement: { bankAccount: { companyId } },
+      isReconciled: true,
+      glAccountId: { not: null },
+      date: { lte: asOfDate },
+    };
+
+    const reconciledTxs = await db.bankTransaction.findMany({
+      where: bankTxWhere,
+      select: {
+        amount: true,
+        description: true,
+        glAccount: {
+          select: {
+            code: true,
+            name: true,
+            accountType: true,
+            normalBalance: true,
+            isActive: true,
+          },
+        },
+        statement: {
+          select: {
+            bankAccount: {
+              select: {
+                glAccount: {
+                  select: {
+                    code: true,
+                    name: true,
+                    accountType: true,
+                    normalBalance: true,
+                    isActive: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
     // Aggregate balances per GL account
     const accountBalances = new Map<
       string,
@@ -69,10 +113,8 @@ export async function GET(request: NextRequest) {
       }
     >();
 
-    for (const line of journalLines) {
-      const acc = line.glAccount;
-      if (!acc || !acc.isActive) continue;
-
+    const addBalance = (acc: any, debit: number, credit: number) => {
+      if (!acc || !acc.isActive) return;
       const key = acc.code;
       if (!accountBalances.has(key)) {
         accountBalances.set(key, {
@@ -84,10 +126,28 @@ export async function GET(request: NextRequest) {
           normalBalance: acc.normalBalance,
         });
       }
-
       const entry = accountBalances.get(key)!;
-      entry.debitTotal += line.debit || 0;
-      entry.creditTotal += line.credit || 0;
+      entry.debitTotal += debit || 0;
+      entry.creditTotal += credit || 0;
+    };
+
+    for (const line of journalLines) {
+      addBalance(line.glAccount, line.debit || 0, line.credit || 0);
+    }
+
+    for (const tx of reconciledTxs) {
+      if (!tx.glAccount) continue;
+      if (realDescSet.has(`Reconciliation: ${tx.description}`)) continue;
+
+      const isDeposit = tx.amount > 0;
+      const absAmount = Math.abs(tx.amount);
+
+      addBalance(tx.glAccount, isDeposit ? 0 : absAmount, isDeposit ? absAmount : 0);
+
+      const bankGlAccount = tx.statement.bankAccount.glAccount;
+      if (bankGlAccount) {
+        addBalance(bankGlAccount, isDeposit ? absAmount : 0, isDeposit ? 0 : absAmount);
+      }
     }
 
     // Build result: for each account, calculate net balance adjusted for normal balance

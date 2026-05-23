@@ -21,10 +21,10 @@ import {
   FileSpreadsheet,
   RotateCcw,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Database
 } from 'lucide-react';
 import {
-  ResponsiveContainer,
   BarChart,
   Bar,
   LineChart,
@@ -39,7 +39,8 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  ReferenceLine
+  ReferenceLine,
+  ResponsiveContainer,
 } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { useLanguageStore } from '@/store/language-store';
@@ -56,6 +57,12 @@ interface Transaction {
   cuenta_contable: string;
   conciliado: boolean;
   categoria?: string;
+  glAccountCode?: string | null;
+  glAccountName?: string | null;
+  glAccountType?: string | null;
+  matchedRuleId?: string | null;
+  matchedRuleName?: string | null;
+  matchedRuleGlAccountName?: string | null;
 }
 
 // Color Palette Constants matching the original visual identity
@@ -69,9 +76,6 @@ const PALETTE = {
   verdeClaro: 'rgba(29, 158, 117, 0.85)',
   rojoClaro: 'rgba(216, 90, 48, 0.85)',
 };
-
-const EXPENSE_CATEGORIES: string[] = [];
-const INCOME_CATEGORIES: string[] = [];
 
 const MONTHS_SPANISH = [
   { key: '01', name: 'Ene' },
@@ -91,12 +95,17 @@ const MONTHS_SPANISH = [
 export function FinancialDashboardPage() {
   const t = useLanguageStore((s) => s.t);
   const activeCompany = useAuthStore((s) => s.activeCompany);
+  const setCurrentView = useAuthStore((s) => s.setCurrentView);
 
   // States
   const [loading, setLoading] = useState(true);
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [dbTransactions, setDbTransactions] = useState<Transaction[]>([]);
-  const [initialBalanceInput, setInitialBalanceInput] = useState<number>(32616);
+  const [initialBalanceInput, setInitialBalanceInput] = useState<number>(0);
+  const apiInitialBalance = React.useRef<number>(0);
+  const [bankAccountInfo, setBankAccountInfo] = useState<{ accountName: string; bankName: string; accountNo: string } | null>(null);
+  const [revenueTrend, setRevenueTrend] = useState<number>(0);
+  const [expenseTrend, setExpenseTrend] = useState<number>(0);
   const [filtersOpen, setFiltersOpen] = useState(true);
 
   // Filter conditions
@@ -105,21 +114,74 @@ export function FinancialDashboardPage() {
   const [filterEndDate, setFilterEndDate] = useState<string>('');
   const [filterYear, setFilterYear] = useState<string>('all');
   const [selectedMonths, setSelectedMonths] = useState<Set<string>>(new Set(MONTHS_SPANISH.map(m => m.key)));
-  const [selectedIncomeCategories, setSelectedIncomeCategories] = useState<Set<string>>(new Set());
-  const [selectedExpenseCategories, setSelectedExpenseCategories] = useState<Set<string>>(new Set());
+  const [selectedIncomeCategories, setSelectedIncomeCategories] = useState<Set<string>>(new Set(['Sin asignar']));
+  const [selectedExpenseCategories, setSelectedExpenseCategories] = useState<Set<string>>(new Set(['Sin asignar']));
 
   // Modal State
   const [helpOpen, setHelpOpen] = useState(false);
+  const [recurrentMap, setRecurrentMap] = useState<Map<string, string>>(new Map());
+
+  const recurrentMapRef = React.useRef(recurrentMap);
+  React.useEffect(() => {
+    recurrentMapRef.current = recurrentMap;
+  }, [recurrentMap]);
 
   // --- CLASSIFICATION ENGINE ---
-  const classifyTransaction = useCallback((tx: Omit<Transaction, 'categoria'>): string => {
-    const cta = (tx.cuenta_contable || '').trim();
-    if (!cta) {
-      return tx.tipo === 'credito' ? 'Otros ingresos' : 'Otros egresos';
+  const classifyTransaction = useCallback((tx: Omit<Transaction, 'categoria'>, recurrent?: Map<string, string>): string => {
+    if (tx.glAccountName) {
+      return tx.glAccountName;
     }
-    // Clean account code or prefix (e.g., "6010 - Rent Expense" -> "Rent Expense")
-    const cleaned = cta.replace(/^\d+[\s\-\:]+/, '').trim();
-    return cleaned || (tx.tipo === 'credito' ? 'Otros ingresos' : 'Otros egresos');
+    if (tx.matchedRuleGlAccountName) {
+      return tx.matchedRuleGlAccountName;
+    }
+    if (tx.cuenta_contable) {
+      const parts = tx.cuenta_contable.trim().split(' ');
+      if (parts.length > 1 && /^\d+$/.test(parts[0])) {
+        return parts.slice(1).join(' ');
+      }
+      return tx.cuenta_contable;
+    }
+
+    // Clasificación heurística inteligente basada en descripción de base de datos
+    const desc = (tx.descripcion || '').toLowerCase();
+    if (desc.includes('uber') || desc.includes('raiser')) {
+      return 'Uber / Raiser';
+    }
+    if (desc.includes('lyft')) {
+      return 'Lyft';
+    }
+    if (desc.includes('turo')) {
+      return 'Turo';
+    }
+    if (desc.includes('american express') || desc.includes('amex') || desc.includes('americanexp')) {
+      return 'American Express';
+    }
+    if (desc.includes('toyota')) {
+      return 'Toyota / autos';
+    }
+    if (desc.includes('kmf')) {
+      return 'KMF';
+    }
+    if (desc.includes('rodrigo ochoa') || desc.includes('rentas') || desc.includes('ochoa')) {
+      return 'Rodrigo Ochoa (rentas)';
+    }
+    if (desc.includes('comision') || desc.includes('comisión') || desc.includes('fee') || desc.includes('charge')) {
+      return 'Comisiones Bancarias';
+    }
+    if (desc.includes('lqom') || desc.includes('lq&om') || desc.includes('lq & om') || desc.includes('lq') || desc.includes('om')) {
+      return 'Cuotas LQ&OM Inv.';
+    }
+
+    // Heurística dinámica por repetición (4 o más transacciones con descripción similar)
+    const activeRecurrentMap = recurrent || recurrentMapRef.current;
+    for (const [clean, prettyName] of activeRecurrentMap.entries()) {
+      const cleanWords = clean.toLowerCase().split(' ').filter(w => w.length > 2);
+      if (cleanWords.length > 0 && cleanWords.every(w => desc.includes(w))) {
+        return prettyName;
+      }
+    }
+
+    return tx.tipo === 'credito' ? 'Otros ingresos' : 'Otros egresos';
   }, []);
 
   // --- DATA LOADING HUB ---
@@ -130,26 +192,63 @@ export function FinancialDashboardPage() {
       const res = await fetch(`/api/dashboard/financial?companyId=${activeCompany.id}`);
       if (res.ok) {
         const data = await res.json();
+        setInitialBalanceInput(data.initialBalance || 0);
+        apiInitialBalance.current = data.initialBalance || 0;
+        setBankAccountInfo(data.bankAccountInfo || null);
+        setRevenueTrend(data.revenueTrend || 0);
+        setExpenseTrend(data.expenseTrend || 0);
+
         if (data.transactions && data.transactions.length > 0) {
+          // 1. Identificar descripciones recurrentes (4 o más repeticiones similares)
+          const cleanCounts = new Map<string, number>();
+          const rawDescriptions = new Map<string, string>();
+          
+          data.transactions.forEach((tx: any) => {
+            const rawDesc = tx.description || '';
+            let clean = rawDesc.toUpperCase();
+            clean = clean.replace(/\b\d{3,}\b/g, ''); // eliminar números de 3+ dígitos
+            clean = clean.replace(/[^A-ZÁÉÍÓÚÑ\s]/g, ' ');
+            clean = clean.replace(/\s+/g, ' ').trim();
+            
+            if (clean.length >= 3) {
+              cleanCounts.set(clean, (cleanCounts.get(clean) || 0) + 1);
+              if (!rawDescriptions.has(clean) || rawDesc.length < rawDescriptions.get(clean)!.length) {
+                const pretty = clean.split(' ').map((w: string) => w.charAt(0) + w.slice(1).toLowerCase()).join(' ');
+                rawDescriptions.set(clean, pretty);
+              }
+            }
+          });
+
+          const localRecurrent = new Map<string, string>();
+          cleanCounts.forEach((count, clean) => {
+            if (count >= 4) {
+              localRecurrent.set(clean, rawDescriptions.get(clean) || clean);
+            }
+          });
+          setRecurrentMap(localRecurrent);
+
+          // 2. Clasificar las transacciones con las descripciones recurrentes identificadas
           const parsed = data.transactions.map((tx: any) => ({
             ...tx,
-            categoria: classifyTransaction(tx),
+            categoria: classifyTransaction(tx, localRecurrent),
           }));
           setDbTransactions(parsed);
           setIsDemoMode(false);
 
-          // Dynamically compute unique categories
-          const uniqueIncome = new Set<string>();
-          const uniqueExpense = new Set<string>();
+          const incCats = new Set<string>();
+          const expCats = new Set<string>();
           parsed.forEach((tx: any) => {
             if (tx.tipo === 'credito') {
-              uniqueIncome.add(tx.categoria || 'Otros ingresos');
+              incCats.add(tx.categoria || 'Sin asignar');
             } else {
-              uniqueExpense.add(tx.categoria || 'Otros egresos');
+              expCats.add(tx.categoria || 'Sin asignar');
             }
           });
-          setSelectedIncomeCategories(uniqueIncome);
-          setSelectedExpenseCategories(uniqueExpense);
+          if (incCats.size === 0) incCats.add('Sin asignar');
+          if (expCats.size === 0) expCats.add('Sin asignar');
+
+          setSelectedIncomeCategories(incCats);
+          setSelectedExpenseCategories(expCats);
 
           const dates = parsed.map((tx: any) => tx.fecha).sort();
           setFilterStartDate(dates[0]);
@@ -157,6 +256,8 @@ export function FinancialDashboardPage() {
         } else {
           setDbTransactions([]);
           setIsDemoMode(false);
+          setSelectedIncomeCategories(new Set(['Sin asignar']));
+          setSelectedExpenseCategories(new Set(['Sin asignar']));
         }
       }
     } catch (err) {
@@ -170,21 +271,27 @@ export function FinancialDashboardPage() {
     loadData();
   }, [loadData]);
 
-  // Unique categories derived dynamically
+  // Stable pre-defined categories derived dynamically
   const allIncomeCategories = useMemo(() => {
-    const cats = new Set<string>();
+    const categories = new Set<string>();
     dbTransactions.forEach(tx => {
-      if (tx.tipo === 'credito') cats.add(tx.categoria || 'Otros ingresos');
+      if (tx.tipo === 'credito') {
+        categories.add(tx.categoria || 'Sin asignar');
+      }
     });
-    return Array.from(cats).sort();
+    if (categories.size === 0) categories.add('Sin asignar');
+    return Array.from(categories);
   }, [dbTransactions]);
 
   const allExpenseCategories = useMemo(() => {
-    const cats = new Set<string>();
+    const categories = new Set<string>();
     dbTransactions.forEach(tx => {
-      if (tx.tipo === 'debito') cats.add(tx.categoria || 'Otros egresos');
+      if (tx.tipo === 'debito') {
+        categories.add(tx.categoria || 'Sin asignar');
+      }
     });
-    return Array.from(cats).sort();
+    if (categories.size === 0) categories.add('Sin asignar');
+    return Array.from(categories);
   }, [dbTransactions]);
 
   // Year Selection Options
@@ -319,7 +426,7 @@ export function FinancialDashboardPage() {
         revenue += t.monto;
       } else {
         expenses += t.monto;
-        if (t.categoria === 'Comisión Bancaria') {
+        if (t.categoria === 'Comisiones Bancarias' || t.categoria === 'Comisión Bancaria') {
           commissions += t.monto;
         }
       }
@@ -342,18 +449,22 @@ export function FinancialDashboardPage() {
   // --- CATEGORY CHART PREPARATION ---
   const expensesByCategoryData = useMemo(() => {
     const counts: Record<string, number> = {};
-    allExpenseCategories.forEach(c => { counts[c] = 0; });
+    // Seed only the categories currently selected (active in filter)
+    Array.from(selectedExpenseCategories).forEach(c => { counts[c] = 0; });
 
     filteredTransactions.forEach(t => {
       if (t.tipo === 'debito') {
         const cat = t.categoria || 'Otros egresos';
-        counts[cat] = (counts[cat] || 0) + t.monto;
+        if (selectedExpenseCategories.has(cat)) {
+          counts[cat] = (counts[cat] || 0) + t.monto;
+        }
       }
     });
 
-    const total = Object.values(counts).reduce((a, b) => a + b, 0);
+    const activeCats = Array.from(selectedExpenseCategories);
+    const total = activeCats.reduce((a, c) => a + (counts[c] || 0), 0);
 
-    return allExpenseCategories.map((cat, idx) => {
+    return activeCats.map((cat, idx) => {
       const value = counts[cat] || 0;
       const percentage = total > 0 ? (value / total) * 100 : 0;
       return {
@@ -363,22 +474,26 @@ export function FinancialDashboardPage() {
         color: Object.values(PALETTE)[idx % Object.values(PALETTE).length]
       };
     });
-  }, [filteredTransactions, allExpenseCategories]);
+  }, [filteredTransactions, selectedExpenseCategories]);
 
   const incomeByCategoryData = useMemo(() => {
     const counts: Record<string, number> = {};
-    allIncomeCategories.forEach(c => { counts[c] = 0; });
+    // Seed only the categories currently selected (active in filter)
+    Array.from(selectedIncomeCategories).forEach(c => { counts[c] = 0; });
 
     filteredTransactions.forEach(t => {
       if (t.tipo === 'credito') {
         const cat = t.categoria || 'Otros ingresos';
-        counts[cat] = (counts[cat] || 0) + t.monto;
+        if (selectedIncomeCategories.has(cat)) {
+          counts[cat] = (counts[cat] || 0) + t.monto;
+        }
       }
     });
 
-    const total = Object.values(counts).reduce((a, b) => a + b, 0);
+    const activeCats = Array.from(selectedIncomeCategories);
+    const total = activeCats.reduce((a, c) => a + (counts[c] || 0), 0);
 
-    return allIncomeCategories.map((cat, idx) => {
+    return activeCats.map((cat, idx) => {
       const value = counts[cat] || 0;
       const percentage = total > 0 ? (value / total) * 100 : 0;
       return {
@@ -388,54 +503,38 @@ export function FinancialDashboardPage() {
         color: Object.values(PALETTE)[(idx + 3) % Object.values(PALETTE).length]
       };
     });
-  }, [filteredTransactions, allIncomeCategories]);
+  }, [filteredTransactions, selectedIncomeCategories]);
 
-  // Top 3 Income Categories dynamically computed
-  const top3IncomeCategories = useMemo(() => {
-    const valid = incomeByCategoryData.filter(d => d.name !== 'Otros créditos' && d.value > 0);
-    const sorted = [...valid].sort((a, b) => b.value - a.value);
-    return sorted.slice(0, 3).map(c => c.name);
-  }, [incomeByCategoryData]);
+  // --- CUSTOM DATA DERIVATIONS FOR 10 CHARTS ---
 
-  const top3IncomePlatformData = useMemo(() => {
-    return monthlyAggregatedData.map(m => {
-      const row: any = { month: m.monthLabel };
-      top3IncomeCategories.forEach(cat => {
-        row[cat] = m.txs.filter(t => t.categoria === cat).reduce((s, t) => s + t.monto, 0);
-      });
-      return row;
+  const minCierreMonth = useMemo(() => {
+    if (monthlyAggregatedData.length === 0) return null;
+    let minVal = Infinity;
+    let minMonth = '';
+    monthlyAggregatedData.forEach(m => {
+      if (m.cierre < minVal) {
+        minVal = m.cierre;
+        minMonth = m.monthKey;
+      }
     });
-  }, [monthlyAggregatedData, top3IncomeCategories]);
+    return minMonth;
+  }, [monthlyAggregatedData]);
 
-  // Top 3 Expense Categories dynamically computed
-  const top3ExpenseCategories = useMemo(() => {
-    const valid = expensesByCategoryData.filter(d => d.name !== 'Otros egresos' && d.value > 0);
-    const sorted = [...valid].sort((a, b) => b.value - a.value);
-    return sorted.slice(0, 3).map(c => c.name);
-  }, [expensesByCategoryData]);
-
-  const top3ExpenseCostsData = useMemo(() => {
-    return monthlyAggregatedData.map(m => {
-      const row: any = { month: m.monthLabel };
-      top3ExpenseCategories.forEach(cat => {
-        row[cat] = m.txs.filter(t => t.categoria === cat).reduce((s, t) => s + t.monto, 0);
-      });
-      return row;
-    });
-  }, [monthlyAggregatedData, top3ExpenseCategories]);
-
-  // Top single expense category trend dynamically computed
   const topExpenseCategory = useMemo(() => {
-    if (expensesByCategoryData.length === 0) return null;
-    const sorted = [...expensesByCategoryData].sort((a, b) => b.value - a.value);
-    return sorted[0]?.value > 0 ? sorted[0].name : null;
-  }, [expensesByCategoryData]);
+    const totals: Record<string, number> = {};
+    dbTransactions.filter(t => t.tipo === 'debito').forEach(t => {
+      const cat = t.categoria || 'Otros egresos';
+      if (cat !== 'Otros egresos') {
+        totals[cat] = (totals[cat] || 0) + t.monto;
+      }
+    });
+    const sorted = Object.keys(totals).sort((a, b) => totals[b] - totals[a]);
+    return sorted[0] || 'Egresos Principales';
+  }, [dbTransactions]);
 
   const topExpenseCategoryData = useMemo(() => {
     return monthlyAggregatedData.map(m => {
-      const val = topExpenseCategory
-        ? m.txs.filter(t => t.categoria === topExpenseCategory).reduce((s, t) => s + t.monto, 0)
-        : 0;
+      const val = m.txs.filter(t => t.categoria === topExpenseCategory).reduce((s, t) => s + t.monto, 0);
       return {
         month: m.monthLabel,
         Monto: val
@@ -443,60 +542,111 @@ export function FinancialDashboardPage() {
     });
   }, [monthlyAggregatedData, topExpenseCategory]);
 
-  // Composition of Revenue (Top income category vs all others)
-  const topIncomeCategory = useMemo(() => {
-    if (incomeByCategoryData.length === 0) return null;
-    const sorted = [...incomeByCategoryData].sort((a, b) => b.value - a.value);
-    return sorted[0]?.value > 0 ? sorted[0].name : null;
-  }, [incomeByCategoryData]);
+  const top3ExpenseCategories = useMemo(() => {
+    const totals: Record<string, number> = {};
+    dbTransactions.filter(t => t.tipo === 'debito').forEach(t => {
+      const cat = t.categoria || 'Otros egresos';
+      if (cat !== 'Otros egresos') {
+        totals[cat] = (totals[cat] || 0) + t.monto;
+      }
+    });
+    return Object.keys(totals).sort((a, b) => totals[b] - totals[a]).slice(0, 3);
+  }, [dbTransactions]);
 
-  const topIncomeCompositionData = useMemo(() => {
+  const recurrentExpensesData = useMemo(() => {
     return monthlyAggregatedData.map(m => {
-      const topVal = topIncomeCategory
-        ? m.txs.filter(t => t.categoria === topIncomeCategory).reduce((s, t) => s + t.monto, 0)
-        : 0;
-      const otherVal = m.txs.filter(t => t.tipo === 'credito' && t.categoria !== topIncomeCategory).reduce((s, t) => s + t.monto, 0);
+      const data: Record<string, any> = { month: m.monthLabel };
+      top3ExpenseCategories.forEach(cat => {
+        data[cat] = m.txs.filter(t => t.categoria === cat).reduce((s, t) => s + t.monto, 0);
+      });
+      return data;
+    });
+  }, [monthlyAggregatedData, top3ExpenseCategories]);
+
+  const top3IncomeCategories = useMemo(() => {
+    const totals: Record<string, number> = {};
+    dbTransactions.filter(t => t.tipo === 'credito').forEach(t => {
+      const cat = t.categoria || 'Otros ingresos';
+      if (cat !== 'Otros ingresos') {
+        totals[cat] = (totals[cat] || 0) + t.monto;
+      }
+    });
+    return Object.keys(totals).sort((a, b) => totals[b] - totals[a]).slice(0, 3);
+  }, [dbTransactions]);
+
+  const platformIncomeData = useMemo(() => {
+    return monthlyAggregatedData.map(m => {
+      const data: Record<string, any> = { month: m.monthLabel };
+      top3IncomeCategories.forEach(cat => {
+        data[cat] = m.txs.filter(t => t.categoria === cat).reduce((s, t) => s + t.monto, 0);
+      });
+      return data;
+    });
+  }, [monthlyAggregatedData, top3IncomeCategories]);
+
+  const topIncomeCategory = useMemo(() => {
+    const totals: Record<string, number> = {};
+    dbTransactions.filter(t => t.tipo === 'credito').forEach(t => {
+      const cat = t.categoria || 'Otros ingresos';
+      if (cat !== 'Otros ingresos') {
+        totals[cat] = (totals[cat] || 0) + t.monto;
+      }
+    });
+    const sorted = Object.keys(totals).sort((a, b) => totals[b] - totals[a]);
+    return sorted[0] || 'Ingreso Principal';
+  }, [dbTransactions]);
+
+  const rentasVsOperacionesData = useMemo(() => {
+    return monthlyAggregatedData.map(m => {
+      const rentas = m.txs.filter(t => t.categoria === topIncomeCategory).reduce((s, t) => s + t.monto, 0);
+      const operaciones = m.txs.filter(t => t.tipo === 'credito' && t.categoria !== topIncomeCategory).reduce((s, t) => s + t.monto, 0);
       return {
         month: m.monthLabel,
-        Principal: topVal,
-        Otros: otherVal
+        Rentas: rentas,
+        Operaciones: operaciones
       };
     });
   }, [monthlyAggregatedData, topIncomeCategory]);
 
-  // --- AUTOMATED CONCLUSIONS & ALERTS GENERATOR ---
-  const automatedConclusions = useMemo(() => {
-    const list: { icon: string; text: React.ReactNode; type: 'success' | 'warning' | 'alert' | 'info' }[] = [];
-    if (monthlyAggregatedData.length === 0) return [];
+  // Recharts tooltip formatter helper
+  const fmtTooltip = (value: any) => formatCurrency(Number(value));
+
+  // --- AUTOMATED CONCLUSIONS & ALERTS GENERATOR (Grouped) ---
+  const categorizedConclusions = useMemo(() => {
+    const alerts: { icon: string; text: React.ReactNode; title: string }[] = [];
+    const structure: { icon: string; text: React.ReactNode; title: string }[] = [];
+    const opportunities: { icon: string; text: React.ReactNode; title: string }[] = [];
+
+    if (monthlyAggregatedData.length === 0) return { alerts, structure, opportunities };
 
     const finalBal = stats.finalBalance;
     const diffBal = finalBal - initialBalanceInput;
-    const changePct = initialBalanceInput > 0 ? (diffBal / initialBalanceInput) * 100 : 100;
+    const changePct = initialBalanceInput > 0 ? (diffBal / initialBalanceInput) * 105 : 100;
 
     // 1. Tendencia del saldo
     if (finalBal < initialBalanceInput) {
-      list.push({
+      alerts.push({
         icon: '⚠️',
-        type: 'warning',
+        title: 'Saldo Final a la Baja',
         text: (
           <span>
-            El saldo cayó de <strong>{formatCurrency(initialBalanceInput)}</strong> a <strong>{formatCurrency(finalBal)}</strong> en el período, una reducción del <strong>{Math.abs(changePct).toFixed(1)}%</strong>.
+            El saldo de cierre de tesorería disminuyó un <strong>{Math.abs(changePct).toFixed(1)}%</strong> con respecto al balance inicial.
           </span>
         )
       });
     } else {
-      list.push({
+      structure.push({
         icon: '✅',
-        type: 'success',
+        title: 'Crecimiento de Tesorería',
         text: (
           <span>
-            El saldo creció de <strong>{formatCurrency(initialBalanceInput)}</strong> a <strong>{formatCurrency(finalBal)}</strong> en el período, un incremento del <strong>{changePct.toFixed(1)}%</strong>.
+            El balance final se incrementó un <strong>{changePct.toFixed(1)}%</strong> en comparación con el saldo inicial del período.
           </span>
         )
       });
     }
 
-    // 2. Meses con flujo positivo vs negativo
+    // 2. Meses negativos y flujo
     let posCount = 0;
     const negMonths: string[] = [];
     monthlyAggregatedData.forEach(m => {
@@ -504,91 +654,84 @@ export function FinancialDashboardPage() {
       else negMonths.push(m.monthLabel);
     });
 
-    list.push({
-      icon: '📊',
-      type: 'info',
-      text: (
-        <span>
-          Flujo neto: <strong>{posCount} meses positivos</strong> vs <strong>{negMonths.length} meses con saldo deficitario</strong>. Meses negativos: <strong>{negMonths.join(', ') || 'Ninguno'}</strong>.
-        </span>
-      )
-    });
-
-    // 3. Mes más crítico
-    let maxNegFlow = 0;
-    let criticalMonthLabel = '';
-    let critExpenses = 0, critRev = 0;
-
-    monthlyAggregatedData.forEach(m => {
-      if (m.netFlow < maxNegFlow) {
-        maxNegFlow = m.netFlow;
-        criticalMonthLabel = m.monthLabel;
-        critExpenses = m.gastos;
-        critRev = m.ingresos;
-      }
-    });
-
-    if (criticalMonthLabel) {
-      list.push({
-        icon: '🚨',
-        type: 'alert',
+    if (negMonths.length > 0) {
+      alerts.push({
+        icon: '📉',
+        title: 'Déficit Mensual Detectado',
         text: (
           <span>
-            <strong>{criticalMonthLabel}</strong> fue el mes más crítico: <strong>{formatCurrency(critExpenses)}</strong> en egresos contra <strong>{formatCurrency(critRev)}</strong> en ingresos.
+            Se registraron <strong>{negMonths.length} meses deficitarios</strong> ({negMonths.join(', ')}), lo que sugiere tensiones temporales de caja.
+          </span>
+        )
+      });
+    } else {
+      structure.push({
+        icon: '📊',
+        title: 'Flujo Positivo Sostenido',
+        text: (
+          <span>
+            Flujo de caja 100% positivo: todos los meses registraron superávit neto acumulado.
           </span>
         )
       });
     }
 
-    // 4. Mayor Categoría de egreso
+    // 3. Mayor Egreso
     const validExpCats = expensesByCategoryData.filter(d => d.name !== 'Otros egresos');
-    if (validExpCats.length > 0) {
-      const topExp = [...validExpCats].sort((a, b) => b.value - a.value)[0];
-      if (topExp && topExp.value > 0) {
-        list.push({
-          icon: '💰',
-          type: 'warning',
+    const topExp = [...validExpCats].sort((a, b) => b.value - a.value)[0];
+    if (topExp && topExp.value > 0) {
+      structure.push({
+        icon: '💰',
+        title: 'Concentración de Egresos',
+        text: (
+          <span>
+            Las salidas hacia <strong>{topExp.name}</strong> representan el <strong>{topExp.percentage.toFixed(1)}%</strong> del gasto total ({formatCurrency(topExp.value)}).
+          </span>
+        )
+      });
+
+      if (topExp.percentage > 15) {
+        alerts.push({
+          icon: '💳',
+          title: 'Alerta de Dependencia de Gasto',
           text: (
             <span>
-              Las salidas hacia <strong>{topExp.name}</strong> representan el mayor egreso con <strong>{formatCurrency(topExp.value)}</strong> (<strong>{topExp.percentage.toFixed(1)}%</strong> del total). Es clave documentar estos movimientos.
-            </span>
-          )
-        });
-
-        // 5. Alerta de concentración de egresos
-        if (topExp.percentage > 15) {
-          list.push({
-            icon: '💳',
-            type: 'alert',
-            text: (
-              <span>
-                La cuenta <strong>{topExp.name}</strong> consume <strong>{formatCurrency(topExp.value)}</strong> (<strong>{topExp.percentage.toFixed(1)}%</strong> de egresos) — se recomienda auditar conceptos recurrentes de esta categoría.
-              </span>
-            )
-          });
-        }
-      }
-    }
-
-    // 6. Principales fuentes de ingresos
-    const validIncomeCats = incomeByCategoryData.filter(d => d.name !== 'Otros créditos' && d.value > 0);
-    if (validIncomeCats.length > 0) {
-      const sortedIncomes = [...validIncomeCats].sort((a, b) => b.value - a.value);
-      const mainIncome = sortedIncomes[0];
-      if (mainIncome) {
-        list.push({
-          icon: '📈',
-          type: 'success',
-          text: (
-            <span>
-              La mayor fuente de ingresos es <strong>{mainIncome.name}</strong>, aportando un acumulado de <strong>{formatCurrency(mainIncome.value)}</strong> (<strong>{mainIncome.percentage.toFixed(1)}%</strong> del total).
+              La cuenta <strong>{topExp.name}</strong> concentra más del 15% de egresos operacionales. Se sugiere una revisión de facturas recurrentes.
             </span>
           )
         });
       }
     }
 
-    // 7. Saldo Mínimo vs Umbral Prudencial
+    // 4. Mayor Ingreso
+    const validIncomeCats = incomeByCategoryData.filter(d => d.name !== 'Otros ingresos' && d.value > 0);
+    const sortedIncomes = [...validIncomeCats].sort((a, b) => b.value - a.value);
+    const mainIncome = sortedIncomes[0];
+    if (mainIncome) {
+      structure.push({
+        icon: '📈',
+        title: 'Principal Fuente de Recursos',
+        text: (
+          <span>
+            <strong>{mainIncome.name}</strong> constituye la mayor vía de captación, representando el <strong>{mainIncome.percentage.toFixed(1)}%</strong> de créditos.
+          </span>
+        )
+      });
+
+      if (mainIncome.percentage > 80) {
+        alerts.push({
+          icon: '⚠️',
+          title: 'Riesgo de Concentración de Ingresos',
+          text: (
+            <span>
+              La empresa tiene una dependencia del <strong>{mainIncome.percentage.toFixed(1)}%</strong> de una sola categoría de ingresos. Se sugiere diversificar cartera.
+            </span>
+          )
+        });
+      }
+    }
+
+    // 5. Saldo Mínimo vs Seguridad
     let minBal = Infinity;
     let minBalMonth = '';
     monthlyAggregatedData.forEach(m => {
@@ -601,19 +744,85 @@ export function FinancialDashboardPage() {
     if (minBalMonth && minBal !== Infinity) {
       const threshold = 15000;
       const below = minBal < threshold;
-      list.push({
-        icon: '📉',
-        type: below ? 'alert' : 'success',
+      if (below) {
+        alerts.push({
+          icon: '🚨',
+          title: 'Reserva de Seguridad Vulnerada',
+          text: (
+            <span>
+              En <strong>{minBalMonth}</strong> el saldo cayó a <strong>{formatCurrency(minBal)}</strong>, por debajo del mínimo prudencial de $15,000.
+            </span>
+          )
+        });
+      } else {
+        structure.push({
+          icon: '🛡️',
+          title: 'Colchón de Seguridad Sólido',
+          text: (
+            <span>
+              El saldo mínimo se mantuvo en <strong>{formatCurrency(minBal)}</strong>, preservando el colchón mínimo de seguridad.
+            </span>
+          )
+        });
+      }
+    }
+
+    // 6. Oportunidades y Recomendaciones
+    if (stats.netFlow >= 0) {
+      opportunities.push({
+        icon: '🚀',
+        title: 'Optimización de Excedentes',
         text: (
           <span>
-            Saldo mínimo registrado: <strong>{formatCurrency(minBal)}</strong> en <strong>{minBalMonth}</strong>, ubicándose <strong>{below ? 'POR DEBAJO' : 'por encima'}</strong> del umbral mínimo de seguridad de $15,000.
+            Con un flujo positivo neto de <strong>{formatCurrency(stats.netFlow)}</strong>, existe oportunidad para reinvertir en expansión o liquidar deudas costosas.
+          </span>
+        )
+      });
+      opportunities.push({
+        icon: '🏦',
+        title: 'Colocaciones Estratégicas',
+        text: (
+          <span>
+            Se recomienda colocar excedentes temporales en fondos líquidos de bajo riesgo para generar rendimientos pasivos estables.
+          </span>
+        )
+      });
+    } else {
+      opportunities.push({
+        icon: '✂️',
+        title: 'Control Estricto de Gastos',
+        text: (
+          <span>
+            El flujo neto del periodo es negativo. Urge renegociar contratos de egresos fijos para restablecer el equilibrio de tesorería.
+          </span>
+        )
+      });
+      opportunities.push({
+        icon: '📈',
+        title: 'Estrategia de Captación Activa',
+        text: (
+          <span>
+            Priorizar campañas de captación a corto plazo y acelerar la facturación de servicios pendientes para inyectar liquidez inmediata.
           </span>
         )
       });
     }
 
-    return list;
-  }, [monthlyAggregatedData, stats.finalBalance, initialBalanceInput, expensesByCategoryData, incomeByCategoryData]);
+    const pendingCount = dbTransactions.filter(t => !t.conciliado).length;
+    if (pendingCount > 0) {
+      opportunities.push({
+        icon: '🎯',
+        title: 'Optimización Contable',
+        text: (
+          <span>
+            Hay <strong>{pendingCount} transacciones pendientes</strong> por conciliar. Completar la conciliación mejorará la precisión del balance fiscal.
+          </span>
+        )
+      });
+    }
+
+    return { alerts, structure, opportunities };
+  }, [monthlyAggregatedData, stats.finalBalance, initialBalanceInput, expensesByCategoryData, incomeByCategoryData, dbTransactions, stats.netFlow]);
 
   // --- FILTERS TOGGLE HANDLERS ---
   const toggleAllMonths = (checked: boolean) => {
@@ -663,7 +872,7 @@ export function FinancialDashboardPage() {
       setFilterEndDate(dates[dates.length - 1]);
     }
     setFilterYear('all');
-    setInitialBalanceInput(isDemoMode ? 32616 : 0);
+    setInitialBalanceInput(apiInitialBalance.current);
     setSelectedMonths(new Set(MONTHS_SPANISH.map(m => m.key)));
     setSelectedIncomeCategories(new Set(allIncomeCategories));
     setSelectedExpenseCategories(new Set(allExpenseCategories));
@@ -717,6 +926,28 @@ export function FinancialDashboardPage() {
     );
   }
 
+  if (!loading && dbTransactions.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[500px] space-y-6 text-center px-4">
+        <div className="p-6 rounded-3xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+          <Database className="w-16 h-16 text-slate-400 dark:text-slate-500 mx-auto" />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white">Sin transacciones importadas</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md">
+            No hay transacciones importadas. Importa un estado de cuenta bancario para ver el dashboard financiero.
+          </p>
+        </div>
+        <Button
+          onClick={() => setCurrentView && setCurrentView('banks')}
+          className="bg-teal-600 hover:bg-teal-700 text-white rounded-xl px-6 py-2.5 font-bold"
+        >
+          Ir a Importar Transacciones
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8 pb-16">
       {/* HEADER SECTION */}
@@ -737,7 +968,9 @@ export function FinancialDashboardPage() {
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 font-medium flex items-center gap-1.5">
             <Activity className="w-4 h-4 text-teal-500" />
-            Cuenta corriente BofA #3224 · período activo del reporte
+            {bankAccountInfo
+              ? `${bankAccountInfo.bankName} — ${bankAccountInfo.accountName}${bankAccountInfo.accountNo ? ' #' + bankAccountInfo.accountNo : ''}`
+              : 'Sin cuenta bancaria seleccionada'}
           </p>
         </div>
 
@@ -993,7 +1226,7 @@ export function FinancialDashboardPage() {
         </ChartBox>
 
         {/* Chart 2: Evolución del saldo al cierre */}
-        <ChartBox title="Evolución del saldo al cierre mensual" subtitle="Dinámica del balance de tesorería consolidado">
+        <ChartBox title="Evolución del saldo al cierre mensual" subtitle="Dinámica del balance de tesorería consolidado con saldo mínimo">
           <ResponsiveContainer width="100%" height={240}>
             <AreaChart data={monthlyAggregatedData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <defs>
@@ -1006,7 +1239,23 @@ export function FinancialDashboardPage() {
               <XAxis dataKey="monthLabel" stroke="#888780" fontSize={10} axisLine={false} tickLine={false} />
               <YAxis stroke="#888780" fontSize={10} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v/1000}k`} />
               <Tooltip formatter={(value: any) => formatCurrency(value)} contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '1rem', color: '#fff' }} />
-              <Area type="monotone" dataKey="cierre" stroke={PALETTE.azul} strokeWidth={2.5} fill="url(#areaBal)" name="Saldo Cierre" />
+              <Area
+                type="monotone"
+                dataKey="cierre"
+                stroke={PALETTE.azul}
+                strokeWidth={2.5}
+                fill="url(#areaBal)"
+                name="Saldo Cierre"
+                dot={(props: any) => {
+                  const { cx, cy, payload } = props;
+                  if (payload.monthKey === minCierreMonth) {
+                    return (
+                      <circle key={payload.monthKey} cx={cx} cy={cy} r={6} fill={PALETTE.rojo} stroke="#fff" strokeWidth={2} />
+                    );
+                  }
+                  return <path d="" />;
+                }}
+              />
             </AreaChart>
           </ResponsiveContainer>
         </ChartBox>
@@ -1094,86 +1343,80 @@ export function FinancialDashboardPage() {
           </ResponsiveContainer>
         </ChartBox>
 
-        {/* Chart 6: Principal egreso */}
+        {/* Chart 6: Principal categoría de egreso */}
         <ChartBox
-          title={`Principal categoría de egreso: ${topExpenseCategory || 'Sin transacciones'}`}
-          subtitle={`Salidas mensuales hacia ${topExpenseCategory || 'la categoría mayoritaria'}`}
+          title={`Evolución de: ${topExpenseCategory}`}
+          subtitle="Histórico mensual de la categoría principal de egresos operacionales"
         >
-          {topExpenseCategory ? (
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={topExpenseCategoryData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(128,128,128,0.12)" />
-                <XAxis dataKey="month" stroke="#888780" fontSize={10} axisLine={false} tickLine={false} />
-                <YAxis stroke="#888780" fontSize={10} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v/1000}k`} />
-                <Tooltip formatter={(value: any) => formatCurrency(value)} />
-                <Bar dataKey="Monto" fill={PALETTE.morado} name={topExpenseCategory} radius={[4, 4, 0, 0]} barSize={18} />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex items-center justify-center h-[240px] text-xs font-bold text-slate-400 bg-slate-50 dark:bg-slate-950/20 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
-              Sin transacciones registradas para este período
-            </div>
-          )}
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={topExpenseCategoryData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(128,128,128,0.12)" />
+              <XAxis dataKey="month" stroke="#888780" fontSize={10} axisLine={false} tickLine={false} />
+              <YAxis stroke="#888780" fontSize={10} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v/1000}k`} />
+              <Tooltip formatter={(value: any) => formatCurrency(value)} />
+              <Bar dataKey="Monto" fill={PALETTE.morado} name={topExpenseCategory} radius={[4, 4, 0, 0]} barSize={18} />
+            </BarChart>
+          </ResponsiveContainer>
         </ChartBox>
 
-        {/* Chart 7: Top 3 Egresos */}
-        <ChartBox title="Top 3 categorías principales de egreso" subtitle="Evolución mensual de egresos mayoritarios acumulados">
-          {top3ExpenseCategories.length > 0 ? (
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={top3ExpenseCostsData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(128,128,128,0.12)" />
-                <XAxis dataKey="month" stroke="#888780" fontSize={10} axisLine={false} tickLine={false} />
-                <YAxis stroke="#888780" fontSize={10} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v/1000}k`} />
-                <Tooltip formatter={(value: any) => formatCurrency(value)} />
-                <Legend verticalAlign="top" height={36} iconType="circle" />
-                {top3ExpenseCategories.map((cat, idx) => (
+        {/* Chart 7: Gastos recurrentes principales por mes */}
+        <ChartBox title="Gastos recurrentes principales por mes" subtitle="Histórico mensual de las principales salidas operacionales del usuario">
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={recurrentExpensesData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(128,128,128,0.12)" />
+              <XAxis dataKey="month" stroke="#888780" fontSize={10} axisLine={false} tickLine={false} />
+              <YAxis stroke="#888780" fontSize={10} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v/1000}k`} />
+              <Tooltip formatter={(value: any) => formatCurrency(value)} />
+              <Legend verticalAlign="top" height={36} iconType="circle" />
+              {top3ExpenseCategories.map((cat, idx) => {
+                const colors = [PALETTE.azul, PALETTE.rojo, PALETTE.ambar];
+                return (
                   <Bar
                     key={cat}
                     dataKey={cat}
                     stackId="a"
-                    fill={Object.values(PALETTE)[(idx + 1) % Object.values(PALETTE).length]}
+                    fill={colors[idx % colors.length]}
                     name={cat}
                     radius={idx === top3ExpenseCategories.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
                   />
-                ))}
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex items-center justify-center h-[240px] text-xs font-bold text-slate-400 bg-slate-50 dark:bg-slate-950/20 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
-              Sin egresos registrados en el período
-            </div>
-          )}
+                );
+              })}
+              {top3ExpenseCategories.length === 0 && (
+                <Bar dataKey="Sin asignar" fill={PALETTE.gris} name="Sin gastos a clasificar" />
+              )}
+            </BarChart>
+          </ResponsiveContainer>
         </ChartBox>
 
-        {/* Chart 8: Top 3 Ingresos */}
-        <ChartBox title="Top 3 fuentes principales de ingresos" subtitle="Evolución mensual de las categorías con mayores depósitos">
-          {top3IncomeCategories.length > 0 ? (
-            <ResponsiveContainer width="100%" height={240}>
-              <LineChart data={top3IncomePlatformData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(128,128,128,0.12)" />
-                <XAxis dataKey="month" stroke="#888780" fontSize={10} axisLine={false} tickLine={false} />
-                <YAxis stroke="#888780" fontSize={10} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v/1000}k`} />
-                <Tooltip formatter={(value: any) => formatCurrency(value)} />
-                <Legend verticalAlign="top" height={36} iconType="circle" />
-                {top3IncomeCategories.map((cat, idx) => (
+        {/* Chart 8: Tendencia de principales fuentes de ingresos */}
+        <ChartBox title="Tendencia de principales fuentes de ingresos" subtitle="Desempeño mensual de los créditos mayores registrados">
+          <ResponsiveContainer width="100%" height={240}>
+            <LineChart data={platformIncomeData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(128,128,128,0.12)" />
+              <XAxis dataKey="month" stroke="#888780" fontSize={10} axisLine={false} tickLine={false} />
+              <YAxis stroke="#888780" fontSize={10} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v/1000}k`} />
+              <Tooltip formatter={(value: any) => formatCurrency(value)} />
+              <Legend verticalAlign="top" height={36} iconType="circle" />
+              {top3IncomeCategories.map((cat, idx) => {
+                const colors = [PALETTE.verde, PALETTE.azul, PALETTE.morado];
+                return (
                   <Line
                     key={cat}
                     type="monotone"
                     dataKey={cat}
-                    stroke={Object.values(PALETTE)[(idx + 2) % Object.values(PALETTE).length]}
+                    stroke={colors[idx % colors.length]}
                     strokeWidth={2}
                     dot={{ r: 3 }}
                     activeDot={{ r: 5 }}
                     name={cat}
                   />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex items-center justify-center h-[240px] text-xs font-bold text-slate-400 bg-slate-50 dark:bg-slate-950/20 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
-              Sin ingresos registrados en el período
-            </div>
-          )}
+                );
+              })}
+              {top3IncomeCategories.length === 0 && (
+                <Line type="monotone" dataKey="Sin asignar" stroke={PALETTE.gris} name="Sin ingresos a clasificar" />
+              )}
+            </LineChart>
+          </ResponsiveContainer>
         </ChartBox>
 
         {/* Chart 9: Saldo Promedio Mensual */}
@@ -1198,64 +1441,100 @@ export function FinancialDashboardPage() {
           </ResponsiveContainer>
         </ChartBox>
 
-        {/* Chart 10: Principal Ingreso vs Resto */}
+        {/* Chart 10: Composición de ingresos: Principal fuente vs Resto */}
         <ChartBox
-          title={`Ingresos: ${topIncomeCategory || 'Principal'} vs. resto de créditos`}
-          subtitle="Comparativo mensual de diversificación de fuentes de ingresos"
+          title={`Composición: ${topIncomeCategory} vs Resto`}
+          subtitle="Comparativa del principal ingreso frente a otras fuentes secundarias"
         >
-          {topIncomeCategory ? (
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={topIncomeCompositionData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(128,128,128,0.12)" />
-                <XAxis dataKey="month" stroke="#888780" fontSize={10} axisLine={false} tickLine={false} />
-                <YAxis stroke="#888780" fontSize={10} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v/1000}k`} />
-                <Tooltip formatter={(value: any) => formatCurrency(value)} />
-                <Legend verticalAlign="top" height={36} iconType="circle" />
-                <Bar dataKey="Principal" stackId="a" fill={PALETTE.verde} name={topIncomeCategory} />
-                <Bar dataKey="Otros" stackId="a" fill={PALETTE.morado} name="Otros ingresos" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex items-center justify-center h-[240px] text-xs font-bold text-slate-400 bg-slate-50 dark:bg-slate-950/20 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
-              Sin ingresos registrados en el período
-            </div>
-          )}
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={rentasVsOperacionesData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(128,128,128,0.12)" />
+              <XAxis dataKey="month" stroke="#888780" fontSize={10} axisLine={false} tickLine={false} />
+              <YAxis stroke="#888780" fontSize={10} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v/1000}k`} />
+              <Tooltip formatter={(value: any) => formatCurrency(value)} />
+              <Legend verticalAlign="top" height={36} iconType="circle" />
+              <Bar dataKey="Rentas" stackId="a" fill={PALETTE.verde} name={topIncomeCategory} />
+              <Bar dataKey="Operaciones" stackId="a" fill={PALETTE.morado} name="Otros ingresos" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
         </ChartBox>
 
       </div>
 
-      {/* AUTOMATED CONCLUSIONS & ALERTS */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 lg:p-8 shadow-sm">
-        <div className="flex items-center gap-2 mb-6">
-          <Zap className="w-5 h-5 text-teal-500" />
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white uppercase tracking-tight">
-            Conclusiones y alertas del período
-          </h2>
+      {/* AUTOMATED CONCLUSIONS & ALERTS GROUPED */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Column 1: Señales de Alerta */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm flex flex-col">
+          <div className="flex items-center gap-2 mb-6 pb-2 border-b border-slate-100 dark:border-slate-800/50">
+            <span className="p-1.5 rounded-lg bg-rose-500/10 text-rose-600">
+              <AlertCircle className="w-5 h-5" />
+            </span>
+            <h2 className="text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-wider">
+              Señales de Alerta
+            </h2>
+          </div>
+          <div className="flex-1 space-y-4">
+            {categorizedConclusions.alerts.length === 0 ? (
+              <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 italic uppercase">Sin alertas críticas detectadas</p>
+            ) : (
+              categorizedConclusions.alerts.map((conc, idx) => (
+                <div key={idx} className="flex gap-3 items-start p-3 bg-rose-500/5 border border-rose-500/10 rounded-xl">
+                  <span className="text-lg leading-none shrink-0">{conc.icon}</span>
+                  <div className="space-y-1">
+                    <h4 className="text-xs font-extrabold text-rose-800 dark:text-rose-400 uppercase tracking-wider">{conc.title}</h4>
+                    <p className="text-xs font-medium text-slate-600 dark:text-slate-300 leading-relaxed">{conc.text}</p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
 
-        <ul className="space-y-4">
-          {automatedConclusions.map((conclusion, idx) => {
-            const types: any = {
-              success: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-800 dark:text-emerald-300',
-              warning: 'bg-amber-500/10 border-amber-500/20 text-amber-800 dark:text-amber-300',
-              alert: 'bg-rose-500/10 border-rose-500/20 text-rose-800 dark:text-rose-300',
-              info: 'bg-slate-100 dark:bg-slate-800/80 border-transparent text-slate-800 dark:text-slate-300'
-            };
+        {/* Column 2: Estructura del Negocio */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm flex flex-col">
+          <div className="flex items-center gap-2 mb-6 pb-2 border-b border-slate-100 dark:border-slate-800/50">
+            <span className="p-1.5 rounded-lg bg-teal-500/10 text-teal-600">
+              <Layers className="w-5 h-5" />
+            </span>
+            <h2 className="text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-wider">
+              Estructura del Negocio
+            </h2>
+          </div>
+          <div className="flex-1 space-y-4">
+            {categorizedConclusions.structure.map((conc, idx) => (
+              <div key={idx} className="flex gap-3 items-start p-3 bg-teal-500/5 border border-teal-500/10 rounded-xl">
+                <span className="text-lg leading-none shrink-0">{conc.icon}</span>
+                <div className="space-y-1">
+                  <h4 className="text-xs font-extrabold text-teal-800 dark:text-teal-400 uppercase tracking-wider">{conc.title}</h4>
+                  <p className="text-xs font-medium text-slate-600 dark:text-slate-300 leading-relaxed">{conc.text}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
 
-            return (
-              <motion.li
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: idx * 0.05 }}
-                key={idx}
-                className={`flex gap-3 items-start p-4 rounded-2xl border ${types[conclusion.type] || types.info}`}
-              >
-                <span className="text-xl leading-none">{conclusion.icon}</span>
-                <div className="text-sm font-medium">{conclusion.text}</div>
-              </motion.li>
-            );
-          })}
-        </ul>
+        {/* Column 3: Oportunidad */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm flex flex-col">
+          <div className="flex items-center gap-2 mb-6 pb-2 border-b border-slate-100 dark:border-slate-800/50">
+            <span className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-600">
+              <Zap className="w-5 h-5" />
+            </span>
+            <h2 className="text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-wider">
+              Oportunidades
+            </h2>
+          </div>
+          <div className="flex-1 space-y-4">
+            {categorizedConclusions.opportunities.map((conc, idx) => (
+              <div key={idx} className="flex gap-3 items-start p-3 bg-emerald-500/5 border border-emerald-500/10 rounded-xl">
+                <span className="text-lg leading-none shrink-0">{conc.icon}</span>
+                <div className="space-y-1">
+                  <h4 className="text-xs font-extrabold text-emerald-800 dark:text-emerald-400 uppercase tracking-wider">{conc.title}</h4>
+                  <p className="text-xs font-medium text-slate-600 dark:text-slate-300 leading-relaxed">{conc.text}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* EXPORT ACTION FOOTER BAR */}

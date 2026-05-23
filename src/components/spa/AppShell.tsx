@@ -1,8 +1,10 @@
 'use client';
 
 import { useCallback, useEffect } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
+  TrendingUp,
   BookOpen,
   FileText,
   Landmark,
@@ -55,6 +57,7 @@ import { SettingsPage } from '@/components/spa/SettingsPage';
 import { UsersPage } from '@/components/spa/UsersPage';
 import { SelectCompanyPage } from '@/components/spa/SelectCompanyPage';
 import { AIAssistantModal } from '@/components/spa/AIAssistantModal';
+import { FinancialDashboardPage } from '@/components/spa/FinancialDashboardPage';
 import { useLanguageStore } from '@/store/language-store';
 import { useAuthStore, type ViewName } from '@/store/auth-store';
 
@@ -67,6 +70,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { view: 'dashboard', icon: LayoutDashboard, labelKey: 'dashboard.title' },
+  { view: 'financial-dashboard', icon: TrendingUp, labelKey: 'financialDashboard.title' },
   { view: 'accounts', icon: BookOpen, labelKey: 'accounts.title' },
   { view: 'journal', icon: FileText, labelKey: 'journal.title' },
   { view: 'banks', icon: Landmark, labelKey: 'banks.title' },
@@ -82,11 +86,20 @@ const settingsItem: NavItem = { view: 'settings', icon: Settings, labelKey: 'set
 /* ─── Sidebar Content (shared between desktop + mobile) ─── */
 function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const t = useLanguageStore((s) => s.t);
+  const router = useRouter();
+  const pathname = usePathname();
   const currentView = useAuthStore((s) => s.currentView);
   const setCurrentView = useAuthStore((s) => s.setCurrentView);
 
   function handleNav(view: ViewName) {
-    setCurrentView(view);
+    if (view === 'accounts') {
+      router.push('/accounts');
+    } else {
+      if (pathname !== '/') {
+        router.push('/');
+      }
+      setCurrentView(view);
+    }
     onNavigate?.();
   }
 
@@ -108,7 +121,9 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
       <ScrollArea className="flex-1 py-2">
         <nav className="space-y-1 px-3">
           {navItems.map((item) => {
-            const isActive = currentView === item.view;
+            const isActive = item.view === 'accounts'
+              ? pathname === '/accounts'
+              : pathname === '/' && currentView === item.view;
             return (
               <button
                 key={item.view}
@@ -143,7 +158,7 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
           onClick={() => handleNav('settings')}
           className={cn(
             'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-            currentView === 'settings'
+            pathname === '/' && currentView === 'settings'
               ? 'bg-primary/10 text-primary'
               : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
           )}
@@ -213,20 +228,35 @@ function DesktopSidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
 
 function DesktopNavItems({ collapsed }: { collapsed: boolean }) {
   const t = useLanguageStore((s) => s.t);
+  const router = useRouter();
+  const pathname = usePathname();
   const currentView = useAuthStore((s) => s.currentView);
   const setCurrentView = useAuthStore((s) => s.setCurrentView);
 
   const setAiAssistantOpen = useAuthStore((s) => s.setAiAssistantOpen);
   const allItems = [...navItems, settingsItem];
 
+  function handleNav(view: ViewName) {
+    if (view === 'accounts') {
+      router.push('/accounts');
+    } else {
+      if (pathname !== '/') {
+        router.push('/');
+      }
+      setCurrentView(view);
+    }
+  }
+
   return (
     <>
       {allItems.map((item) => {
-        const isActive = currentView === item.view;
+        const isActive = item.view === 'accounts'
+          ? pathname === '/accounts'
+          : pathname === '/' && currentView === item.view;
         return (
           <button
             key={item.view}
-            onClick={() => setCurrentView(item.view)}
+            onClick={() => handleNav(item.view)}
             title={collapsed ? t(item.labelKey) : undefined}
             className={cn(
               'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
@@ -258,7 +288,7 @@ function DesktopNavItems({ collapsed }: { collapsed: boolean }) {
 }
 
 /* ─── Main AppShell ─── */
-export function AppShell() {
+export function AppShell({ children }: { children?: React.ReactNode }) {
   const t = useLanguageStore((s) => s.t);
   const { user, activeCompany, logout, sidebarOpen, setSidebarOpen } =
     useAuthStore();
@@ -392,7 +422,7 @@ export function AppShell() {
         {/* ── Main Content Area ── */}
         <main className="flex-1 overflow-auto p-4 lg:p-6">
           <div className="mx-auto max-w-7xl">
-            <PlaceholderView view={currentView} />
+            {children ? children : <PlaceholderView view={currentView} />}
           </div>
         </main>
       </div>
@@ -444,10 +474,14 @@ function PlaceholderView({ view }: { view: ViewName }) {
   if (view === 'select-company') {
     return <SelectCompanyPage />;
   }
+  if (view === 'financial-dashboard') {
+    return <FinancialDashboardPage />;
+  }
 
   // Map views to their title keys
   const viewKeyMap: Partial<Record<ViewName, string>> = {
     dashboard: 'dashboard.title',
+    'financial-dashboard': 'financialDashboard.title',
     accounts: 'accounts.title',
     journal: 'journal.title',
     banks: 'banks.title',

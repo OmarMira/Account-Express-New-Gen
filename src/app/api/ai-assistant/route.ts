@@ -1,20 +1,53 @@
 import { NextRequest, NextResponse } from 'next/server';
 import ZAI from 'z-ai-web-dev-sdk';
+import { z } from 'zod';
+
+// ─── Request schema ─────────────────────────────────────────────────
+const RequestBodySchema = z.object({
+  message: z.string().min(1, 'Message is required'),
+  mode: z.enum(['chat', 'create-rule']).default('chat'),
+});
+
+// ─── AI response schema ─────────────────────────────────────────────
+const ZAIChoiceSchema = z.object({
+  message: z.object({ content: z.string().nullable().optional() }),
+});
+const ZAIResponseSchema = z.object({
+  choices: z.array(ZAIChoiceSchema).optional(),
+});
+
+// ─── Parsed rule schema ─────────────────────────────────────────────
+const ConditionTypeSchema = z.enum([
+  'contains',
+  'starts_with',
+  'ends_with',
+  'equals',
+  'amount_greater',
+  'amount_less',
+]);
+const ParsedRuleSchema = z.object({
+  name: z.string().min(1),
+  conditionType: ConditionTypeSchema,
+  conditionValue: z.union([z.string(), z.number()]),
+  transactionDirection: z.enum(['any', 'debit', 'credit']).default('any'),
+  glAccountName: z.string().default(''),
+  priority: z.number().int().min(0).max(20).default(10),
+});
 
 // ─── POST /api/ai-assistant ────────────────────────────────────────
-// AI chat & rule creation endpoint
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { message, mode = 'chat' } = body;
+    const raw: unknown = await request.json();
+    const parsed = RequestBodySchema.safeParse(raw);
 
-    if (!message?.trim()) {
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: 'Message is required' },
+        { error: parsed.error.issues?.[0]?.message || 'Invalid request format' },
         { status: 400 }
       );
     }
 
+    const { message, mode } = parsed.data;
     const zai = await ZAI.create();
 
     if (mode === 'create-rule') {
@@ -32,7 +65,7 @@ export async function POST(request: NextRequest) {
 }
 
 // ─── Chat Mode ─────────────────────────────────────────────────────
-async function handleChat(zai: any, message: string) {
+async function handleChat(zai: Awaited<ReturnType<typeof ZAI.create>>, message: string) {
   const systemPrompt = `You are "Asistente Contable", a helpful and professional AI accounting assistant for the AccountExpress platform.
 
 LANGUAGE RULES:
@@ -57,22 +90,24 @@ YOUR STYLE:
 - Format responses with clear structure when needed (bullet points, numbered lists)
 - Keep responses concise but thorough`;
 
-  const response = await zai.chat.completions.create({
+  const rawResponse: unknown = await zai.chat.completions.create({
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: message },
     ],
   });
 
+  const response = ZAIResponseSchema.safeParse(rawResponse);
   const reply =
-    response?.choices?.[0]?.message?.content ??
-    'Lo siento, no pude procesar tu solicitud. Intenta de nuevo.';
+    response.success
+      ? (response.data.choices?.[0]?.message?.content ?? 'Lo siento, no pude procesar tu solicitud. Intenta de nuevo.')
+      : 'Lo siento, no pude procesar tu solicitud. Intenta de nuevo.';
 
   return NextResponse.json({ reply });
 }
 
 // ─── Create Rule Mode ──────────────────────────────────────────────
-async function handleCreateRule(zai: any, message: string) {
+async function handleCreateRule(zai: Awaited<ReturnType<typeof ZAI.create>>, message: string) {
   const systemPrompt = `You are a rule parser for the AccountExpress accounting platform. The user will describe a bank categorization rule in natural language. You must parse it into a structured JSON object.
 
 VALID conditionType values:
@@ -107,18 +142,19 @@ EXAMPLE OUTPUT:
 
 Respond ONLY with the JSON object.`;
 
-  const response = await zai.chat.completions.create({
+  const rawResponse: unknown = await zai.chat.completions.create({
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: message },
     ],
   });
 
-  const rawReply =
-    response?.choices?.[0]?.message?.content ?? '';
+  const aiResponse = ZAIResponseSchema.safeParse(rawResponse);
+  const rawReply = aiResponse.success
+    ? (aiResponse.data.choices?.[0]?.message?.content ?? '')
+    : '';
 
-  // Try to parse the JSON from the reply
-  let parsedRule = null;
+  let parsedRule: z.infer<typeof ParsedRuleSchema> | null = null;
   let reply = rawReply;
 
   try {
@@ -126,45 +162,19 @@ Respond ONLY with the JSON object.`;
     const jsonMatch = rawReply.match(/```(?:json)?\s*([\s\S]*?)```/) ?? null;
     const jsonStr = jsonMatch ? jsonMatch[1].trim() : rawReply.trim();
 
-    parsedRule = JSON.parse(jsonStr);
+    const jsonUnknown: unknown = JSON.parse(jsonStr);
 
-    // Validate required fields
-    const validConditionTypes = [
-      'contains',
-      'starts_with',
-      'ends_with',
-      'equals',
-      'amount_greater',
-      'amount_less',
-    ];
-    const validDirections = ['any', 'debit', 'credit'];
+    // Validate and coerce with Zod — rejects malformed AI output at the boundary
+    const ruleResult = ParsedRuleSchema.safeParse(jsonUnknown);
 
-    if (
-      parsedRule.name &&
-      parsedRule.conditionType &&
-      parsedRule.conditionValue &&
-      validConditionTypes.includes(parsedRule.conditionType) &&
-      (parsedRule.transactionDirection === undefined ||
-        validDirections.includes(parsedRule.transactionDirection))
-    ) {
-      // Normalize defaults
-      parsedRule.transactionDirection =
-        parsedRule.transactionDirection ?? 'any';
-      parsedRule.priority =
-        typeof parsedRule.priority === 'number'
-          ? Math.min(20, Math.max(0, Math.round(parsedRule.priority)))
-          : 10;
-      parsedRule.glAccountName = parsedRule.glAccountName ?? '';
-
-      reply =
-        '✅ Regla analizada exitosamente. Revisa los campos y guarda la regla.';
+    if (ruleResult.success) {
+      parsedRule = ruleResult.data;
+      reply = '✅ Regla analizada exitosamente. Revisa los campos y guarda la regla.';
     } else {
-      parsedRule = null;
       reply =
         '⚠️ No se pudo interpretar completamente la regla. Por favor, verifica el formato e intenta de nuevo.\n\nFormato sugerido: \'Contiene "TEXTO", cuenta "Nombre de Cuenta", prioridad 5\'';
     }
   } catch {
-    parsedRule = null;
     reply =
       '⚠️ Error al analizar la regla. Por favor, describe la regla con más detalle.\n\nEjemplo: \'Contiene "AMAZON", cuenta "Office Supplies", prioridad 5\'';
   }

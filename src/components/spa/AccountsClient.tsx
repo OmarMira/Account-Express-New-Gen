@@ -37,18 +37,18 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useLanguageStore } from '@/store/language-store';
+import { useTranslations } from 'next-intl';
 import { useAuthStore } from '@/store/auth-store';
 import { BalanceBadge } from '@/components/spa/accounts/BalanceBadge';
-import type { GlAccount as GlAccountType, AccountFormData } from '@/components/spa/accounts/AccountFormDialog';
+import type { GlAccount as GlAccountType, AccountFormData } from '@/components/spa/accounts/AccountFormClientDialog';
 
 // ── Lazy-loaded modals — not included in the initial bundle ──────────
 const AccountFormDialog = dynamic(
-  () => import('@/components/spa/accounts/AccountFormDialog').then((m) => ({ default: m.AccountFormDialog })),
+  () => import('@/components/spa/accounts/AccountFormClientDialog').then((m) => ({ default: m.AccountFormClientDialog })),
   { ssr: false, loading: () => null }
 );
 const AccountDeleteDialog = dynamic(
-  () => import('@/components/spa/accounts/AccountDeleteDialog').then((m) => ({ default: m.AccountDeleteDialog })),
+  () => import('@/components/spa/accounts/AccountDeleteClientDialog').then((m) => ({ default: m.AccountDeleteClientDialog })),
   { ssr: false, loading: () => null }
 );
 
@@ -182,13 +182,13 @@ const rowVariants = {
 };
 
 /* ─── AccountsPage ─── */
-export function AccountsPage() {
-  const t = useLanguageStore((s) => s.t);
+export function AccountsClient({ initialAccounts }: { initialAccounts?: GlAccount[] }) {
+  const t = useTranslations();
   const activeCompany = useAuthStore((s) => s.activeCompany);
 
   // ── State ──
-  const [accounts, setAccounts] = useState<GlAccount[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [accounts, setAccounts] = useState<GlAccount[]>(initialAccounts || []);
+  const [loading, setLoading] = useState(!initialAccounts);
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());

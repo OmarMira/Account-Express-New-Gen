@@ -148,6 +148,140 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // --- INCLUDE VIRTUAL ENTRIES FROM RECONCILED BANK TRANSACTIONS ---
+    const bankTxWhere: Prisma.BankTransactionWhereInput = {
+      statement: { bankAccount: { companyId } },
+      isReconciled: true,
+      glAccountId: { not: null },
+    };
+
+    if (fromDate || toDate) {
+      const dateWhere: Prisma.DateTimeFilter = {};
+      if (fromDate) dateWhere.gte = new Date(fromDate + 'T00:00:00.000Z');
+      if (toDate) dateWhere.lte = new Date(toDate + 'T23:59:59.999Z');
+      bankTxWhere.date = dateWhere;
+    }
+
+    if (accountId) {
+      bankTxWhere.glAccountId = accountId;
+    }
+
+    const reconciledTxs = await db.bankTransaction.findMany({
+      where: bankTxWhere,
+      select: {
+        id: true,
+        date: true,
+        amount: true,
+        description: true,
+        reference: true,
+        glAccount: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            accountType: true,
+            normalBalance: true,
+          },
+        },
+        statement: {
+          select: {
+            bankAccount: {
+              select: {
+                glAccount: {
+                  select: {
+                    id: true,
+                    code: true,
+                    name: true,
+                    accountType: true,
+                    normalBalance: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const journalDescSet = new Set(entries.map(e => e.description));
+
+    for (const tx of reconciledTxs) {
+      if (!tx.glAccount) continue;
+      if (journalDescSet.has(`Reconciliation: ${tx.description}`)) {
+        continue;
+      }
+
+      transactionCount++;
+
+      const isDeposit = tx.amount > 0;
+      const absAmount = Math.abs(tx.amount);
+
+      // Function to process a "virtual" line
+      const processVirtualLine = (glAcct: any, debit: number, credit: number) => {
+        if (!glAcct) return;
+        totalDebits += debit;
+        totalCredits += credit;
+
+        // By account
+        const acctKey = glAcct.id;
+        const existing = accountMap.get(acctKey);
+        if (existing) {
+          existing.debits += debit;
+          existing.credits += credit;
+        } else {
+          accountMap.set(acctKey, {
+            accountId: glAcct.id,
+            accountCode: glAcct.code,
+            accountName: glAcct.name,
+            accountType: glAcct.accountType,
+            debits: debit,
+            credits: credit,
+          });
+        }
+
+        // By type
+        const typeKey = glAcct.accountType;
+        const existingType = typeMap.get(typeKey);
+        if (existingType) {
+          existingType.debits += debit;
+          existingType.credits += credit;
+        } else {
+          typeMap.set(typeKey, {
+            type: typeKey,
+            debits: debit,
+            credits: credit,
+          });
+        }
+
+        // Add to recent movements
+        recentMovements.push({
+          id: tx.id + '-' + glAcct.id,
+          date: tx.date.toISOString().split('T')[0],
+          description: tx.description,
+          debit: debit,
+          credit: credit,
+          account: `${glAcct.code} - ${glAcct.name}`,
+          reference: tx.reference ?? '',
+        });
+      };
+
+      // The assigned GL Account line
+      processVirtualLine(
+        tx.glAccount,
+        isDeposit ? 0 : absAmount,
+        isDeposit ? absAmount : 0
+      );
+
+      // The Bank Asset Account line (if not filtered out by accountId)
+      if (!accountId || accountId === tx.statement.bankAccount.glAccount?.id) {
+        processVirtualLine(
+          tx.statement.bankAccount.glAccount,
+          isDeposit ? absAmount : 0,
+          isDeposit ? 0 : absAmount
+        );
+      }
+    }
+
     const netMovement = totalDebits - totalCredits;
 
     // Sort by account code

@@ -291,7 +291,7 @@ export function LandingPage() {
               className="absolute inset-0 opacity-[0.015]"
               style={{
                 backgroundImage:
-                  'linear-gradient(hsl(var(--foreground)) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--foreground)) 1px, transparent 1px)',
+                  'linear-gradient(var(--app-foreground) 1px, transparent 1px), linear-gradient(90deg, var(--app-foreground) 1px, transparent 1px)',
                 backgroundSize: '64px 64px',
               }}
             />

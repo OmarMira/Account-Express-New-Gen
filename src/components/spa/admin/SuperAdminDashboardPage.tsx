@@ -30,6 +30,33 @@ import AdminUsersPage from './AdminUsersPage';
 import AdminAuditLogsPage from './AdminAuditLogsPage';
 import AdminCompanyDetailPage from './AdminCompanyDetailPage';
 
+// Nav menu item component
+interface NavBtnProps {
+  viewName: any;
+  currentView: any;
+  setCurrentView: (view: any) => void;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+}
+
+const NavBtn = ({ viewName, currentView, setCurrentView, icon: Icon, label }: NavBtnProps) => {
+  const isActive = currentView === viewName;
+  return (
+    <button
+      onClick={() => setCurrentView(viewName)}
+      className={cn(
+        "flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200",
+        isActive 
+          ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 font-semibold"
+          : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+      )}
+    >
+      <Icon className="size-4 shrink-0" />
+      {label}
+    </button>
+  );
+};
+
 export default function SuperAdminDashboardPage() {
   const t = useLanguageStore((s) => s.t);
   const { user, currentView, setCurrentView, logout } = useAuthStore();
@@ -76,31 +103,6 @@ export default function SuperAdminDashboardPage() {
     logout();
   };
 
-  // Nav menu item component
-  interface NavBtnProps {
-    viewName: typeof currentView;
-    icon: React.ComponentType<{ className?: string }>;
-    label: string;
-  }
-
-  const NavBtn = ({ viewName, icon: Icon, label }: NavBtnProps) => {
-    const isActive = currentView === viewName;
-    return (
-      <button
-        onClick={() => setCurrentView(viewName)}
-        className={cn(
-          "flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200",
-          isActive 
-            ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 font-semibold"
-            : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-        )}
-      >
-        <Icon className="size-4 shrink-0" />
-        {label}
-      </button>
-    );
-  };
-
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background">
       {/* ── Sidebar ── */}
@@ -123,21 +125,29 @@ export default function SuperAdminDashboardPage() {
           <div className="space-y-1">
             <NavBtn 
               viewName="admin-dashboard" 
+              currentView={currentView}
+              setCurrentView={setCurrentView}
               icon={Cpu} 
               label="Panel de Control" 
             />
             <NavBtn 
               viewName="admin-companies" 
+              currentView={currentView}
+              setCurrentView={setCurrentView}
               icon={Building2} 
               label="Empresas Globales" 
             />
             <NavBtn 
               viewName="admin-users" 
+              currentView={currentView}
+              setCurrentView={setCurrentView}
               icon={Users} 
               label="Usuarios Globales" 
             />
             <NavBtn 
               viewName="admin-audit-logs" 
+              currentView={currentView}
+              setCurrentView={setCurrentView}
               icon={Activity} 
               label="Bitácora de Logs" 
             />

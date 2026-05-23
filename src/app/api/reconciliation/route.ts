@@ -326,7 +326,7 @@ export async function POST(request: NextRequest) {
 
           // Case 1: Splits provided
           if (txn.splits && txn.splits.length > 0) {
-            const lines = [];
+            const lines: any[] = [];
             
             // The bank side line
             lines.push({
