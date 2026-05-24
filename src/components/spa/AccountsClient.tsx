@@ -19,6 +19,8 @@ import {
   Wallet,
   TrendingUp,
   Receipt,
+  Power,
+  PowerOff,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -60,7 +62,7 @@ const DEFAULT_FORM: AccountFormData = {
   name: '',
   accountType: '',
   normalBalance: '',
-  parentId: '',
+  parentId: 'none',
 };
 
 const ACCOUNT_TYPES = ['asset', 'liability', 'equity', 'revenue', 'expense'];
@@ -160,6 +162,14 @@ const LINE_COLORS: Record<string, string> = {
   revenue: 'border-emerald-300 dark:border-emerald-700',
   expense: 'border-rose-300 dark:border-rose-700',
 };
+
+function fmtCurrency(amount: number): string {
+  const formatted = new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Math.abs(amount));
+  return amount < 0 ? `-$${formatted}` : `$${formatted}`;
+}
 
 /* ─── Animation Variants ─── */
 const sectionVariants = {
@@ -315,7 +325,7 @@ export function AccountsClient({ initialAccounts }: { initialAccounts?: GlAccoun
       name: account.name,
       accountType: account.accountType,
       normalBalance: account.normalBalance,
-      parentId: account.parentId ?? '',
+      parentId: account.parentId ?? 'none',
     });
     setFormErrors({});
     setModalOpen(true);
@@ -353,7 +363,7 @@ export function AccountsClient({ initialAccounts }: { initialAccounts?: GlAccoun
         name: formData.name.trim(),
         accountType: formData.accountType,
         normalBalance: formData.normalBalance,
-        parentId: formData.parentId || null,
+        parentId: formData.parentId === 'none' || !formData.parentId ? null : formData.parentId,
       };
 
       let res: Response;
@@ -386,6 +396,21 @@ export function AccountsClient({ initialAccounts }: { initialAccounts?: GlAccoun
     }
   }
 
+  function handleDeleteClick(account: GlAccount) {
+    setDeleteError('');
+    setDeleteTarget(account);
+
+    if (account.isSystem) {
+      setDeleteError(t('accounts.systemAccountCannotBeDeleted'));
+      return;
+    }
+
+    if (account.balance && account.balance !== 0) {
+      setDeleteError(t('accounts.accountHasBalanceCannotBeDeleted'));
+      return;
+    }
+  }
+
   /* ── Delete account ── */
   async function handleDelete() {
     if (!deleteTarget) return;
@@ -405,6 +430,21 @@ export function AccountsClient({ initialAccounts }: { initialAccounts?: GlAccoun
       setDeleteError(t('common.error'));
     } finally {
       setDeleting(false);
+    }
+  }
+
+  async function handleToggleActive(account: GlAccount) {
+    try {
+      const res = await fetch(`/api/accounts/${account.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: !account.isActive }),
+      });
+      if (res.ok) {
+        fetchAccounts();
+      }
+    } catch (err) {
+      console.error('[TOGGLE ACTIVE ERROR]', err);
     }
   }
 
@@ -437,11 +477,15 @@ export function AccountsClient({ initialAccounts }: { initialAccounts?: GlAccoun
         >
           <div
             className={cn(
-              'group flex items-center gap-2 rounded-md px-3 py-2 transition-colors',
+              'group flex items-center gap-2 rounded-md px-3 py-2 transition-colors cursor-pointer select-none',
               'hover:bg-muted/60',
               !account.isActive && 'opacity-50',
               depth > 0 && 'ml-1',
             )}
+            onDoubleClick={(e) => {
+              e.stopPropagation();
+              openEditModal(account);
+            }}
           >
             {/* Tree indentation + connection line */}
             {depth > 0 && (
@@ -507,28 +551,53 @@ export function AccountsClient({ initialAccounts }: { initialAccounts?: GlAccoun
               {account.name}
             </span>
 
-            {/* Normal balance badge */}
-            <div className="shrink-0 hidden sm:block">
-              <BalanceBadge normalBalance={account.normalBalance} />
-            </div>
+            {/* Balance / Importe */}
+            <span className="font-mono text-sm text-right min-w-[90px] hidden sm:inline mr-2 text-muted-foreground">
+              {fmtCurrency(account.balance ?? 0)}
+            </span>
+
+            {/* Account Type */}
+            <span className="hidden md:inline mr-2">
+              <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0 capitalize font-medium", config.iconColor, config.iconBg, config.accentBorder)}>
+                {t(`accounts.${account.accountType}`)}
+              </Badge>
+            </span>
 
             {/* Status badge */}
-            <div className="shrink-0 hidden sm:block">
-              <Badge
-                variant={account.isActive ? 'default' : 'secondary'}
-                className={cn(
-                  'text-[10px] px-1.5 py-0',
-                  account.isActive
-                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'
-                    : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
-                )}
-              >
-                {account.isActive ? t('common.active') : t('common.inactive')}
-              </Badge>
-            </div>
+            {!account.isActive && (
+              <div className="shrink-0 hidden sm:block mr-2">
+                <Badge
+                  variant="secondary"
+                  className="text-[10px] px-1.5 py-0 bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+                >
+                  {t('common.inactive')}
+                </Badge>
+              </div>
+            )}
 
             {/* Actions */}
-            <div className="shrink-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="shrink-0 flex items-center gap-0.5">
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "size-7 transition-colors",
+                  account.isActive
+                    ? "text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/30"
+                    : "text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/30"
+                )}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleToggleActive(account);
+                }}
+                title={account.isActive ? t('accounts.deactivate') : t('accounts.activate')}
+              >
+                {account.isActive ? (
+                  <Power className="size-3.5" />
+                ) : (
+                  <PowerOff className="size-3.5" />
+                )}
+              </Button>
               <Button
                 variant="ghost"
                 size="icon"
@@ -540,20 +609,23 @@ export function AccountsClient({ initialAccounts }: { initialAccounts?: GlAccoun
               >
                 <Pencil className="size-3" />
               </Button>
-              {!account.isSystem && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-7 text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/30"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setDeleteTarget(account);
-                    setDeleteError('');
-                  }}
-                >
-                  <Trash2 className="size-3" />
-                </Button>
-              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "size-7 transition-colors",
+                  account.isSystem
+                    ? "text-zinc-500/60 dark:text-zinc-400/50 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                    : "text-red-500 hover:text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30"
+                )}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteClick(account);
+                }}
+                title={account.isSystem ? 'System account' : t('common.delete')}
+              >
+                <Trash2 className="size-3.5" />
+              </Button>
             </div>
           </div>
 

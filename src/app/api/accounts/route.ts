@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
       ];
     }
 
-    const accounts = await db.glAccount.findMany({
+    const rawAccounts = await db.glAccount.findMany({
       where,
       include: {
         parent: {
@@ -44,8 +44,24 @@ export async function GET(request: NextRequest) {
         _count: {
           select: { children: true, journalLines: true },
         },
+        journalLines: {
+          select: { debit: true, credit: true }
+        }
       },
       orderBy: [{ code: 'asc' }],
+    });
+
+    const accounts = rawAccounts.map(account => {
+      let balance = 0;
+      for (const line of account.journalLines) {
+        if (account.normalBalance === 'debit') {
+          balance += (line.debit - line.credit);
+        } else {
+          balance += (line.credit - line.debit);
+        }
+      }
+      const { journalLines, ...rest } = account;
+      return { ...rest, balance };
     });
 
     return NextResponse.json({ accounts });

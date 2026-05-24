@@ -202,7 +202,7 @@ export async function PUT(
   }
 }
 
-// ─── DELETE /api/accounts/[id] (soft delete: set isActive=false) ───────
+// ─── DELETE /api/accounts/[id] (hard delete) ───────────────────────────
 export async function DELETE(
   request: NextRequest,
   { params }: RouteParams
@@ -219,7 +219,13 @@ export async function DELETE(
       where: { id },
       include: {
         _count: {
-          select: { children: true, journalLines: true },
+          select: {
+            children: true,
+            journalLines: true,
+            bankAccounts: true,
+            bankRules: true,
+            transactions: true,
+          },
         },
       },
     });
@@ -255,21 +261,36 @@ export async function DELETE(
       );
     }
 
-    // Soft delete
-    const updated = await db.glAccount.update({
+    // Cannot delete accounts linked to bank accounts
+    if (account._count.bankAccounts > 0) {
+      return NextResponse.json(
+        { error: 'This account is linked to a bank account and cannot be deleted' },
+        { status: 409 }
+      );
+    }
+
+    // Cannot delete accounts linked to bank rules
+    if (account._count.bankRules > 0) {
+      return NextResponse.json(
+        { error: 'This account is linked to a bank rule and cannot be deleted' },
+        { status: 409 }
+      );
+    }
+
+    // Cannot delete accounts linked to bank transactions
+    if (account._count.transactions > 0) {
+      return NextResponse.json(
+        { error: 'This account is linked to bank transactions and cannot be deleted' },
+        { status: 409 }
+      );
+    }
+
+    // Hard delete from database
+    const deleted = await db.glAccount.delete({
       where: { id },
-      data: { isActive: false },
-      include: {
-        parent: {
-          select: { id: true, code: true, name: true },
-        },
-        _count: {
-          select: { children: true, journalLines: true },
-        },
-      },
     });
 
-    return NextResponse.json({ account: updated });
+    return NextResponse.json({ account: deleted });
   } catch (error) {
     console.error('[ACCOUNT DELETE ERROR]', error);
     return NextResponse.json(

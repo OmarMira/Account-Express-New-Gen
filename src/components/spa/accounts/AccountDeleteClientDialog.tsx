@@ -11,7 +11,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import type { GlAccount } from './AccountFormClientDialog';
 
 interface Props {
@@ -30,6 +30,7 @@ export function AccountDeleteClientDialog({
   onConfirm,
 }: Props) {
   const t = useTranslations();
+  const language = useLocale();
 
   return (
     <AlertDialog open={!!target} onOpenChange={(open) => !open && onOpenChange(false)}>
@@ -53,15 +54,23 @@ export function AccountDeleteClientDialog({
         )}
 
         <AlertDialogFooter>
-          <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={onConfirm}
-            disabled={deleting}
-            className="bg-rose-600 hover:bg-rose-700 text-white"
-          >
-            {deleting && <Loader2 className="size-4 mr-2 animate-spin" />}
-            {t('common.delete')}
-          </AlertDialogAction>
+          {deleteError ? (
+            <AlertDialogCancel className="bg-teal-600 hover:bg-teal-700 text-white hover:text-white dark:bg-teal-700 dark:hover:bg-teal-600">
+              {language === 'es' ? 'Aceptar' : 'OK'}
+            </AlertDialogCancel>
+          ) : (
+            <>
+              <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={onConfirm}
+                disabled={deleting}
+                className="bg-rose-600 hover:bg-rose-700 text-white"
+              >
+                {deleting && <Loader2 className="size-4 mr-2 animate-spin" />}
+                {t('common.delete')}
+              </AlertDialogAction>
+            </>
+          )}
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

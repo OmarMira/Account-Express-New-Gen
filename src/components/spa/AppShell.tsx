@@ -290,6 +290,7 @@ function DesktopNavItems({ collapsed }: { collapsed: boolean }) {
 
 /* ─── Main AppShell ─── */
 export function AppShell({ children }: { children?: React.ReactNode }) {
+  const router = useRouter();
   const t = useLanguageStore((s) => s.t);
   const { user, activeCompany, logout, sidebarOpen, setSidebarOpen } =
     useAuthStore();
@@ -307,7 +308,8 @@ export function AppShell({ children }: { children?: React.ReactNode }) {
   const handleChangeCompany = useCallback(() => {
     useAuthStore.getState().setActiveCompany(null as any);
     useAuthStore.getState().setCurrentView('select-company');
-  }, []);
+    router.push('/');
+  }, [router]);
 
   const isProcessing = useAuthStore((s) => s.isProcessing);
   const processingMessage = useAuthStore((s) => s.processingMessage);

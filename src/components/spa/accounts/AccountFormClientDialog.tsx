@@ -50,6 +50,7 @@ export interface GlAccount {
   companyId: string;
   parent?: { id: string; code: string; name: string } | null;
   _count?: { children: number; journalLines: number };
+  balance?: number;
 }
 
 export interface AccountFormData {
@@ -104,7 +105,9 @@ export function AccountFormClientDialog({
             {editingAccount ? t('accounts.editAccount') : t('accounts.newAccount')}
           </DialogTitle>
           <DialogDescription>
-            {editingAccount ? t('accounts.editAccount') : t('accounts.newAccount')}
+            {editingAccount 
+              ? (language === 'es' ? 'Modifica los detalles y la jerarquía de esta cuenta contable.' : 'Modify the details and hierarchy of this ledger account.')
+              : (language === 'es' ? 'Define el código, nombre y tipo para tu nueva cuenta contable.' : 'Define the code, name, and type for your new ledger account.')}
           </DialogDescription>
         </DialogHeader>
 
@@ -114,11 +117,13 @@ export function AccountFormClientDialog({
           </div>
         )}
 
-        <div className="grid gap-4 py-2">
+        <div className="grid gap-5 py-2">
           {/* Code + Name */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="account-code">{t('accounts.accountCode')}</Label>
+              <Label htmlFor="account-code" className="flex items-center gap-1 font-semibold text-zinc-900 dark:text-zinc-100/90 text-sm">
+                {t('accounts.accountCode')} <span className="text-red-500">*</span>
+              </Label>
               <Input
                 id="account-code"
                 placeholder="1000"
@@ -126,10 +131,12 @@ export function AccountFormClientDialog({
                 onChange={(e) => onFormChange({ code: e.target.value })}
                 className={formErrors.code ? 'border-rose-500' : ''}
               />
-              {formErrors.code && <p className="text-xs text-rose-600">{formErrors.code}</p>}
+              {formErrors.code && <p className="text-xs text-rose-600 font-medium">{formErrors.code}</p>}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="account-name">{t('accounts.accountName')}</Label>
+              <Label htmlFor="account-name" className="flex items-center gap-1 font-semibold text-zinc-900 dark:text-zinc-100/90 text-sm">
+                {t('accounts.accountName')} <span className="text-red-500">*</span>
+              </Label>
               <Input
                 id="account-name"
                 placeholder={language === 'es' ? 'Efectivo' : 'Cash'}
@@ -137,14 +144,14 @@ export function AccountFormClientDialog({
                 onChange={(e) => onFormChange({ name: e.target.value })}
                 className={formErrors.name ? 'border-rose-500' : ''}
               />
-              {formErrors.name && <p className="text-xs text-rose-600">{formErrors.name}</p>}
+              {formErrors.name && <p className="text-xs text-rose-600 font-medium">{formErrors.name}</p>}
             </div>
           </div>
 
           {/* Type + Balance */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>{t('accounts.accountType')}</Label>
+              <Label className="flex items-center gap-1 font-semibold text-zinc-900 dark:text-zinc-100/90 text-sm">{t('accounts.accountType')} <span className="text-red-500">*</span></Label>
               <Select
                 value={formData.accountType}
                 onValueChange={(v) => onFormChange({ accountType: v })}
@@ -160,13 +167,15 @@ export function AccountFormClientDialog({
                   ))}
                 </SelectContent>
               </Select>
-              {formErrors.accountType && <p className="text-xs text-rose-600">{formErrors.accountType}</p>}
+              {formErrors.accountType && <p className="text-xs text-rose-600 font-medium">{formErrors.accountType}</p>}
               {formData.accountType && (
-                <p className="text-xs text-muted-foreground">{getTypeHelper(formData.accountType)}</p>
+                <div className="rounded-md bg-teal-500/5 dark:bg-teal-500/10 border border-teal-500/20 p-2.5 text-[11px] text-teal-700 dark:text-teal-400 mt-1.5 leading-relaxed">
+                  {getTypeHelper(formData.accountType)}
+                </div>
               )}
             </div>
             <div className="space-y-2">
-              <Label>{t('accounts.normalBalance')}</Label>
+              <Label className="flex items-center gap-1 font-semibold text-zinc-900 dark:text-zinc-100/90 text-sm">{t('accounts.normalBalance')} <span className="text-red-500">*</span></Label>
               <Select
                 value={formData.normalBalance}
                 onValueChange={(v) => onFormChange({ normalBalance: v })}
@@ -179,16 +188,18 @@ export function AccountFormClientDialog({
                   <SelectItem value="credit">{t('accounts.credit')}</SelectItem>
                 </SelectContent>
               </Select>
-              {formErrors.normalBalance && <p className="text-xs text-rose-600">{formErrors.normalBalance}</p>}
+              {formErrors.normalBalance && <p className="text-xs text-rose-600 font-medium">{formErrors.normalBalance}</p>}
               {formData.normalBalance && (
-                <p className="text-xs text-muted-foreground">{getBalanceHelper(formData.normalBalance)}</p>
+                <div className="rounded-md bg-indigo-500/5 dark:bg-indigo-500/10 border border-indigo-500/20 p-2.5 text-[11px] text-indigo-700 dark:text-indigo-400 mt-1.5 leading-relaxed">
+                  {getBalanceHelper(formData.normalBalance)}
+                </div>
               )}
             </div>
           </div>
 
           {/* Parent Account */}
-          <div className="space-y-2">
-            <Label>{t('accounts.parentAccount')}</Label>
+          <div className="space-y-2 border-t pt-4 border-border/50">
+            <Label className="font-semibold text-zinc-900 dark:text-zinc-100/90 text-sm">{t('accounts.parentAccount')}</Label>
             <Select
               value={formData.parentId}
               onValueChange={(v) => onFormChange({ parentId: v })}
@@ -197,7 +208,7 @@ export function AccountFormClientDialog({
                 <SelectValue placeholder="—" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">
+                <SelectItem value="none">
                   <span className="text-muted-foreground">
                     {language === 'es' ? 'Ninguna (cuenta raíz)' : 'None (root account)'}
                   </span>
@@ -211,7 +222,7 @@ export function AccountFormClientDialog({
                   ))}
               </SelectContent>
             </Select>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-[11px] text-muted-foreground/80 pl-1">
               {language === 'es'
                 ? 'Opcional. Agrupa esta cuenta bajo una cuenta padre.'
                 : 'Optional. Group this account under a parent account.'}

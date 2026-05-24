@@ -120,13 +120,40 @@ export const useAuthStore = create<AuthState>()(
           if (res.ok) {
             const data = await res.json();
             if (data.user) {
+              const currentStore = get();
+              
               set({
                 user: data.user,
                 isAuthenticated: true,
-                currentView: 'dashboard',
               });
-              if (data.companies && data.companies.length > 0) {
-                set({ activeCompany: data.companies[0] });
+
+              if (currentStore.currentView === 'select-company') {
+                // If explicitly on select-company, keep it open and keep activeCompany null
+                set({
+                  activeCompany: null,
+                  currentView: 'select-company',
+                });
+              } else if (
+                !currentStore.activeCompany &&
+                data.companies &&
+                data.companies.length > 0
+              ) {
+                // If no company is selected and not explicitly on select-company, auto-select first
+                set({
+                  activeCompany: data.companies[0],
+                  currentView: 'dashboard',
+                });
+              } else if (currentStore.activeCompany) {
+                // Verify the active company is still valid
+                const stillExists = data.companies?.some(
+                  (c: Company) => c.id === currentStore.activeCompany?.id
+                );
+                if (!stillExists) {
+                  set({
+                    activeCompany: data.companies?.[0] || null,
+                    currentView: data.companies?.[0] ? 'dashboard' : 'select-company',
+                  });
+                }
               }
             }
           }
