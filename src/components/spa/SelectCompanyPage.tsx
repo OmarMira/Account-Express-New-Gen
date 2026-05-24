@@ -25,6 +25,7 @@ export function SelectCompanyPage() {
   const [legalName, setLegalName] = useState('');
   const [taxId, setTaxId] = useState('');
   const [creating, setCreating] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   async function handleCreateCompany(e: React.FormEvent) {
@@ -73,6 +74,8 @@ export function SelectCompanyPage() {
         }
       } catch {
         // ignore
+      } finally {
+        setLoading(false);
       }
     }
     fetchCompanies();
@@ -127,7 +130,19 @@ export function SelectCompanyPage() {
                 </div>
               )}
 
-              {companies.length === 0 ? (
+              {loading ? (
+                <div className="space-y-3">
+                  {[1, 2].map((i) => (
+                    <div key={i} className="flex items-center gap-3 rounded-lg border p-4 animate-pulse">
+                      <div className="size-10 rounded-lg bg-muted shrink-0" />
+                      <div className="flex-1 space-y-2">
+                        <div className="h-4 bg-muted rounded w-3/4" />
+                        <div className="h-3 bg-muted rounded w-1/2" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : companies.length === 0 ? (
                 <div className="space-y-4">
                   <div className="rounded-xl border border-dashed border-amber-500/20 bg-amber-500/5 p-4 text-center">
                     <p className="text-sm text-amber-600 dark:text-amber-400 font-medium">

@@ -47,7 +47,7 @@ export function RolesTab() {
   const superAdminPermissions = [
     'Gestionar todas las empresas del sistema',
     'Crear, editar y eliminar usuarios',
-    'Acceso completo a cuentas, pólizas y reportes',
+    'Acceso completo a cuentas, libro mayor y reportes',
     'Configurar períodos fiscales y respaldos',
     'Acceso al diagnóstico del sistema',
     'Gestionar roles y permisos',
@@ -56,7 +56,7 @@ export function RolesTab() {
   const companyAdminPermissions = [
     'Acceso completo a la empresa asignada',
     'Crear y gestionar cuentas contables',
-    'Crear y registrar pólizas de diario',
+    'Crear y registrar asientos en el libro mayor',
     'Conciliación bancaria',
     'Generación de reportes financieros',
     'Importación de estados de cuenta',

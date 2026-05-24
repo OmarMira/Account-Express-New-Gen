@@ -313,7 +313,7 @@ export function FiscalPeriodsTab() {
             </AlertDialogTitle>
             <AlertDialogDescription>
               {lockTarget?.isLocked
-                ? `¿Abrir el período "${lockTarget.name}"? Se podrán crear y modificar pólizas.`
+                ? `¿Abrir el período "${lockTarget.name}"? Se podrán crear y modificar asientos.`
                 : t('settings.periods.confirmLockDesc')}
             </AlertDialogDescription>
           </AlertDialogHeader>

@@ -308,7 +308,11 @@ export function DashboardPage() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">{t('dashboard.cashBalance')}</p>
-              <p className="text-sm font-semibold">{formatCurrency(d.totalBankBalance)}</p>
+              {loading ? (
+                <Skeleton className="h-4 w-20 mt-1" />
+              ) : (
+                <p className="text-sm font-semibold">{formatCurrency(d.totalBankBalance)}</p>
+              )}
             </div>
           </div>
         </Card>
@@ -319,7 +323,11 @@ export function DashboardPage() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">{t('reconciliation.reconciled')}</p>
-              <p className="text-sm font-semibold">{d.reconciledCount}</p>
+              {loading ? (
+                <Skeleton className="h-4 w-12 mt-1" />
+              ) : (
+                <p className="text-sm font-semibold">{d.reconciledCount}</p>
+              )}
             </div>
           </div>
         </Card>
@@ -330,7 +338,11 @@ export function DashboardPage() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">{t('reconciliation.unreconciled')}</p>
-              <p className="text-sm font-semibold">{d.unreconciledCount}</p>
+              {loading ? (
+                <Skeleton className="h-4 w-12 mt-1" />
+              ) : (
+                <p className="text-sm font-semibold">{d.unreconciledCount}</p>
+              )}
             </div>
           </div>
         </Card>
@@ -341,7 +353,11 @@ export function DashboardPage() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">{t('journal.posted')}</p>
-              <p className="text-sm font-semibold">{d.postedEntries}</p>
+              {loading ? (
+                <Skeleton className="h-4 w-12 mt-1" />
+              ) : (
+                <p className="text-sm font-semibold">{d.postedEntries}</p>
+              )}
             </div>
           </div>
         </Card>
@@ -392,7 +408,9 @@ export function DashboardPage() {
               </div>
             </CardHeader>
             <CardContent>
-              {d.monthlyTrend && d.monthlyTrend.length > 0 ? (
+              {loading ? (
+                <Skeleton className="h-[280px] w-full" />
+              ) : d.monthlyTrend && d.monthlyTrend.length > 0 ? (
               <ChartContainer config={cashFlowChartConfig} className="h-[280px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={d.monthlyTrend} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>

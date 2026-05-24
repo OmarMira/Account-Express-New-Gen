@@ -66,33 +66,27 @@ export default function SuperAdminDashboardPage() {
     logsCount: 0,
     systemLoad: '0%'
   });
+  const [statsLoading, setStatsLoading] = useState(true);
 
   // Load stats from API
   useEffect(() => {
     async function loadStats() {
+      setStatsLoading(true);
       try {
-        const [compRes, userRes, logRes] = await Promise.all([
-          fetch('/api/admin/companies'),
-          fetch('/api/admin/users'),
-          fetch('/api/admin/audit-logs?limit=1')
-        ]);
-        
-        const compsData = compRes.ok ? await compRes.json() : { companies: [] };
-        const usersData = userRes.ok ? await userRes.json() : { users: [] };
-        const logsData = logRes.ok ? await logRes.json() : { auditLogs: [] };
-        
-        const companiesList = compsData.companies || [];
-        const usersList = usersData.users || [];
-        const logsList = logsData.auditLogs || [];
-
-        setStats({
-          companiesCount: companiesList.length,
-          usersCount: usersList.length,
-          logsCount: logsList.length,
-          systemLoad: `${Math.floor(Math.random() * 12) + 5}%`
-        });
+        const res = await fetch('/api/admin/stats');
+        if (res.ok) {
+          const data = await res.json();
+          setStats({
+            companiesCount: data.companiesCount || 0,
+            usersCount: data.usersCount || 0,
+            logsCount: data.logsCount || 0,
+            systemLoad: `${Math.floor(Math.random() * 12) + 5}%`
+          });
+        }
       } catch (err) {
         console.error('Error loading stats:', err);
+      } finally {
+        setStatsLoading(false);
       }
     }
     loadStats();
@@ -240,7 +234,11 @@ export default function SuperAdminDashboardPage() {
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <span className="text-3xl font-bold text-foreground">{stats.companiesCount}</span>
+                      {statsLoading ? (
+                        <div className="h-9 w-16 animate-pulse bg-muted rounded my-0.5" />
+                      ) : (
+                        <span className="text-3xl font-bold text-foreground">{stats.companiesCount}</span>
+                      )}
                       <p className="text-xs text-muted-foreground mt-1">Registradas en el sistema</p>
                     </CardContent>
                   </Card>
@@ -256,7 +254,11 @@ export default function SuperAdminDashboardPage() {
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <span className="text-3xl font-bold text-foreground">{stats.usersCount}</span>
+                      {statsLoading ? (
+                        <div className="h-9 w-16 animate-pulse bg-muted rounded my-0.5" />
+                      ) : (
+                        <span className="text-3xl font-bold text-foreground">{stats.usersCount}</span>
+                      )}
                       <p className="text-xs text-muted-foreground mt-1">Administradores y operadores</p>
                     </CardContent>
                   </Card>
@@ -272,7 +274,11 @@ export default function SuperAdminDashboardPage() {
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <span className="text-3xl font-bold text-foreground">{stats.logsCount}</span>
+                      {statsLoading ? (
+                        <div className="h-9 w-16 animate-pulse bg-muted rounded my-0.5" />
+                      ) : (
+                        <span className="text-3xl font-bold text-foreground">{stats.logsCount}</span>
+                      )}
                       <p className="text-xs text-muted-foreground mt-1">Registros de actividad</p>
                     </CardContent>
                   </Card>
@@ -285,7 +291,11 @@ export default function SuperAdminDashboardPage() {
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <span className="text-3xl font-bold text-foreground">{stats.systemLoad}</span>
+                      {statsLoading ? (
+                        <div className="h-9 w-16 animate-pulse bg-muted rounded my-0.5" />
+                      ) : (
+                        <span className="text-3xl font-bold text-foreground">{stats.systemLoad}</span>
+                      )}
                       <p className="text-xs text-muted-foreground mt-1">Recursos consumidos</p>
                     </CardContent>
                   </Card>

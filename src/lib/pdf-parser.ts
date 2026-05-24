@@ -1,4 +1,15 @@
 import { PDFParse } from 'pdf-parse';
+import path from 'path';
+import { pathToFileURL } from 'url';
+
+// Configure the pdf.js worker path for the server context
+try {
+  const workerPath = path.join(process.cwd(), 'node_modules', 'pdfjs-dist', 'legacy', 'build', 'pdf.worker.mjs');
+  const workerUrl = pathToFileURL(workerPath).href;
+  PDFParse.setWorker(workerUrl);
+} catch (e) {
+  console.error('Failed to configure PDF worker:', e);
+}
 
 export interface ParsedTransaction {
   date: Date;

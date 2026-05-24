@@ -131,6 +131,17 @@ function fmtCurrency(amount: number): string {
   return amount < 0 ? `-$${formatCurrency(amount)}` : `$${formatCurrency(amount)}`;
 }
 
+function formatNumberWithComas(val: string): string {
+  const cleaned = val.replace(/[^0-9.]/g, '');
+  const parts = cleaned.split('.');
+  if (parts.length > 2) return val;
+  const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  if (parts.length === 2) {
+    return `${integerPart}.${parts[1].slice(0, 2)}`;
+  }
+  return integerPart;
+}
+
 function maskAccountNo(accountNo: string | null): string {
   if (!accountNo) return '—';
   if (accountNo.length <= 4) return '••••';
@@ -263,7 +274,8 @@ export function BanksPage() {
     setFormAccountNo(account.accountNo || '');
     setFormRoutingNo(account.routingNo || '');
     setFormGlAccountId(account.glAccountId);
-    setFormBalance((((account as any).startingBalance !== undefined ? (account as any).startingBalance : account.balance) as number).toString());
+    const rawBalance = ((account as any).startingBalance !== undefined ? (account as any).startingBalance : account.balance) as number;
+    setFormBalance(typeof rawBalance === 'number' ? formatNumberWithComas(Number(rawBalance.toFixed(2)).toString()) : '');
     setFormCurrency(account.currency);
     setFormError('');
     setModalOpen(true);
@@ -293,7 +305,7 @@ export function BanksPage() {
         accountNo: formAccountNo || null,
         routingNo: formRoutingNo || null,
         glAccountId: formGlAccountId,
-        balance: parseFloat(formBalance) || 0,
+        balance: parseFloat(formBalance.replace(/,/g, '')) || 0,
         currency: formCurrency,
       };
 
@@ -886,11 +898,10 @@ export function BanksPage() {
                   {t('banks.startingBalance')}
                 </label>
                 <Input
-                  type="number"
-                  step="0.01"
+                  type="text"
                   placeholder="0.00"
                   value={formBalance}
-                  onChange={(e) => setFormBalance(e.target.value)}
+                  onChange={(e) => setFormBalance(formatNumberWithComas(e.target.value))}
                   className="font-mono text-right"
                 />
               </div>

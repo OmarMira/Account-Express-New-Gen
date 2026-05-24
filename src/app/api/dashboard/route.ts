@@ -173,15 +173,19 @@ export async function GET(request: NextRequest) {
     });
 
     // ── Reconciliation status ──
-    const allTx = await db.bankTransaction.findMany({
+    const reconciledCount = await db.bankTransaction.count({
       where: {
         statement: { bankAccount: { companyId } },
+        isReconciled: true,
       },
-      select: { isReconciled: true },
     });
 
-    const reconciledCount = allTx.filter((tx) => tx.isReconciled).length;
-    const unreconciledCount = allTx.filter((tx) => !tx.isReconciled).length;
+    const unreconciledCount = await db.bankTransaction.count({
+      where: {
+        statement: { bankAccount: { companyId } },
+        isReconciled: false,
+      },
+    });
 
     // ── Recent transactions (last 10) ──
     const recentTransactions = await db.bankTransaction.findMany({

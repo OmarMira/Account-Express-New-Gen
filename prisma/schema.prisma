@@ -101,6 +101,9 @@ model BankAccount {
   glAccount  GlAccount              @relation(fields: [glAccountId], references: [id])
   statements BankStatement[]
   reconciliationPeriods ReconciliationPeriod[]
+
+  @@index([companyId])
+  @@index([glAccountId])
 }
 
 model BankStatement {
@@ -141,6 +144,10 @@ model BankTransaction {
   glAccount             GlAccount?             @relation(fields: [glAccountId], references: [id])
   matchedRule           BankRule?              @relation(fields: [matchedRuleId], references: [id])
   reconciliationPeriod  ReconciliationPeriod?  @relation(fields: [reconciliationPeriodId], references: [id])
+
+  @@index([statementId])
+  @@index([glAccountId])
+  @@index([isReconciled])
 }
 
 model ReconciliationPeriod {
@@ -210,6 +217,9 @@ model JournalLine {
 
   entry     JournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
   glAccount GlAccount    @relation(fields: [glAccountId], references: [id])
+
+  @@index([entryId])
+  @@index([glAccountId])
 }
 
 model FiscalPeriod {

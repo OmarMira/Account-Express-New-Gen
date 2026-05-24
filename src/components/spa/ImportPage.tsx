@@ -179,6 +179,9 @@ export function ImportPage() {
   const activeCompany = useAuthStore((s) => s.activeCompany);
   const setCurrentView = useAuthStore((s) => s.setCurrentView);
 
+  const startProcessing = useAuthStore((s) => s.startProcessing);
+  const stopProcessing = useAuthStore((s) => s.stopProcessing);
+
   // State
   const [bankAccounts, setBankAccounts] = useState<BankAccountOption[]>([]);
   const [selectedBankAccountId, setSelectedBankAccountId] = useState<string>('');
@@ -327,6 +330,7 @@ export function ImportPage() {
     setUploading(true);
     setUploadProgress(5);
     setUploadError('');
+    startProcessing('Importando y procesando estado de cuenta...');
 
     try {
       let totalTransactions = 0;
@@ -357,8 +361,13 @@ export function ImportPage() {
         });
 
         if (!res.ok) {
-          const err = await res.json();
-          throw new Error(err.error || `${file.name}: ${t('banks.importFailed')}`);
+          const contentType = res.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const err = await res.json();
+            throw new Error(err.error || `${file.name}: ${t('banks.importFailed')}`);
+          } else {
+            throw new Error(`${file.name}: Error del servidor (${res.status})`);
+          }
         }
 
         const data: ImportResult = await res.json();
@@ -389,6 +398,7 @@ export function ImportPage() {
     } finally {
       setUploading(false);
       setUploadProgress(0);
+      stopProcessing();
     }
   }
 

@@ -49,6 +49,8 @@ interface AuthState {
   sidebarOpen: boolean;
   aiAssistantOpen: boolean;
   adminSelectedCompanyId: string | null;
+  isProcessing: boolean;
+  processingMessage: string;
   login: (user: User) => void;
   logout: () => void;
   setActiveCompany: (company: Company) => void;
@@ -56,6 +58,8 @@ interface AuthState {
   setSidebarOpen: (open: boolean) => void;
   setAiAssistantOpen: (open: boolean) => void;
   setAdminSelectedCompanyId: (id: string | null) => void;
+  startProcessing: (message?: string) => void;
+  stopProcessing: () => void;
   hydrate: () => Promise<void>;
 }
 
@@ -69,6 +73,8 @@ export const useAuthStore = create<AuthState>()(
       sidebarOpen: true,
       aiAssistantOpen: false,
       adminSelectedCompanyId: null,
+      isProcessing: false,
+      processingMessage: 'Procesando...',
 
       login: (user: User) =>
         set({
@@ -86,6 +92,7 @@ export const useAuthStore = create<AuthState>()(
           sidebarOpen: true,
           aiAssistantOpen: false,
           adminSelectedCompanyId: null,
+          isProcessing: false,
         }),
 
       setActiveCompany: (company: Company) =>
@@ -99,6 +106,11 @@ export const useAuthStore = create<AuthState>()(
 
       setAdminSelectedCompanyId: (id: string | null) =>
         set({ adminSelectedCompanyId: id }),
+
+      startProcessing: (message) =>
+        set({ isProcessing: true, processingMessage: message || 'Procesando...' }),
+
+      stopProcessing: () => set({ isProcessing: false }),
 
       hydrate: async () => {
         try {

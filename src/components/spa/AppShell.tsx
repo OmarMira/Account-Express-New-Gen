@@ -20,6 +20,7 @@ import {
   Activity,
   Sparkles,
   ShieldCheck,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -308,6 +309,9 @@ export function AppShell({ children }: { children?: React.ReactNode }) {
     useAuthStore.getState().setCurrentView('select-company');
   }, []);
 
+  const isProcessing = useAuthStore((s) => s.isProcessing);
+  const processingMessage = useAuthStore((s) => s.processingMessage);
+
   // Close mobile sidebar on nav change
   useEffect(() => {
     if (window.innerWidth < 1024) {
@@ -321,6 +325,32 @@ export function AppShell({ children }: { children?: React.ReactNode }) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
+      {/* Global Processing Loader Overlay */}
+      {isProcessing && (
+        <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-background/40 backdrop-blur-sm transition-all duration-300 animate-in fade-in">
+          <div className="flex flex-col items-center gap-5 rounded-2xl border bg-card/85 p-8 shadow-2xl backdrop-blur-xl border-border/50 max-w-sm text-center">
+            <div className="relative flex items-center justify-center size-20">
+              {/* Outer glow ring */}
+              <div className="absolute inset-0 rounded-full border-t-2 border-r-2 border-primary animate-spin" />
+              {/* Inner glow ring running counter-clockwise */}
+              <div className="absolute inset-2 rounded-full border-b-2 border-l-2 border-indigo-500 animate-spin [animation-direction:reverse]" />
+              {/* Inner core spinner icon */}
+              <div className="flex size-10 items-center justify-center rounded-full bg-primary/10">
+                <Loader2 className="size-5 animate-spin text-primary" />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <h3 className="font-semibold text-sm tracking-tight text-foreground">
+                {processingMessage || 'Procesando...'}
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Por favor, espera un momento.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* AI Assistant Modal */}
       <AIAssistantModal />
 

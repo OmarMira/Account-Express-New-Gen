@@ -150,6 +150,8 @@ export function ReconciliationPage() {
   const t = useLanguageStore((s) => s.t);
   const activeCompany = useAuthStore((s) => s.activeCompany);
   const setCurrentView = useAuthStore((s) => s.setCurrentView);
+  const startProcessing = useAuthStore((s) => s.startProcessing);
+  const stopProcessing = useAuthStore((s) => s.stopProcessing);
 
   // Bank account selector - auto-select first account
   const [bankAccounts, setBankAccounts] = useState<BankAccountOption[]>([]);
@@ -355,6 +357,7 @@ export function ReconciliationPage() {
     if (!activeCompany?.id || !selectedAccountId) return;
     setAutoMatching(true);
     setAutoMatchResult(null);
+    startProcessing('Emparejando transacciones automáticamente...');
     try {
       const res = await fetch('/api/reconciliation/auto', {
         method: 'POST',
@@ -374,6 +377,7 @@ export function ReconciliationPage() {
       }
     } catch { /* ignore */ } finally {
       setAutoMatching(false);
+      stopProcessing();
     }
   };
 
@@ -382,6 +386,7 @@ export function ReconciliationPage() {
     if (!activeCompany?.id || !selectedAccountId || selectedTxIds.size === 0) return;
     setReconciling(true);
     setReconcileResult(null);
+    startProcessing('Conciliando transacciones seleccionadas...');
     try {
       const transactions = Array.from(selectedTxIds).map((id) => ({
         id,
@@ -409,6 +414,7 @@ export function ReconciliationPage() {
       }
     } catch { /* ignore */ } finally {
       setReconciling(false);
+      stopProcessing();
     }
   };
 
@@ -417,6 +423,7 @@ export function ReconciliationPage() {
     if (!activeCompany?.id || !selectedAccountId || selectedTxIds.size === 0) return;
     setUnreconciling(true);
     setUnreconcileResult(null);
+    startProcessing('Revirtiendo conciliación de transacciones...');
     try {
       const res = await fetch('/api/reconciliation/unreconcile', {
         method: 'POST',
@@ -434,6 +441,7 @@ export function ReconciliationPage() {
       }
     } catch { /* ignore */ } finally {
       setUnreconciling(false);
+      stopProcessing();
     }
   };
 
@@ -442,6 +450,7 @@ export function ReconciliationPage() {
     if (!activeCompany?.id || !selectedAccountId) return;
     if (!adjustForm.description || !adjustForm.debitAccountId || !adjustForm.creditAccountId || !adjustForm.amount) return;
     setAdjusting(true);
+    startProcessing('Creando asiento de ajuste...');
     try {
       const res = await fetch('/api/reconciliation/adjustment', {
         method: 'POST',
@@ -461,6 +470,7 @@ export function ReconciliationPage() {
       }
     } catch { /* ignore */ } finally {
       setAdjusting(false);
+      stopProcessing();
     }
   };
 
