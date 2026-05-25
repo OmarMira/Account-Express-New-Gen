@@ -1,20 +1,9 @@
 'use client';
 
-import {
-  Shield,
-  Crown,
-  Building2,
-  CheckCircle2,
-} from 'lucide-react';
+import { Shield, Crown, Building2, CheckCircle2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useLanguageStore } from '@/store/language-store';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
 /* ─── Animation Variants ──────────────────────────────────────── */
@@ -76,9 +65,7 @@ export function RolesTab() {
               <Shield className="size-4" />
               {t('settings.roles.title')}
             </CardTitle>
-            <CardDescription>
-              {t('settings.roles.permissions')}
-            </CardDescription>
+            <CardDescription>{t('settings.roles.permissions')}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid gap-6 md:grid-cols-2">
@@ -91,7 +78,9 @@ export function RolesTab() {
                     </div>
                     <div>
                       <h3 className="font-semibold text-sm">{t('settings.roles.superAdmin')}</h3>
-                      <p className="text-xs text-muted-foreground">{t('settings.roles.superAdminDesc')}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {t('settings.roles.superAdminDesc')}
+                      </p>
                     </div>
                   </div>
                   <div className="border-t pt-3 space-y-0.5">
@@ -100,7 +89,10 @@ export function RolesTab() {
                     ))}
                   </div>
                   <div className="flex justify-end">
-                    <Badge variant="outline" className="text-xs border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-400">
+                    <Badge
+                      variant="outline"
+                      className="text-xs border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-400"
+                    >
                       Super Admin
                     </Badge>
                   </div>
@@ -116,7 +108,9 @@ export function RolesTab() {
                     </div>
                     <div>
                       <h3 className="font-semibold text-sm">{t('settings.roles.companyAdmin')}</h3>
-                      <p className="text-xs text-muted-foreground">{t('settings.roles.companyAdminDesc')}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {t('settings.roles.companyAdminDesc')}
+                      </p>
                     </div>
                   </div>
                   <div className="border-t pt-3 space-y-0.5">
@@ -125,7 +119,10 @@ export function RolesTab() {
                     ))}
                   </div>
                   <div className="flex justify-end">
-                    <Badge variant="outline" className="text-xs border-sky-300 text-sky-700 dark:border-sky-700 dark:text-sky-400">
+                    <Badge
+                      variant="outline"
+                      className="text-xs border-sky-300 text-sky-700 dark:border-sky-700 dark:text-sky-400"
+                    >
                       Admin
                     </Badge>
                   </div>

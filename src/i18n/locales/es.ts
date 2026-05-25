@@ -66,7 +66,8 @@ const es = {
     selectCompany: 'Seleccionar Empresa',
     noCompanies: 'No se encontraron empresas',
     landingTitle: 'Contabilidad Profesional Simplificada',
-    landingSubtitle: 'Optimiza la gestión financiera con herramientas poderosas para cuentas, diarios, conciliación bancaria y reportes.',
+    landingSubtitle:
+      'Optimiza la gestión financiera con herramientas poderosas para cuentas, diarios, conciliación bancaria y reportes.',
     getStarted: 'Comenzar',
     learnMore: 'Más información',
     features: 'Características',
@@ -75,9 +76,11 @@ const es = {
     featureJournal: 'Libro Mayor',
     featureJournalDesc: 'Crea y administra asientos del libro mayor de partida doble.',
     featureReconciliation: 'Conciliación Bancaria',
-    featureReconciliationDesc: 'Concilia transacciones bancarias con tus registros automáticamente.',
+    featureReconciliationDesc:
+      'Concilia transacciones bancarias con tus registros automáticamente.',
     featureReports: 'Reportes Financieros',
-    featureReportsDesc: 'Genera balances generales, estados de resultados y balanzas de comprobación.',
+    featureReportsDesc:
+      'Genera balances generales, estados de resultados y balanzas de comprobación.',
   },
   dashboard: {
     title: 'Panel',
@@ -120,7 +123,8 @@ const es = {
     confirmDelete: '¿Estás seguro de que deseas eliminar esta cuenta?',
     hasChildren: 'Esta cuenta tiene subcuentas y no puede ser eliminada.',
     hasTransactions: 'Esta cuenta tiene transacciones y no puede ser eliminada.',
-    systemAccountCannotBeDeleted: 'Esta es una cuenta del sistema obligatoria y no se puede eliminar.',
+    systemAccountCannotBeDeleted:
+      'Esta es una cuenta del sistema obligatoria y no se puede eliminar.',
     accountHasBalanceCannotBeDeleted: 'Esta cuenta tiene un saldo activo y no se puede eliminar.',
     expandedView: 'Vista Expandida',
     collapsedView: 'Vista Colapsada',
@@ -160,7 +164,8 @@ const es = {
     saveDraft: 'Guardar como Borrador',
     saveAndPost: 'Guardar y Registrar',
     confirmPost: '¿Registrar este asiento?',
-    confirmPostDesc: 'Esto cambiará el estado a "Registrado". Los asientos registrados no pueden editarse.',
+    confirmPostDesc:
+      'Esto cambiará el estado a "Registrado". Los asientos registrados no pueden editarse.',
     confirmVoid: '¿Cancelar este asiento?',
     confirmVoidDesc: 'Esto marcará el asiento como "Cancelado". Esta acción no se puede deshacer.',
     confirmDelete: '¿Estás seguro de que deseas eliminar este asiento?',
@@ -201,15 +206,19 @@ const es = {
     processing: 'Procesando...',
     categorizationProgress: 'Progreso de Categorización',
     transactionsImported: 'Transacciones Importadas',
-    importSuccessMessage: 'Tu estado de cuenta ha sido importado y las transacciones han sido creadas.',
-    uncategorizedNote: 'necesitan categorización manual. Configura reglas bancarias para mejorar la auto-categorización.',
+    importSuccessMessage:
+      'Tu estado de cuenta ha sido importado y las transacciones han sido creadas.',
+    uncategorizedNote:
+      'necesitan categorización manual. Configura reglas bancarias para mejorar la auto-categorización.',
     editAccountDesc: 'Actualiza la información de tu cuenta bancaria',
     newAccountDesc: 'Agrega una nueva cuenta bancaria para tu empresa',
-    linkedAccountHelp: 'Las cuentas bancarias deben estar vinculadas a una cuenta contable de activo',
+    linkedAccountHelp:
+      'Las cuentas bancarias deben estar vinculadas a una cuenta contable de activo',
     startingBalance: 'Saldo Inicial',
     currency: 'Moneda',
     deactivateTitle: 'Desactivar Cuenta Bancaria',
-    deactivateDesc: '¿Estás seguro de que deseas desactivar "{name}" en "{bank}"? Esto marcará la cuenta como inactiva. Los estados de cuenta y transacciones existentes se conservarán.',
+    deactivateDesc:
+      '¿Estás seguro de que deseas desactivar "{name}" en "{bank}"? Esto marcará la cuenta como inactiva. Los estados de cuenta y transacciones existentes se conservarán.',
     deactivateAction: 'Desactivar',
   },
   bankRules: {
@@ -237,7 +246,8 @@ const es = {
     rulesDescription: 'Categoriza automáticamente las transacciones bancarias basándose en reglas.',
     applyAll: 'Aplicar Todas',
     applyAllTitle: 'Aplicar Reglas Bancarias',
-    applyAllDesc: 'Aplica todas las reglas activas a las transacciones sin categorizar. Las reglas se procesan en orden de prioridad — la primera coincidencia gana.',
+    applyAllDesc:
+      'Aplica todas las reglas activas a las transacciones sin categorizar. Las reglas se procesan en orden de prioridad — la primera coincidencia gana.',
     transactionsCategorized: 'transacciones auto-categorizadas',
     autoMatches: 'Auto-coincidencias',
     priorityCritical: 'Crítica',
@@ -285,11 +295,13 @@ const es = {
     deselectAll: 'Deseleccionar Todo',
     reconcileSelected: 'Conciliar Seleccionados',
     autoMatchTitle: 'Emparejamiento Automático',
-    autoMatchDesc: 'Aplica reglas bancarias para categorizar y emparejar automáticamente las transacciones sin conciliar.',
+    autoMatchDesc:
+      'Aplica reglas bancarias para categorizar y emparejar automáticamente las transacciones sin conciliar.',
     transactionsMatched: 'transacciones emparejadas',
     stillUnmatched: 'transacciones sin emparejar',
     confirmReconcile: 'Confirmar Conciliación',
-    confirmReconcileDesc: 'Marcar {count} transacción(es) seleccionada(s) como conciliadas. Esta acción actualizará su estado a conciliado.',
+    confirmReconcileDesc:
+      'Marcar {count} transacción(es) seleccionada(s) como conciliadas. Esta acción actualizará su estado a conciliado.',
     transactionsReconciled: 'transacciones conciliadas',
     // Nuevas funciones
     showReconciled: 'Mostrar Conciliadas',
@@ -301,11 +313,13 @@ const es = {
     allStatements: 'Todos los Estados',
     unreconcileSelected: 'Desconciliar Seleccionados',
     confirmUnreconcile: 'Confirmar Deshacer Conciliación',
-    confirmUnreconcileDesc: 'Eliminar el estado de conciliación de {count} transacción(es). Esto no eliminará los asientos contables creados.',
+    confirmUnreconcileDesc:
+      'Eliminar el estado de conciliación de {count} transacción(es). Esto no eliminará los asientos contables creados.',
     transactionsUnreconciled: 'transacciones desconciliadas',
     createAdjustment: 'Crear Ajuste',
     adjustmentTitle: 'Ajuste de Conciliación',
-    adjustmentDesc: 'Crear un asiento contable para ajustar el saldo de libros y conciliar la diferencia.',
+    adjustmentDesc:
+      'Crear un asiento contable para ajustar el saldo de libros y conciliar la diferencia.',
     adjustmentDate: 'Fecha',
     adjustmentDescription: 'Descripción',
     adjustmentDebitAccount: 'Cuenta Débito',
@@ -314,7 +328,8 @@ const es = {
     adjustmentNotes: 'Notas (opcional)',
     adjustmentCreated: 'Asiento de ajuste creado exitosamente',
     createJournalEntries: 'Crear Asientos Contables',
-    createJournalEntriesDesc: 'Crear automáticamente asientos contables publicados por cada transacción conciliada.',
+    createJournalEntriesDesc:
+      'Crear automáticamente asientos contables publicados por cada transacción conciliada.',
     startPeriod: 'Iniciar Período',
     completePeriod: 'Finalizar Período',
     cancelPeriod: 'Cancelar Período',
@@ -424,7 +439,8 @@ const es = {
     system: 'Predeterminado del sistema',
     dangerZone: 'Zona de Peligro',
     deleteCompany: 'Eliminar Empresa',
-    deleteCompanyWarning: 'Esta acción no se puede deshacer. Todos los datos serán eliminados permanentemente.',
+    deleteCompanyWarning:
+      'Esta acción no se puede deshacer. Todos los datos serán eliminados permanentemente.',
     saveSuccess: 'Configuración guardada exitosamente.',
     changePassword: 'Cambiar Contraseña',
     currentPassword: 'Contraseña Actual',
@@ -460,7 +476,8 @@ const es = {
       backupFailed: 'Error al crear el respaldo',
       restoreBackup: 'Restaurar Respaldo',
       restoreBackupDesc: 'Restaura los datos desde un archivo de respaldo previo.',
-      restoreWarning: 'ADVERTENCIA: Esto reemplazará todos los datos actuales. Esta acción no se puede deshacer.',
+      restoreWarning:
+        'ADVERTENCIA: Esto reemplazará todos los datos actuales. Esta acción no se puede deshacer.',
       selectFile: 'Seleccionar archivo de respaldo',
       restoring: 'Restaurando...',
       restoreSuccess: 'Respaldo restaurado exitosamente',
@@ -484,10 +501,12 @@ const es = {
       supportedFormats: 'Formato soportado: .json (respaldo de AccountExpress)',
       records: 'registros',
       confirmRestore: 'Confirmar Restauración',
-      confirmRestoreDesc: 'Esto reemplazará permanentemente TODOS los datos actuales con el respaldo. Esta acción no se puede deshacer.',
+      confirmRestoreDesc:
+        'Esto reemplazará permanentemente TODOS los datos actuales con el respaldo. Esta acción no se puede deshacer.',
       lastBackup: 'Último respaldo',
       noRecords: 'Sin registros',
-      errorInvalidFile: 'Archivo de respaldo inválido. Selecciona un respaldo válido de AccountExpress.',
+      errorInvalidFile:
+        'Archivo de respaldo inválido. Selecciona un respaldo válido de AccountExpress.',
       errorCompanyIdMismatch: 'Este respaldo pertenece a una empresa diferente.',
     },
     aiRules: {
@@ -585,11 +604,15 @@ const es = {
     transactionDetail: 'Detalle de Transacciones',
     reconciliationReport: 'Reporte de Conciliación',
     allData: 'Todos los Datos de la Empresa',
-    trialBalanceDesc: 'Balanza de comprobación completa con todos los saldos de cuentas a una fecha seleccionada.',
-    generalLedgerDesc: 'Asientos del libro mayor detallados con todas las líneas de cargo/abono para un rango de fechas.',
+    trialBalanceDesc:
+      'Balanza de comprobación completa con todos los saldos de cuentas a una fecha seleccionada.',
+    generalLedgerDesc:
+      'Asientos del libro mayor detallados con todas las líneas de cargo/abono para un rango de fechas.',
     transactionDetailDesc: 'Líneas de transacción individuales con códigos de cuenta y montos.',
-    reconciliationReportDesc: 'Estado de conciliación bancaria mostrando transacciones conciliadas vs sin conciliar.',
-    allDataDesc: 'Exportación completa de todos los datos de la empresa incluyendo cuentas, libro mayor y transacciones.',
+    reconciliationReportDesc:
+      'Estado de conciliación bancaria mostrando transacciones conciliadas vs sin conciliar.',
+    allDataDesc:
+      'Exportación completa de todos los datos de la empresa incluyendo cuentas, libro mayor y transacciones.',
     recentExports: 'Exportaciones Recientes',
     noRecentExports: 'No hay exportaciones recientes.',
     format: 'Formato',
@@ -627,17 +650,21 @@ const es = {
     accessDenied: 'Solo los administradores pueden gestionar usuarios.',
   },
   landing: {
-    featuresSubtitle: 'Todo lo que necesitas para gestionar tus finanzas en una plataforma poderosa.',
+    featuresSubtitle:
+      'Todo lo que necesitas para gestionar tus finanzas en una plataforma poderosa.',
     featureImport: 'Importación Masiva',
-    featureImportDesc: 'Importa cuentas, asientos y estados de cuenta desde archivos CSV, OFX y Excel.',
+    featureImportDesc:
+      'Importa cuentas, asientos y estados de cuenta desde archivos CSV, OFX y Excel.',
     featureMultilang: 'Multi-Idioma',
-    featureMultilangDesc: 'Soporte completo en inglés y español con formatos locales para fechas y moneda.',
+    featureMultilangDesc:
+      'Soporte completo en inglés y español con formatos locales para fechas y moneda.',
     trustSecurity: 'Seguridad empresarial con cifrado de 256 bits',
     trustFast: 'Rendimiento ultrarrápido optimizado para grandes volúmenes de datos',
     trustUptime: 'Garantía de 99.9% de disponibilidad con infraestructura redundante',
     trustUsers: 'Respaldado por miles de contadores en todo el mundo',
     ctaTitle: '¿Listo para Simplificar tu Contabilidad?',
-    ctaSubtitle: 'Únete a miles de empresas que confían en AccountExpress para su gestión financiera.',
+    ctaSubtitle:
+      'Únete a miles de empresas que confían en AccountExpress para su gestión financiera.',
     copyright: 'Todos los derechos reservados.',
     comingSoon: 'Próximamente...',
     loginSubtitle: 'Ingresa tus credenciales para acceder a tu cuenta',
@@ -656,7 +683,8 @@ const es = {
     step1Title: 'Regístrate',
     step1Desc: 'Crea tu cuenta gratuita y configura tu perfil de empresa en menos de 2 minutos.',
     step2Title: 'Conecta Bancos',
-    step2Desc: 'Vincula tus cuentas bancarias e importa transacciones automáticamente desde estados de cuenta.',
+    step2Desc:
+      'Vincula tus cuentas bancarias e importa transacciones automáticamente desde estados de cuenta.',
     step3Title: 'Automatiza',
     step3Desc: 'Configura reglas, concilia y genera reportes — todo en piloto automático.',
     socialProofTitle: 'Seguridad y Cumplimiento Empresarial',
@@ -696,7 +724,8 @@ const es = {
     inputPlaceholder: 'Escribe tu pregunta... (Enter para enviar)',
     shiftEnterHint: 'Shift+Enter para nueva línea',
     ruleTitle: 'Para crear una regla bancaria:',
-    ruleInstructions: 'Describe la regla en lenguaje natural y la IA analizará el texto para sugerir una regla automáticamente.',
+    ruleInstructions:
+      'Describe la regla en lenguaje natural y la IA analizará el texto para sugerir una regla automáticamente.',
     ruleExample: 'Ej: \'Contiene "AMAZON", cuenta "Office Supplies", prioridad 5\'',
     createRuleButton: 'Crear Regla',
     saveRule: 'Guardar Regla',
@@ -751,8 +780,8 @@ const es = {
     historicalSync: 'Sincronización histórica del libro diario',
     periods: {
       '6m': 'Últimos 6 Meses',
-      'ytd': 'Año en Curso',
-      '12m': 'Histórico 12 Meses'
+      ytd: 'Año en Curso',
+      '12m': 'Histórico 12 Meses',
     },
     months: {
       jan: 'Ene',
@@ -766,8 +795,8 @@ const es = {
       sep: 'Sep',
       oct: 'Oct',
       nov: 'Nov',
-      dic: 'Dic'
-    }
+      dic: 'Dic',
+    },
   },
 };
 

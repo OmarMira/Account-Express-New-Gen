@@ -99,9 +99,7 @@ export function RegisterPage() {
             <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm">
               AE
             </div>
-            <span className="text-lg font-semibold tracking-tight">
-              {t('common.appName')}
-            </span>
+            <span className="text-lg font-semibold tracking-tight">{t('common.appName')}</span>
           </button>
           <div className="flex items-center gap-1">
             <LanguageSelector />
@@ -115,9 +113,7 @@ export function RegisterPage() {
         <Card className="w-full max-w-lg">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl">{t('auth.createAccount')}</CardTitle>
-            <CardDescription>
-              {t('register.subtitle')}
-            </CardDescription>
+            <CardDescription>{t('register.subtitle')}</CardDescription>
           </CardHeader>
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-4">
@@ -223,11 +219,7 @@ export function RegisterPage() {
               </div>
             </CardContent>
             <CardFooter className="flex flex-col gap-4">
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={loading}
-              >
+              <Button type="submit" className="w-full" disabled={loading}>
                 {loading && <Loader2 className="size-4 animate-spin" />}
                 {t('auth.register')}
               </Button>
@@ -250,8 +242,7 @@ export function RegisterPage() {
       <footer className="border-t">
         <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 text-center">
           <p className="text-xs text-muted-foreground">
-            &copy; {new Date().getFullYear()} {t('common.appName')}.{' '}
-            {t('landing.copyright')}
+            &copy; {new Date().getFullYear()} {t('common.appName')}. {t('landing.copyright')}
           </p>
         </div>
       </footer>

@@ -5,7 +5,7 @@ import { getSessionUserId } from '@/lib/sessions';
 // ─── GET /api/import/history?companyId=xxx ────────────────────────────
 // List all bank statements (import history) for a company
 export async function GET(request: NextRequest) {
-  const userId = getSessionUserId(request);
+  const userId = await getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -14,10 +14,7 @@ export async function GET(request: NextRequest) {
   const companyId = searchParams.get('companyId');
 
   if (!companyId) {
-    return NextResponse.json(
-      { error: 'companyId is required' },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: 'companyId is required' }, { status: 400 });
   }
 
   // Verify membership
@@ -74,20 +71,15 @@ export async function GET(request: NextRequest) {
           autoCategorizedCount: categorizedCount,
           autoCategorizedPercent:
             stmt._count.transactions > 0
-              ? Math.round(
-                  (categorizedCount / stmt._count.transactions) * 100
-                )
+              ? Math.round((categorizedCount / stmt._count.transactions) * 100)
               : 0,
         };
-      })
+      }),
     );
 
     return NextResponse.json({ statements: statementsWithStats });
   } catch (error) {
     console.error('[IMPORT HISTORY ERROR]', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch import history' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to fetch import history' }, { status: 500 });
   }
 }

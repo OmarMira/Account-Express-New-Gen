@@ -15,13 +15,7 @@ import { motion } from 'framer-motion';
 import { useLanguageStore } from '@/store/language-store';
 import { useAuthStore } from '@/store/auth-store';
 import { formatDate } from '@/lib/format';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -129,7 +123,15 @@ const exportOptions: ExportOption[] = [
 
 function BookOpenIcon({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
       <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
     </svg>
@@ -179,7 +181,7 @@ export function ExportPage() {
   useEffect(() => {
     if (!activeCompany?.id) return;
     fetch(`/api/dashboard?companyId=${activeCompany.id}`)
-      .then((r) => r.ok ? r.json() : null)
+      .then((r) => (r.ok ? r.json() : null))
       .then((dash) => {
         if (dash?.bankAccounts) setBankAccounts(dash.bankAccounts);
       })
@@ -244,7 +246,9 @@ export function ExportPage() {
             <Card className="h-full flex flex-col">
               <CardHeader className="pb-3">
                 <div className="flex items-center gap-3">
-                  <div className={`flex size-10 items-center justify-center rounded-lg bg-muted ${opt.color}`}>
+                  <div
+                    className={`flex size-10 items-center justify-center rounded-lg bg-muted ${opt.color}`}
+                  >
                     <opt.icon className="size-5" />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -290,7 +294,9 @@ export function ExportPage() {
                       <Input
                         type="date"
                         value={startDates[opt.key] || ''}
-                        onChange={(e) => setStartDates((prev) => ({ ...prev, [opt.key]: e.target.value }))}
+                        onChange={(e) =>
+                          setStartDates((prev) => ({ ...prev, [opt.key]: e.target.value }))
+                        }
                         className="h-8 text-xs"
                       />
                     </div>
@@ -299,7 +305,9 @@ export function ExportPage() {
                       <Input
                         type="date"
                         value={endDates[opt.key] || ''}
-                        onChange={(e) => setEndDates((prev) => ({ ...prev, [opt.key]: e.target.value }))}
+                        onChange={(e) =>
+                          setEndDates((prev) => ({ ...prev, [opt.key]: e.target.value }))
+                        }
                         className="h-8 text-xs"
                       />
                     </div>
@@ -313,7 +321,9 @@ export function ExportPage() {
                     <Input
                       type="date"
                       value={asOfDates[opt.key] || ''}
-                      onChange={(e) => setAsOfDates((prev) => ({ ...prev, [opt.key]: e.target.value }))}
+                      onChange={(e) =>
+                        setAsOfDates((prev) => ({ ...prev, [opt.key]: e.target.value }))
+                      }
                       className="h-8 text-xs"
                     />
                   </div>
@@ -325,7 +335,9 @@ export function ExportPage() {
                     <Label className="text-xs">{t('exportData.selectBankAccount')}</Label>
                     <Select
                       value={bankAccountIds[opt.key] || ''}
-                      onValueChange={(v) => setBankAccountIds((prev) => ({ ...prev, [opt.key]: v }))}
+                      onValueChange={(v) =>
+                        setBankAccountIds((prev) => ({ ...prev, [opt.key]: v }))
+                      }
                     >
                       <SelectTrigger className="h-8 text-xs">
                         <SelectValue placeholder={t('exportData.selectBankAccount')} />
@@ -346,7 +358,9 @@ export function ExportPage() {
                   <Button
                     className="w-full"
                     onClick={() => startExport(opt.key)}
-                    disabled={exporting[opt.key] || (opt.hasBankAccount && !bankAccountIds[opt.key])}
+                    disabled={
+                      exporting[opt.key] || (opt.hasBankAccount && !bankAccountIds[opt.key])
+                    }
                   >
                     {exporting[opt.key] ? (
                       <>
@@ -380,7 +394,10 @@ export function ExportPage() {
             {recentExports.length > 0 ? (
               <div className="space-y-2">
                 {recentExports.map((exp) => (
-                  <div key={exp.id} className="flex items-center justify-between rounded-md border px-3 py-2">
+                  <div
+                    key={exp.id}
+                    className="flex items-center justify-between rounded-md border px-3 py-2"
+                  >
                     <div className="flex items-center gap-3">
                       <CheckCircle2 className="size-4 text-emerald-500" />
                       <div>

@@ -79,9 +79,7 @@ export function LoginPage() {
             <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm">
               AE
             </div>
-            <span className="text-lg font-semibold tracking-tight">
-              {t('common.appName')}
-            </span>
+            <span className="text-lg font-semibold tracking-tight">{t('common.appName')}</span>
           </button>
           <div className="flex items-center gap-1">
             <LanguageSelector />
@@ -95,9 +93,7 @@ export function LoginPage() {
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl">{t('auth.welcomeBack')}</CardTitle>
-            <CardDescription>
-              {t('landing.loginSubtitle')}
-            </CardDescription>
+            <CardDescription>{t('landing.loginSubtitle')}</CardDescription>
           </CardHeader>
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-4">
@@ -122,10 +118,7 @@ export function LoginPage() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="password">{t('auth.password')}</Label>
-                  <button
-                    type="button"
-                    className="text-xs text-primary hover:underline"
-                  >
+                  <button type="button" className="text-xs text-primary hover:underline">
                     {t('auth.forgotPassword')}
                   </button>
                 </div>
@@ -140,11 +133,7 @@ export function LoginPage() {
               </div>
             </CardContent>
             <CardFooter className="flex flex-col gap-4">
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={loading}
-              >
+              <Button type="submit" className="w-full" disabled={loading}>
                 {loading && <Loader2 className="size-4 animate-spin" />}
                 {t('auth.login')}
               </Button>
@@ -167,8 +156,7 @@ export function LoginPage() {
       <footer className="border-t">
         <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 text-center">
           <p className="text-xs text-muted-foreground">
-            &copy; {new Date().getFullYear()} {t('common.appName')}.{' '}
-            {t('landing.copyright')}
+            &copy; {new Date().getFullYear()} {t('common.appName')}. {t('landing.copyright')}
           </p>
         </div>
       </footer>

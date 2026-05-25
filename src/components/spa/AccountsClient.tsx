@@ -33,25 +33,30 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTranslations } from 'next-intl';
 import { useAuthStore } from '@/store/auth-store';
 import { BalanceBadge } from '@/components/spa/accounts/BalanceBadge';
-import type { GlAccount as GlAccountType, AccountFormData } from '@/components/spa/accounts/AccountFormClientDialog';
+import type {
+  GlAccount as GlAccountType,
+  AccountFormData,
+} from '@/components/spa/accounts/AccountFormClientDialog';
 
 // ── Lazy-loaded modals — not included in the initial bundle ──────────
 const AccountFormDialog = dynamic(
-  () => import('@/components/spa/accounts/AccountFormClientDialog').then((m) => ({ default: m.AccountFormClientDialog })),
-  { ssr: false, loading: () => null }
+  () =>
+    import('@/components/spa/accounts/AccountFormClientDialog').then((m) => ({
+      default: m.AccountFormClientDialog,
+    })),
+  { ssr: false, loading: () => null },
 );
 const AccountDeleteDialog = dynamic(
-  () => import('@/components/spa/accounts/AccountDeleteClientDialog').then((m) => ({ default: m.AccountDeleteClientDialog })),
-  { ssr: false, loading: () => null }
+  () =>
+    import('@/components/spa/accounts/AccountDeleteClientDialog').then((m) => ({
+      default: m.AccountDeleteClientDialog,
+    })),
+  { ssr: false, loading: () => null },
 );
 
 /* ─── Types (re-exported from AccountFormDialog) ─── */
@@ -143,7 +148,6 @@ const TYPE_SECTION_CONFIG: TypeSectionConfig[] = [
     iconColor: 'text-rose-600 dark:text-rose-400',
   },
 ];
-
 
 /* ─── Code color per type ─── */
 const CODE_COLORS: Record<string, string> = {
@@ -257,7 +261,10 @@ export function AccountsClient({ initialAccounts }: { initialAccounts?: GlAccoun
       if (account.parentId) {
         const existing = map.get(account.parentId) ?? [];
         existing.push(account);
-        map.set(account.parentId, existing.sort((a, b) => a.code.localeCompare(b.code)));
+        map.set(
+          account.parentId,
+          existing.sort((a, b) => a.code.localeCompare(b.code)),
+        );
       }
     }
     return map;
@@ -448,7 +455,6 @@ export function AccountsClient({ initialAccounts }: { initialAccounts?: GlAccoun
     }
   }
 
-
   /* ── Render account row within a type section ── */
   function renderAccountRow(
     account: GlAccount,
@@ -471,10 +477,7 @@ export function AccountsClient({ initialAccounts }: { initialAccounts?: GlAccoun
         exit="exit"
         layout
       >
-        <Collapsible
-          open={isExpanded}
-          onOpenChange={() => toggleExpand(account.id)}
-        >
+        <Collapsible open={isExpanded} onOpenChange={() => toggleExpand(account.id)}>
           <div
             className={cn(
               'group flex items-center gap-2 rounded-md px-3 py-2 transition-colors cursor-pointer select-none',
@@ -540,10 +543,7 @@ export function AccountsClient({ initialAccounts }: { initialAccounts?: GlAccoun
 
             {/* Name */}
             <span
-              className={cn(
-                'flex-1 truncate',
-                isRoot ? 'font-semibold' : 'font-medium text-sm',
-              )}
+              className={cn('flex-1 truncate', isRoot ? 'font-semibold' : 'font-medium text-sm')}
             >
               {account.isSystem && (
                 <Lock className="inline size-3 mr-1 text-amber-500" aria-label="System account" />
@@ -558,7 +558,15 @@ export function AccountsClient({ initialAccounts }: { initialAccounts?: GlAccoun
 
             {/* Account Type */}
             <span className="hidden md:inline mr-2">
-              <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0 capitalize font-medium", config.iconColor, config.iconBg, config.accentBorder)}>
+              <Badge
+                variant="outline"
+                className={cn(
+                  'text-[10px] px-1.5 py-0 capitalize font-medium',
+                  config.iconColor,
+                  config.iconBg,
+                  config.accentBorder,
+                )}
+              >
                 {t(`accounts.${account.accountType}`)}
               </Badge>
             </span>
@@ -581,10 +589,10 @@ export function AccountsClient({ initialAccounts }: { initialAccounts?: GlAccoun
                 variant="ghost"
                 size="icon"
                 className={cn(
-                  "size-7 transition-colors",
+                  'size-7 transition-colors',
                   account.isActive
-                    ? "text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/30"
-                    : "text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/30"
+                    ? 'text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/30'
+                    : 'text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/30',
                 )}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -613,10 +621,10 @@ export function AccountsClient({ initialAccounts }: { initialAccounts?: GlAccoun
                 variant="ghost"
                 size="icon"
                 className={cn(
-                  "size-7 transition-colors",
+                  'size-7 transition-colors',
                   account.isSystem
-                    ? "text-zinc-500/60 dark:text-zinc-400/50 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                    : "text-red-500 hover:text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30"
+                    ? 'text-zinc-500/60 dark:text-zinc-400/50 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                    : 'text-red-500 hover:text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30',
                 )}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -643,11 +651,17 @@ export function AccountsClient({ initialAccounts }: { initialAccounts?: GlAccoun
   }
 
   /* ── Render a type section ── */
-  function renderTypeSection(config: TypeSectionConfig, typeAccounts: GlAccount[], sectionIndex: number) {
+  function renderTypeSection(
+    config: TypeSectionConfig,
+    typeAccounts: GlAccount[],
+    sectionIndex: number,
+  ) {
     const typeLabel = t(config.i18nKey);
     const isCollapsed = collapsedTypes.has(config.key);
     const Icon = config.icon;
-    const rootAccounts = typeAccounts.filter((a) => !a.parentId).sort((a, b) => a.code.localeCompare(b.code));
+    const rootAccounts = typeAccounts
+      .filter((a) => !a.parentId)
+      .sort((a, b) => a.code.localeCompare(b.code));
     const accountCount = typeAccounts.length;
 
     return (
@@ -659,10 +673,7 @@ export function AccountsClient({ initialAccounts }: { initialAccounts?: GlAccoun
         animate="visible"
         layout
       >
-        <Collapsible
-          open={!isCollapsed}
-          onOpenChange={() => toggleTypeSection(config.key)}
-        >
+        <Collapsible open={!isCollapsed} onOpenChange={() => toggleTypeSection(config.key)}>
           <div className={cn('rounded-xl border overflow-hidden', config.accentBorder)}>
             {/* Section header */}
             <CollapsibleTrigger asChild>
@@ -697,9 +708,7 @@ export function AccountsClient({ initialAccounts }: { initialAccounts?: GlAccoun
             {/* Section content */}
             <CollapsibleContent>
               <div className="p-2 space-y-0.5 bg-muted/20">
-                {rootAccounts.map((account, i) =>
-                  renderAccountRow(account, 0, i, config),
-                )}
+                {rootAccounts.map((account, i) => renderAccountRow(account, 0, i, config))}
                 {rootAccounts.length === 0 && typeAccounts.length === 0 && (
                   <div className="py-6 text-center text-sm text-muted-foreground">
                     {t('common.noData')}
@@ -734,7 +743,10 @@ export function AccountsClient({ initialAccounts }: { initialAccounts?: GlAccoun
             {totalAccounts} {totalAccounts === 1 ? 'account' : 'accounts'}
           </p>
         </div>
-        <Button onClick={openCreateModal} className="bg-teal-600 hover:bg-teal-700 text-white shrink-0">
+        <Button
+          onClick={openCreateModal}
+          className="bg-teal-600 hover:bg-teal-700 text-white shrink-0"
+        >
           <Plus className="size-4 mr-2" />
           {t('accounts.newAccount')}
         </Button>
@@ -794,7 +806,10 @@ export function AccountsClient({ initialAccounts }: { initialAccounts?: GlAccoun
               >
                 <Icon className="size-3" />
                 {t(config.i18nKey)}
-                <Badge variant="secondary" className="ml-0.5 text-[10px] px-1.5 py-0 h-4 min-w-[18px] flex items-center justify-center">
+                <Badge
+                  variant="secondary"
+                  className="ml-0.5 text-[10px] px-1.5 py-0 h-4 min-w-[18px] flex items-center justify-center"
+                >
                   {count}
                 </Badge>
               </button>

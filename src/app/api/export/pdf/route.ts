@@ -9,7 +9,7 @@ import { getSessionUserId } from '@/lib/sessions';
  */
 export async function GET(request: NextRequest) {
   try {
-    const userId = getSessionUserId(request);
+    const userId = await getSessionUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -41,18 +41,30 @@ export async function GET(request: NextRequest) {
 
     switch (type) {
       case 'trial_balance':
-        ({ htmlContent, filename } = await generateTrialBalanceHTML(companyId, searchParams, company?.legalName ?? ''));
+        ({ htmlContent, filename } = await generateTrialBalanceHTML(
+          companyId,
+          searchParams,
+          company?.legalName ?? '',
+        ));
         break;
       case 'transactions':
-        ({ htmlContent, filename } = await generateTransactionsHTML(companyId, searchParams, company?.legalName ?? ''));
+        ({ htmlContent, filename } = await generateTransactionsHTML(
+          companyId,
+          searchParams,
+          company?.legalName ?? '',
+        ));
         break;
       case 'reconciliation':
-        ({ htmlContent, filename } = await generateReconciliationHTML(companyId, searchParams, company?.legalName ?? ''));
+        ({ htmlContent, filename } = await generateReconciliationHTML(
+          companyId,
+          searchParams,
+          company?.legalName ?? '',
+        ));
         break;
       default:
         return NextResponse.json(
           { error: 'Invalid type. Use: trial_balance, transactions, reconciliation' },
-          { status: 400 }
+          { status: 400 },
         );
     }
 
@@ -181,31 +193,45 @@ ${tableHTML}
 async function generateTrialBalanceHTML(
   companyId: string,
   searchParams: URLSearchParams,
-  companyName: string
+  companyName: string,
 ): Promise<{ htmlContent: string; filename: string }> {
   const asOfDateParam = searchParams.get('asOfDate');
-  const asOfDate = asOfDateParam
-    ? new Date(asOfDateParam + 'T23:59:59.999Z')
-    : new Date();
+  const asOfDate = asOfDateParam ? new Date(asOfDateParam + 'T23:59:59.999Z') : new Date();
 
   const journalLines = await db.journalLine.findMany({
     where: {
       entry: { companyId, status: 'posted', date: { lte: asOfDate } },
     },
     include: {
-      glAccount: { select: { code: true, name: true, accountType: true, normalBalance: true, isActive: true } },
+      glAccount: {
+        select: { code: true, name: true, accountType: true, normalBalance: true, isActive: true },
+      },
     },
   });
 
-  const accountBalances = new Map<string, { code: string; name: string; accountType: string; debitTotal: number; creditTotal: number; normalBalance: string }>();
+  const accountBalances = new Map<
+    string,
+    {
+      code: string;
+      name: string;
+      accountType: string;
+      debitTotal: number;
+      creditTotal: number;
+      normalBalance: string;
+    }
+  >();
 
   for (const line of journalLines) {
     const acc = line.glAccount;
     if (!acc || !acc.isActive) continue;
     if (!accountBalances.has(acc.code)) {
       accountBalances.set(acc.code, {
-        code: acc.code, name: acc.name, accountType: acc.accountType,
-        debitTotal: 0, creditTotal: 0, normalBalance: acc.normalBalance,
+        code: acc.code,
+        name: acc.name,
+        accountType: acc.accountType,
+        debitTotal: 0,
+        creditTotal: 0,
+        normalBalance: acc.normalBalance,
       });
     }
     const entry = accountBalances.get(acc.code)!;
@@ -218,7 +244,7 @@ async function generateTrialBalanceHTML(
   let rows = '';
 
   const sorted = Array.from(accountBalances.values()).sort((a, b) =>
-    a.code.localeCompare(b.code, undefined, { numeric: true })
+    a.code.localeCompare(b.code, undefined, { numeric: true }),
   );
 
   if (sorted.length === 0) {
@@ -272,7 +298,7 @@ async function generateTrialBalanceHTML(
 async function generateTransactionsHTML(
   companyId: string,
   searchParams: URLSearchParams,
-  companyName: string
+  companyName: string,
 ): Promise<{ htmlContent: string; filename: string }> {
   const startDateParam = searchParams.get('startDate');
   const endDateParam = searchParams.get('endDate');
@@ -280,8 +306,10 @@ async function generateTransactionsHTML(
   const where: Record<string, unknown> = { companyId, status: 'posted' };
   if (startDateParam || endDateParam) {
     where.date = {};
-    if (startDateParam) (where.date as Record<string, unknown>).gte = new Date(startDateParam + 'T00:00:00.000Z');
-    if (endDateParam) (where.date as Record<string, unknown>).lte = new Date(endDateParam + 'T23:59:59.999Z');
+    if (startDateParam)
+      (where.date as Record<string, unknown>).gte = new Date(startDateParam + 'T00:00:00.000Z');
+    if (endDateParam)
+      (where.date as Record<string, unknown>).lte = new Date(endDateParam + 'T23:59:59.999Z');
   }
 
   const entries = await db.journalEntry.findMany({
@@ -315,9 +343,8 @@ async function generateTransactionsHTML(
     }
   }
 
-  const dateRange = startDateParam && endDateParam
-    ? `${startDateParam} to ${endDateParam}`
-    : 'All dates';
+  const dateRange =
+    startDateParam && endDateParam ? `${startDateParam} to ${endDateParam}` : 'All dates';
 
   const tableHTML = `<table>
     <thead><tr>
@@ -339,7 +366,7 @@ async function generateTransactionsHTML(
 async function generateReconciliationHTML(
   companyId: string,
   searchParams: URLSearchParams,
-  companyName: string
+  companyName: string,
 ): Promise<{ htmlContent: string; filename: string }> {
   const bankAccountId = searchParams.get('bankAccountId');
   if (!bankAccountId) {
@@ -417,4 +444,3 @@ async function generateReconciliationHTML(
     filename: `reconciliation_report.html`,
   };
 }
-

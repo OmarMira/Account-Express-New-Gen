@@ -8,7 +8,7 @@ import { createBackup, listBackups, deleteBackup } from '@/lib/backup';
  */
 export async function POST(request: NextRequest) {
   try {
-    const userId = getSessionUserId(request);
+    const userId = await getSessionUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     console.error('[BACKUP CREATE ERROR]', error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to create backup' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
-    const userId = getSessionUserId(request);
+    const userId = await getSessionUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    const userId = getSessionUserId(request);
+    const userId = await getSessionUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

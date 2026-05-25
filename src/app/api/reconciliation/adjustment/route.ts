@@ -6,7 +6,7 @@ import { getSessionUserId } from '@/lib/sessions';
 // Create an adjusting journal entry from the reconciliation screen.
 // Body: { companyId, bankAccountId, date, description, debitAccountId, creditAccountId, amount, notes? }
 export async function POST(request: NextRequest) {
-  const userId = getSessionUserId(request);
+  const userId = await getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -24,18 +24,26 @@ export async function POST(request: NextRequest) {
       notes,
     } = body;
 
-    if (!companyId || !bankAccountId || !date || !description || !debitAccountId || !creditAccountId || !amount) {
+    if (
+      !companyId ||
+      !bankAccountId ||
+      !date ||
+      !description ||
+      !debitAccountId ||
+      !creditAccountId ||
+      !amount
+    ) {
       return NextResponse.json(
-        { error: 'All fields are required: companyId, bankAccountId, date, description, debitAccountId, creditAccountId, amount' },
-        { status: 400 }
+        {
+          error:
+            'All fields are required: companyId, bankAccountId, date, description, debitAccountId, creditAccountId, amount',
+        },
+        { status: 400 },
       );
     }
 
     if (amount <= 0) {
-      return NextResponse.json(
-        { error: 'Amount must be greater than zero' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Amount must be greater than zero' }, { status: 400 });
     }
 
     // Verify access
@@ -52,10 +60,7 @@ export async function POST(request: NextRequest) {
       include: { glAccount: { select: { id: true } } },
     });
     if (!bankAccount) {
-      return NextResponse.json(
-        { error: 'Bank account not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Bank account not found' }, { status: 404 });
     }
 
     // Verify GL accounts belong to company
@@ -65,10 +70,7 @@ export async function POST(request: NextRequest) {
     ]);
 
     if (!debitAccount || !creditAccount) {
-      return NextResponse.json(
-        { error: 'One or both GL accounts not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'One or both GL accounts not found' }, { status: 404 });
     }
 
     const ref = `RECON-ADJ-${new Date().toISOString().split('T')[0]}`;
@@ -134,9 +136,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('[RECONCILIATION ADJUSTMENT ERROR]', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

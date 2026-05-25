@@ -9,7 +9,7 @@ import { restoreBackup, validateBackup, type BackupData } from '@/lib/backup';
  */
 export async function POST(request: NextRequest) {
   try {
-    const userId = getSessionUserId(request);
+    const userId = await getSessionUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -74,7 +74,10 @@ export async function POST(request: NextRequest) {
         const jsonString = Buffer.from(base64Data, 'base64').toString('utf-8');
         backupData = JSON.parse(jsonString) as BackupData;
       } catch {
-        return NextResponse.json({ error: 'Invalid backup data: not valid base64/JSON' }, { status: 400 });
+        return NextResponse.json(
+          { error: 'Invalid backup data: not valid base64/JSON' },
+          { status: 400 },
+        );
       }
     }
 
@@ -83,7 +86,7 @@ export async function POST(request: NextRequest) {
     if (!validation.valid) {
       return NextResponse.json(
         { error: `Invalid backup: ${validation.errors.join(', ')}` },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -103,7 +106,7 @@ export async function POST(request: NextRequest) {
     console.error('[BACKUP RESTORE ERROR]', error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to restore backup' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

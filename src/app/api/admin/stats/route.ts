@@ -4,7 +4,7 @@ import { getSessionUserId } from '@/lib/sessions';
 
 export async function GET(request: NextRequest) {
   try {
-    const userId = getSessionUserId(request);
+    const userId = await getSessionUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -17,13 +17,13 @@ export async function GET(request: NextRequest) {
     const [companiesCount, usersCount, logsCount] = await Promise.all([
       db.company.count(),
       db.user.count(),
-      db.auditLog.count()
+      db.auditLog.count(),
     ]);
 
     return NextResponse.json({
       companiesCount,
       usersCount,
-      logsCount
+      logsCount,
     });
   } catch (error) {
     console.error('[ADMIN STATS GET]', error);

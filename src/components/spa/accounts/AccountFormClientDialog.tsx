@@ -24,16 +24,34 @@ import { useTranslations, useLocale } from 'next-intl';
 const ACCOUNT_TYPES = ['asset', 'liability', 'equity', 'revenue', 'expense'];
 
 const TYPE_HELPERS: Record<string, { en: string; es: string }> = {
-  asset: { en: 'Resources owned by the company (cash, receivables, inventory)', es: 'Recursos propiedad de la empresa (efectivo, cuentas por cobrar, inventario)' },
-  liability: { en: 'Debts and obligations (payables, loans, taxes)', es: 'Deudas y obligaciones (cuentas por pagar, préstamos, impuestos)' },
-  equity: { en: "Owner's equity and retained earnings", es: 'Capital contable y utilidades retenidas' },
+  asset: {
+    en: 'Resources owned by the company (cash, receivables, inventory)',
+    es: 'Recursos propiedad de la empresa (efectivo, cuentas por cobrar, inventario)',
+  },
+  liability: {
+    en: 'Debts and obligations (payables, loans, taxes)',
+    es: 'Deudas y obligaciones (cuentas por pagar, préstamos, impuestos)',
+  },
+  equity: {
+    en: "Owner's equity and retained earnings",
+    es: 'Capital contable y utilidades retenidas',
+  },
   revenue: { en: 'Income from business operations', es: 'Ingresos por operaciones del negocio' },
-  expense: { en: 'Costs incurred in business operations', es: 'Costos incurridos en las operaciones del negocio' },
+  expense: {
+    en: 'Costs incurred in business operations',
+    es: 'Costos incurridos en las operaciones del negocio',
+  },
 };
 
 const BALANCE_HELPERS: Record<string, { en: string; es: string }> = {
-  debit: { en: 'Increases with debits (Assets, Expenses)', es: 'Aumenta con cargos (Activos, Gastos)' },
-  credit: { en: 'Increases with credits (Liabilities, Equity, Revenue)', es: 'Aumenta con abonos (Pasivos, Capital, Ingresos)' },
+  debit: {
+    en: 'Increases with debits (Assets, Expenses)',
+    es: 'Aumenta con cargos (Activos, Gastos)',
+  },
+  credit: {
+    en: 'Increases with credits (Liabilities, Equity, Revenue)',
+    es: 'Aumenta con abonos (Pasivos, Capital, Ingresos)',
+  },
 };
 
 export interface GlAccount {
@@ -105,9 +123,13 @@ export function AccountFormClientDialog({
             {editingAccount ? t('accounts.editAccount') : t('accounts.newAccount')}
           </DialogTitle>
           <DialogDescription>
-            {editingAccount 
-              ? (language === 'es' ? 'Modifica los detalles y la jerarquía de esta cuenta contable.' : 'Modify the details and hierarchy of this ledger account.')
-              : (language === 'es' ? 'Define el código, nombre y tipo para tu nueva cuenta contable.' : 'Define the code, name, and type for your new ledger account.')}
+            {editingAccount
+              ? language === 'es'
+                ? 'Modifica los detalles y la jerarquía de esta cuenta contable.'
+                : 'Modify the details and hierarchy of this ledger account.'
+              : language === 'es'
+                ? 'Define el código, nombre y tipo para tu nueva cuenta contable.'
+                : 'Define the code, name, and type for your new ledger account.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -121,7 +143,10 @@ export function AccountFormClientDialog({
           {/* Code + Name */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="account-code" className="flex items-center gap-1 font-semibold text-zinc-900 dark:text-zinc-100/90 text-sm">
+              <Label
+                htmlFor="account-code"
+                className="flex items-center gap-1 font-semibold text-zinc-900 dark:text-zinc-100/90 text-sm"
+              >
                 {t('accounts.accountCode')} <span className="text-red-500">*</span>
               </Label>
               <Input
@@ -131,10 +156,15 @@ export function AccountFormClientDialog({
                 onChange={(e) => onFormChange({ code: e.target.value })}
                 className={formErrors.code ? 'border-rose-500' : ''}
               />
-              {formErrors.code && <p className="text-xs text-rose-600 font-medium">{formErrors.code}</p>}
+              {formErrors.code && (
+                <p className="text-xs text-rose-600 font-medium">{formErrors.code}</p>
+              )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="account-name" className="flex items-center gap-1 font-semibold text-zinc-900 dark:text-zinc-100/90 text-sm">
+              <Label
+                htmlFor="account-name"
+                className="flex items-center gap-1 font-semibold text-zinc-900 dark:text-zinc-100/90 text-sm"
+              >
                 {t('accounts.accountName')} <span className="text-red-500">*</span>
               </Label>
               <Input
@@ -144,14 +174,18 @@ export function AccountFormClientDialog({
                 onChange={(e) => onFormChange({ name: e.target.value })}
                 className={formErrors.name ? 'border-rose-500' : ''}
               />
-              {formErrors.name && <p className="text-xs text-rose-600 font-medium">{formErrors.name}</p>}
+              {formErrors.name && (
+                <p className="text-xs text-rose-600 font-medium">{formErrors.name}</p>
+              )}
             </div>
           </div>
 
           {/* Type + Balance */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label className="flex items-center gap-1 font-semibold text-zinc-900 dark:text-zinc-100/90 text-sm">{t('accounts.accountType')} <span className="text-red-500">*</span></Label>
+              <Label className="flex items-center gap-1 font-semibold text-zinc-900 dark:text-zinc-100/90 text-sm">
+                {t('accounts.accountType')} <span className="text-red-500">*</span>
+              </Label>
               <Select
                 value={formData.accountType}
                 onValueChange={(v) => onFormChange({ accountType: v })}
@@ -167,7 +201,9 @@ export function AccountFormClientDialog({
                   ))}
                 </SelectContent>
               </Select>
-              {formErrors.accountType && <p className="text-xs text-rose-600 font-medium">{formErrors.accountType}</p>}
+              {formErrors.accountType && (
+                <p className="text-xs text-rose-600 font-medium">{formErrors.accountType}</p>
+              )}
               {formData.accountType && (
                 <div className="rounded-md bg-teal-500/5 dark:bg-teal-500/10 border border-teal-500/20 p-2.5 text-[11px] text-teal-700 dark:text-teal-400 mt-1.5 leading-relaxed">
                   {getTypeHelper(formData.accountType)}
@@ -175,7 +211,9 @@ export function AccountFormClientDialog({
               )}
             </div>
             <div className="space-y-2">
-              <Label className="flex items-center gap-1 font-semibold text-zinc-900 dark:text-zinc-100/90 text-sm">{t('accounts.normalBalance')} <span className="text-red-500">*</span></Label>
+              <Label className="flex items-center gap-1 font-semibold text-zinc-900 dark:text-zinc-100/90 text-sm">
+                {t('accounts.normalBalance')} <span className="text-red-500">*</span>
+              </Label>
               <Select
                 value={formData.normalBalance}
                 onValueChange={(v) => onFormChange({ normalBalance: v })}
@@ -188,7 +226,9 @@ export function AccountFormClientDialog({
                   <SelectItem value="credit">{t('accounts.credit')}</SelectItem>
                 </SelectContent>
               </Select>
-              {formErrors.normalBalance && <p className="text-xs text-rose-600 font-medium">{formErrors.normalBalance}</p>}
+              {formErrors.normalBalance && (
+                <p className="text-xs text-rose-600 font-medium">{formErrors.normalBalance}</p>
+              )}
               {formData.normalBalance && (
                 <div className="rounded-md bg-indigo-500/5 dark:bg-indigo-500/10 border border-indigo-500/20 p-2.5 text-[11px] text-indigo-700 dark:text-indigo-400 mt-1.5 leading-relaxed">
                   {getBalanceHelper(formData.normalBalance)}
@@ -199,11 +239,10 @@ export function AccountFormClientDialog({
 
           {/* Parent Account */}
           <div className="space-y-2 border-t pt-4 border-border/50">
-            <Label className="font-semibold text-zinc-900 dark:text-zinc-100/90 text-sm">{t('accounts.parentAccount')}</Label>
-            <Select
-              value={formData.parentId}
-              onValueChange={(v) => onFormChange({ parentId: v })}
-            >
+            <Label className="font-semibold text-zinc-900 dark:text-zinc-100/90 text-sm">
+              {t('accounts.parentAccount')}
+            </Label>
+            <Select value={formData.parentId} onValueChange={(v) => onFormChange({ parentId: v })}>
               <SelectTrigger>
                 <SelectValue placeholder="—" />
               </SelectTrigger>

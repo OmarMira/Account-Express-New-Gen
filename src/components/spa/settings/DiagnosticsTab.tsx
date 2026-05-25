@@ -16,13 +16,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useLanguageStore } from '@/store/language-store';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
@@ -210,7 +204,11 @@ export function DiagnosticsTab() {
               icon={Database}
               iconColor="bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400"
               label={t('settings.diag.database')}
-              value={data.database.status === 'connected' ? t('settings.diag.connected') : data.database.status}
+              value={
+                data.database.status === 'connected'
+                  ? t('settings.diag.connected')
+                  : data.database.status
+              }
               subValue={`${t('settings.diag.size')}: ${data.database.size} · ${data.database.tables} ${t('settings.diag.tables')}`}
             />
             <StatCard
@@ -282,9 +280,7 @@ export function DiagnosticsTab() {
             <div className="flex items-center justify-center size-16 rounded-full bg-muted">
               <Activity className="size-8 text-muted-foreground" />
             </div>
-            <p className="text-sm text-muted-foreground">
-              {t('settings.diag.runDiagnostic')}
-            </p>
+            <p className="text-sm text-muted-foreground">{t('settings.diag.runDiagnostic')}</p>
           </div>
         </motion.div>
       )}

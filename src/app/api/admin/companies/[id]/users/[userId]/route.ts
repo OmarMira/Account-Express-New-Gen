@@ -4,10 +4,10 @@ import { getSessionUserId } from '@/lib/sessions';
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string; userId: string }> }
+  { params }: { params: Promise<{ id: string; userId: string }> },
 ) {
   try {
-    const sessionUserId = getSessionUserId(request);
+    const sessionUserId = await getSessionUserId(request);
     if (!sessionUserId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

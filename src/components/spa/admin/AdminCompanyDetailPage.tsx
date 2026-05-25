@@ -19,7 +19,13 @@ import {
 import { useAuthStore } from '@/store/auth-store';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 
 interface User {
@@ -73,7 +79,9 @@ export default function AdminCompanyDetailPage() {
       const compRes = await fetch('/api/admin/companies');
       if (compRes.ok) {
         const compData = await compRes.json();
-        const found = (compData.companies || []).find((c: Company) => c.id === adminSelectedCompanyId);
+        const found = (compData.companies || []).find(
+          (c: Company) => c.id === adminSelectedCompanyId,
+        );
         if (found) {
           setCompany(found);
         } else {
@@ -131,9 +139,12 @@ export default function AdminCompanyDetailPage() {
     if (!adminSelectedCompanyId) return;
     setRevokingId(memberUserId);
     try {
-      const res = await fetch(`/api/admin/companies/${adminSelectedCompanyId}/users/${memberUserId}`, {
-        method: 'DELETE',
-      });
+      const res = await fetch(
+        `/api/admin/companies/${adminSelectedCompanyId}/users/${memberUserId}`,
+        {
+          method: 'DELETE',
+        },
+      );
       if (res.ok) {
         loadData();
       }
@@ -157,8 +168,13 @@ export default function AdminCompanyDetailPage() {
     return (
       <div className="flex flex-col items-center justify-center py-20 bg-card text-card-foreground rounded-2xl border shadow-sm max-w-lg mx-auto">
         <Shield className="size-16 text-rose-500/80 mb-4" />
-        <p className="text-rose-600 dark:text-rose-400 font-bold">{error || 'Empresa no encontrada'}</p>
-        <Button onClick={() => setCurrentView('admin-companies')} className="mt-6 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md">
+        <p className="text-rose-600 dark:text-rose-400 font-bold">
+          {error || 'Empresa no encontrada'}
+        </p>
+        <Button
+          onClick={() => setCurrentView('admin-companies')}
+          className="mt-6 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md"
+        >
           Volver a Empresas
         </Button>
       </div>
@@ -166,9 +182,7 @@ export default function AdminCompanyDetailPage() {
   }
 
   // Filter out users that are already members
-  const unassignedUsers = allUsers.filter(
-    (u) => !members.some((m) => m.user.id === u.id)
-  );
+  const unassignedUsers = allUsers.filter((u) => !members.some((m) => m.user.id === u.id));
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -194,7 +208,9 @@ export default function AdminCompanyDetailPage() {
                 {company.isActive ? 'Activa' : 'Inactiva'}
               </Badge>
               {company.taxId && (
-                <span className="text-xs font-mono text-muted-foreground">Tax ID: {company.taxId}</span>
+                <span className="text-xs font-mono text-muted-foreground">
+                  Tax ID: {company.taxId}
+                </span>
               )}
             </div>
           </div>
@@ -213,7 +229,9 @@ export default function AdminCompanyDetailPage() {
         {/* Left column: Card details */}
         <div className="space-y-6 lg:col-span-1">
           <div className="p-6 bg-card text-card-foreground rounded-2xl border shadow-sm space-y-4">
-            <h2 className="text-sm font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Ficha de Identidad</h2>
+            <h2 className="text-sm font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
+              Ficha de Identidad
+            </h2>
             <div className="space-y-3.5 text-sm">
               {company.email && (
                 <div className="flex items-center gap-3 text-foreground/80">
@@ -254,10 +272,18 @@ export default function AdminCompanyDetailPage() {
                 <table className="min-w-full divide-y divide-border">
                   <thead className="bg-muted/50">
                     <tr>
-                      <th className="px-6 py-3.5 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">Usuario</th>
-                      <th className="px-6 py-3.5 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">Email</th>
-                      <th className="px-6 py-3.5 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">Rol Asignado</th>
-                      <th className="px-6 py-3.5 text-right text-xs font-bold text-muted-foreground uppercase tracking-wider">Acciones</th>
+                      <th className="px-6 py-3.5 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                        Usuario
+                      </th>
+                      <th className="px-6 py-3.5 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                        Email
+                      </th>
+                      <th className="px-6 py-3.5 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                        Rol Asignado
+                      </th>
+                      <th className="px-6 py-3.5 text-right text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                        Acciones
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border bg-card">
@@ -316,7 +342,9 @@ export default function AdminCompanyDetailPage() {
           </DialogHeader>
           <form onSubmit={handleAssign} className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <Label className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Seleccionar Usuario</Label>
+              <Label className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                Seleccionar Usuario
+              </Label>
               <select
                 required
                 value={selectedUserId}
@@ -332,7 +360,9 @@ export default function AdminCompanyDetailPage() {
               </select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Rol de Empresa</Label>
+              <Label className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                Rol de Empresa
+              </Label>
               <select
                 required
                 value={selectedRole}

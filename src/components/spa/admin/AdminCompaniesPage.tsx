@@ -24,7 +24,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 
 interface Company {
@@ -44,12 +50,12 @@ export default function AdminCompaniesPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  
+
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  
+
   // Delete Dialog state
   const [deleteTarget, setDeleteTarget] = useState<Company | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -158,7 +164,7 @@ export default function AdminCompaniesPage() {
   const filteredCompanies = companies.filter(
     (c) =>
       c.legalName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (c.taxId && c.taxId.toLowerCase().includes(searchQuery.toLowerCase()))
+      (c.taxId && c.taxId.toLowerCase().includes(searchQuery.toLowerCase())),
   );
 
   return (
@@ -246,8 +252,12 @@ export default function AdminCompaniesPage() {
                   <div className="space-y-2 pt-2 text-sm border-t border-border">
                     {company.taxId && (
                       <div className="flex items-center gap-2 text-foreground/80">
-                        <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider w-16">Tax ID:</span>
-                        <span className="font-mono text-foreground font-medium">{company.taxId}</span>
+                        <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider w-16">
+                          Tax ID:
+                        </span>
+                        <span className="font-mono text-foreground font-medium">
+                          {company.taxId}
+                        </span>
                       </div>
                     )}
                     {company.email && (
@@ -330,7 +340,9 @@ export default function AdminCompaniesPage() {
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">Nombre Legal *</Label>
+              <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
+                Nombre Legal *
+              </Label>
               <Input
                 required
                 value={formData.legalName}
@@ -340,7 +352,9 @@ export default function AdminCompaniesPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">EIN / Tax ID</Label>
+              <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
+                EIN / Tax ID
+              </Label>
               <Input
                 value={formData.taxId}
                 onChange={(e) => setFormData({ ...formData, taxId: e.target.value })}
@@ -349,7 +363,9 @@ export default function AdminCompaniesPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">Email de Contacto</Label>
+              <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
+                Email de Contacto
+              </Label>
               <Input
                 type="email"
                 value={formData.email}
@@ -359,7 +375,9 @@ export default function AdminCompaniesPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">Teléfono</Label>
+              <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
+                Teléfono
+              </Label>
               <Input
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
@@ -368,7 +386,9 @@ export default function AdminCompaniesPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">Dirección Física</Label>
+              <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
+                Dirección Física
+              </Label>
               <Input
                 value={formData.address}
                 onChange={(e) => setFormData({ ...formData, address: e.target.value })}
@@ -385,7 +405,10 @@ export default function AdminCompaniesPage() {
                   onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
                   className="size-4 rounded border-input bg-card text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                 />
-                <Label htmlFor="isActiveCheck" className="text-foreground/90 text-sm font-semibold select-none cursor-pointer">
+                <Label
+                  htmlFor="isActiveCheck"
+                  className="text-foreground/90 text-sm font-semibold select-none cursor-pointer"
+                >
                   Empresa Activa
                 </Label>
               </div>
@@ -425,7 +448,8 @@ export default function AdminCompaniesPage() {
             <span className="font-extrabold text-foreground">{deleteTarget?.legalName}</span>?
             <br />
             <br />
-            Esta acción purgará todo el catálogo si es seguro hacerlo. Esta operación es irreversible.
+            Esta acción purgará todo el catálogo si es seguro hacerlo. Esta operación es
+            irreversible.
           </div>
           <DialogFooter className="pt-4 border-t border-border">
             <Button

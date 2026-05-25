@@ -25,6 +25,6 @@ export const useLanguageStore = create<LanguageState>()(
     {
       name: 'accountexpress-language',
       partialize: (state) => ({ language: state.language }),
-    }
-  )
+    },
+  ),
 );

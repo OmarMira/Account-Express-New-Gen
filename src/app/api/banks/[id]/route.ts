@@ -3,11 +3,8 @@ import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
 
 // ─── GET /api/banks/[id]?companyId=xxx ──────────────────────────────────
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const userId = getSessionUserId(request);
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const userId = await getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -17,10 +14,7 @@ export async function GET(
   const companyId = searchParams.get('companyId');
 
   if (!companyId) {
-    return NextResponse.json(
-      { error: 'companyId is required' },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: 'companyId is required' }, { status: 400 });
   }
 
   try {
@@ -49,10 +43,7 @@ export async function GET(
     });
 
     if (!account) {
-      return NextResponse.json(
-        { error: 'Bank account not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Bank account not found' }, { status: 404 });
     }
 
     // Extract recent transactions from the latest statement
@@ -66,19 +57,13 @@ export async function GET(
     });
   } catch (error) {
     console.error('[BANK GET ERROR]', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch bank account' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to fetch bank account' }, { status: 500 });
   }
 }
 
 // ─── PUT /api/banks/[id] ───────────────────────────────────────────────
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const userId = getSessionUserId(request);
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const userId = await getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -100,10 +85,7 @@ export async function PUT(
     } = body;
 
     if (!companyId) {
-      return NextResponse.json(
-        { error: 'companyId is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'companyId is required' }, { status: 400 });
     }
 
     // Verify membership
@@ -119,10 +101,7 @@ export async function PUT(
       where: { id, companyId },
     });
     if (!existing) {
-      return NextResponse.json(
-        { error: 'Bank account not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Bank account not found' }, { status: 404 });
     }
 
     // Validate GL account if provided
@@ -131,18 +110,14 @@ export async function PUT(
         where: { id: glAccountId, companyId, isActive: true },
       });
       if (!glAccount) {
-        return NextResponse.json(
-          { error: 'GL account not found or inactive' },
-          { status: 404 }
-        );
+        return NextResponse.json({ error: 'GL account not found or inactive' }, { status: 404 });
       }
       if (glAccount.accountType !== 'asset') {
         return NextResponse.json(
           {
-            error:
-              'Bank accounts must be linked to an asset-type GL account',
+            error: 'Bank accounts must be linked to an asset-type GL account',
           },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
@@ -170,19 +145,16 @@ export async function PUT(
     return NextResponse.json({ account });
   } catch (error) {
     console.error('[BANK UPDATE ERROR]', error);
-    return NextResponse.json(
-      { error: 'Failed to update bank account' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to update bank account' }, { status: 500 });
   }
 }
 
 // ─── DELETE /api/banks/[id] ────────────────────────────────────────────
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const userId = getSessionUserId(request);
+  const userId = await getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -194,10 +166,7 @@ export async function DELETE(
     const { companyId } = body;
 
     if (!companyId) {
-      return NextResponse.json(
-        { error: 'companyId is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'companyId is required' }, { status: 400 });
     }
 
     // Verify membership
@@ -216,7 +185,7 @@ export async function DELETE(
     if (!account) {
       return NextResponse.json(
         { error: 'Bank account not found or already deactivated' },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -228,9 +197,6 @@ export async function DELETE(
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('[BANK DELETE ERROR]', error);
-    return NextResponse.json(
-      { error: 'Failed to deactivate bank account' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to deactivate bank account' }, { status: 500 });
   }
 }

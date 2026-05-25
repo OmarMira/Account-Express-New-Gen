@@ -14,13 +14,7 @@ import {
 import { motion } from 'framer-motion';
 import { useLanguageStore } from '@/store/language-store';
 import { useAuthStore } from '@/store/auth-store';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -125,10 +119,14 @@ export function CompanyDataTab() {
             });
           }
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
       if (!cancelled) setLoading(false);
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [companyId]);
 
   // Fetch all companies (super_admin)
@@ -142,10 +140,14 @@ export function CompanyDataTab() {
           const data = await res.json();
           setCompanies(data.companies || []);
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
       if (!cancelled) setLoadingCompanies(false);
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [isSuperAdmin]);
 
   async function handleSaveCompany() {
@@ -168,7 +170,9 @@ export function CompanyDataTab() {
         setEditingCompany(false);
         toast.success(t('settings.companyUpdated'));
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     setSavingCompany(false);
   }
 
@@ -188,7 +192,9 @@ export function CompanyDataTab() {
         setNewCompanyOpen(false);
         toast.success(t('settings.companies.companyCreated'));
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     setCreatingCompany(false);
   }
 
@@ -209,9 +215,7 @@ export function CompanyDataTab() {
                   <Building2 className="size-4" />
                   {activeCompany?.legalName || t('settings.companyData')}
                 </CardTitle>
-                <CardDescription className="mt-1">
-                  {t('settings.companyInfo')}
-                </CardDescription>
+                <CardDescription className="mt-1">{t('settings.companyInfo')}</CardDescription>
               </div>
               {!editingCompany && (
                 <Button variant="outline" size="sm" onClick={() => setEditingCompany(true)}>
@@ -235,7 +239,9 @@ export function CompanyDataTab() {
                   <Input
                     id="legalName"
                     value={companyData.legalName}
-                    onChange={(e) => setCompanyData((prev) => ({ ...prev, legalName: e.target.value }))}
+                    onChange={(e) =>
+                      setCompanyData((prev) => ({ ...prev, legalName: e.target.value }))
+                    }
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -268,15 +274,21 @@ export function CompanyDataTab() {
                   <Input
                     id="address"
                     value={companyData.address}
-                    onChange={(e) => setCompanyData((prev) => ({ ...prev, address: e.target.value }))}
+                    onChange={(e) =>
+                      setCompanyData((prev) => ({ ...prev, address: e.target.value }))
+                    }
                   />
                 </div>
                 <div className="flex gap-2 sm:col-span-2">
                   <Button onClick={handleSaveCompany} disabled={savingCompany}>
                     {savingCompany ? (
-                      <><Loader2 className="size-4 mr-1 animate-spin" /> {t('settings.saving')}</>
+                      <>
+                        <Loader2 className="size-4 mr-1 animate-spin" /> {t('settings.saving')}
+                      </>
                     ) : (
-                      <><Save className="size-4 mr-1" /> {t('common.save')}</>
+                      <>
+                        <Save className="size-4 mr-1" /> {t('common.save')}
+                      </>
                     )}
                   </Button>
                   <Button variant="outline" onClick={() => setEditingCompany(false)}>
@@ -290,7 +302,11 @@ export function CompanyDataTab() {
                 <InfoRow label={t('settings.taxId')} value={companyData.taxId || '—'} />
                 <InfoRow label={t('settings.email')} value={companyData.email || '—'} />
                 <InfoRow label={t('settings.phone')} value={companyData.phone || '—'} />
-                <InfoRow label={t('settings.address')} value={companyData.address || '—'} fullWidth />
+                <InfoRow
+                  label={t('settings.address')}
+                  value={companyData.address || '—'}
+                  fullWidth
+                />
               </div>
             )}
           </CardContent>
@@ -316,23 +332,25 @@ export function CompanyDataTab() {
                   <DialogContent>
                     <DialogHeader>
                       <DialogTitle>{t('settings.companies.createCompany')}</DialogTitle>
-                      <DialogDescription>
-                        {t('settings.companyInfo')}
-                      </DialogDescription>
+                      <DialogDescription>{t('settings.companyInfo')}</DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
                       <div className="space-y-1.5">
                         <Label>{t('settings.legalName')}</Label>
                         <Input
                           value={newCompany.legalName}
-                          onChange={(e) => setNewCompany((prev) => ({ ...prev, legalName: e.target.value }))}
+                          onChange={(e) =>
+                            setNewCompany((prev) => ({ ...prev, legalName: e.target.value }))
+                          }
                         />
                       </div>
                       <div className="space-y-1.5">
                         <Label>{t('settings.companies.ein')}</Label>
                         <Input
                           value={newCompany.taxId}
-                          onChange={(e) => setNewCompany((prev) => ({ ...prev, taxId: e.target.value }))}
+                          onChange={(e) =>
+                            setNewCompany((prev) => ({ ...prev, taxId: e.target.value }))
+                          }
                         />
                       </div>
                       <div className="space-y-1.5">
@@ -340,7 +358,9 @@ export function CompanyDataTab() {
                         <Input
                           type="email"
                           value={newCompany.email}
-                          onChange={(e) => setNewCompany((prev) => ({ ...prev, email: e.target.value }))}
+                          onChange={(e) =>
+                            setNewCompany((prev) => ({ ...prev, email: e.target.value }))
+                          }
                         />
                       </div>
                     </div>
@@ -348,11 +368,18 @@ export function CompanyDataTab() {
                       <Button variant="outline" onClick={() => setNewCompanyOpen(false)}>
                         {t('common.cancel')}
                       </Button>
-                      <Button onClick={handleCreateCompany} disabled={creatingCompany || !newCompany.legalName.trim()}>
+                      <Button
+                        onClick={handleCreateCompany}
+                        disabled={creatingCompany || !newCompany.legalName.trim()}
+                      >
                         {creatingCompany ? (
-                          <><Loader2 className="size-4 mr-1 animate-spin" /> {t('settings.saving')}</>
+                          <>
+                            <Loader2 className="size-4 mr-1 animate-spin" /> {t('settings.saving')}
+                          </>
                         ) : (
-                          <><Plus className="size-4 mr-1" /> {t('common.create')}</>
+                          <>
+                            <Plus className="size-4 mr-1" /> {t('common.create')}
+                          </>
                         )}
                       </Button>
                     </DialogFooter>
@@ -378,8 +405,12 @@ export function CompanyDataTab() {
                       <TableRow>
                         <TableHead className="font-semibold">EMPRESA</TableHead>
                         <TableHead className="font-semibold">EIN</TableHead>
-                        <TableHead className="font-semibold">{t('settings.companies.contact')}</TableHead>
-                        <TableHead className="font-semibold">{t('settings.companies.status')}</TableHead>
+                        <TableHead className="font-semibold">
+                          {t('settings.companies.contact')}
+                        </TableHead>
+                        <TableHead className="font-semibold">
+                          {t('settings.companies.status')}
+                        </TableHead>
                         <TableHead className="font-semibold w-12"></TableHead>
                       </TableRow>
                     </TableHeader>
@@ -390,8 +421,13 @@ export function CompanyDataTab() {
                           <TableCell>{company.taxId || '—'}</TableCell>
                           <TableCell>{company.email || '—'}</TableCell>
                           <TableCell>
-                            <Badge variant={company.isActive ? 'default' : 'secondary'} className="text-xs">
-                              {company.isActive ? t('settings.companies.active') : t('settings.companies.inactive')}
+                            <Badge
+                              variant={company.isActive ? 'default' : 'secondary'}
+                              className="text-xs"
+                            >
+                              {company.isActive
+                                ? t('settings.companies.active')
+                                : t('settings.companies.inactive')}
                             </Badge>
                           </TableCell>
                           <TableCell>
@@ -429,7 +465,15 @@ export function CompanyDataTab() {
 
 /* ─── Helper Component ────────────────────────────────────────── */
 
-function InfoRow({ label, value, fullWidth = false }: { label: string; value: string; fullWidth?: boolean }) {
+function InfoRow({
+  label,
+  value,
+  fullWidth = false,
+}: {
+  label: string;
+  value: string;
+  fullWidth?: boolean;
+}) {
   return (
     <div className={fullWidth ? 'sm:col-span-2' : ''}>
       <p className="text-xs text-muted-foreground">{label}</p>

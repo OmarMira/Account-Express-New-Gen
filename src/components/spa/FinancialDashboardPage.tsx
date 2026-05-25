@@ -22,7 +22,7 @@ import {
   RotateCcw,
   CheckCircle2,
   AlertCircle,
-  Database
+  Database,
 } from 'lucide-react';
 import {
   BarChart,
@@ -89,7 +89,7 @@ const MONTHS_SPANISH = [
   { key: '09', name: 'Sep' },
   { key: '10', name: 'Oct' },
   { key: '11', name: 'Nov' },
-  { key: '12', name: 'Dic' }
+  { key: '12', name: 'Dic' },
 ];
 
 export function FinancialDashboardPage() {
@@ -103,19 +103,31 @@ export function FinancialDashboardPage() {
   const [dbTransactions, setDbTransactions] = useState<Transaction[]>([]);
   const [initialBalanceInput, setInitialBalanceInput] = useState<number>(0);
   const apiInitialBalance = React.useRef<number>(0);
-  const [bankAccountInfo, setBankAccountInfo] = useState<{ accountName: string; bankName: string; accountNo: string } | null>(null);
+  const [bankAccountInfo, setBankAccountInfo] = useState<{
+    accountName: string;
+    bankName: string;
+    accountNo: string;
+  } | null>(null);
   const [revenueTrend, setRevenueTrend] = useState<number>(0);
   const [expenseTrend, setExpenseTrend] = useState<number>(0);
   const [filtersOpen, setFiltersOpen] = useState(true);
 
   // Filter conditions
-  const [filterReconciliation, setFilterReconciliation] = useState<'all' | 'reconciled' | 'unreconciled'>('all');
+  const [filterReconciliation, setFilterReconciliation] = useState<
+    'all' | 'reconciled' | 'unreconciled'
+  >('all');
   const [filterStartDate, setFilterStartDate] = useState<string>('');
   const [filterEndDate, setFilterEndDate] = useState<string>('');
   const [filterYear, setFilterYear] = useState<string>('all');
-  const [selectedMonths, setSelectedMonths] = useState<Set<string>>(new Set(MONTHS_SPANISH.map(m => m.key)));
-  const [selectedIncomeCategories, setSelectedIncomeCategories] = useState<Set<string>>(new Set(['Sin asignar']));
-  const [selectedExpenseCategories, setSelectedExpenseCategories] = useState<Set<string>>(new Set(['Sin asignar']));
+  const [selectedMonths, setSelectedMonths] = useState<Set<string>>(
+    new Set(MONTHS_SPANISH.map((m) => m.key)),
+  );
+  const [selectedIncomeCategories, setSelectedIncomeCategories] = useState<Set<string>>(
+    new Set(['Sin asignar']),
+  );
+  const [selectedExpenseCategories, setSelectedExpenseCategories] = useState<Set<string>>(
+    new Set(['Sin asignar']),
+  );
 
   // Modal State
   const [helpOpen, setHelpOpen] = useState(false);
@@ -127,62 +139,83 @@ export function FinancialDashboardPage() {
   }, [recurrentMap]);
 
   // --- CLASSIFICATION ENGINE ---
-  const classifyTransaction = useCallback((tx: Omit<Transaction, 'categoria'>, recurrent?: Map<string, string>): string => {
-    if (tx.glAccountName) {
-      return tx.glAccountName;
-    }
-    if (tx.matchedRuleGlAccountName) {
-      return tx.matchedRuleGlAccountName;
-    }
-    if (tx.cuenta_contable) {
-      const parts = tx.cuenta_contable.trim().split(' ');
-      if (parts.length > 1 && /^\d+$/.test(parts[0])) {
-        return parts.slice(1).join(' ');
+  const classifyTransaction = useCallback(
+    (tx: Omit<Transaction, 'categoria'>, recurrent?: Map<string, string>): string => {
+      if (tx.glAccountName) {
+        return tx.glAccountName;
       }
-      return tx.cuenta_contable;
-    }
-
-    // Clasificación heurística inteligente basada en descripción de base de datos
-    const desc = (tx.descripcion || '').toLowerCase();
-    if (desc.includes('uber') || desc.includes('raiser')) {
-      return 'Uber / Raiser';
-    }
-    if (desc.includes('lyft')) {
-      return 'Lyft';
-    }
-    if (desc.includes('turo')) {
-      return 'Turo';
-    }
-    if (desc.includes('american express') || desc.includes('amex') || desc.includes('americanexp')) {
-      return 'American Express';
-    }
-    if (desc.includes('toyota')) {
-      return 'Toyota / autos';
-    }
-    if (desc.includes('kmf')) {
-      return 'KMF';
-    }
-    if (desc.includes('rodrigo ochoa') || desc.includes('rentas') || desc.includes('ochoa')) {
-      return 'Rodrigo Ochoa (rentas)';
-    }
-    if (desc.includes('comision') || desc.includes('comisión') || desc.includes('fee') || desc.includes('charge')) {
-      return 'Comisiones Bancarias';
-    }
-    if (desc.includes('lqom') || desc.includes('lq&om') || desc.includes('lq & om') || desc.includes('lq') || desc.includes('om')) {
-      return 'Cuotas LQ&OM Inv.';
-    }
-
-    // Heurística dinámica por repetición (4 o más transacciones con descripción similar)
-    const activeRecurrentMap = recurrent || recurrentMapRef.current;
-    for (const [clean, prettyName] of activeRecurrentMap.entries()) {
-      const cleanWords = clean.toLowerCase().split(' ').filter(w => w.length > 2);
-      if (cleanWords.length > 0 && cleanWords.every(w => desc.includes(w))) {
-        return prettyName;
+      if (tx.matchedRuleGlAccountName) {
+        return tx.matchedRuleGlAccountName;
       }
-    }
+      if (tx.cuenta_contable) {
+        const parts = tx.cuenta_contable.trim().split(' ');
+        if (parts.length > 1 && /^\d+$/.test(parts[0])) {
+          return parts.slice(1).join(' ');
+        }
+        return tx.cuenta_contable;
+      }
 
-    return tx.tipo === 'credito' ? 'Otros ingresos' : 'Otros egresos';
-  }, []);
+      // Clasificación heurística inteligente basada en descripción de base de datos
+      const desc = (tx.descripcion || '').toLowerCase();
+      if (desc.includes('uber') || desc.includes('raiser')) {
+        return 'Uber / Raiser';
+      }
+      if (desc.includes('lyft')) {
+        return 'Lyft';
+      }
+      if (desc.includes('turo')) {
+        return 'Turo';
+      }
+      if (
+        desc.includes('american express') ||
+        desc.includes('amex') ||
+        desc.includes('americanexp')
+      ) {
+        return 'American Express';
+      }
+      if (desc.includes('toyota')) {
+        return 'Toyota / autos';
+      }
+      if (desc.includes('kmf')) {
+        return 'KMF';
+      }
+      if (desc.includes('rodrigo ochoa') || desc.includes('rentas') || desc.includes('ochoa')) {
+        return 'Rodrigo Ochoa (rentas)';
+      }
+      if (
+        desc.includes('comision') ||
+        desc.includes('comisión') ||
+        desc.includes('fee') ||
+        desc.includes('charge')
+      ) {
+        return 'Comisiones Bancarias';
+      }
+      if (
+        desc.includes('lqom') ||
+        desc.includes('lq&om') ||
+        desc.includes('lq & om') ||
+        desc.includes('lq') ||
+        desc.includes('om')
+      ) {
+        return 'Cuotas LQ&OM Inv.';
+      }
+
+      // Heurística dinámica por repetición (4 o más transacciones con descripción similar)
+      const activeRecurrentMap = recurrent || recurrentMapRef.current;
+      for (const [clean, prettyName] of activeRecurrentMap.entries()) {
+        const cleanWords = clean
+          .toLowerCase()
+          .split(' ')
+          .filter((w) => w.length > 2);
+        if (cleanWords.length > 0 && cleanWords.every((w) => desc.includes(w))) {
+          return prettyName;
+        }
+      }
+
+      return tx.tipo === 'credito' ? 'Otros ingresos' : 'Otros egresos';
+    },
+    [],
+  );
 
   // --- DATA LOADING HUB ---
   const loadData = useCallback(async () => {
@@ -202,18 +235,24 @@ export function FinancialDashboardPage() {
           // 1. Identificar descripciones recurrentes (4 o más repeticiones similares)
           const cleanCounts = new Map<string, number>();
           const rawDescriptions = new Map<string, string>();
-          
+
           data.transactions.forEach((tx: any) => {
             const rawDesc = tx.description || '';
             let clean = rawDesc.toUpperCase();
             clean = clean.replace(/\b\d{3,}\b/g, ''); // eliminar números de 3+ dígitos
             clean = clean.replace(/[^A-ZÁÉÍÓÚÑ\s]/g, ' ');
             clean = clean.replace(/\s+/g, ' ').trim();
-            
+
             if (clean.length >= 3) {
               cleanCounts.set(clean, (cleanCounts.get(clean) || 0) + 1);
-              if (!rawDescriptions.has(clean) || rawDesc.length < rawDescriptions.get(clean)!.length) {
-                const pretty = clean.split(' ').map((w: string) => w.charAt(0) + w.slice(1).toLowerCase()).join(' ');
+              if (
+                !rawDescriptions.has(clean) ||
+                rawDesc.length < rawDescriptions.get(clean)!.length
+              ) {
+                const pretty = clean
+                  .split(' ')
+                  .map((w: string) => w.charAt(0) + w.slice(1).toLowerCase())
+                  .join(' ');
                 rawDescriptions.set(clean, pretty);
               }
             }
@@ -274,7 +313,7 @@ export function FinancialDashboardPage() {
   // Stable pre-defined categories derived dynamically
   const allIncomeCategories = useMemo(() => {
     const categories = new Set<string>();
-    dbTransactions.forEach(tx => {
+    dbTransactions.forEach((tx) => {
       if (tx.tipo === 'credito') {
         categories.add(tx.categoria || 'Sin asignar');
       }
@@ -285,7 +324,7 @@ export function FinancialDashboardPage() {
 
   const allExpenseCategories = useMemo(() => {
     const categories = new Set<string>();
-    dbTransactions.forEach(tx => {
+    dbTransactions.forEach((tx) => {
       if (tx.tipo === 'debito') {
         categories.add(tx.categoria || 'Sin asignar');
       }
@@ -296,13 +335,13 @@ export function FinancialDashboardPage() {
 
   // Year Selection Options
   const yearOptions = useMemo(() => {
-    const years = new Set(dbTransactions.map(tx => tx.fecha.substring(0, 4)));
+    const years = new Set(dbTransactions.map((tx) => tx.fecha.substring(0, 4)));
     return Array.from(years).sort();
   }, [dbTransactions]);
 
   // --- MAIN CRITICAL FILTERING ENGINE ---
   const filteredTransactions = useMemo(() => {
-    return dbTransactions.filter(t => {
+    return dbTransactions.filter((t) => {
       // Reconciliation
       if (filterReconciliation === 'reconciled' && !t.conciliado) return false;
       if (filterReconciliation === 'unreconciled' && t.conciliado) return false;
@@ -334,12 +373,15 @@ export function FinancialDashboardPage() {
     filterYear,
     selectedMonths,
     selectedIncomeCategories,
-    selectedExpenseCategories
+    selectedExpenseCategories,
   ]);
 
   // --- MONTHLY DATA AGGREGATION & SALDOS ---
   const monthlyAggregatedData = useMemo(() => {
-    const map = new Map<string, { monthKey: string; ingresos: number; gastos: number; txs: Transaction[] }>();
+    const map = new Map<
+      string,
+      { monthKey: string; ingresos: number; gastos: number; txs: Transaction[] }
+    >();
 
     // Seed all chronological months within filter range to keep timelines solid
     if (filteredTransactions.length > 0) {
@@ -356,7 +398,7 @@ export function FinancialDashboardPage() {
     }
 
     // Populate actual figures
-    filteredTransactions.forEach(t => {
+    filteredTransactions.forEach((t) => {
       const ym = t.fecha.substring(0, 7);
       if (!map.has(ym)) {
         map.set(ym, { monthKey: ym, ingresos: 0, gastos: 0, txs: [] });
@@ -373,7 +415,7 @@ export function FinancialDashboardPage() {
     const sortedYm = Array.from(map.keys()).sort();
     let currentBal = initialBalanceInput;
 
-    const finalMonths = sortedYm.map(ym => {
+    const finalMonths = sortedYm.map((ym) => {
       const b = map.get(ym)!;
       const net = b.ingresos - b.gastos;
 
@@ -385,8 +427,8 @@ export function FinancialDashboardPage() {
 
       for (let d = 1; d <= daysInMonth; d++) {
         const dayStr = `${ym}-${String(d).padStart(2, '0')}`;
-        const dayTxs = b.txs.filter(t => t.fecha === dayStr);
-        dayTxs.forEach(t => {
+        const dayTxs = b.txs.filter((t) => t.fecha === dayStr);
+        dayTxs.forEach((t) => {
           if (t.tipo === 'credito') runningBal += t.monto;
           else runningBal -= t.monto;
         });
@@ -408,7 +450,7 @@ export function FinancialDashboardPage() {
         netFlow: net,
         cierre: currentBal,
         promedio: avg,
-        txs: b.txs
+        txs: b.txs,
       };
     });
 
@@ -421,7 +463,7 @@ export function FinancialDashboardPage() {
     let expenses = 0;
     let commissions = 0;
 
-    filteredTransactions.forEach(t => {
+    filteredTransactions.forEach((t) => {
       if (t.tipo === 'credito') {
         revenue += t.monto;
       } else {
@@ -433,16 +475,17 @@ export function FinancialDashboardPage() {
     });
 
     const netFlow = revenue - expenses;
-    const finalBalance = monthlyAggregatedData.length > 0
-      ? monthlyAggregatedData[monthlyAggregatedData.length - 1].cierre
-      : initialBalanceInput;
+    const finalBalance =
+      monthlyAggregatedData.length > 0
+        ? monthlyAggregatedData[monthlyAggregatedData.length - 1].cierre
+        : initialBalanceInput;
 
     return {
       revenue,
       expenses,
       netFlow,
       commissions,
-      finalBalance
+      finalBalance,
     };
   }, [filteredTransactions, monthlyAggregatedData, initialBalanceInput]);
 
@@ -450,9 +493,11 @@ export function FinancialDashboardPage() {
   const expensesByCategoryData = useMemo(() => {
     const counts: Record<string, number> = {};
     // Seed only the categories currently selected (active in filter)
-    Array.from(selectedExpenseCategories).forEach(c => { counts[c] = 0; });
+    Array.from(selectedExpenseCategories).forEach((c) => {
+      counts[c] = 0;
+    });
 
-    filteredTransactions.forEach(t => {
+    filteredTransactions.forEach((t) => {
       if (t.tipo === 'debito') {
         const cat = t.categoria || 'Otros egresos';
         if (selectedExpenseCategories.has(cat)) {
@@ -471,7 +516,7 @@ export function FinancialDashboardPage() {
         name: cat,
         value,
         percentage,
-        color: Object.values(PALETTE)[idx % Object.values(PALETTE).length]
+        color: Object.values(PALETTE)[idx % Object.values(PALETTE).length],
       };
     });
   }, [filteredTransactions, selectedExpenseCategories]);
@@ -479,9 +524,11 @@ export function FinancialDashboardPage() {
   const incomeByCategoryData = useMemo(() => {
     const counts: Record<string, number> = {};
     // Seed only the categories currently selected (active in filter)
-    Array.from(selectedIncomeCategories).forEach(c => { counts[c] = 0; });
+    Array.from(selectedIncomeCategories).forEach((c) => {
+      counts[c] = 0;
+    });
 
-    filteredTransactions.forEach(t => {
+    filteredTransactions.forEach((t) => {
       if (t.tipo === 'credito') {
         const cat = t.categoria || 'Otros ingresos';
         if (selectedIncomeCategories.has(cat)) {
@@ -500,7 +547,7 @@ export function FinancialDashboardPage() {
         name: cat,
         value,
         percentage,
-        color: Object.values(PALETTE)[(idx + 3) % Object.values(PALETTE).length]
+        color: Object.values(PALETTE)[(idx + 3) % Object.values(PALETTE).length],
       };
     });
   }, [filteredTransactions, selectedIncomeCategories]);
@@ -511,7 +558,7 @@ export function FinancialDashboardPage() {
     if (monthlyAggregatedData.length === 0) return null;
     let minVal = Infinity;
     let minMonth = '';
-    monthlyAggregatedData.forEach(m => {
+    monthlyAggregatedData.forEach((m) => {
       if (m.cierre < minVal) {
         minVal = m.cierre;
         minMonth = m.monthKey;
@@ -522,42 +569,50 @@ export function FinancialDashboardPage() {
 
   const topExpenseCategory = useMemo(() => {
     const totals: Record<string, number> = {};
-    dbTransactions.filter(t => t.tipo === 'debito').forEach(t => {
-      const cat = t.categoria || 'Otros egresos';
-      if (cat !== 'Otros egresos') {
-        totals[cat] = (totals[cat] || 0) + t.monto;
-      }
-    });
+    dbTransactions
+      .filter((t) => t.tipo === 'debito')
+      .forEach((t) => {
+        const cat = t.categoria || 'Otros egresos';
+        if (cat !== 'Otros egresos') {
+          totals[cat] = (totals[cat] || 0) + t.monto;
+        }
+      });
     const sorted = Object.keys(totals).sort((a, b) => totals[b] - totals[a]);
     return sorted[0] || 'Egresos Principales';
   }, [dbTransactions]);
 
   const topExpenseCategoryData = useMemo(() => {
-    return monthlyAggregatedData.map(m => {
-      const val = m.txs.filter(t => t.categoria === topExpenseCategory).reduce((s, t) => s + t.monto, 0);
+    return monthlyAggregatedData.map((m) => {
+      const val = m.txs
+        .filter((t) => t.categoria === topExpenseCategory)
+        .reduce((s, t) => s + t.monto, 0);
       return {
         month: m.monthLabel,
-        Monto: val
+        Monto: val,
       };
     });
   }, [monthlyAggregatedData, topExpenseCategory]);
 
   const top3ExpenseCategories = useMemo(() => {
     const totals: Record<string, number> = {};
-    dbTransactions.filter(t => t.tipo === 'debito').forEach(t => {
-      const cat = t.categoria || 'Otros egresos';
-      if (cat !== 'Otros egresos') {
-        totals[cat] = (totals[cat] || 0) + t.monto;
-      }
-    });
-    return Object.keys(totals).sort((a, b) => totals[b] - totals[a]).slice(0, 3);
+    dbTransactions
+      .filter((t) => t.tipo === 'debito')
+      .forEach((t) => {
+        const cat = t.categoria || 'Otros egresos';
+        if (cat !== 'Otros egresos') {
+          totals[cat] = (totals[cat] || 0) + t.monto;
+        }
+      });
+    return Object.keys(totals)
+      .sort((a, b) => totals[b] - totals[a])
+      .slice(0, 3);
   }, [dbTransactions]);
 
   const recurrentExpensesData = useMemo(() => {
-    return monthlyAggregatedData.map(m => {
+    return monthlyAggregatedData.map((m) => {
       const data: Record<string, any> = { month: m.monthLabel };
-      top3ExpenseCategories.forEach(cat => {
-        data[cat] = m.txs.filter(t => t.categoria === cat).reduce((s, t) => s + t.monto, 0);
+      top3ExpenseCategories.forEach((cat) => {
+        data[cat] = m.txs.filter((t) => t.categoria === cat).reduce((s, t) => s + t.monto, 0);
       });
       return data;
     });
@@ -565,20 +620,24 @@ export function FinancialDashboardPage() {
 
   const top3IncomeCategories = useMemo(() => {
     const totals: Record<string, number> = {};
-    dbTransactions.filter(t => t.tipo === 'credito').forEach(t => {
-      const cat = t.categoria || 'Otros ingresos';
-      if (cat !== 'Otros ingresos') {
-        totals[cat] = (totals[cat] || 0) + t.monto;
-      }
-    });
-    return Object.keys(totals).sort((a, b) => totals[b] - totals[a]).slice(0, 3);
+    dbTransactions
+      .filter((t) => t.tipo === 'credito')
+      .forEach((t) => {
+        const cat = t.categoria || 'Otros ingresos';
+        if (cat !== 'Otros ingresos') {
+          totals[cat] = (totals[cat] || 0) + t.monto;
+        }
+      });
+    return Object.keys(totals)
+      .sort((a, b) => totals[b] - totals[a])
+      .slice(0, 3);
   }, [dbTransactions]);
 
   const platformIncomeData = useMemo(() => {
-    return monthlyAggregatedData.map(m => {
+    return monthlyAggregatedData.map((m) => {
       const data: Record<string, any> = { month: m.monthLabel };
-      top3IncomeCategories.forEach(cat => {
-        data[cat] = m.txs.filter(t => t.categoria === cat).reduce((s, t) => s + t.monto, 0);
+      top3IncomeCategories.forEach((cat) => {
+        data[cat] = m.txs.filter((t) => t.categoria === cat).reduce((s, t) => s + t.monto, 0);
       });
       return data;
     });
@@ -586,24 +645,30 @@ export function FinancialDashboardPage() {
 
   const topIncomeCategory = useMemo(() => {
     const totals: Record<string, number> = {};
-    dbTransactions.filter(t => t.tipo === 'credito').forEach(t => {
-      const cat = t.categoria || 'Otros ingresos';
-      if (cat !== 'Otros ingresos') {
-        totals[cat] = (totals[cat] || 0) + t.monto;
-      }
-    });
+    dbTransactions
+      .filter((t) => t.tipo === 'credito')
+      .forEach((t) => {
+        const cat = t.categoria || 'Otros ingresos';
+        if (cat !== 'Otros ingresos') {
+          totals[cat] = (totals[cat] || 0) + t.monto;
+        }
+      });
     const sorted = Object.keys(totals).sort((a, b) => totals[b] - totals[a]);
     return sorted[0] || 'Ingreso Principal';
   }, [dbTransactions]);
 
   const rentasVsOperacionesData = useMemo(() => {
-    return monthlyAggregatedData.map(m => {
-      const rentas = m.txs.filter(t => t.categoria === topIncomeCategory).reduce((s, t) => s + t.monto, 0);
-      const operaciones = m.txs.filter(t => t.tipo === 'credito' && t.categoria !== topIncomeCategory).reduce((s, t) => s + t.monto, 0);
+    return monthlyAggregatedData.map((m) => {
+      const rentas = m.txs
+        .filter((t) => t.categoria === topIncomeCategory)
+        .reduce((s, t) => s + t.monto, 0);
+      const operaciones = m.txs
+        .filter((t) => t.tipo === 'credito' && t.categoria !== topIncomeCategory)
+        .reduce((s, t) => s + t.monto, 0);
       return {
         month: m.monthLabel,
         Rentas: rentas,
-        Operaciones: operaciones
+        Operaciones: operaciones,
       };
     });
   }, [monthlyAggregatedData, topIncomeCategory]);
@@ -630,9 +695,10 @@ export function FinancialDashboardPage() {
         title: 'Saldo Final a la Baja',
         text: (
           <span>
-            El saldo de cierre de tesorería disminuyó un <strong>{Math.abs(changePct).toFixed(1)}%</strong> con respecto al balance inicial.
+            El saldo de cierre de tesorería disminuyó un{' '}
+            <strong>{Math.abs(changePct).toFixed(1)}%</strong> con respecto al balance inicial.
           </span>
-        )
+        ),
       });
     } else {
       structure.push({
@@ -640,16 +706,17 @@ export function FinancialDashboardPage() {
         title: 'Crecimiento de Tesorería',
         text: (
           <span>
-            El balance final se incrementó un <strong>{changePct.toFixed(1)}%</strong> en comparación con el saldo inicial del período.
+            El balance final se incrementó un <strong>{changePct.toFixed(1)}%</strong> en
+            comparación con el saldo inicial del período.
           </span>
-        )
+        ),
       });
     }
 
     // 2. Meses negativos y flujo
     let posCount = 0;
     const negMonths: string[] = [];
-    monthlyAggregatedData.forEach(m => {
+    monthlyAggregatedData.forEach((m) => {
       if (m.netFlow >= 0) posCount++;
       else negMonths.push(m.monthLabel);
     });
@@ -660,9 +727,10 @@ export function FinancialDashboardPage() {
         title: 'Déficit Mensual Detectado',
         text: (
           <span>
-            Se registraron <strong>{negMonths.length} meses deficitarios</strong> ({negMonths.join(', ')}), lo que sugiere tensiones temporales de caja.
+            Se registraron <strong>{negMonths.length} meses deficitarios</strong> (
+            {negMonths.join(', ')}), lo que sugiere tensiones temporales de caja.
           </span>
-        )
+        ),
       });
     } else {
       structure.push({
@@ -672,12 +740,12 @@ export function FinancialDashboardPage() {
           <span>
             Flujo de caja 100% positivo: todos los meses registraron superávit neto acumulado.
           </span>
-        )
+        ),
       });
     }
 
     // 3. Mayor Egreso
-    const validExpCats = expensesByCategoryData.filter(d => d.name !== 'Otros egresos');
+    const validExpCats = expensesByCategoryData.filter((d) => d.name !== 'Otros egresos');
     const topExp = [...validExpCats].sort((a, b) => b.value - a.value)[0];
     if (topExp && topExp.value > 0) {
       structure.push({
@@ -685,9 +753,11 @@ export function FinancialDashboardPage() {
         title: 'Concentración de Egresos',
         text: (
           <span>
-            Las salidas hacia <strong>{topExp.name}</strong> representan el <strong>{topExp.percentage.toFixed(1)}%</strong> del gasto total ({formatCurrency(topExp.value)}).
+            Las salidas hacia <strong>{topExp.name}</strong> representan el{' '}
+            <strong>{topExp.percentage.toFixed(1)}%</strong> del gasto total (
+            {formatCurrency(topExp.value)}).
           </span>
-        )
+        ),
       });
 
       if (topExp.percentage > 15) {
@@ -696,15 +766,18 @@ export function FinancialDashboardPage() {
           title: 'Alerta de Dependencia de Gasto',
           text: (
             <span>
-              La cuenta <strong>{topExp.name}</strong> concentra más del 15% de egresos operacionales. Se sugiere una revisión de facturas recurrentes.
+              La cuenta <strong>{topExp.name}</strong> concentra más del 15% de egresos
+              operacionales. Se sugiere una revisión de facturas recurrentes.
             </span>
-          )
+          ),
         });
       }
     }
 
     // 4. Mayor Ingreso
-    const validIncomeCats = incomeByCategoryData.filter(d => d.name !== 'Otros ingresos' && d.value > 0);
+    const validIncomeCats = incomeByCategoryData.filter(
+      (d) => d.name !== 'Otros ingresos' && d.value > 0,
+    );
     const sortedIncomes = [...validIncomeCats].sort((a, b) => b.value - a.value);
     const mainIncome = sortedIncomes[0];
     if (mainIncome) {
@@ -713,9 +786,10 @@ export function FinancialDashboardPage() {
         title: 'Principal Fuente de Recursos',
         text: (
           <span>
-            <strong>{mainIncome.name}</strong> constituye la mayor vía de captación, representando el <strong>{mainIncome.percentage.toFixed(1)}%</strong> de créditos.
+            <strong>{mainIncome.name}</strong> constituye la mayor vía de captación, representando
+            el <strong>{mainIncome.percentage.toFixed(1)}%</strong> de créditos.
           </span>
-        )
+        ),
       });
 
       if (mainIncome.percentage > 80) {
@@ -724,9 +798,11 @@ export function FinancialDashboardPage() {
           title: 'Riesgo de Concentración de Ingresos',
           text: (
             <span>
-              La empresa tiene una dependencia del <strong>{mainIncome.percentage.toFixed(1)}%</strong> de una sola categoría de ingresos. Se sugiere diversificar cartera.
+              La empresa tiene una dependencia del{' '}
+              <strong>{mainIncome.percentage.toFixed(1)}%</strong> de una sola categoría de
+              ingresos. Se sugiere diversificar cartera.
             </span>
-          )
+          ),
         });
       }
     }
@@ -734,7 +810,7 @@ export function FinancialDashboardPage() {
     // 5. Saldo Mínimo vs Seguridad
     let minBal = Infinity;
     let minBalMonth = '';
-    monthlyAggregatedData.forEach(m => {
+    monthlyAggregatedData.forEach((m) => {
       if (m.cierre < minBal) {
         minBal = m.cierre;
         minBalMonth = m.monthLabel;
@@ -750,9 +826,11 @@ export function FinancialDashboardPage() {
           title: 'Reserva de Seguridad Vulnerada',
           text: (
             <span>
-              En <strong>{minBalMonth}</strong> el saldo cayó a <strong>{formatCurrency(minBal)}</strong>, por debajo del mínimo prudencial de $15,000.
+              En <strong>{minBalMonth}</strong> el saldo cayó a{' '}
+              <strong>{formatCurrency(minBal)}</strong>, por debajo del mínimo prudencial de
+              $15,000.
             </span>
-          )
+          ),
         });
       } else {
         structure.push({
@@ -760,9 +838,10 @@ export function FinancialDashboardPage() {
           title: 'Colchón de Seguridad Sólido',
           text: (
             <span>
-              El saldo mínimo se mantuvo en <strong>{formatCurrency(minBal)}</strong>, preservando el colchón mínimo de seguridad.
+              El saldo mínimo se mantuvo en <strong>{formatCurrency(minBal)}</strong>, preservando
+              el colchón mínimo de seguridad.
             </span>
-          )
+          ),
         });
       }
     }
@@ -774,18 +853,20 @@ export function FinancialDashboardPage() {
         title: 'Optimización de Excedentes',
         text: (
           <span>
-            Con un flujo positivo neto de <strong>{formatCurrency(stats.netFlow)}</strong>, existe oportunidad para reinvertir en expansión o liquidar deudas costosas.
+            Con un flujo positivo neto de <strong>{formatCurrency(stats.netFlow)}</strong>, existe
+            oportunidad para reinvertir en expansión o liquidar deudas costosas.
           </span>
-        )
+        ),
       });
       opportunities.push({
         icon: '🏦',
         title: 'Colocaciones Estratégicas',
         text: (
           <span>
-            Se recomienda colocar excedentes temporales en fondos líquidos de bajo riesgo para generar rendimientos pasivos estables.
+            Se recomienda colocar excedentes temporales en fondos líquidos de bajo riesgo para
+            generar rendimientos pasivos estables.
           </span>
-        )
+        ),
       });
     } else {
       opportunities.push({
@@ -793,41 +874,52 @@ export function FinancialDashboardPage() {
         title: 'Control Estricto de Gastos',
         text: (
           <span>
-            El flujo neto del periodo es negativo. Urge renegociar contratos de egresos fijos para restablecer el equilibrio de tesorería.
+            El flujo neto del periodo es negativo. Urge renegociar contratos de egresos fijos para
+            restablecer el equilibrio de tesorería.
           </span>
-        )
+        ),
       });
       opportunities.push({
         icon: '📈',
         title: 'Estrategia de Captación Activa',
         text: (
           <span>
-            Priorizar campañas de captación a corto plazo y acelerar la facturación de servicios pendientes para inyectar liquidez inmediata.
+            Priorizar campañas de captación a corto plazo y acelerar la facturación de servicios
+            pendientes para inyectar liquidez inmediata.
           </span>
-        )
+        ),
       });
     }
 
-    const pendingCount = dbTransactions.filter(t => !t.conciliado).length;
+    const pendingCount = dbTransactions.filter((t) => !t.conciliado).length;
     if (pendingCount > 0) {
       opportunities.push({
         icon: '🎯',
         title: 'Optimización Contable',
         text: (
           <span>
-            Hay <strong>{pendingCount} transacciones pendientes</strong> por conciliar. Completar la conciliación mejorará la precisión del balance fiscal.
+            Hay <strong>{pendingCount} transacciones pendientes</strong> por conciliar. Completar la
+            conciliación mejorará la precisión del balance fiscal.
           </span>
-        )
+        ),
       });
     }
 
     return { alerts, structure, opportunities };
-  }, [monthlyAggregatedData, stats.finalBalance, initialBalanceInput, expensesByCategoryData, incomeByCategoryData, dbTransactions, stats.netFlow]);
+  }, [
+    monthlyAggregatedData,
+    stats.finalBalance,
+    initialBalanceInput,
+    expensesByCategoryData,
+    incomeByCategoryData,
+    dbTransactions,
+    stats.netFlow,
+  ]);
 
   // --- FILTERS TOGGLE HANDLERS ---
   const toggleAllMonths = (checked: boolean) => {
     if (checked) {
-      setSelectedMonths(new Set(MONTHS_SPANISH.map(m => m.key)));
+      setSelectedMonths(new Set(MONTHS_SPANISH.map((m) => m.key)));
     } else {
       setSelectedMonths(new Set());
     }
@@ -867,13 +959,13 @@ export function FinancialDashboardPage() {
   const clearFilters = () => {
     setFilterReconciliation('all');
     if (dbTransactions.length > 0) {
-      const dates = dbTransactions.map(t => t.fecha).sort();
+      const dates = dbTransactions.map((t) => t.fecha).sort();
       setFilterStartDate(dates[0]);
       setFilterEndDate(dates[dates.length - 1]);
     }
     setFilterYear('all');
     setInitialBalanceInput(apiInitialBalance.current);
-    setSelectedMonths(new Set(MONTHS_SPANISH.map(m => m.key)));
+    setSelectedMonths(new Set(MONTHS_SPANISH.map((m) => m.key)));
     setSelectedIncomeCategories(new Set(allIncomeCategories));
     setSelectedExpenseCategories(new Set(allExpenseCategories));
   };
@@ -882,7 +974,7 @@ export function FinancialDashboardPage() {
   const handleExportClassified = () => {
     if (filteredTransactions.length === 0) return;
     let csv = '\uFEFFfecha,descripcion,monto,tipo,cuenta_contable,conciliado,categoria,mes\n';
-    filteredTransactions.forEach(t => {
+    filteredTransactions.forEach((t) => {
       const month = t.fecha.substring(0, 7);
       const descEscaped = `"${(t.descripcion || '').replace(/"/g, '""')}"`;
       const ctaEscaped = `"${(t.cuenta_contable || '').replace(/"/g, '""')}"`;
@@ -896,7 +988,7 @@ export function FinancialDashboardPage() {
   const handleExportSummary = () => {
     if (monthlyAggregatedData.length === 0) return;
     let csv = '\uFEFFmes,ingresos,egresos,flujo_neto,saldo_cierre,saldo_promedio\n';
-    monthlyAggregatedData.forEach(m => {
+    monthlyAggregatedData.forEach((m) => {
       csv += `${m.monthKey},${m.ingresos.toFixed(2)},${m.gastos.toFixed(2)},${m.netFlow.toFixed(2)},${m.cierre.toFixed(2)},${m.promedio.toFixed(2)}\n`;
     });
 
@@ -933,9 +1025,12 @@ export function FinancialDashboardPage() {
           <Database className="w-16 h-16 text-slate-400 dark:text-slate-500 mx-auto" />
         </div>
         <div className="space-y-2">
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white">Sin transacciones importadas</h2>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+            Sin transacciones importadas
+          </h2>
           <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md">
-            No hay transacciones importadas. Importa un estado de cuenta bancario para ver el dashboard financiero.
+            No hay transacciones importadas. Importa un estado de cuenta bancario para ver el
+            dashboard financiero.
           </p>
         </div>
         <Button
@@ -1019,7 +1114,9 @@ export function FinancialDashboardPage() {
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4 mb-6">
               <div className="flex items-center gap-2">
                 <Filter className="w-4.5 h-4.5 text-teal-500" />
-                <h3 className="font-bold text-slate-950 dark:text-slate-50 text-sm uppercase tracking-wider">Filtros Dinámicos de Consulta</h3>
+                <h3 className="font-bold text-slate-950 dark:text-slate-50 text-sm uppercase tracking-wider">
+                  Filtros Dinámicos de Consulta
+                </h3>
               </div>
               <div className="flex items-center gap-3">
                 <Button
@@ -1036,7 +1133,9 @@ export function FinancialDashboardPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {/* Reconciliation Filter */}
               <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Estado Conciliación</label>
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+                  Estado Conciliación
+                </label>
                 <select
                   value={filterReconciliation}
                   onChange={(e: any) => setFilterReconciliation(e.target.value)}
@@ -1050,7 +1149,9 @@ export function FinancialDashboardPage() {
 
               {/* Start Date */}
               <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Fecha Inicio</label>
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+                  Fecha Inicio
+                </label>
                 <div className="relative">
                   <input
                     type="date"
@@ -1063,7 +1164,9 @@ export function FinancialDashboardPage() {
 
               {/* End Date */}
               <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Fecha Fin</label>
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+                  Fecha Fin
+                </label>
                 <input
                   type="date"
                   value={filterEndDate}
@@ -1074,7 +1177,9 @@ export function FinancialDashboardPage() {
 
               {/* Initial Balance */}
               <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Saldo Inicial ($)</label>
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+                  Saldo Inicial ($)
+                </label>
                 <input
                   type="number"
                   value={initialBalanceInput}
@@ -1089,7 +1194,9 @@ export function FinancialDashboardPage() {
               {/* Months filter */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Meses Seleccionados</span>
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+                    Meses Seleccionados
+                  </span>
                   <label className="flex items-center gap-1 text-[10px] font-bold text-teal-600 dark:text-teal-400 uppercase cursor-pointer select-none">
                     <input
                       type="checkbox"
@@ -1101,7 +1208,7 @@ export function FinancialDashboardPage() {
                   </label>
                 </div>
                 <div className="grid grid-cols-4 gap-2 bg-white dark:bg-slate-950/60 p-3 rounded-2xl border border-slate-200 dark:border-slate-800/80">
-                  {MONTHS_SPANISH.map(m => {
+                  {MONTHS_SPANISH.map((m) => {
                     const isChecked = selectedMonths.has(m.key);
                     return (
                       <label
@@ -1124,7 +1231,9 @@ export function FinancialDashboardPage() {
               {/* Income Categories */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Categorías de Ingresos</span>
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+                    Categorías de Ingresos
+                  </span>
                   <label className="flex items-center gap-1 text-[10px] font-bold text-teal-600 dark:text-teal-400 uppercase cursor-pointer select-none">
                     <input
                       type="checkbox"
@@ -1136,8 +1245,11 @@ export function FinancialDashboardPage() {
                   </label>
                 </div>
                 <div className="max-h-[120px] overflow-y-auto space-y-1 bg-white dark:bg-slate-950/60 p-3 rounded-2xl border border-slate-200 dark:border-slate-800/80">
-                  {allIncomeCategories.map(cat => (
-                    <label key={cat} className="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                  {allIncomeCategories.map((cat) => (
+                    <label
+                      key={cat}
+                      className="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer"
+                    >
                       <input
                         type="checkbox"
                         checked={selectedIncomeCategories.has(cat)}
@@ -1153,7 +1265,9 @@ export function FinancialDashboardPage() {
               {/* Expense Categories */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Categorías de Egresos</span>
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+                    Categorías de Egresos
+                  </span>
                   <label className="flex items-center gap-1 text-[10px] font-bold text-teal-600 dark:text-teal-400 uppercase cursor-pointer select-none">
                     <input
                       type="checkbox"
@@ -1165,8 +1279,11 @@ export function FinancialDashboardPage() {
                   </label>
                 </div>
                 <div className="max-h-[120px] overflow-y-auto space-y-1 bg-white dark:bg-slate-950/60 p-3 rounded-2xl border border-slate-200 dark:border-slate-800/80">
-                  {allExpenseCategories.map(cat => (
-                    <label key={cat} className="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                  {allExpenseCategories.map((cat) => (
+                    <label
+                      key={cat}
+                      className="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer"
+                    >
                       <input
                         type="checkbox"
                         checked={selectedExpenseCategories.has(cat)}
@@ -1182,15 +1299,17 @@ export function FinancialDashboardPage() {
 
             {/* Quick Metrics Info */}
             <div className="flex flex-wrap items-center gap-4 mt-6 pt-4 border-t border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-500">
-              <span className="bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full">{dbTransactions.length} transacciones en total</span>
+              <span className="bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full">
+                {dbTransactions.length} transacciones en total
+              </span>
               <span className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-3 py-1 rounded-full font-bold">
                 {filteredTransactions.length} transacciones filtradas
               </span>
               <span className="bg-teal-500/10 text-teal-600 dark:text-teal-400 px-3 py-1 rounded-full font-bold">
-                {dbTransactions.filter(t => t.conciliado).length} conciliadas en el sistema
+                {dbTransactions.filter((t) => t.conciliado).length} conciliadas en el sistema
               </span>
               <span className="bg-rose-500/10 text-rose-600 dark:text-rose-400 px-3 py-1 rounded-full font-bold">
-                {dbTransactions.filter(t => !t.conciliado).length} pendientes
+                {dbTransactions.filter((t) => !t.conciliado).length} pendientes
               </span>
             </div>
           </motion.div>
@@ -1199,46 +1318,156 @@ export function FinancialDashboardPage() {
 
       {/* KPI METRIC CARDS GRID (6 Cards) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-5">
-        <PremiumCard title="Ingresos Totales" value={formatCurrency(stats.revenue)} trend="+10.4%" isUp={true} color="teal" />
-        <PremiumCard title="Egresos Totales" value={formatCurrency(stats.expenses)} trend="+8.2%" isUp={false} color="rose" />
-        <PremiumCard title="Flujo Neto" value={formatCurrency(stats.netFlow)} trend="" isUp={stats.netFlow >= 0} color="emerald" isSpecialColor={true} />
-        <PremiumCard title="Saldo Inicial" value={formatCurrency(initialBalanceInput)} trend="" isUp={true} color="blue" />
-        <PremiumCard title="Saldo Final" value={formatCurrency(stats.finalBalance)} trend="" isUp={stats.finalBalance >= initialBalanceInput} color="teal" isSpecialBalance={true} isDrop={stats.finalBalance < initialBalanceInput} />
-        <PremiumCard title="Comisión Bancaria" value={formatCurrency(stats.commissions)} trend="" isUp={false} color="gray" />
+        <PremiumCard
+          title="Ingresos Totales"
+          value={formatCurrency(stats.revenue)}
+          trend="+10.4%"
+          isUp={true}
+          color="teal"
+        />
+        <PremiumCard
+          title="Egresos Totales"
+          value={formatCurrency(stats.expenses)}
+          trend="+8.2%"
+          isUp={false}
+          color="rose"
+        />
+        <PremiumCard
+          title="Flujo Neto"
+          value={formatCurrency(stats.netFlow)}
+          trend=""
+          isUp={stats.netFlow >= 0}
+          color="emerald"
+          isSpecialColor={true}
+        />
+        <PremiumCard
+          title="Saldo Inicial"
+          value={formatCurrency(initialBalanceInput)}
+          trend=""
+          isUp={true}
+          color="blue"
+        />
+        <PremiumCard
+          title="Saldo Final"
+          value={formatCurrency(stats.finalBalance)}
+          trend=""
+          isUp={stats.finalBalance >= initialBalanceInput}
+          color="teal"
+          isSpecialBalance={true}
+          isDrop={stats.finalBalance < initialBalanceInput}
+        />
+        <PremiumCard
+          title="Comisión Bancaria"
+          value={formatCurrency(stats.commissions)}
+          trend=""
+          isUp={false}
+          color="gray"
+        />
       </div>
 
       {/* --- GRAPHICS GRID (10 Charts) --- */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-        
         {/* Chart 1: Ingresos vs Egresos por Mes */}
-        <ChartBox title="Ingresos vs. egresos por mes" subtitle="Comparativo mensual de flujos monetarios">
+        <ChartBox
+          title="Ingresos vs. egresos por mes"
+          subtitle="Comparativo mensual de flujos monetarios"
+        >
           <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={monthlyAggregatedData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(128,128,128,0.12)" />
-              <XAxis dataKey="monthLabel" stroke="#888780" fontSize={10} axisLine={false} tickLine={false} />
-              <YAxis stroke="#888780" fontSize={10} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v/1000}k`} />
-              <Tooltip formatter={(value: any) => formatCurrency(value)} contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '1rem', color: '#fff' }} />
+            <BarChart
+              data={monthlyAggregatedData}
+              margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+            >
+              <CartesianGrid
+                strokeDasharray="3 3"
+                vertical={false}
+                stroke="rgba(128,128,128,0.12)"
+              />
+              <XAxis
+                dataKey="monthLabel"
+                stroke="#888780"
+                fontSize={10}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                stroke="#888780"
+                fontSize={10}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(v) => `$${v / 1000}k`}
+              />
+              <Tooltip
+                formatter={(value: any) => formatCurrency(value)}
+                contentStyle={{
+                  backgroundColor: '#0f172a',
+                  border: 'none',
+                  borderRadius: '1rem',
+                  color: '#fff',
+                }}
+              />
               <Legend verticalAlign="top" height={36} iconType="circle" />
-              <Bar dataKey="ingresos" fill={PALETTE.verde} name="Ingresos" radius={[4, 4, 0, 0]} barSize={16} />
-              <Bar dataKey="gastos" fill={PALETTE.rojo} name="Egresos" radius={[4, 4, 0, 0]} barSize={16} />
+              <Bar
+                dataKey="ingresos"
+                fill={PALETTE.verde}
+                name="Ingresos"
+                radius={[4, 4, 0, 0]}
+                barSize={16}
+              />
+              <Bar
+                dataKey="gastos"
+                fill={PALETTE.rojo}
+                name="Egresos"
+                radius={[4, 4, 0, 0]}
+                barSize={16}
+              />
             </BarChart>
           </ResponsiveContainer>
         </ChartBox>
 
         {/* Chart 2: Evolución del saldo al cierre */}
-        <ChartBox title="Evolución del saldo al cierre mensual" subtitle="Dinámica del balance de tesorería consolidado con saldo mínimo">
+        <ChartBox
+          title="Evolución del saldo al cierre mensual"
+          subtitle="Dinámica del balance de tesorería consolidado con saldo mínimo"
+        >
           <ResponsiveContainer width="100%" height={240}>
-            <AreaChart data={monthlyAggregatedData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+            <AreaChart
+              data={monthlyAggregatedData}
+              margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+            >
               <defs>
                 <linearGradient id="areaBal" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor={PALETTE.azul} stopOpacity={0.2} />
                   <stop offset="95%" stopColor={PALETTE.azul} stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(128,128,128,0.12)" />
-              <XAxis dataKey="monthLabel" stroke="#888780" fontSize={10} axisLine={false} tickLine={false} />
-              <YAxis stroke="#888780" fontSize={10} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v/1000}k`} />
-              <Tooltip formatter={(value: any) => formatCurrency(value)} contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '1rem', color: '#fff' }} />
+              <CartesianGrid
+                strokeDasharray="3 3"
+                vertical={false}
+                stroke="rgba(128,128,128,0.12)"
+              />
+              <XAxis
+                dataKey="monthLabel"
+                stroke="#888780"
+                fontSize={10}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                stroke="#888780"
+                fontSize={10}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(v) => `$${v / 1000}k`}
+              />
+              <Tooltip
+                formatter={(value: any) => formatCurrency(value)}
+                contentStyle={{
+                  backgroundColor: '#0f172a',
+                  border: 'none',
+                  borderRadius: '1rem',
+                  color: '#fff',
+                }}
+              />
               <Area
                 type="monotone"
                 dataKey="cierre"
@@ -1250,7 +1479,15 @@ export function FinancialDashboardPage() {
                   const { cx, cy, payload } = props;
                   if (payload.monthKey === minCierreMonth) {
                     return (
-                      <circle key={payload.monthKey} cx={cx} cy={cy} r={6} fill={PALETTE.rojo} stroke="#fff" strokeWidth={2} />
+                      <circle
+                        key={payload.monthKey}
+                        cx={cx}
+                        cy={cy}
+                        r={6}
+                        fill={PALETTE.rojo}
+                        stroke="#fff"
+                        strokeWidth={2}
+                      />
                     );
                   }
                   return <path d="" />;
@@ -1261,12 +1498,15 @@ export function FinancialDashboardPage() {
         </ChartBox>
 
         {/* Chart 3: Distribución de egresos */}
-        <ChartBox title="Distribución de egresos por categoría" subtitle="Composición relativa del egreso acumulado">
+        <ChartBox
+          title="Distribución de egresos por categoría"
+          subtitle="Composición relativa del egreso acumulado"
+        >
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <ResponsiveContainer width="100%" height={200} className="max-w-[200px]">
               <PieChart>
                 <Pie
-                  data={expensesByCategoryData.filter(d => d.value > 0)}
+                  data={expensesByCategoryData.filter((d) => d.value > 0)}
                   cx="50%"
                   cy="50%"
                   innerRadius={60}
@@ -1274,19 +1514,28 @@ export function FinancialDashboardPage() {
                   paddingAngle={3}
                   dataKey="value"
                 >
-                  {expensesByCategoryData.filter(d => d.value > 0).map((entry, idx) => (
-                    <Cell key={`cell-${idx}`} fill={entry.color} />
-                  ))}
+                  {expensesByCategoryData
+                    .filter((d) => d.value > 0)
+                    .map((entry, idx) => (
+                      <Cell key={`cell-${idx}`} fill={entry.color} />
+                    ))}
                 </Pie>
                 <Tooltip formatter={(value: any) => formatCurrency(value)} />
               </PieChart>
             </ResponsiveContainer>
             <div className="flex-1 grid grid-cols-2 gap-x-4 gap-y-2">
-              {expensesByCategoryData.map(c => (
+              {expensesByCategoryData.map((c) => (
                 <div key={c.name} className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: c.color }} />
-                  <span className="text-xs font-medium text-slate-600 dark:text-slate-300 truncate max-w-[140px]">{c.name}</span>
-                  <span className="text-[10px] font-bold text-slate-400 ml-auto">{c.percentage.toFixed(1)}%</span>
+                  <div
+                    className="w-3 h-3 rounded-full shrink-0"
+                    style={{ backgroundColor: c.color }}
+                  />
+                  <span className="text-xs font-medium text-slate-600 dark:text-slate-300 truncate max-w-[140px]">
+                    {c.name}
+                  </span>
+                  <span className="text-[10px] font-bold text-slate-400 ml-auto">
+                    {c.percentage.toFixed(1)}%
+                  </span>
                 </div>
               ))}
             </div>
@@ -1294,12 +1543,15 @@ export function FinancialDashboardPage() {
         </ChartBox>
 
         {/* Chart 4: Distribución de ingresos */}
-        <ChartBox title="Distribución de ingresos por fuente" subtitle="Origen y dispersión de créditos en cuenta">
+        <ChartBox
+          title="Distribución de ingresos por fuente"
+          subtitle="Origen y dispersión de créditos en cuenta"
+        >
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <ResponsiveContainer width="100%" height={200} className="max-w-[200px]">
               <PieChart>
                 <Pie
-                  data={incomeByCategoryData.filter(d => d.value > 0)}
+                  data={incomeByCategoryData.filter((d) => d.value > 0)}
                   cx="50%"
                   cy="50%"
                   innerRadius={60}
@@ -1307,19 +1559,28 @@ export function FinancialDashboardPage() {
                   paddingAngle={3}
                   dataKey="value"
                 >
-                  {incomeByCategoryData.filter(d => d.value > 0).map((entry, idx) => (
-                    <Cell key={`cell-${idx}`} fill={entry.color} />
-                  ))}
+                  {incomeByCategoryData
+                    .filter((d) => d.value > 0)
+                    .map((entry, idx) => (
+                      <Cell key={`cell-${idx}`} fill={entry.color} />
+                    ))}
                 </Pie>
                 <Tooltip formatter={(value: any) => formatCurrency(value)} />
               </PieChart>
             </ResponsiveContainer>
             <div className="flex-1 grid grid-cols-2 gap-x-4 gap-y-2">
-              {incomeByCategoryData.map(c => (
+              {incomeByCategoryData.map((c) => (
                 <div key={c.name} className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: c.color }} />
-                  <span className="text-xs font-medium text-slate-600 dark:text-slate-300 truncate max-w-[140px]">{c.name}</span>
-                  <span className="text-[10px] font-bold text-slate-400 ml-auto">{c.percentage.toFixed(1)}%</span>
+                  <div
+                    className="w-3 h-3 rounded-full shrink-0"
+                    style={{ backgroundColor: c.color }}
+                  />
+                  <span className="text-xs font-medium text-slate-600 dark:text-slate-300 truncate max-w-[140px]">
+                    {c.name}
+                  </span>
+                  <span className="text-[10px] font-bold text-slate-400 ml-auto">
+                    {c.percentage.toFixed(1)}%
+                  </span>
                 </div>
               ))}
             </div>
@@ -1327,16 +1588,49 @@ export function FinancialDashboardPage() {
         </ChartBox>
 
         {/* Chart 5: Flujo Neto Mensual */}
-        <ChartBox title="Flujo neto mensual (ingresos − egresos)" subtitle="Capacidad de retención de efectivo mes a mes">
+        <ChartBox
+          title="Flujo neto mensual (ingresos − egresos)"
+          subtitle="Capacidad de retención de efectivo mes a mes"
+        >
           <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={monthlyAggregatedData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(128,128,128,0.12)" />
-              <XAxis dataKey="monthLabel" stroke="#888780" fontSize={10} axisLine={false} tickLine={false} />
-              <YAxis stroke="#888780" fontSize={10} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v/1000}k`} />
-              <Tooltip formatter={(value: any) => formatCurrency(value)} contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '1rem', color: '#fff' }} />
+            <BarChart
+              data={monthlyAggregatedData}
+              margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+            >
+              <CartesianGrid
+                strokeDasharray="3 3"
+                vertical={false}
+                stroke="rgba(128,128,128,0.12)"
+              />
+              <XAxis
+                dataKey="monthLabel"
+                stroke="#888780"
+                fontSize={10}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                stroke="#888780"
+                fontSize={10}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(v) => `$${v / 1000}k`}
+              />
+              <Tooltip
+                formatter={(value: any) => formatCurrency(value)}
+                contentStyle={{
+                  backgroundColor: '#0f172a',
+                  border: 'none',
+                  borderRadius: '1rem',
+                  color: '#fff',
+                }}
+              />
               <Bar dataKey="netFlow" radius={[4, 4, 0, 0]} barSize={20}>
                 {monthlyAggregatedData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.netFlow >= 0 ? PALETTE.verdeClaro : PALETTE.rojoClaro} />
+                  <Cell
+                    key={`cell-${index}`}
+                    fill={entry.netFlow >= 0 ? PALETTE.verdeClaro : PALETTE.rojoClaro}
+                  />
                 ))}
               </Bar>
             </BarChart>
@@ -1349,23 +1643,70 @@ export function FinancialDashboardPage() {
           subtitle="Histórico mensual de la categoría principal de egresos operacionales"
         >
           <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={topExpenseCategoryData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(128,128,128,0.12)" />
-              <XAxis dataKey="month" stroke="#888780" fontSize={10} axisLine={false} tickLine={false} />
-              <YAxis stroke="#888780" fontSize={10} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v/1000}k`} />
+            <BarChart
+              data={topExpenseCategoryData}
+              margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+            >
+              <CartesianGrid
+                strokeDasharray="3 3"
+                vertical={false}
+                stroke="rgba(128,128,128,0.12)"
+              />
+              <XAxis
+                dataKey="month"
+                stroke="#888780"
+                fontSize={10}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                stroke="#888780"
+                fontSize={10}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(v) => `$${v / 1000}k`}
+              />
               <Tooltip formatter={(value: any) => formatCurrency(value)} />
-              <Bar dataKey="Monto" fill={PALETTE.morado} name={topExpenseCategory} radius={[4, 4, 0, 0]} barSize={18} />
+              <Bar
+                dataKey="Monto"
+                fill={PALETTE.morado}
+                name={topExpenseCategory}
+                radius={[4, 4, 0, 0]}
+                barSize={18}
+              />
             </BarChart>
           </ResponsiveContainer>
         </ChartBox>
 
         {/* Chart 7: Gastos recurrentes principales por mes */}
-        <ChartBox title="Gastos recurrentes principales por mes" subtitle="Histórico mensual de las principales salidas operacionales del usuario">
+        <ChartBox
+          title="Gastos recurrentes principales por mes"
+          subtitle="Histórico mensual de las principales salidas operacionales del usuario"
+        >
           <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={recurrentExpensesData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(128,128,128,0.12)" />
-              <XAxis dataKey="month" stroke="#888780" fontSize={10} axisLine={false} tickLine={false} />
-              <YAxis stroke="#888780" fontSize={10} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v/1000}k`} />
+            <BarChart
+              data={recurrentExpensesData}
+              margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+            >
+              <CartesianGrid
+                strokeDasharray="3 3"
+                vertical={false}
+                stroke="rgba(128,128,128,0.12)"
+              />
+              <XAxis
+                dataKey="month"
+                stroke="#888780"
+                fontSize={10}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                stroke="#888780"
+                fontSize={10}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(v) => `$${v / 1000}k`}
+              />
               <Tooltip formatter={(value: any) => formatCurrency(value)} />
               <Legend verticalAlign="top" height={36} iconType="circle" />
               {top3ExpenseCategories.map((cat, idx) => {
@@ -1389,12 +1730,34 @@ export function FinancialDashboardPage() {
         </ChartBox>
 
         {/* Chart 8: Tendencia de principales fuentes de ingresos */}
-        <ChartBox title="Tendencia de principales fuentes de ingresos" subtitle="Desempeño mensual de los créditos mayores registrados">
+        <ChartBox
+          title="Tendencia de principales fuentes de ingresos"
+          subtitle="Desempeño mensual de los créditos mayores registrados"
+        >
           <ResponsiveContainer width="100%" height={240}>
-            <LineChart data={platformIncomeData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(128,128,128,0.12)" />
-              <XAxis dataKey="month" stroke="#888780" fontSize={10} axisLine={false} tickLine={false} />
-              <YAxis stroke="#888780" fontSize={10} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v/1000}k`} />
+            <LineChart
+              data={platformIncomeData}
+              margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+            >
+              <CartesianGrid
+                strokeDasharray="3 3"
+                vertical={false}
+                stroke="rgba(128,128,128,0.12)"
+              />
+              <XAxis
+                dataKey="month"
+                stroke="#888780"
+                fontSize={10}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                stroke="#888780"
+                fontSize={10}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(v) => `$${v / 1000}k`}
+              />
               <Tooltip formatter={(value: any) => formatCurrency(value)} />
               <Legend verticalAlign="top" height={36} iconType="circle" />
               {top3IncomeCategories.map((cat, idx) => {
@@ -1413,21 +1776,60 @@ export function FinancialDashboardPage() {
                 );
               })}
               {top3IncomeCategories.length === 0 && (
-                <Line type="monotone" dataKey="Sin asignar" stroke={PALETTE.gris} name="Sin ingresos a clasificar" />
+                <Line
+                  type="monotone"
+                  dataKey="Sin asignar"
+                  stroke={PALETTE.gris}
+                  name="Sin ingresos a clasificar"
+                />
               )}
             </LineChart>
           </ResponsiveContainer>
         </ChartBox>
 
         {/* Chart 9: Saldo Promedio Mensual */}
-        <ChartBox title="Saldo promedio mensual" subtitle="Promedio del saldo diario con umbral de seguridad">
+        <ChartBox
+          title="Saldo promedio mensual"
+          subtitle="Promedio del saldo diario con umbral de seguridad"
+        >
           <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={monthlyAggregatedData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(128,128,128,0.12)" />
-              <XAxis dataKey="monthLabel" stroke="#888780" fontSize={10} axisLine={false} tickLine={false} />
-              <YAxis stroke="#888780" fontSize={10} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v/1000}k`} />
+            <BarChart
+              data={monthlyAggregatedData}
+              margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+            >
+              <CartesianGrid
+                strokeDasharray="3 3"
+                vertical={false}
+                stroke="rgba(128,128,128,0.12)"
+              />
+              <XAxis
+                dataKey="monthLabel"
+                stroke="#888780"
+                fontSize={10}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                stroke="#888780"
+                fontSize={10}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(v) => `$${v / 1000}k`}
+              />
               <Tooltip formatter={(value: any) => formatCurrency(value)} />
-              <ReferenceLine y={15000} stroke={PALETTE.rojo} strokeWidth={1.5} strokeDasharray="6 4" label={{ value: 'Umbral Mínimo $15,000', position: 'top', fill: PALETTE.rojo, fontSize: 10, fontWeight: 'bold' }} />
+              <ReferenceLine
+                y={15000}
+                stroke={PALETTE.rojo}
+                strokeWidth={1.5}
+                strokeDasharray="6 4"
+                label={{
+                  value: 'Umbral Mínimo $15,000',
+                  position: 'top',
+                  fill: PALETTE.rojo,
+                  fontSize: 10,
+                  fontWeight: 'bold',
+                }}
+              />
               <Bar dataKey="promedio" radius={[4, 4, 0, 0]} barSize={20}>
                 {monthlyAggregatedData.map((entry, index) => {
                   const val = entry.promedio;
@@ -1447,18 +1849,42 @@ export function FinancialDashboardPage() {
           subtitle="Comparativa del principal ingreso frente a otras fuentes secundarias"
         >
           <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={rentasVsOperacionesData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(128,128,128,0.12)" />
-              <XAxis dataKey="month" stroke="#888780" fontSize={10} axisLine={false} tickLine={false} />
-              <YAxis stroke="#888780" fontSize={10} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v/1000}k`} />
+            <BarChart
+              data={rentasVsOperacionesData}
+              margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+            >
+              <CartesianGrid
+                strokeDasharray="3 3"
+                vertical={false}
+                stroke="rgba(128,128,128,0.12)"
+              />
+              <XAxis
+                dataKey="month"
+                stroke="#888780"
+                fontSize={10}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                stroke="#888780"
+                fontSize={10}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(v) => `$${v / 1000}k`}
+              />
               <Tooltip formatter={(value: any) => formatCurrency(value)} />
               <Legend verticalAlign="top" height={36} iconType="circle" />
               <Bar dataKey="Rentas" stackId="a" fill={PALETTE.verde} name={topIncomeCategory} />
-              <Bar dataKey="Operaciones" stackId="a" fill={PALETTE.morado} name="Otros ingresos" radius={[4, 4, 0, 0]} />
+              <Bar
+                dataKey="Operaciones"
+                stackId="a"
+                fill={PALETTE.morado}
+                name="Otros ingresos"
+                radius={[4, 4, 0, 0]}
+              />
             </BarChart>
           </ResponsiveContainer>
         </ChartBox>
-
       </div>
 
       {/* AUTOMATED CONCLUSIONS & ALERTS GROUPED */}
@@ -1475,14 +1901,23 @@ export function FinancialDashboardPage() {
           </div>
           <div className="flex-1 space-y-4">
             {categorizedConclusions.alerts.length === 0 ? (
-              <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 italic uppercase">Sin alertas críticas detectadas</p>
+              <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 italic uppercase">
+                Sin alertas críticas detectadas
+              </p>
             ) : (
               categorizedConclusions.alerts.map((conc, idx) => (
-                <div key={idx} className="flex gap-3 items-start p-3 bg-rose-500/5 border border-rose-500/10 rounded-xl">
+                <div
+                  key={idx}
+                  className="flex gap-3 items-start p-3 bg-rose-500/5 border border-rose-500/10 rounded-xl"
+                >
                   <span className="text-lg leading-none shrink-0">{conc.icon}</span>
                   <div className="space-y-1">
-                    <h4 className="text-xs font-extrabold text-rose-800 dark:text-rose-400 uppercase tracking-wider">{conc.title}</h4>
-                    <p className="text-xs font-medium text-slate-600 dark:text-slate-300 leading-relaxed">{conc.text}</p>
+                    <h4 className="text-xs font-extrabold text-rose-800 dark:text-rose-400 uppercase tracking-wider">
+                      {conc.title}
+                    </h4>
+                    <p className="text-xs font-medium text-slate-600 dark:text-slate-300 leading-relaxed">
+                      {conc.text}
+                    </p>
                   </div>
                 </div>
               ))
@@ -1502,11 +1937,18 @@ export function FinancialDashboardPage() {
           </div>
           <div className="flex-1 space-y-4">
             {categorizedConclusions.structure.map((conc, idx) => (
-              <div key={idx} className="flex gap-3 items-start p-3 bg-teal-500/5 border border-teal-500/10 rounded-xl">
+              <div
+                key={idx}
+                className="flex gap-3 items-start p-3 bg-teal-500/5 border border-teal-500/10 rounded-xl"
+              >
                 <span className="text-lg leading-none shrink-0">{conc.icon}</span>
                 <div className="space-y-1">
-                  <h4 className="text-xs font-extrabold text-teal-800 dark:text-teal-400 uppercase tracking-wider">{conc.title}</h4>
-                  <p className="text-xs font-medium text-slate-600 dark:text-slate-300 leading-relaxed">{conc.text}</p>
+                  <h4 className="text-xs font-extrabold text-teal-800 dark:text-teal-400 uppercase tracking-wider">
+                    {conc.title}
+                  </h4>
+                  <p className="text-xs font-medium text-slate-600 dark:text-slate-300 leading-relaxed">
+                    {conc.text}
+                  </p>
                 </div>
               </div>
             ))}
@@ -1525,11 +1967,18 @@ export function FinancialDashboardPage() {
           </div>
           <div className="flex-1 space-y-4">
             {categorizedConclusions.opportunities.map((conc, idx) => (
-              <div key={idx} className="flex gap-3 items-start p-3 bg-emerald-500/5 border border-emerald-500/10 rounded-xl">
+              <div
+                key={idx}
+                className="flex gap-3 items-start p-3 bg-emerald-500/5 border border-emerald-500/10 rounded-xl"
+              >
                 <span className="text-lg leading-none shrink-0">{conc.icon}</span>
                 <div className="space-y-1">
-                  <h4 className="text-xs font-extrabold text-emerald-800 dark:text-emerald-400 uppercase tracking-wider">{conc.title}</h4>
-                  <p className="text-xs font-medium text-slate-600 dark:text-slate-300 leading-relaxed">{conc.text}</p>
+                  <h4 className="text-xs font-extrabold text-emerald-800 dark:text-emerald-400 uppercase tracking-wider">
+                    {conc.title}
+                  </h4>
+                  <p className="text-xs font-medium text-slate-600 dark:text-slate-300 leading-relaxed">
+                    {conc.text}
+                  </p>
                 </div>
               </div>
             ))}
@@ -1589,7 +2038,10 @@ export function FinancialDashboardPage() {
               Estructura del archivo requerida
             </h3>
             <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
-              El motor de conciliación y el dashboard financiero importan archivos de extractos bancarios en formatos <strong>CSV</strong>, <strong>OFX</strong> y <strong>QFX</strong>. Al importar un archivo CSV, asegúrate de mapear o estructurar las siguientes columnas básicas:
+              El motor de conciliación y el dashboard financiero importan archivos de extractos
+              bancarios en formatos <strong>CSV</strong>, <strong>OFX</strong> y{' '}
+              <strong>QFX</strong>. Al importar un archivo CSV, asegúrate de mapear o estructurar
+              las siguientes columnas básicas:
             </p>
 
             <div className="overflow-hidden border border-slate-200 dark:border-slate-800 rounded-2xl mb-6">
@@ -1605,32 +2057,50 @@ export function FinancialDashboardPage() {
                   <tr>
                     <td className="px-4 py-3 font-bold text-slate-900 dark:text-white">fecha</td>
                     <td className="px-4 py-3">Texto</td>
-                    <td className="px-4 py-3">Fecha de la transacción (YYYY-MM-DD, MM/DD/YYYY o DD/MM/YYYY).</td>
+                    <td className="px-4 py-3">
+                      Fecha de la transacción (YYYY-MM-DD, MM/DD/YYYY o DD/MM/YYYY).
+                    </td>
                   </tr>
                   <tr>
-                    <td className="px-4 py-3 font-bold text-slate-900 dark:text-white">descripcion</td>
+                    <td className="px-4 py-3 font-bold text-slate-900 dark:text-white">
+                      descripcion
+                    </td>
                     <td className="px-4 py-3">Texto</td>
-                    <td className="px-4 py-3">Concepto, beneficiario o descripción detallada de la transacción.</td>
+                    <td className="px-4 py-3">
+                      Concepto, beneficiario o descripción detallada de la transacción.
+                    </td>
                   </tr>
                   <tr>
                     <td className="px-4 py-3 font-bold text-slate-900 dark:text-white">monto</td>
                     <td className="px-4 py-3">Número</td>
-                    <td className="px-4 py-3">Valor numérico de la transacción (debitos negativos, creditos positivos).</td>
+                    <td className="px-4 py-3">
+                      Valor numérico de la transacción (debitos negativos, creditos positivos).
+                    </td>
                   </tr>
                   <tr>
                     <td className="px-4 py-3 font-bold text-slate-900 dark:text-white">tipo</td>
                     <td className="px-4 py-3">Texto</td>
-                    <td className="px-4 py-3">Dirección del flujo ("credito" o "debito"). Opcional si el monto tiene signo.</td>
+                    <td className="px-4 py-3">
+                      Dirección del flujo ("credito" o "debito"). Opcional si el monto tiene signo.
+                    </td>
                   </tr>
                   <tr>
-                    <td className="px-4 py-3 font-bold text-slate-900 dark:text-white">cuenta_contable</td>
+                    <td className="px-4 py-3 font-bold text-slate-900 dark:text-white">
+                      cuenta_contable
+                    </td>
                     <td className="px-4 py-3">Texto</td>
-                    <td className="px-4 py-3">Código contable o cuenta del catálogo asociada (opcional).</td>
+                    <td className="px-4 py-3">
+                      Código contable o cuenta del catálogo asociada (opcional).
+                    </td>
                   </tr>
                   <tr>
-                    <td className="px-4 py-3 font-bold text-slate-900 dark:text-white">conciliado</td>
+                    <td className="px-4 py-3 font-bold text-slate-900 dark:text-white">
+                      conciliado
+                    </td>
                     <td className="px-4 py-3">Booleano</td>
-                    <td className="px-4 py-3">"si"/"no", "true"/"false" o "1"/"0" (opcional, por defecto "no").</td>
+                    <td className="px-4 py-3">
+                      "si"/"no", "true"/"false" o "1"/"0" (opcional, por defecto "no").
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -1638,12 +2108,13 @@ export function FinancialDashboardPage() {
 
             <p className="text-xs text-slate-400 font-medium flex items-start gap-1.5">
               <Info className="w-4 h-4 shrink-0 text-teal-500" />
-              El sistema cuenta con un motor de tolerancia inteligente para inferir campos incompletos, corregir formatos de fechas y deducir la clasificación contable en base a reglas dinámicas.
+              El sistema cuenta con un motor de tolerancia inteligente para inferir campos
+              incompletos, corregir formatos de fechas y deducir la clasificación contable en base a
+              reglas dinámicas.
             </p>
           </motion.div>
         </div>
       )}
-
     </div>
   );
 }
@@ -1668,7 +2139,7 @@ function PremiumCard({
   color,
   isSpecialColor = false,
   isSpecialBalance = false,
-  isDrop = false
+  isDrop = false,
 }: PremiumCardProps) {
   const isPositive = isUp;
 
@@ -1682,7 +2153,9 @@ function PremiumCard({
 
   const getDynamicColor = () => {
     if (isSpecialColor) {
-      return isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400';
+      return isPositive
+        ? 'text-emerald-600 dark:text-emerald-400'
+        : 'text-rose-600 dark:text-rose-400';
     }
     if (isSpecialBalance) {
       return isDrop ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white';
@@ -1694,21 +2167,34 @@ function PremiumCard({
     <div className="bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800/80 p-5 rounded-2xl shadow-sm hover:border-slate-300 dark:hover:border-slate-700 transition-all duration-300 relative group overflow-hidden">
       <div className="relative z-10 flex flex-col justify-between h-full space-y-3">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block truncate max-w-[120px]">{title}</span>
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block truncate max-w-[120px]">
+            {title}
+          </span>
           {trend && (
-            <div className={`flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider ${isPositive ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-600'}`}>
-              {isPositive ? <ArrowUpRight className="w-2.5 h-2.5" /> : <ArrowDownRight className="w-2.5 h-2.5" />}
+            <div
+              className={`flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider ${isPositive ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-600'}`}
+            >
+              {isPositive ? (
+                <ArrowUpRight className="w-2.5 h-2.5" />
+              ) : (
+                <ArrowDownRight className="w-2.5 h-2.5" />
+              )}
               {trend}
             </div>
           )}
         </div>
 
         <div>
-          <div className={`text-lg font-bold tracking-tight font-mono tabular-nums leading-none truncate ${getDynamicColor()}`}>
+          <div
+            className={`text-lg font-bold tracking-tight font-mono tabular-nums leading-none truncate ${getDynamicColor()}`}
+          >
             {value}
           </div>
           <div className="w-full h-1 bg-slate-100 dark:bg-slate-950 rounded-full overflow-hidden border border-slate-200 dark:border-slate-850 mt-3">
-            <div className={`h-full rounded-full ${isPositive ? 'bg-emerald-500' : 'bg-rose-500'}`} style={{ width: '65%' }}></div>
+            <div
+              className={`h-full rounded-full ${isPositive ? 'bg-emerald-500' : 'bg-rose-500'}`}
+              style={{ width: '65%' }}
+            ></div>
           </div>
         </div>
       </div>
@@ -1726,12 +2212,14 @@ function ChartBox({ title, subtitle, children }: ChartBoxProps) {
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm flex flex-col justify-between">
       <header className="mb-4">
-        <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">{title}</h3>
-        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">{subtitle}</p>
+        <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+          {title}
+        </h3>
+        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+          {subtitle}
+        </p>
       </header>
-      <div className="relative z-10 w-full mt-2">
-        {children}
-      </div>
+      <div className="relative z-10 w-full mt-2">{children}</div>
     </div>
   );
 }

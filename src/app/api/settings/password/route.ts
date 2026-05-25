@@ -9,7 +9,7 @@ import { getSessionUserId } from '@/lib/sessions';
  */
 export async function POST(request: NextRequest) {
   try {
-    const userId = getSessionUserId(request);
+    const userId = await getSessionUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -20,14 +20,14 @@ export async function POST(request: NextRequest) {
     if (!currentPassword || !newPassword) {
       return NextResponse.json(
         { error: 'Current password and new password are required' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (newPassword.length < 8) {
       return NextResponse.json(
         { error: 'New password must be at least 8 characters' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -44,10 +44,7 @@ export async function POST(request: NextRequest) {
     // Verify current password
     const valid = await verifyPassword(currentPassword, user.passwordHash);
     if (!valid) {
-      return NextResponse.json(
-        { error: 'Current password is incorrect' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Current password is incorrect' }, { status: 400 });
     }
 
     // Hash and save new password
@@ -73,4 +70,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
-

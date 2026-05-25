@@ -1,23 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import {
-  Calendar,
-  Plus,
-  Lock,
-  Unlock,
-  Loader2,
-} from 'lucide-react';
+import { Calendar, Plus, Lock, Unlock, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useLanguageStore } from '@/store/language-store';
 import { useAuthStore } from '@/store/auth-store';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -106,10 +94,14 @@ export function FiscalPeriodsTab() {
           const data = await res.json();
           setPeriods(data.periods || []);
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
       if (!cancelled) setLoading(false);
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [companyId]);
 
   async function handleAddPeriod() {
@@ -148,10 +140,12 @@ export function FiscalPeriodsTab() {
       });
       if (res.ok) {
         setPeriods((prev) =>
-          prev.map((p) => (p.id === period.id ? { ...p, isLocked: !p.isLocked } : p))
+          prev.map((p) => (p.id === period.id ? { ...p, isLocked: !p.isLocked } : p)),
         );
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     setToggling(false);
     setLockTarget(null);
   }
@@ -172,9 +166,7 @@ export function FiscalPeriodsTab() {
                   <Calendar className="size-4" />
                   {t('settings.fiscalPeriodsTab')}
                 </CardTitle>
-                <CardDescription className="mt-1">
-                  {t('settings.fiscalYear')}
-                </CardDescription>
+                <CardDescription className="mt-1">{t('settings.fiscalYear')}</CardDescription>
               </div>
               <Dialog open={addOpen} onOpenChange={setAddOpen}>
                 <DialogTrigger asChild>
@@ -203,7 +195,9 @@ export function FiscalPeriodsTab() {
                         <Input
                           type="date"
                           value={newPeriod.startDate}
-                          onChange={(e) => setNewPeriod((p) => ({ ...p, startDate: e.target.value }))}
+                          onChange={(e) =>
+                            setNewPeriod((p) => ({ ...p, startDate: e.target.value }))
+                          }
                         />
                       </div>
                       <div className="space-y-1.5">
@@ -222,12 +216,18 @@ export function FiscalPeriodsTab() {
                     </Button>
                     <Button
                       onClick={handleAddPeriod}
-                      disabled={adding || !newPeriod.name || !newPeriod.startDate || !newPeriod.endDate}
+                      disabled={
+                        adding || !newPeriod.name || !newPeriod.startDate || !newPeriod.endDate
+                      }
                     >
                       {adding ? (
-                        <><Loader2 className="size-4 mr-1 animate-spin" /> {t('settings.saving')}</>
+                        <>
+                          <Loader2 className="size-4 mr-1 animate-spin" /> {t('settings.saving')}
+                        </>
                       ) : (
-                        <><Plus className="size-4 mr-1" /> {t('common.create')}</>
+                        <>
+                          <Plus className="size-4 mr-1" /> {t('common.create')}
+                        </>
                       )}
                     </Button>
                   </DialogFooter>
@@ -252,11 +252,21 @@ export function FiscalPeriodsTab() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="font-semibold">{t('settings.periods.periodName')}</TableHead>
-                      <TableHead className="font-semibold">{t('settings.periods.startDate')}</TableHead>
-                      <TableHead className="font-semibold">{t('settings.periods.endDate')}</TableHead>
-                      <TableHead className="font-semibold">{t('settings.periods.locked')}/{t('settings.periods.unlocked')}</TableHead>
-                      <TableHead className="font-semibold">{t('settings.companies.actions')}</TableHead>
+                      <TableHead className="font-semibold">
+                        {t('settings.periods.periodName')}
+                      </TableHead>
+                      <TableHead className="font-semibold">
+                        {t('settings.periods.startDate')}
+                      </TableHead>
+                      <TableHead className="font-semibold">
+                        {t('settings.periods.endDate')}
+                      </TableHead>
+                      <TableHead className="font-semibold">
+                        {t('settings.periods.locked')}/{t('settings.periods.unlocked')}
+                      </TableHead>
+                      <TableHead className="font-semibold">
+                        {t('settings.companies.actions')}
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -288,9 +298,15 @@ export function FiscalPeriodsTab() {
                             className="text-xs"
                           >
                             {period.isLocked ? (
-                              <><Unlock className="size-3.5 mr-1" /> {t('settings.periods.unlockPeriod')}</>
+                              <>
+                                <Unlock className="size-3.5 mr-1" />{' '}
+                                {t('settings.periods.unlockPeriod')}
+                              </>
                             ) : (
-                              <><Lock className="size-3.5 mr-1" /> {t('settings.periods.lockPeriod')}</>
+                              <>
+                                <Lock className="size-3.5 mr-1" />{' '}
+                                {t('settings.periods.lockPeriod')}
+                              </>
                             )}
                           </Button>
                         </TableCell>
@@ -309,7 +325,9 @@ export function FiscalPeriodsTab() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {lockTarget?.isLocked ? t('settings.periods.unlockPeriod') : t('settings.periods.confirmLock')}
+              {lockTarget?.isLocked
+                ? t('settings.periods.unlockPeriod')
+                : t('settings.periods.confirmLock')}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {lockTarget?.isLocked
@@ -320,7 +338,9 @@ export function FiscalPeriodsTab() {
           <AlertDialogFooter>
             <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={() => lockTarget && handleToggleLock(lockTarget)}>
-              {lockTarget?.isLocked ? t('settings.periods.unlockPeriod') : t('settings.periods.lockPeriod')}
+              {lockTarget?.isLocked
+                ? t('settings.periods.unlockPeriod')
+                : t('settings.periods.lockPeriod')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

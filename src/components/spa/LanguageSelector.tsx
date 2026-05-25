@@ -25,7 +25,9 @@ export function LanguageSelector() {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="sm" className="gap-1.5">
           <Globe className="size-4" />
-          <span className="hidden sm:inline">{current.flag} {current.label}</span>
+          <span className="hidden sm:inline">
+            {current.flag} {current.label}
+          </span>
           <span className="sm:hidden">{current.flag}</span>
         </Button>
       </DropdownMenuTrigger>

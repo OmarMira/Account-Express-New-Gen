@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json(
         { error: parsed.error.issues?.[0]?.message || 'Invalid request format' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -57,10 +57,7 @@ export async function POST(request: NextRequest) {
     return handleChat(zai, message);
   } catch (error) {
     console.error('[AI ASSISTANT ERROR]', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -98,10 +95,10 @@ YOUR STYLE:
   });
 
   const response = ZAIResponseSchema.safeParse(rawResponse);
-  const reply =
-    response.success
-      ? (response.data.choices?.[0]?.message?.content ?? 'Lo siento, no pude procesar tu solicitud. Intenta de nuevo.')
-      : 'Lo siento, no pude procesar tu solicitud. Intenta de nuevo.';
+  const reply = response.success
+    ? (response.data.choices?.[0]?.message?.content ??
+      'Lo siento, no pude procesar tu solicitud. Intenta de nuevo.')
+    : 'Lo siento, no pude procesar tu solicitud. Intenta de nuevo.';
 
   return NextResponse.json({ reply });
 }
@@ -150,9 +147,7 @@ Respond ONLY with the JSON object.`;
   });
 
   const aiResponse = ZAIResponseSchema.safeParse(rawResponse);
-  const rawReply = aiResponse.success
-    ? (aiResponse.data.choices?.[0]?.message?.content ?? '')
-    : '';
+  const rawReply = aiResponse.success ? (aiResponse.data.choices?.[0]?.message?.content ?? '') : '';
 
   let parsedRule: z.infer<typeof ParsedRuleSchema> | null = null;
   let reply = rawReply;

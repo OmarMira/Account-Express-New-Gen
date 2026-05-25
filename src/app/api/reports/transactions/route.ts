@@ -4,7 +4,7 @@ import { getSessionUserId } from '@/lib/sessions';
 
 export async function GET(request: NextRequest) {
   try {
-    const userId = getSessionUserId(request);
+    const userId = await getSessionUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -15,10 +15,7 @@ export async function GET(request: NextRequest) {
     const endDateParam = searchParams.get('endDate');
     const glAccountId = searchParams.get('glAccountId');
     const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10) || 1);
-    const limit = Math.min(
-      100,
-      Math.max(1, parseInt(searchParams.get('limit') ?? '25', 10) || 25)
-    );
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') ?? '25', 10) || 25));
 
     if (!companyId) {
       return NextResponse.json({ error: 'companyId is required' }, { status: 400 });
@@ -98,11 +95,23 @@ export async function GET(request: NextRequest) {
         amount: true,
         description: true,
         reference: true,
-        glAccount: { select: { id: true, code: true, name: true, accountType: true, normalBalance: true } },
+        glAccount: {
+          select: { id: true, code: true, name: true, accountType: true, normalBalance: true },
+        },
         statement: {
           select: {
             bankAccount: {
-              select: { glAccount: { select: { id: true, code: true, name: true, accountType: true, normalBalance: true } } },
+              select: {
+                glAccount: {
+                  select: {
+                    id: true,
+                    code: true,
+                    name: true,
+                    accountType: true,
+                    normalBalance: true,
+                  },
+                },
+              },
             },
           },
         },
@@ -137,7 +146,7 @@ export async function GET(request: NextRequest) {
       const absAmount = Math.abs(tx.amount);
       const bankGlAccount = tx.statement.bankAccount.glAccount;
 
-      const lines = [];
+      const lines: any[] = [];
 
       // The assigned GL Account line
       lines.push({
@@ -213,4 +222,3 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
-

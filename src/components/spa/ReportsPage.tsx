@@ -16,13 +16,7 @@ import { useLanguageStore } from '@/store/language-store';
 import { useAuthStore } from '@/store/auth-store';
 import { formatCurrency, formatDate } from '@/lib/format';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -98,7 +92,13 @@ interface ReconTransaction {
 }
 
 interface ReconciliationResponse {
-  bankAccount: { id: string; accountName: string; bankName: string; balance: number; currency: string };
+  bankAccount: {
+    id: string;
+    accountName: string;
+    bankName: string;
+    balance: number;
+    currency: string;
+  };
   summary: {
     totalTransactions: number;
     reconciledCount: number;
@@ -139,12 +139,18 @@ const itemVariants = {
 
 function accountTypeColor(type: string): string {
   switch (type) {
-    case 'asset': return 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400';
-    case 'liability': return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400';
-    case 'equity': return 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400';
-    case 'revenue': return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400';
-    case 'expense': return 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400';
-    default: return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400';
+    case 'asset':
+      return 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400';
+    case 'liability':
+      return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400';
+    case 'equity':
+      return 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400';
+    case 'revenue':
+      return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400';
+    case 'expense':
+      return 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400';
+    default:
+      return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400';
   }
 }
 
@@ -212,17 +218,20 @@ function TrialBalanceTab({ companyId }: { companyId?: string }) {
   useEffect(() => {
     if (!companyId) return;
     let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     void (async () => {
       try {
         const params = new URLSearchParams({ companyId, asOfDate });
         const res = await fetch(`/api/reports/trial-balance?${params}`);
         if (res.ok && !cancelled) setData(await res.json());
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
       if (!cancelled) setLoading(false);
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [companyId, asOfDate, refreshKey]);
 
   function handleExport(format: 'csv' | 'pdf') {
@@ -245,11 +254,15 @@ function TrialBalanceTab({ companyId }: { companyId?: string }) {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <CardTitle>{t('reports.trialBalance')}</CardTitle>
-              <CardDescription>{t('reports.asOf')}: {formatDate(asOfDate)}</CardDescription>
+              <CardDescription>
+                {t('reports.asOf')}: {formatDate(asOfDate)}
+              </CardDescription>
             </div>
             <div className="flex flex-wrap gap-2">
               <div className="flex items-center gap-2">
-                <Label htmlFor="asOfDate" className="whitespace-nowrap text-sm">{t('reports.asOfDate')}</Label>
+                <Label htmlFor="asOfDate" className="whitespace-nowrap text-sm">
+                  {t('reports.asOfDate')}
+                </Label>
                 <Input
                   id="asOfDate"
                   type="date"
@@ -258,7 +271,12 @@ function TrialBalanceTab({ companyId }: { companyId?: string }) {
                   className="w-40"
                 />
               </div>
-              <Button variant="outline" size="sm" onClick={() => setRefreshKey((k) => k + 1)} disabled={loading}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setRefreshKey((k) => k + 1)}
+                disabled={loading}
+              >
                 <RefreshCw className={`size-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
                 {t('common.refresh')}
               </Button>
@@ -297,7 +315,9 @@ function TrialBalanceTab({ companyId }: { companyId?: string }) {
                 <TableBody>
                   {data.accounts.map((acc) => (
                     <TableRow key={acc.code}>
-                      <TableCell className="font-mono text-teal-600 dark:text-teal-400">{acc.code}</TableCell>
+                      <TableCell className="font-mono text-teal-600 dark:text-teal-400">
+                        {acc.code}
+                      </TableCell>
                       <TableCell className="font-medium">{acc.name}</TableCell>
                       <TableCell>
                         <Badge variant="secondary" className={accountTypeColor(acc.accountType)}>
@@ -310,7 +330,9 @@ function TrialBalanceTab({ companyId }: { companyId?: string }) {
                       <TableCell className="text-right font-mono">
                         {acc.credit > 0 ? formatCurrency(acc.credit) : '—'}
                       </TableCell>
-                      <TableCell className={`text-right font-mono font-semibold ${acc.balance >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                      <TableCell
+                        className={`text-right font-mono font-semibold ${acc.balance >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}
+                      >
                         {formatCurrency(acc.balance)}
                       </TableCell>
                     </TableRow>
@@ -318,9 +340,15 @@ function TrialBalanceTab({ companyId }: { companyId?: string }) {
                 </TableBody>
                 <TableFooter>
                   <TableRow className="bg-teal-50/50 dark:bg-teal-950/20">
-                    <TableCell colSpan={3} className="font-bold">{t('common.total')}</TableCell>
-                    <TableCell className="text-right font-mono font-bold">{formatCurrency(data.totalDebits)}</TableCell>
-                    <TableCell className="text-right font-mono font-bold">{formatCurrency(data.totalCredits)}</TableCell>
+                    <TableCell colSpan={3} className="font-bold">
+                      {t('common.total')}
+                    </TableCell>
+                    <TableCell className="text-right font-mono font-bold">
+                      {formatCurrency(data.totalDebits)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono font-bold">
+                      {formatCurrency(data.totalCredits)}
+                    </TableCell>
                     <TableCell className="text-right font-mono font-bold">
                       {formatCurrency(data.totalDebits - data.totalCredits)}
                     </TableCell>
@@ -362,7 +390,7 @@ function TransactionListingTab({ companyId }: { companyId?: string }) {
   useEffect(() => {
     if (!companyId) return;
     fetch(`/api/journal/accounts?companyId=${companyId}`)
-      .then((r) => r.ok ? r.json() : [])
+      .then((r) => (r.ok ? r.json() : []))
       .then((json) => {
         const list = Array.isArray(json) ? json : (json.data ?? []);
         setGlAccounts(list);
@@ -386,10 +414,14 @@ function TransactionListingTab({ companyId }: { companyId?: string }) {
         if (glAccountId) params.set('glAccountId', glAccountId);
         const res = await fetch(`/api/reports/transactions?${params}`);
         if (res.ok && !cancelled) setData(await res.json());
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
       if (!cancelled) setLoading(false);
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [companyId, startDate, endDate, glAccountId, page, refreshKey]);
 
   function handleExport(format: 'csv' | 'pdf') {
@@ -413,7 +445,7 @@ function TransactionListingTab({ companyId }: { companyId?: string }) {
       entryRef: entry.reference,
       entryDesc: entry.description,
       ...line,
-    }))
+    })),
   );
 
   return (
@@ -423,7 +455,9 @@ function TransactionListingTab({ companyId }: { companyId?: string }) {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <CardTitle>{t('reports.transactionListing')}</CardTitle>
-              <CardDescription>{startDate} — {endDate}</CardDescription>
+              <CardDescription>
+                {startDate} — {endDate}
+              </CardDescription>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" size="sm" onClick={() => handleExport('csv')}>
@@ -440,15 +474,37 @@ function TransactionListingTab({ companyId }: { companyId?: string }) {
           <div className="flex flex-wrap gap-3">
             <div className="flex items-center gap-2">
               <Label className="text-sm">{t('reports.from')}</Label>
-              <Input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setPage(1); }} className="w-36" />
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => {
+                  setStartDate(e.target.value);
+                  setPage(1);
+                }}
+                className="w-36"
+              />
             </div>
             <div className="flex items-center gap-2">
               <Label className="text-sm">{t('reports.to')}</Label>
-              <Input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setPage(1); }} className="w-36" />
+              <Input
+                type="date"
+                value={endDate}
+                onChange={(e) => {
+                  setEndDate(e.target.value);
+                  setPage(1);
+                }}
+                className="w-36"
+              />
             </div>
             <div className="flex items-center gap-2">
               <Label className="text-sm">{t('reports.glAccountFilter')}</Label>
-              <Select value={glAccountId} onValueChange={(v) => { setGlAccountId(v === '__all__' ? '' : v); setPage(1); }}>
+              <Select
+                value={glAccountId}
+                onValueChange={(v) => {
+                  setGlAccountId(v === '__all__' ? '' : v);
+                  setPage(1);
+                }}
+              >
                 <SelectTrigger className="w-48">
                   <SelectValue placeholder={t('reports.allAccounts')} />
                 </SelectTrigger>
@@ -456,13 +512,19 @@ function TransactionListingTab({ companyId }: { companyId?: string }) {
                   <SelectItem value="__all__">{t('reports.allAccounts')}</SelectItem>
                   {glAccounts.map((a) => (
                     <SelectItem key={a.id} value={a.id}>
-                      <span className="font-mono text-teal-600 dark:text-teal-400">{a.code}</span> — {a.name}
+                      <span className="font-mono text-teal-600 dark:text-teal-400">{a.code}</span> —{' '}
+                      {a.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            <Button variant="outline" size="sm" onClick={() => setRefreshKey((k) => k + 1)} disabled={loading}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setRefreshKey((k) => k + 1)}
+              disabled={loading}
+            >
               <RefreshCw className={`size-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
               {t('common.refresh')}
             </Button>
@@ -484,7 +546,9 @@ function TransactionListingTab({ companyId }: { companyId?: string }) {
                     <TableHead className="w-[100px]">{t('common.reference')}</TableHead>
                     <TableHead>{t('common.description')}</TableHead>
                     <TableHead className="w-[100px]">{t('accounts.accountCode')}</TableHead>
-                    <TableHead className="hidden lg:table-cell">{t('accounts.accountName')}</TableHead>
+                    <TableHead className="hidden lg:table-cell">
+                      {t('accounts.accountName')}
+                    </TableHead>
                     <TableHead className="text-right w-[110px]">{t('accounts.debit')}</TableHead>
                     <TableHead className="text-right w-[110px]">{t('accounts.credit')}</TableHead>
                   </TableRow>
@@ -492,11 +556,19 @@ function TransactionListingTab({ companyId }: { companyId?: string }) {
                 <TableBody>
                   {flatRows.map((row) => (
                     <TableRow key={row.id}>
-                      <TableCell className="whitespace-nowrap">{formatDate(row.entryDate)}</TableCell>
-                      <TableCell className="font-mono text-muted-foreground">{row.entryRef || '—'}</TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {formatDate(row.entryDate)}
+                      </TableCell>
+                      <TableCell className="font-mono text-muted-foreground">
+                        {row.entryRef || '—'}
+                      </TableCell>
                       <TableCell className="max-w-[200px] truncate">{row.entryDesc}</TableCell>
-                      <TableCell className="font-mono text-teal-600 dark:text-teal-400">{row.accountCode}</TableCell>
-                      <TableCell className="hidden lg:table-cell max-w-[180px] truncate">{row.accountName}</TableCell>
+                      <TableCell className="font-mono text-teal-600 dark:text-teal-400">
+                        {row.accountCode}
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell max-w-[180px] truncate">
+                        {row.accountName}
+                      </TableCell>
                       <TableCell className="text-right font-mono">
                         {row.debit > 0 ? formatCurrency(row.debit) : ''}
                       </TableCell>
@@ -519,13 +591,14 @@ function TransactionListingTab({ companyId }: { companyId?: string }) {
           {data && data.pagination.totalPages > 1 && (
             <div className="flex items-center justify-between text-sm text-muted-foreground">
               <span>
-                {t('reports.showing')} {((data.pagination.page - 1) * data.pagination.limit) + 1}–
+                {t('reports.showing')} {(data.pagination.page - 1) * data.pagination.limit + 1}–
                 {Math.min(data.pagination.page * data.pagination.limit, data.pagination.totalCount)}{' '}
                 {t('reports.of')} {data.pagination.totalCount}
               </span>
               <div className="flex gap-2">
                 <Button
-                  variant="outline" size="sm"
+                  variant="outline"
+                  size="sm"
                   disabled={page <= 1}
                   onClick={() => setPage((p) => p - 1)}
                 >
@@ -535,7 +608,8 @@ function TransactionListingTab({ companyId }: { companyId?: string }) {
                   {t('reports.page')} {page} {t('reports.of')} {data.pagination.totalPages}
                 </span>
                 <Button
-                  variant="outline" size="sm"
+                  variant="outline"
+                  size="sm"
                   disabled={page >= data.pagination.totalPages}
                   onClick={() => setPage((p) => p + 1)}
                 >
@@ -565,7 +639,7 @@ function ReconciliationTab({ companyId }: { companyId?: string }) {
   useEffect(() => {
     if (!companyId) return;
     fetch(`/api/dashboard?companyId=${companyId}`)
-      .then((r) => r.ok ? r.json() : null)
+      .then((r) => (r.ok ? r.json() : null))
       .then((dash) => {
         if (dash?.bankAccounts) setBankAccounts(dash.bankAccounts);
       })
@@ -575,16 +649,19 @@ function ReconciliationTab({ companyId }: { companyId?: string }) {
   useEffect(() => {
     if (!companyId || !bankAccountId) return;
     let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     (async () => {
       try {
         const res = await fetch(`/api/reports/reconciliation?bankAccountId=${bankAccountId}`);
         if (res.ok && !cancelled) setData(await res.json());
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
       if (!cancelled) setLoading(false);
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [companyId, bankAccountId]);
 
   function handleExport(format: 'csv' | 'pdf') {
@@ -616,10 +693,20 @@ function ReconciliationTab({ companyId }: { companyId?: string }) {
                   ))}
                 </SelectContent>
               </Select>
-              <Button variant="outline" size="sm" onClick={() => handleExport('csv')} disabled={!bankAccountId}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleExport('csv')}
+                disabled={!bankAccountId}
+              >
                 <Download className="size-4 mr-1" /> CSV
               </Button>
-              <Button variant="outline" size="sm" onClick={() => handleExport('pdf')} disabled={!bankAccountId}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleExport('pdf')}
+                disabled={!bankAccountId}
+              >
                 <Download className="size-4 mr-1" /> PDF
               </Button>
             </div>
@@ -643,33 +730,51 @@ function ReconciliationTab({ companyId }: { companyId?: string }) {
               <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
                 <Card className="border-teal-200 dark:border-teal-800">
                   <CardContent className="pt-4 pb-4">
-                    <p className="text-xs text-muted-foreground">{t('reports.totalTransactions')}</p>
-                    <p className="text-2xl font-bold text-teal-600 dark:text-teal-400">{data.summary.totalTransactions}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {t('reports.totalTransactions')}
+                    </p>
+                    <p className="text-2xl font-bold text-teal-600 dark:text-teal-400">
+                      {data.summary.totalTransactions}
+                    </p>
                   </CardContent>
                 </Card>
                 <Card className="border-emerald-200 dark:border-emerald-800">
                   <CardContent className="pt-4 pb-4">
                     <div className="flex items-center gap-1">
                       <CheckCircle2 className="size-4 text-emerald-500" />
-                      <p className="text-xs text-muted-foreground">{t('reports.reconciledCount')}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {t('reports.reconciledCount')}
+                      </p>
                     </div>
-                    <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{data.summary.reconciledCount}</p>
-                    <p className="text-xs text-muted-foreground">{formatCurrency(data.summary.reconciledTotal)}</p>
+                    <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                      {data.summary.reconciledCount}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatCurrency(data.summary.reconciledTotal)}
+                    </p>
                   </CardContent>
                 </Card>
                 <Card className="border-amber-200 dark:border-amber-800">
                   <CardContent className="pt-4 pb-4">
                     <div className="flex items-center gap-1">
                       <AlertTriangle className="size-4 text-amber-500" />
-                      <p className="text-xs text-muted-foreground">{t('reports.unreconciledCount')}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {t('reports.unreconciledCount')}
+                      </p>
                     </div>
-                    <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{data.summary.unreconciledCount}</p>
-                    <p className="text-xs text-muted-foreground">{formatCurrency(data.summary.unreconciledTotal)}</p>
+                    <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+                      {data.summary.unreconciledCount}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatCurrency(data.summary.unreconciledTotal)}
+                    </p>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardContent className="pt-4 pb-4">
-                    <p className="text-xs text-muted-foreground">{t('reports.reconciledPercentage')}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {t('reports.reconciledPercentage')}
+                    </p>
                     <p className="text-2xl font-bold">{data.summary.reconciledPercentage}%</p>
                   </CardContent>
                 </Card>
@@ -688,27 +793,43 @@ function ReconciliationTab({ companyId }: { companyId?: string }) {
                         <TableRow>
                           <TableHead className="w-[100px]">{t('common.date')}</TableHead>
                           <TableHead>{t('common.description')}</TableHead>
-                          <TableHead className="text-right w-[110px]">{t('common.amount')}</TableHead>
+                          <TableHead className="text-right w-[110px]">
+                            {t('common.amount')}
+                          </TableHead>
                           <TableHead className="w-[100px]">{t('common.reference')}</TableHead>
-                          <TableHead className="hidden md:table-cell">{t('journal.account')}</TableHead>
+                          <TableHead className="hidden md:table-cell">
+                            {t('journal.account')}
+                          </TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {data.unreconciledTransactions.map((tx) => (
                           <TableRow key={tx.id}>
-                            <TableCell className="whitespace-nowrap">{formatDate(tx.date)}</TableCell>
-                            <TableCell className="max-w-[250px] truncate">{tx.description}</TableCell>
-                            <TableCell className={`text-right font-mono ${tx.amount >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                            <TableCell className="whitespace-nowrap">
+                              {formatDate(tx.date)}
+                            </TableCell>
+                            <TableCell className="max-w-[250px] truncate">
+                              {tx.description}
+                            </TableCell>
+                            <TableCell
+                              className={`text-right font-mono ${tx.amount >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}
+                            >
                               {formatCurrency(tx.amount)}
                             </TableCell>
-                            <TableCell className="text-muted-foreground">{tx.reference || '—'}</TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {tx.reference || '—'}
+                            </TableCell>
                             <TableCell className="hidden md:table-cell text-muted-foreground">
                               {tx.glAccount ? (
                                 <span>
-                                  <span className="font-mono text-teal-600 dark:text-teal-400">{tx.glAccount.code}</span>{' '}
+                                  <span className="font-mono text-teal-600 dark:text-teal-400">
+                                    {tx.glAccount.code}
+                                  </span>{' '}
                                   — {tx.glAccount.name}
                                 </span>
-                              ) : '—'}
+                              ) : (
+                                '—'
+                              )}
                             </TableCell>
                           </TableRow>
                         ))}

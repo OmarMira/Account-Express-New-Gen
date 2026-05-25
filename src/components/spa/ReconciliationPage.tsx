@@ -173,7 +173,9 @@ export function ReconciliationPage() {
   const [loadingData, setLoadingData] = useState(false);
 
   // Filters
-  const [statusFilter, setStatusFilter] = useState<'unreconciled' | 'reconciled' | 'all'>('unreconciled');
+  const [statusFilter, setStatusFilter] = useState<'unreconciled' | 'reconciled' | 'all'>(
+    'unreconciled',
+  );
   const [search, setSearch] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -185,13 +187,18 @@ export function ReconciliationPage() {
   // Selected transactions for reconciliation
   const [selectedTxIds, setSelectedTxIds] = useState<Set<string>>(new Set());
   const [txGlAssignments, setTxGlAssignments] = useState<Record<string, string>>({});
-  const [txSplits, setTxSplits] = useState<Record<string, { glAccountId: string; amount: number; description: string }[]>>({});
+  const [txSplits, setTxSplits] = useState<
+    Record<string, { glAccountId: string; amount: number; description: string }[]>
+  >({});
 
   // Dialogs
   const [autoMatchDialogOpen, setAutoMatchDialogOpen] = useState(false);
   const [autoMatching, setAutoMatching] = useState(false);
   const [autoMatchResult, setAutoMatchResult] = useState<{
-    matched: number; total: number; matchedByRule: number; matchedByAmount: number;
+    matched: number;
+    total: number;
+    matchedByRule: number;
+    matchedByAmount: number;
   } | null>(null);
 
   const [reconcileDialogOpen, setReconcileDialogOpen] = useState(false);
@@ -218,7 +225,9 @@ export function ReconciliationPage() {
 
   const [splitDialogOpen, setSplitDialogOpen] = useState(false);
   const [splittingTx, setSplittingTx] = useState<Transaction | null>(null);
-  const [currentSplits, setCurrentSplits] = useState<{ glAccountId: string; amount: number; description: string }[]>([]);
+  const [currentSplits, setCurrentSplits] = useState<
+    { glAccountId: string; amount: number; description: string }[]
+  >([]);
 
   // Build query params
   const queryParams = useMemo(() => {
@@ -229,9 +238,18 @@ export function ReconciliationPage() {
     if (search) params.set('search', search);
     if (startDate) params.set('startDate', startDate);
     if (endDate) params.set('endDate', endDate);
-    if (selectedStatementId && selectedStatementId !== 'all') params.set('statementId', selectedStatementId);
+    if (selectedStatementId && selectedStatementId !== 'all')
+      params.set('statementId', selectedStatementId);
     return params.toString();
-  }, [selectedAccountId, activeCompany?.id, statusFilter, search, startDate, endDate, selectedStatementId]);
+  }, [
+    selectedAccountId,
+    activeCompany?.id,
+    statusFilter,
+    search,
+    startDate,
+    endDate,
+    selectedStatementId,
+  ]);
 
   // Fetch bank accounts list and auto-select first one
   const fetchBankAccounts = useCallback(async () => {
@@ -244,11 +262,13 @@ export function ReconciliationPage() {
       if (res.ok) {
         const data = await res.json();
         if (data.bankAccounts) {
-          const accounts = data.bankAccounts.map((ba: { id: string; accountName: string; bankName: string }) => ({
-            id: ba.id,
-            accountName: ba.accountName,
-            bankName: ba.bankName,
-          }));
+          const accounts = data.bankAccounts.map(
+            (ba: { id: string; accountName: string; bankName: string }) => ({
+              id: ba.id,
+              accountName: ba.accountName,
+              bankName: ba.bankName,
+            }),
+          );
           setBankAccounts(accounts);
           // Auto-select the first bank account if none selected yet
           if (initialAutoSelect && accounts.length > 0 && !selectedAccountId) {
@@ -257,7 +277,9 @@ export function ReconciliationPage() {
           }
         }
       }
-    } catch { /* ignore */ } finally {
+    } catch {
+      /* ignore */
+    } finally {
       setLoadingAccounts(false);
     }
   }, [activeCompany?.id, initialAutoSelect, selectedAccountId]);
@@ -271,7 +293,9 @@ export function ReconciliationPage() {
         const data = await res.json();
         setAccounts(data.data ?? data);
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, [activeCompany?.id]);
 
   // Fetch reconciliation data
@@ -292,7 +316,9 @@ export function ReconciliationPage() {
         setOpenPeriod(data.openPeriod ?? null);
         setRecentPeriods(data.recentPeriods ?? []);
       }
-    } catch { /* ignore */ } finally {
+    } catch {
+      /* ignore */
+    } finally {
       setLoadingData(false);
     }
   }, [activeCompany?.id, selectedAccountId, queryParams]);
@@ -375,7 +401,9 @@ export function ReconciliationPage() {
         setAutoMatchResult(data);
         fetchReconciliation();
       }
-    } catch { /* ignore */ } finally {
+    } catch {
+      /* ignore */
+    } finally {
       setAutoMatching(false);
       stopProcessing();
     }
@@ -412,7 +440,9 @@ export function ReconciliationPage() {
         }
         fetchReconciliation();
       }
-    } catch { /* ignore */ } finally {
+    } catch {
+      /* ignore */
+    } finally {
       setReconciling(false);
       stopProcessing();
     }
@@ -439,7 +469,9 @@ export function ReconciliationPage() {
         setUnreconcileResult(data.unreconciled);
         fetchReconciliation();
       }
-    } catch { /* ignore */ } finally {
+    } catch {
+      /* ignore */
+    } finally {
       setUnreconciling(false);
       stopProcessing();
     }
@@ -448,7 +480,13 @@ export function ReconciliationPage() {
   // Create adjustment
   const handleAdjustment = async () => {
     if (!activeCompany?.id || !selectedAccountId) return;
-    if (!adjustForm.description || !adjustForm.debitAccountId || !adjustForm.creditAccountId || !adjustForm.amount) return;
+    if (
+      !adjustForm.description ||
+      !adjustForm.debitAccountId ||
+      !adjustForm.creditAccountId ||
+      !adjustForm.amount
+    )
+      return;
     setAdjusting(true);
     startProcessing('Creando asiento de ajuste...');
     try {
@@ -465,10 +503,19 @@ export function ReconciliationPage() {
       if (res.ok) {
         toast.success(t('reconciliation.adjustmentCreated'));
         setAdjustmentDialogOpen(false);
-        setAdjustForm({ date: new Date().toISOString().split('T')[0], description: '', debitAccountId: '', creditAccountId: '', amount: '', notes: '' });
+        setAdjustForm({
+          date: new Date().toISOString().split('T')[0],
+          description: '',
+          debitAccountId: '',
+          creditAccountId: '',
+          amount: '',
+          notes: '',
+        });
         fetchReconciliation();
       }
-    } catch { /* ignore */ } finally {
+    } catch {
+      /* ignore */
+    } finally {
       setAdjusting(false);
       stopProcessing();
     }
@@ -491,19 +538,25 @@ export function ReconciliationPage() {
       if (res.ok) {
         fetchReconciliation();
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   };
 
   // Fetch history
   const fetchHistory = async () => {
     if (!activeCompany?.id || !selectedAccountId) return;
     try {
-      const res = await fetch(`/api/reconciliation/periods?bankAccountId=${selectedAccountId}&companyId=${activeCompany.id}`);
+      const res = await fetch(
+        `/api/reconciliation/periods?bankAccountId=${selectedAccountId}&companyId=${activeCompany.id}`,
+      );
       if (res.ok) {
         const data = await res.json();
         setHistoryPeriods(data.periods ?? []);
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   };
 
   // Export
@@ -531,7 +584,7 @@ export function ReconciliationPage() {
       '─'.repeat(80),
       ...allTxs.map(
         (tx) =>
-          `${formatDate(tx.date)}\t${tx.type}\t${tx.description}\t${formatCurrency(tx.amount)}\t${tx.glAccount ? `${tx.glAccount.code} - ${tx.glAccount.name}` : '—'}\t${tx.matchedRule?.name ?? '—'}`
+          `${formatDate(tx.date)}\t${tx.type}\t${tx.description}\t${formatCurrency(tx.amount)}\t${tx.glAccount ? `${tx.glAccount.code} - ${tx.glAccount.name}` : '—'}\t${tx.matchedRule?.name ?? '—'}`,
       ),
     ];
     const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
@@ -553,7 +606,11 @@ export function ReconciliationPage() {
       setCurrentSplits([...existingSplits]);
     } else {
       setCurrentSplits([
-        { glAccountId: tx.glAccountId || '', amount: Math.abs(tx.amount), description: tx.description }
+        {
+          glAccountId: tx.glAccountId || '',
+          amount: Math.abs(tx.amount),
+          description: tx.description,
+        },
       ]);
     }
     setSplitDialogOpen(true);
@@ -563,16 +620,18 @@ export function ReconciliationPage() {
     if (!splittingTx) return;
     const totalSplit = currentSplits.reduce((sum, s) => sum + s.amount, 0);
     if (Math.abs(totalSplit - Math.abs(splittingTx.amount)) > 0.01) {
-      toast.error(t('reconciliation.splitAmountMismatch') || 'Total splits must equal transaction amount');
+      toast.error(
+        t('reconciliation.splitAmountMismatch') || 'Total splits must equal transaction amount',
+      );
       return;
     }
-    setTxSplits(prev => ({ ...prev, [splittingTx.id]: currentSplits }));
-    setTxGlAssignments(prev => {
+    setTxSplits((prev) => ({ ...prev, [splittingTx.id]: currentSplits }));
+    setTxGlAssignments((prev) => {
       const next = { ...prev };
       delete next[splittingTx.id];
       return next;
     });
-    setSelectedTxIds(prev => new Set(prev).add(splittingTx.id));
+    setSelectedTxIds((prev) => new Set(prev).add(splittingTx.id));
     setSplitDialogOpen(false);
   };
 
@@ -585,10 +644,7 @@ export function ReconciliationPage() {
     return (
       <TableRow className={cn(isSelected && 'bg-primary/5', isReconciled && 'opacity-75')}>
         <TableCell className="w-10">
-          <Checkbox
-            checked={isSelected}
-            onCheckedChange={() => toggleTx(tx.id)}
-          />
+          <Checkbox checked={isSelected} onCheckedChange={() => toggleTx(tx.id)} />
         </TableCell>
         <TableCell className="text-sm whitespace-nowrap">{formatDate(tx.date)}</TableCell>
         <TableCell className="max-w-[200px]">
@@ -598,13 +654,15 @@ export function ReconciliationPage() {
         <TableCell
           className={cn(
             'font-mono text-sm text-right whitespace-nowrap',
-            type === 'deposit' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+            type === 'deposit'
+              ? 'text-emerald-600 dark:text-emerald-400'
+              : 'text-rose-600 dark:text-rose-400',
           )}
         >
           {formatCurrency(tx.amount)}
         </TableCell>
         <TableCell className="min-w-[180px]">
-          {(!isReconciled || statusFilter === 'all') ? (
+          {!isReconciled || statusFilter === 'all' ? (
             <AccountSelector
               accounts={accounts}
               value={assignedGl}
@@ -639,9 +697,9 @@ export function ReconciliationPage() {
             <Button
               variant="ghost"
               size="icon"
-              className={cn("size-8", txSplits[tx.id] ? "text-primary" : "text-muted-foreground")}
+              className={cn('size-8', txSplits[tx.id] ? 'text-primary' : 'text-muted-foreground')}
               onClick={() => openSplitDialog(tx)}
-              title={t('reconciliation.splitTransaction') || "Split Transaction"}
+              title={t('reconciliation.splitTransaction') || 'Split Transaction'}
             >
               <Scissors className="size-4" />
             </Button>
@@ -664,12 +722,14 @@ export function ReconciliationPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">{t('reconciliation.title')}</h2>
-          <p className="text-sm text-muted-foreground mt-1">{t('reconciliation.reconciliationSubtitle')}</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            {t('reconciliation.reconciliationSubtitle')}
+          </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button 
-            size="sm" 
-            onClick={() => setCurrentView('import')} 
+          <Button
+            size="sm"
+            onClick={() => setCurrentView('import')}
             className="gap-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-700 dark:hover:bg-indigo-600 text-white border-none shadow-sm hover:shadow transition-all"
           >
             <Upload className="size-4" />
@@ -677,11 +737,25 @@ export function ReconciliationPage() {
           </Button>
           {selectedAccountId && (
             <>
-              <Button variant="outline" size="sm" onClick={() => { fetchHistory(); setHistoryDialogOpen(true); }} className="gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  fetchHistory();
+                  setHistoryDialogOpen(true);
+                }}
+                className="gap-2"
+              >
                 <HistoryIcon className="size-4" />
                 {t('reconciliation.history')}
               </Button>
-              <Button variant="outline" size="sm" onClick={handleExport} disabled={loadingData} className="gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExport}
+                disabled={loadingData}
+                className="gap-2"
+              >
                 <Download className="size-4" />
                 {t('reconciliation.exportReport')}
               </Button>
@@ -702,10 +776,14 @@ export function ReconciliationPage() {
             </SelectTrigger>
             <SelectContent>
               {bankAccounts.length === 0 && (
-                <SelectItem value="__none" disabled>{t('reconciliation.noAccounts')}</SelectItem>
+                <SelectItem value="__none" disabled>
+                  {t('reconciliation.noAccounts')}
+                </SelectItem>
               )}
               {bankAccounts.map((ba) => (
-                <SelectItem key={ba.id} value={ba.id}>{ba.accountName} — {ba.bankName}</SelectItem>
+                <SelectItem key={ba.id} value={ba.id}>
+                  {ba.accountName} — {ba.bankName}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -714,7 +792,11 @@ export function ReconciliationPage() {
 
       {selectedAccountId && loadingData && (
         <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">{[1, 2, 3].map((i) => <Skeleton key={i} className="h-28 rounded-lg" />)}</div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-28 rounded-lg" />
+            ))}
+          </div>
           <Skeleton className="h-64 rounded-lg" />
         </div>
       )}
@@ -725,8 +807,12 @@ export function ReconciliationPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card>
               <CardContent className="p-4">
-                <p className="text-sm text-muted-foreground">{t('reconciliation.statementBalance')}</p>
-                <p className="text-2xl font-bold mt-1">{formatCurrency(summary.statementBalance)}</p>
+                <p className="text-sm text-muted-foreground">
+                  {t('reconciliation.statementBalance')}
+                </p>
+                <p className="text-2xl font-bold mt-1">
+                  {formatCurrency(summary.statementBalance)}
+                </p>
                 <p className="text-xs text-muted-foreground mt-1">{bankAccountInfo?.accountName}</p>
               </CardContent>
             </Card>
@@ -735,7 +821,9 @@ export function ReconciliationPage() {
                 <p className="text-sm text-muted-foreground">{t('reconciliation.bookBalance')}</p>
                 <p className="text-2xl font-bold mt-1">{formatCurrency(summary.bookBalance)}</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {bankAccountInfo?.glAccount ? `${bankAccountInfo.glAccount.code} - ${bankAccountInfo.glAccount.name}` : ''}
+                  {bankAccountInfo?.glAccount
+                    ? `${bankAccountInfo.glAccount.code} - ${bankAccountInfo.glAccount.name}`
+                    : ''}
                 </p>
               </CardContent>
             </Card>
@@ -743,7 +831,14 @@ export function ReconciliationPage() {
               <CardContent className="p-4">
                 <p className="text-sm text-muted-foreground">{t('reconciliation.difference')}</p>
                 <div className="flex items-center gap-2 mt-1">
-                  <p className={cn('text-2xl font-bold', Math.abs(summary.difference) < 0.005 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400')}>
+                  <p
+                    className={cn(
+                      'text-2xl font-bold',
+                      Math.abs(summary.difference) < 0.005
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : 'text-rose-600 dark:text-rose-400',
+                    )}
+                  >
                     {formatCurrency(summary.difference)}
                   </p>
                   {Math.abs(summary.difference) < 0.005 ? (
@@ -753,7 +848,8 @@ export function ReconciliationPage() {
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {summary.reconciledCount} / {summary.totalTransactions} {t('reconciliation.reconciled').toLowerCase()}
+                  {summary.reconciledCount} / {summary.totalTransactions}{' '}
+                  {t('reconciliation.reconciled').toLowerCase()}
                 </p>
               </CardContent>
             </Card>
@@ -769,19 +865,37 @@ export function ReconciliationPage() {
                       <Calendar className="size-5 text-teal-600 dark:text-teal-400" />
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-teal-700 dark:text-teal-300">{t('reconciliation.periodActive')}</p>
-                      <p className="text-xs text-muted-foreground">{t('reconciliation.periodStarted').replace('{date}', formatDate(openPeriod.startedAt))}</p>
+                      <p className="text-sm font-semibold text-teal-700 dark:text-teal-300">
+                        {t('reconciliation.periodActive')}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {t('reconciliation.periodStarted').replace(
+                          '{date}',
+                          formatDate(openPeriod.startedAt),
+                        )}
+                      </p>
                     </div>
                     <Badge variant="outline" className="border-teal-400 text-teal-600">
-                      {openPeriod.transactionCount} {t('reconciliation.periodTransactions').toLowerCase()}
+                      {openPeriod.transactionCount}{' '}
+                      {t('reconciliation.periodTransactions').toLowerCase()}
                     </Badge>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={() => handlePeriod('complete', openPeriod.id)} className="gap-2 border-teal-400 text-teal-700 hover:bg-teal-100">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePeriod('complete', openPeriod.id)}
+                      className="gap-2 border-teal-400 text-teal-700 hover:bg-teal-100"
+                    >
                       <Check className="size-4" />
                       {t('reconciliation.completePeriod')}
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => handlePeriod('cancel', openPeriod.id)} className="text-muted-foreground">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handlePeriod('cancel', openPeriod.id)}
+                      className="text-muted-foreground"
+                    >
                       <X className="size-4" />
                     </Button>
                   </div>
@@ -795,16 +909,30 @@ export function ReconciliationPage() {
             <CardContent className="p-4 space-y-4">
               {/* Status Toggle */}
               <div className="flex flex-wrap items-center gap-3">
-                <Tabs value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
+                <Tabs
+                  value={statusFilter}
+                  onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}
+                >
                   <TabsList className="h-8">
-                    <TabsTrigger value="unreconciled" className="text-xs px-3 h-6">{t('reconciliation.showUnreconciled')} ({summary.unreconciledCount})</TabsTrigger>
-                    <TabsTrigger value="reconciled" className="text-xs px-3 h-6">{t('reconciliation.showReconciled')} ({summary.reconciledCount})</TabsTrigger>
-                    <TabsTrigger value="all" className="text-xs px-3 h-6">{t('reconciliation.showAll')} ({summary.totalTransactions})</TabsTrigger>
+                    <TabsTrigger value="unreconciled" className="text-xs px-3 h-6">
+                      {t('reconciliation.showUnreconciled')} ({summary.unreconciledCount})
+                    </TabsTrigger>
+                    <TabsTrigger value="reconciled" className="text-xs px-3 h-6">
+                      {t('reconciliation.showReconciled')} ({summary.reconciledCount})
+                    </TabsTrigger>
+                    <TabsTrigger value="all" className="text-xs px-3 h-6">
+                      {t('reconciliation.showAll')} ({summary.totalTransactions})
+                    </TabsTrigger>
                   </TabsList>
                 </Tabs>
                 <div className="flex-1" />
                 {!openPeriod && (
-                  <Button variant="outline" size="sm" onClick={() => handlePeriod('start')} className="gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePeriod('start')}
+                    className="gap-2"
+                  >
                     <Calendar className="size-3.5" />
                     {t('reconciliation.startPeriod')}
                   </Button>
@@ -824,9 +952,19 @@ export function ReconciliationPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Filter className="size-3.5 text-muted-foreground" />
-                  <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-8 w-36" />
+                  <Input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="h-8 w-36"
+                  />
                   <span className="text-xs text-muted-foreground">—</span>
-                  <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="h-8 w-36" />
+                  <Input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="h-8 w-36"
+                  />
                 </div>
                 {statements.length > 0 && (
                   <Select value={selectedStatementId} onValueChange={setSelectedStatementId}>
@@ -837,7 +975,8 @@ export function ReconciliationPage() {
                       <SelectItem value="all">{t('reconciliation.allStatements')}</SelectItem>
                       {statements.map((s) => (
                         <SelectItem key={s.id} value={s.id}>
-                          {formatDate(s.startDate)} {t('reconciliation.endDateFrom')} {formatDate(s.endDate)}
+                          {formatDate(s.startDate)} {t('reconciliation.endDateFrom')}{' '}
+                          {formatDate(s.endDate)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -849,23 +988,53 @@ export function ReconciliationPage() {
               <div className="flex items-center gap-2 flex-wrap">
                 {!isReconciledView && (
                   <>
-                    <Button variant="outline" size="sm" onClick={() => { setAutoMatchResult(null); setAutoMatchDialogOpen(true); }} className="gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setAutoMatchResult(null);
+                        setAutoMatchDialogOpen(true);
+                      }}
+                      className="gap-2"
+                    >
                       <Play className="size-4" />
                       {t('reconciliation.autoMatch')}
                     </Button>
-                    <Button size="sm" onClick={() => { setReconcileResult(null); setReconcileDialogOpen(true); }} disabled={selectedTxIds.size === 0} className="gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setReconcileResult(null);
+                        setReconcileDialogOpen(true);
+                      }}
+                      disabled={selectedTxIds.size === 0}
+                      className="gap-2"
+                    >
                       <ArrowLeftRight className="size-4" />
                       {t('reconciliation.reconcileSelected')} ({selectedTxIds.size})
                     </Button>
                   </>
                 )}
                 {isReconciledView && (
-                  <Button variant="outline" size="sm" onClick={() => { setUnreconcileResult(null); setUnreconcileDialogOpen(true); }} disabled={selectedTxIds.size === 0} className="gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setUnreconcileResult(null);
+                      setUnreconcileDialogOpen(true);
+                    }}
+                    disabled={selectedTxIds.size === 0}
+                    className="gap-2"
+                  >
                     <Undo2 className="size-4" />
                     {t('reconciliation.unreconcileSelected')} ({selectedTxIds.size})
                   </Button>
                 )}
-                <Button variant="outline" size="sm" onClick={() => setAdjustmentDialogOpen(true)} className="gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setAdjustmentDialogOpen(true)}
+                  className="gap-2"
+                >
                   <PlusCircle className="size-4" />
                   {t('reconciliation.createAdjustment')}
                 </Button>
@@ -890,18 +1059,26 @@ export function ReconciliationPage() {
           <Dialog open={splitDialogOpen} onOpenChange={setSplitDialogOpen}>
             <DialogContent className="max-w-2xl">
               <DialogHeader>
-                <DialogTitle>{t('reconciliation.splitTransaction') || "Distribuir Transacción"}</DialogTitle>
+                <DialogTitle>
+                  {t('reconciliation.splitTransaction') || 'Distribuir Transacción'}
+                </DialogTitle>
                 <DialogDescription>
-                  Divide el monto de <strong>{formatCurrency(splittingTx?.amount || 0)}</strong> en múltiples cuentas.
+                  Divide el monto de <strong>{formatCurrency(splittingTx?.amount || 0)}</strong> en
+                  múltiples cuentas.
                 </DialogDescription>
               </DialogHeader>
-              
+
               <div className="space-y-4 py-4">
                 <div className="max-h-[300px] overflow-y-auto space-y-3 pr-2">
                   {currentSplits.map((split, index) => (
-                    <div key={index} className="flex items-start gap-3 p-3 rounded-xl border bg-muted/30">
+                    <div
+                      key={index}
+                      className="flex items-start gap-3 p-3 rounded-xl border bg-muted/30"
+                    >
                       <div className="flex-1 space-y-2">
-                        <Label className="text-[10px] uppercase font-bold text-muted-foreground">Cuenta Contable</Label>
+                        <Label className="text-[10px] uppercase font-bold text-muted-foreground">
+                          Cuenta Contable
+                        </Label>
                         <AccountSelector
                           accounts={accounts}
                           value={split.glAccountId}
@@ -913,7 +1090,9 @@ export function ReconciliationPage() {
                         />
                       </div>
                       <div className="w-32 space-y-2">
-                        <Label className="text-[10px] uppercase font-bold text-muted-foreground">Monto</Label>
+                        <Label className="text-[10px] uppercase font-bold text-muted-foreground">
+                          Monto
+                        </Label>
                         <Input
                           type="number"
                           value={split.amount}
@@ -926,7 +1105,9 @@ export function ReconciliationPage() {
                         />
                       </div>
                       <div className="flex-1 space-y-2">
-                        <Label className="text-[10px] uppercase font-bold text-muted-foreground">Descripción</Label>
+                        <Label className="text-[10px] uppercase font-bold text-muted-foreground">
+                          Descripción
+                        </Label>
                         <Input
                           value={split.description}
                           onChange={(e) => {
@@ -958,7 +1139,10 @@ export function ReconciliationPage() {
                   size="sm"
                   className="w-full gap-2 border-dashed"
                   onClick={() => {
-                    setCurrentSplits([...currentSplits, { glAccountId: '', amount: 0, description: splittingTx?.description || '' }]);
+                    setCurrentSplits([
+                      ...currentSplits,
+                      { glAccountId: '', amount: 0, description: splittingTx?.description || '' },
+                    ]);
                   }}
                 >
                   <PlusCircle className="size-4" />
@@ -968,20 +1152,45 @@ export function ReconciliationPage() {
                 <div className="flex items-center justify-between p-4 rounded-xl bg-primary/5 border border-primary/10">
                   <div className="text-sm">
                     <p className="text-muted-foreground">Total Distribuido</p>
-                    <p className="font-bold text-lg">{formatCurrency(currentSplits.reduce((sum, s) => sum + s.amount, 0))}</p>
+                    <p className="font-bold text-lg">
+                      {formatCurrency(currentSplits.reduce((sum, s) => sum + s.amount, 0))}
+                    </p>
                   </div>
                   <div className="text-right text-sm">
                     <p className="text-muted-foreground">Diferencia Pendiente</p>
-                    <p className={cn("font-bold text-lg", Math.abs(Math.abs(splittingTx?.amount || 0) - currentSplits.reduce((sum, s) => sum + s.amount, 0)) < 0.01 ? "text-emerald-600" : "text-rose-600")}>
-                      {formatCurrency(Math.abs(splittingTx?.amount || 0) - currentSplits.reduce((sum, s) => sum + s.amount, 0))}
+                    <p
+                      className={cn(
+                        'font-bold text-lg',
+                        Math.abs(
+                          Math.abs(splittingTx?.amount || 0) -
+                            currentSplits.reduce((sum, s) => sum + s.amount, 0),
+                        ) < 0.01
+                          ? 'text-emerald-600'
+                          : 'text-rose-600',
+                      )}
+                    >
+                      {formatCurrency(
+                        Math.abs(splittingTx?.amount || 0) -
+                          currentSplits.reduce((sum, s) => sum + s.amount, 0),
+                      )}
                     </p>
                   </div>
                 </div>
               </div>
 
               <DialogFooter>
-                <Button variant="outline" onClick={() => setSplitDialogOpen(false)}>Cancelar</Button>
-                <Button onClick={saveSplits} disabled={Math.abs(Math.abs(splittingTx?.amount || 0) - currentSplits.reduce((sum, s) => sum + s.amount, 0)) > 0.01}>
+                <Button variant="outline" onClick={() => setSplitDialogOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={saveSplits}
+                  disabled={
+                    Math.abs(
+                      Math.abs(splittingTx?.amount || 0) -
+                        currentSplits.reduce((sum, s) => sum + s.amount, 0),
+                    ) > 0.01
+                  }
+                >
                   Confirmar Distribución
                 </Button>
               </DialogFooter>
@@ -994,16 +1203,27 @@ export function ReconciliationPage() {
               <div className="flex items-center justify-between p-4 pb-0">
                 <div className="flex items-center gap-3">
                   <h3 className="text-sm font-semibold">{t('reconciliation.depositsCredits')}</h3>
-                  <Badge variant="secondary" className="text-xs">{deposits.length}</Badge>
+                  <Badge variant="secondary" className="text-xs">
+                    {deposits.length}
+                  </Badge>
                 </div>
                 {deposits.length > 0 && (
-                  <Button variant="ghost" size="sm" onClick={() => toggleAll(deposits)} className="text-xs h-7">
-                    {deposits.every((tx) => selectedTxIds.has(tx.id)) ? t('reconciliation.deselectAll') : t('reconciliation.selectAll')}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => toggleAll(deposits)}
+                    className="text-xs h-7"
+                  >
+                    {deposits.every((tx) => selectedTxIds.has(tx.id))
+                      ? t('reconciliation.deselectAll')
+                      : t('reconciliation.selectAll')}
                   </Button>
                 )}
               </div>
               {deposits.length === 0 ? (
-                <div className="text-center py-8 text-sm text-muted-foreground">{t('reconciliation.noTransactions')}</div>
+                <div className="text-center py-8 text-sm text-muted-foreground">
+                  {t('reconciliation.noTransactions')}
+                </div>
               ) : (
                 <div className="overflow-x-auto">
                   <Table>
@@ -1015,7 +1235,9 @@ export function ReconciliationPage() {
                         <TableHead className="text-right">{t('common.amount')}</TableHead>
                         <TableHead>{t('reconciliation.glAccount')}</TableHead>
                         <TableHead>{t('reconciliation.matchedRule')}</TableHead>
-                        {statusFilter !== 'unreconciled' && <TableHead className="w-[100px]">Reconciled</TableHead>}
+                        {statusFilter !== 'unreconciled' && (
+                          <TableHead className="w-[100px]">Reconciled</TableHead>
+                        )}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1028,8 +1250,12 @@ export function ReconciliationPage() {
               )}
               {deposits.length > 0 && (
                 <div className="flex items-center justify-end px-4 py-3 border-t bg-muted/30">
-                  <span className="text-sm text-muted-foreground mr-3">{t('reconciliation.total')}:</span>
-                  <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">{formatCurrency(summary.depositsTotal)}</span>
+                  <span className="text-sm text-muted-foreground mr-3">
+                    {t('reconciliation.total')}:
+                  </span>
+                  <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">
+                    {formatCurrency(summary.depositsTotal)}
+                  </span>
                 </div>
               )}
             </CardContent>
@@ -1041,16 +1267,27 @@ export function ReconciliationPage() {
               <div className="flex items-center justify-between p-4 pb-0">
                 <div className="flex items-center gap-3">
                   <h3 className="text-sm font-semibold">{t('reconciliation.paymentsDebits')}</h3>
-                  <Badge variant="secondary" className="text-xs">{payments.length}</Badge>
+                  <Badge variant="secondary" className="text-xs">
+                    {payments.length}
+                  </Badge>
                 </div>
                 {payments.length > 0 && (
-                  <Button variant="ghost" size="sm" onClick={() => toggleAll(payments)} className="text-xs h-7">
-                    {payments.every((tx) => selectedTxIds.has(tx.id)) ? t('reconciliation.deselectAll') : t('reconciliation.selectAll')}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => toggleAll(payments)}
+                    className="text-xs h-7"
+                  >
+                    {payments.every((tx) => selectedTxIds.has(tx.id))
+                      ? t('reconciliation.deselectAll')
+                      : t('reconciliation.selectAll')}
                   </Button>
                 )}
               </div>
               {payments.length === 0 ? (
-                <div className="text-center py-8 text-sm text-muted-foreground">{t('reconciliation.noTransactions')}</div>
+                <div className="text-center py-8 text-sm text-muted-foreground">
+                  {t('reconciliation.noTransactions')}
+                </div>
               ) : (
                 <div className="overflow-x-auto">
                   <Table>
@@ -1062,7 +1299,9 @@ export function ReconciliationPage() {
                         <TableHead className="text-right">{t('common.amount')}</TableHead>
                         <TableHead>{t('reconciliation.glAccount')}</TableHead>
                         <TableHead>{t('reconciliation.matchedRule')}</TableHead>
-                        {statusFilter !== 'unreconciled' && <TableHead className="w-[100px]">Reconciled</TableHead>}
+                        {statusFilter !== 'unreconciled' && (
+                          <TableHead className="w-[100px]">Reconciled</TableHead>
+                        )}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1075,8 +1314,12 @@ export function ReconciliationPage() {
               )}
               {payments.length > 0 && (
                 <div className="flex items-center justify-end px-4 py-3 border-t bg-muted/30">
-                  <span className="text-sm text-muted-foreground mr-3">{t('reconciliation.total')}:</span>
-                  <span className="font-mono font-semibold text-rose-600 dark:text-rose-400">{formatCurrency(summary.paymentsTotal)}</span>
+                  <span className="text-sm text-muted-foreground mr-3">
+                    {t('reconciliation.total')}:
+                  </span>
+                  <span className="font-mono font-semibold text-rose-600 dark:text-rose-400">
+                    {formatCurrency(summary.paymentsTotal)}
+                  </span>
                 </div>
               )}
             </CardContent>
@@ -1092,7 +1335,10 @@ export function ReconciliationPage() {
                 </h3>
                 <div className="space-y-2">
                   {recentPeriods.map((p) => (
-                    <div key={p.id} className="flex items-center justify-between p-3 rounded-lg border bg-muted/20">
+                    <div
+                      key={p.id}
+                      className="flex items-center justify-between p-3 rounded-lg border bg-muted/20"
+                    >
                       <div className="flex items-center gap-3">
                         <Check className="size-4 text-emerald-500" />
                         <div>
@@ -1102,12 +1348,20 @@ export function ReconciliationPage() {
                           <p className="text-xs text-muted-foreground">
                             {t('reconciliation.periodCompleted')
                               .replace('{date}', formatDate(p.completedAt!))
-                              .replace('{user}', p.user ? `${p.user.firstName} ${p.user.lastName}` : '—')}
+                              .replace(
+                                '{user}',
+                                p.user ? `${p.user.firstName} ${p.user.lastName}` : '—',
+                              )}
                           </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className={cn('text-xs font-mono', Math.abs(p.difference) < 0.005 ? 'text-emerald-600' : 'text-rose-600')}>
+                        <span
+                          className={cn(
+                            'text-xs font-mono',
+                            Math.abs(p.difference) < 0.005 ? 'text-emerald-600' : 'text-rose-600',
+                          )}
+                        >
                           Diff: {formatCurrency(p.difference)}
                         </span>
                       </div>
@@ -1141,31 +1395,46 @@ export function ReconciliationPage() {
           {createJournalEntries && (
             <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
               <AlertTriangle className="size-4 text-amber-600" />
-              <p className="text-xs text-amber-700 dark:text-amber-400">{t('reconciliation.createJournalEntriesDesc')}</p>
+              <p className="text-xs text-amber-700 dark:text-amber-400">
+                {t('reconciliation.createJournalEntriesDesc')}
+              </p>
             </div>
           )}
           {autoMatchResult ? (
             <div className="space-y-4">
               <Card className="bg-emerald-50 border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-800">
                 <CardContent className="p-4 text-center">
-                  <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">{autoMatchResult.matched}</p>
-                  <p className="text-sm text-emerald-600 dark:text-emerald-400 mt-1">{t('reconciliation.transactionsMatched')}</p>
+                  <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">
+                    {autoMatchResult.matched}
+                  </p>
+                  <p className="text-sm text-emerald-600 dark:text-emerald-400 mt-1">
+                    {t('reconciliation.transactionsMatched')}
+                  </p>
                   <div className="flex justify-center gap-4 mt-2">
-                    <span className="text-xs text-muted-foreground">{t('reconciliation.matchedByRule')}: {autoMatchResult.matchedByRule}</span>
-                    <span className="text-xs text-muted-foreground">{t('reconciliation.matchedByAmount')}: {autoMatchResult.matchedByAmount}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {t('reconciliation.matchedByRule')}: {autoMatchResult.matchedByRule}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {t('reconciliation.matchedByAmount')}: {autoMatchResult.matchedByAmount}
+                    </span>
                   </div>
                   {autoMatchResult.total > autoMatchResult.matched && (
                     <p className="text-xs text-muted-foreground mt-1">
-                      {autoMatchResult.total - autoMatchResult.matched} {t('reconciliation.stillUnmatched')}
+                      {autoMatchResult.total - autoMatchResult.matched}{' '}
+                      {t('reconciliation.stillUnmatched')}
                     </p>
                   )}
                 </CardContent>
               </Card>
-              <DialogFooter><Button onClick={() => setAutoMatchDialogOpen(false)}>{t('common.confirm')}</Button></DialogFooter>
+              <DialogFooter>
+                <Button onClick={() => setAutoMatchDialogOpen(false)}>{t('common.confirm')}</Button>
+              </DialogFooter>
             </div>
           ) : (
             <DialogFooter>
-              <Button variant="outline" onClick={() => setAutoMatchDialogOpen(false)}>{t('common.cancel')}</Button>
+              <Button variant="outline" onClick={() => setAutoMatchDialogOpen(false)}>
+                {t('common.cancel')}
+              </Button>
               <Button onClick={handleAutoMatch} disabled={autoMatching} className="gap-2">
                 {autoMatching && <Loader2 className="size-4 animate-spin" />}
                 <Play className="size-4" />
@@ -1181,27 +1450,42 @@ export function ReconciliationPage() {
         <DialogContent className="sm:max-w-[420px]">
           <DialogHeader>
             <DialogTitle>{t('reconciliation.confirmReconcile')}</DialogTitle>
-            <DialogDescription>{t('reconciliation.confirmReconcileDesc').replace('{count}', String(selectedTxIds.size))}</DialogDescription>
+            <DialogDescription>
+              {t('reconciliation.confirmReconcileDesc').replace(
+                '{count}',
+                String(selectedTxIds.size),
+              )}
+            </DialogDescription>
           </DialogHeader>
           {createJournalEntries && (
             <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
               <AlertTriangle className="size-4 text-amber-600" />
-              <p className="text-xs text-amber-700 dark:text-amber-400">{t('reconciliation.createJournalEntriesDesc')}</p>
+              <p className="text-xs text-amber-700 dark:text-amber-400">
+                {t('reconciliation.createJournalEntriesDesc')}
+              </p>
             </div>
           )}
           {reconcileResult !== null ? (
             <div className="space-y-4">
               <Card className="bg-emerald-50 border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-800">
                 <CardContent className="p-4 text-center">
-                  <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">{reconcileResult}</p>
-                  <p className="text-sm text-emerald-600 dark:text-emerald-400 mt-1">{t('reconciliation.transactionsReconciled')}</p>
+                  <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">
+                    {reconcileResult}
+                  </p>
+                  <p className="text-sm text-emerald-600 dark:text-emerald-400 mt-1">
+                    {t('reconciliation.transactionsReconciled')}
+                  </p>
                 </CardContent>
               </Card>
-              <DialogFooter><Button onClick={() => setReconcileDialogOpen(false)}>{t('common.confirm')}</Button></DialogFooter>
+              <DialogFooter>
+                <Button onClick={() => setReconcileDialogOpen(false)}>{t('common.confirm')}</Button>
+              </DialogFooter>
             </div>
           ) : (
             <DialogFooter>
-              <Button variant="outline" onClick={() => setReconcileDialogOpen(false)}>{t('common.cancel')}</Button>
+              <Button variant="outline" onClick={() => setReconcileDialogOpen(false)}>
+                {t('common.cancel')}
+              </Button>
               <Button onClick={handleReconcile} disabled={reconciling} className="gap-2">
                 {reconciling && <Loader2 className="size-4 animate-spin" />}
                 <Check className="size-4" />
@@ -1217,22 +1501,42 @@ export function ReconciliationPage() {
         <DialogContent className="sm:max-w-[420px]">
           <DialogHeader>
             <DialogTitle>{t('reconciliation.confirmUnreconcile')}</DialogTitle>
-            <DialogDescription>{t('reconciliation.confirmUnreconcileDesc').replace('{count}', String(selectedTxIds.size))}</DialogDescription>
+            <DialogDescription>
+              {t('reconciliation.confirmUnreconcileDesc').replace(
+                '{count}',
+                String(selectedTxIds.size),
+              )}
+            </DialogDescription>
           </DialogHeader>
           {unreconcileResult !== null ? (
             <div className="space-y-4">
               <Card className="bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800">
                 <CardContent className="p-4 text-center">
-                  <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">{unreconcileResult}</p>
-                  <p className="text-sm text-amber-600 dark:text-amber-400 mt-1">{t('reconciliation.transactionsUnreconciled')}</p>
+                  <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">
+                    {unreconcileResult}
+                  </p>
+                  <p className="text-sm text-amber-600 dark:text-amber-400 mt-1">
+                    {t('reconciliation.transactionsUnreconciled')}
+                  </p>
                 </CardContent>
               </Card>
-              <DialogFooter><Button onClick={() => setUnreconcileDialogOpen(false)}>{t('common.confirm')}</Button></DialogFooter>
+              <DialogFooter>
+                <Button onClick={() => setUnreconcileDialogOpen(false)}>
+                  {t('common.confirm')}
+                </Button>
+              </DialogFooter>
             </div>
           ) : (
             <DialogFooter>
-              <Button variant="outline" onClick={() => setUnreconcileDialogOpen(false)}>{t('common.cancel')}</Button>
-              <Button onClick={handleUnreconcile} disabled={unreconciling} className="gap-2" variant="destructive">
+              <Button variant="outline" onClick={() => setUnreconcileDialogOpen(false)}>
+                {t('common.cancel')}
+              </Button>
+              <Button
+                onClick={handleUnreconcile}
+                disabled={unreconciling}
+                className="gap-2"
+                variant="destructive"
+              >
                 {unreconciling && <Loader2 className="size-4 animate-spin" />}
                 <Undo2 className="size-4" />
                 {t('reconciliation.unreconcileSelected')} ({selectedTxIds.size})
@@ -1256,35 +1560,76 @@ export function ReconciliationPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-sm">{t('reconciliation.adjustmentDate')}</Label>
-                <Input type="date" value={adjustForm.date} onChange={(e) => setAdjustForm({ ...adjustForm, date: e.target.value })} />
+                <Input
+                  type="date"
+                  value={adjustForm.date}
+                  onChange={(e) => setAdjustForm({ ...adjustForm, date: e.target.value })}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-sm">{t('reconciliation.adjustmentAmount')}</Label>
-                <Input type="number" step="0.01" placeholder="0.00" value={adjustForm.amount} onChange={(e) => setAdjustForm({ ...adjustForm, amount: e.target.value })} />
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={adjustForm.amount}
+                  onChange={(e) => setAdjustForm({ ...adjustForm, amount: e.target.value })}
+                />
               </div>
             </div>
             <div className="space-y-1.5">
               <Label className="text-sm">{t('reconciliation.adjustmentDescription')}</Label>
-              <Input placeholder="e.g., Bank fee adjustment" value={adjustForm.description} onChange={(e) => setAdjustForm({ ...adjustForm, description: e.target.value })} />
+              <Input
+                placeholder="e.g., Bank fee adjustment"
+                value={adjustForm.description}
+                onChange={(e) => setAdjustForm({ ...adjustForm, description: e.target.value })}
+              />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-sm">{t('reconciliation.adjustmentDebitAccount')}</Label>
-                <AccountSelector accounts={accounts} value={adjustForm.debitAccountId} onChange={(id) => setAdjustForm({ ...adjustForm, debitAccountId: id ?? '' })} placeholder="Select debit account" />
+                <AccountSelector
+                  accounts={accounts}
+                  value={adjustForm.debitAccountId}
+                  onChange={(id) => setAdjustForm({ ...adjustForm, debitAccountId: id ?? '' })}
+                  placeholder="Select debit account"
+                />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-sm">{t('reconciliation.adjustmentCreditAccount')}</Label>
-                <AccountSelector accounts={accounts} value={adjustForm.creditAccountId} onChange={(id) => setAdjustForm({ ...adjustForm, creditAccountId: id ?? '' })} placeholder="Select credit account" />
+                <AccountSelector
+                  accounts={accounts}
+                  value={adjustForm.creditAccountId}
+                  onChange={(id) => setAdjustForm({ ...adjustForm, creditAccountId: id ?? '' })}
+                  placeholder="Select credit account"
+                />
               </div>
             </div>
             <div className="space-y-1.5">
               <Label className="text-sm">{t('reconciliation.adjustmentNotes')}</Label>
-              <Textarea placeholder={t('reconciliation.adjustmentNotes')} value={adjustForm.notes} onChange={(e) => setAdjustForm({ ...adjustForm, notes: e.target.value })} rows={2} />
+              <Textarea
+                placeholder={t('reconciliation.adjustmentNotes')}
+                value={adjustForm.notes}
+                onChange={(e) => setAdjustForm({ ...adjustForm, notes: e.target.value })}
+                rows={2}
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAdjustmentDialogOpen(false)}>{t('common.cancel')}</Button>
-            <Button onClick={handleAdjustment} disabled={adjusting || !adjustForm.description || !adjustForm.debitAccountId || !adjustForm.creditAccountId || !adjustForm.amount} className="gap-2">
+            <Button variant="outline" onClick={() => setAdjustmentDialogOpen(false)}>
+              {t('common.cancel')}
+            </Button>
+            <Button
+              onClick={handleAdjustment}
+              disabled={
+                adjusting ||
+                !adjustForm.description ||
+                !adjustForm.debitAccountId ||
+                !adjustForm.creditAccountId ||
+                !adjustForm.amount
+              }
+              className="gap-2"
+            >
               {adjusting && <Loader2 className="size-4 animate-spin" />}
               <PlusCircle className="size-4" />
               {t('reconciliation.createAdjustment')}
@@ -1313,22 +1658,53 @@ export function ReconciliationPage() {
                 <div key={p.id} className="p-4 rounded-lg border space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Badge variant={p.status === 'completed' ? 'default' : p.status === 'open' ? 'secondary' : 'outline'}>
-                        {p.status === 'completed' ? t('reconciliation.periodCompletedStatus') : p.status === 'open' ? t('reconciliation.periodOpen') : t('reconciliation.periodCancelled')}
+                      <Badge
+                        variant={
+                          p.status === 'completed'
+                            ? 'default'
+                            : p.status === 'open'
+                              ? 'secondary'
+                              : 'outline'
+                        }
+                      >
+                        {p.status === 'completed'
+                          ? t('reconciliation.periodCompletedStatus')
+                          : p.status === 'open'
+                            ? t('reconciliation.periodOpen')
+                            : t('reconciliation.periodCancelled')}
                       </Badge>
                       <span className="text-xs text-muted-foreground">
-                        {t('reconciliation.startedBy')}: {p.user ? `${p.user.firstName} ${p.user.lastName}` : '—'}
+                        {t('reconciliation.startedBy')}:{' '}
+                        {p.user ? `${p.user.firstName} ${p.user.lastName}` : '—'}
                       </span>
                     </div>
                     <span className="text-xs text-muted-foreground">{formatDate(p.startedAt)}</span>
                   </div>
                   <div className="grid grid-cols-3 gap-2 text-sm">
-                    <div><span className="text-muted-foreground">Stmt: </span><span className="font-mono">{formatCurrency(p.statementBalance)}</span></div>
-                    <div><span className="text-muted-foreground">Book: </span><span className="font-mono">{formatCurrency(p.bookBalance)}</span></div>
-                    <div><span className="text-muted-foreground">Diff: </span><span className={cn('font-mono', Math.abs(p.difference) < 0.005 ? 'text-emerald-600' : 'text-rose-600')}>{formatCurrency(p.difference)}</span></div>
+                    <div>
+                      <span className="text-muted-foreground">Stmt: </span>
+                      <span className="font-mono">{formatCurrency(p.statementBalance)}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Book: </span>
+                      <span className="font-mono">{formatCurrency(p.bookBalance)}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Diff: </span>
+                      <span
+                        className={cn(
+                          'font-mono',
+                          Math.abs(p.difference) < 0.005 ? 'text-emerald-600' : 'text-rose-600',
+                        )}
+                      >
+                        {formatCurrency(p.difference)}
+                      </span>
+                    </div>
                   </div>
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>{p.transactionCount} {t('reconciliation.transactionsReconciled')}</span>
+                    <span>
+                      {p.transactionCount} {t('reconciliation.transactionsReconciled')}
+                    </span>
                     {p.completedAt && <span>{formatDate(p.completedAt)}</span>}
                   </div>
                 </div>

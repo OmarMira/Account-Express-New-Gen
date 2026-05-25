@@ -21,13 +21,7 @@ import { motion } from 'framer-motion';
 import { useLanguageStore } from '@/store/language-store';
 import { useAuthStore } from '@/store/auth-store';
 import { toast } from 'sonner';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -139,9 +133,10 @@ export function BackupPage() {
 
   useEffect(() => {
     mountedRef.current = true;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetching data on mount
     void fetchBackups();
-    return () => { mountedRef.current = false; };
+    return () => {
+      mountedRef.current = false;
+    };
   }, [fetchBackups]);
 
   // Create backup
@@ -194,7 +189,7 @@ export function BackupPage() {
     setDownloading(backup.id);
     try {
       const res = await fetch(
-        `/api/backup/${encodeURIComponent(backup.filename)}?companyId=${companyId}`
+        `/api/backup/${encodeURIComponent(backup.filename)}?companyId=${companyId}`,
       );
       if (res.ok) {
         const data = await res.json();
@@ -266,7 +261,7 @@ export function BackupPage() {
         setRestoreProgress(100);
         const totalRecords = (Object.values(data.restoredCounts) as number[]).reduce(
           (a, b) => a + b,
-          0
+          0,
         );
         toast.success(t('settings.backup.restoreSuccess'), {
           description: `${totalRecords} ${t('settings.backup.records')}`,
@@ -345,9 +340,7 @@ export function BackupPage() {
             <CardContent className="p-6 flex flex-col items-center gap-4">
               <Loader2 className="size-12 animate-spin text-primary" />
               <div className="text-center">
-                <p className="text-lg font-semibold">
-                  {t('settings.backup.restoring')}
-                </p>
+                <p className="text-lg font-semibold">{t('settings.backup.restoring')}</p>
                 <p className="text-sm text-muted-foreground mt-1">
                   {t('settings.backup.restoreWarning')}
                 </p>
@@ -360,9 +353,7 @@ export function BackupPage() {
 
       {/* Header */}
       <motion.div variants={itemVariants}>
-        <h1 className="text-2xl font-bold tracking-tight">
-          {t('settings.systemBackup')}
-        </h1>
+        <h1 className="text-2xl font-bold tracking-tight">{t('settings.systemBackup')}</h1>
         <p className="text-sm text-muted-foreground mt-1">
           {t('settings.backup.createBackupDesc')}
         </p>
@@ -395,16 +386,10 @@ export function BackupPage() {
                 <DatabaseBackup className="size-4" />
                 {t('settings.backup.createBackup')}
               </CardTitle>
-              <CardDescription>
-                {t('settings.backup.createBackupDesc')}
-              </CardDescription>
+              <CardDescription>{t('settings.backup.createBackupDesc')}</CardDescription>
             </CardHeader>
             <CardContent>
-              <Button
-                onClick={handleCreateBackup}
-                disabled={creating}
-                className="w-full sm:w-auto"
-              >
+              <Button onClick={handleCreateBackup} disabled={creating} className="w-full sm:w-auto">
                 {creating ? (
                   <>
                     <Loader2 className="size-4 mr-2 animate-spin" />
@@ -427,9 +412,7 @@ export function BackupPage() {
                 <ArrowDownToLine className="size-4 text-amber-600 dark:text-amber-400" />
                 {t('settings.backup.restoreBackup')}
               </CardTitle>
-              <CardDescription>
-                {t('settings.backup.restoreBackupDesc')}
-              </CardDescription>
+              <CardDescription>{t('settings.backup.restoreBackupDesc')}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Warning */}
@@ -449,9 +432,10 @@ export function BackupPage() {
                 onClick={() => fileInputRef.current?.click()}
                 className={`
                   flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed p-6 cursor-pointer transition-colors
-                  ${restoreFile
-                    ? 'border-emerald-300 bg-emerald-50/50 dark:border-emerald-800 dark:bg-emerald-950/20'
-                    : 'border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/50'
+                  ${
+                    restoreFile
+                      ? 'border-emerald-300 bg-emerald-50/50 dark:border-emerald-800 dark:bg-emerald-950/20'
+                      : 'border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/50'
                   }
                 `}
               >
@@ -480,9 +464,7 @@ export function BackupPage() {
                       <Upload className="size-5 text-muted-foreground" />
                     </div>
                     <div className="text-center">
-                      <p className="text-sm font-medium">
-                        {t('settings.backup.selectFile')}
-                      </p>
+                      <p className="text-sm font-medium">{t('settings.backup.selectFile')}</p>
                       <p className="text-xs text-muted-foreground mt-1">
                         {t('settings.backup.dragDrop')}
                       </p>
@@ -542,9 +524,7 @@ export function BackupPage() {
                   <div className="flex size-12 items-center justify-center rounded-full bg-muted">
                     <FileJson className="size-6 text-muted-foreground" />
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    {t('settings.backup.noBackups')}
-                  </p>
+                  <p className="text-sm text-muted-foreground">{t('settings.backup.noBackups')}</p>
                 </div>
               ) : (
                 <div className="space-y-3 max-h-96 overflow-y-auto pr-1 custom-scrollbar">
@@ -580,9 +560,7 @@ export function BackupPage() {
           {restoreFile && (
             <div className="rounded-lg border bg-muted/50 p-3">
               <p className="text-sm font-medium">{restoreFile.name}</p>
-              <p className="text-xs text-muted-foreground">
-                {formatFileSize(restoreFile.size)}
-              </p>
+              <p className="text-xs text-muted-foreground">{formatFileSize(restoreFile.size)}</p>
             </div>
           )}
           <AlertDialogFooter>
@@ -605,9 +583,7 @@ export function BackupPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t('settings.backup.deleteConfirm')}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {showDeleteConfirm}
-            </AlertDialogDescription>
+            <AlertDialogDescription>{showDeleteConfirm}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
@@ -645,10 +621,7 @@ function BackupItem({
   onDelete: () => void;
   t: (key: string) => string;
 }) {
-  const totalRecords = (Object.values(backup.recordCounts) as number[]).reduce(
-    (a, b) => a + b,
-    0
-  );
+  const totalRecords = (Object.values(backup.recordCounts) as number[]).reduce((a, b) => a + b, 0);
 
   return (
     <div className="flex items-start gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/30">
@@ -672,7 +645,9 @@ function BackupItem({
             <HardDrive className="size-3" />
             {formatFileSize(backup.size)}
           </span>
-          <span>{totalRecords} {t('settings.backup.records')}</span>
+          <span>
+            {totalRecords} {t('settings.backup.records')}
+          </span>
         </div>
         <div className="flex flex-wrap gap-1 mt-1.5">
           {backup.recordCounts.glAccounts > 0 && (

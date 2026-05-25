@@ -35,13 +35,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { ThemeToggle } from '@/components/spa/ThemeToggle';
 import { LanguageSelector } from '@/components/spa/LanguageSelector';
 import { DashboardPage } from '@/components/spa/DashboardPage';
@@ -111,9 +105,7 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
         <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm">
           AE
         </div>
-        <span className="text-lg font-semibold tracking-tight">
-          {t('common.appName')}
-        </span>
+        <span className="text-lg font-semibold tracking-tight">{t('common.appName')}</span>
       </div>
 
       <Separator />
@@ -122,9 +114,10 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
       <ScrollArea className="flex-1 py-2">
         <nav className="space-y-1 px-3">
           {navItems.map((item) => {
-            const isActive = item.view === 'accounts'
-              ? pathname === '/accounts'
-              : pathname === '/' && currentView === item.view;
+            const isActive =
+              item.view === 'accounts'
+                ? pathname === '/accounts'
+                : pathname === '/' && currentView === item.view;
             return (
               <button
                 key={item.view}
@@ -133,7 +126,7 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
                   'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                   isActive
                     ? 'bg-primary/10 text-primary'
-                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
                 )}
               >
                 <item.icon className="size-4 shrink-0" />
@@ -161,14 +154,17 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
             'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
             pathname === '/' && currentView === 'settings'
               ? 'bg-primary/10 text-primary'
-              : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+              : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
           )}
         >
           <settingsItem.icon className="size-4 shrink-0" />
           {t(settingsItem.labelKey)}
         </button>
         <button
-          onClick={() => { fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }); useAuthStore.getState().logout(); }}
+          onClick={() => {
+            fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+            useAuthStore.getState().logout();
+          }}
           className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-rose-500/10 hover:text-rose-500 transition-colors"
         >
           <LogOut className="size-4 shrink-0" />
@@ -185,17 +181,17 @@ function DesktopSidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
     <aside
       className={cn(
         'hidden lg:flex flex-col border-r bg-card transition-all duration-300 shrink-0',
-        collapsed ? 'w-16' : 'w-64'
+        collapsed ? 'w-16' : 'w-64',
       )}
     >
-      <div className={cn('flex h-14 items-center', collapsed ? 'justify-center px-2' : 'gap-2 px-4')}>
+      <div
+        className={cn('flex h-14 items-center', collapsed ? 'justify-center px-2' : 'gap-2 px-4')}
+      >
         <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm">
           AE
         </div>
         {!collapsed && (
-          <span className="text-lg font-semibold tracking-tight truncate">
-            AccountExpress
-          </span>
+          <span className="text-lg font-semibold tracking-tight truncate">AccountExpress</span>
         )}
       </div>
 
@@ -215,12 +211,7 @@ function DesktopSidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
           className="flex w-full items-center justify-center rounded-lg py-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
-          <ChevronLeft
-            className={cn(
-              'size-4 transition-transform',
-              collapsed && 'rotate-180'
-            )}
-          />
+          <ChevronLeft className={cn('size-4 transition-transform', collapsed && 'rotate-180')} />
         </button>
       </div>
     </aside>
@@ -251,9 +242,10 @@ function DesktopNavItems({ collapsed }: { collapsed: boolean }) {
   return (
     <>
       {allItems.map((item) => {
-        const isActive = item.view === 'accounts'
-          ? pathname === '/accounts'
-          : pathname === '/' && currentView === item.view;
+        const isActive =
+          item.view === 'accounts'
+            ? pathname === '/accounts'
+            : pathname === '/' && currentView === item.view;
         return (
           <button
             key={item.view}
@@ -264,7 +256,7 @@ function DesktopNavItems({ collapsed }: { collapsed: boolean }) {
               collapsed ? 'justify-center' : 'w-full',
               isActive
                 ? 'bg-primary/10 text-primary'
-                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
             )}
           >
             <item.icon className="size-4 shrink-0" />
@@ -278,7 +270,7 @@ function DesktopNavItems({ collapsed }: { collapsed: boolean }) {
         title={t('aiAssistant.title')}
         className={cn(
           'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-purple-500/10 hover:text-purple-500 transition-colors',
-          collapsed ? 'justify-center' : 'w-full'
+          collapsed ? 'justify-center' : 'w-full',
         )}
       >
         <Sparkles className="size-4 shrink-0" />
@@ -292,8 +284,7 @@ function DesktopNavItems({ collapsed }: { collapsed: boolean }) {
 export function AppShell({ children }: { children?: React.ReactNode }) {
   const router = useRouter();
   const t = useLanguageStore((s) => s.t);
-  const { user, activeCompany, logout, sidebarOpen, setSidebarOpen } =
-    useAuthStore();
+  const { user, activeCompany, logout, sidebarOpen, setSidebarOpen } = useAuthStore();
   const currentView = useAuthStore((s) => s.currentView);
 
   const initials = user
@@ -322,7 +313,7 @@ export function AppShell({ children }: { children?: React.ReactNode }) {
   }, [currentView, setSidebarOpen]);
 
   const pageTitle = t(
-    `${navItems.find((i) => i.view === currentView)?.labelKey ?? settingsItem.labelKey}`
+    `${navItems.find((i) => i.view === currentView)?.labelKey ?? settingsItem.labelKey}`,
   );
 
   return (
@@ -345,9 +336,7 @@ export function AppShell({ children }: { children?: React.ReactNode }) {
               <h3 className="font-semibold text-sm tracking-tight text-foreground">
                 {processingMessage || 'Procesando...'}
               </h3>
-              <p className="text-xs text-muted-foreground">
-                Por favor, espera un momento.
-              </p>
+              <p className="text-xs text-muted-foreground">Por favor, espera un momento.</p>
             </div>
           </div>
         </div>
@@ -385,7 +374,9 @@ export function AppShell({ children }: { children?: React.ReactNode }) {
               <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
                 {t('common.companyActive')}
               </span>
-              <span className="text-sm font-medium truncate max-w-[140px]">{activeCompany.legalName}</span>
+              <span className="text-sm font-medium truncate max-w-[140px]">
+                {activeCompany.legalName}
+              </span>
               <button
                 onClick={handleChangeCompany}
                 className="text-xs text-primary hover:underline font-medium"
@@ -429,7 +420,7 @@ export function AppShell({ children }: { children?: React.ReactNode }) {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-    
+
                 <DropdownMenuItem
                   onClick={() => useAuthStore.getState().setCurrentView('settings')}
                   className="gap-2"
@@ -438,11 +429,7 @@ export function AppShell({ children }: { children?: React.ReactNode }) {
                   {t('settings.title')}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={handleLogout}
-                  variant="destructive"
-                  className="gap-2"
-                >
+                <DropdownMenuItem onClick={handleLogout} variant="destructive" className="gap-2">
                   <LogOut className="size-4" />
                   {t('auth.logout')}
                 </DropdownMenuItem>
@@ -537,9 +524,7 @@ function PlaceholderView({ view }: { view: ViewName }) {
       </div>
       <div>
         <h2 className="text-2xl font-semibold">{title}</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          {t('landing.comingSoon')}
-        </p>
+        <p className="mt-2 text-sm text-muted-foreground">{t('landing.comingSoon')}</p>
       </div>
     </div>
   );

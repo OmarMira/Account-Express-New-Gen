@@ -33,8 +33,6 @@ export function formatNumber(num: number): string {
 /**
  * Simple classname merger – filters out falsy values and joins with space.
  */
-export function cn(
-  ...classes: (string | undefined | null | false)[]
-): string {
+export function cn(...classes: (string | undefined | null | false)[]): string {
   return classes.filter(Boolean).join(' ');
 }

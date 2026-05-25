@@ -37,8 +37,7 @@ const UnauthView = ({ view }: { view: string }) => {
 
 /* ── Main SPA Router ── */
 function AppContent() {
-  const { isAuthenticated, activeCompany, currentView, hydrate } =
-    useAuthStore();
+  const { isAuthenticated, activeCompany, currentView, hydrate } = useAuthStore();
   const [hydrating, setHydrating] = useState(true);
 
   useEffect(() => {

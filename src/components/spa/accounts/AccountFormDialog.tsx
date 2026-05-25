@@ -24,16 +24,34 @@ import { useLanguageStore } from '@/store/language-store';
 const ACCOUNT_TYPES = ['asset', 'liability', 'equity', 'revenue', 'expense'];
 
 const TYPE_HELPERS: Record<string, { en: string; es: string }> = {
-  asset: { en: 'Resources owned by the company (cash, receivables, inventory)', es: 'Recursos propiedad de la empresa (efectivo, cuentas por cobrar, inventario)' },
-  liability: { en: 'Debts and obligations (payables, loans, taxes)', es: 'Deudas y obligaciones (cuentas por pagar, préstamos, impuestos)' },
-  equity: { en: "Owner's equity and retained earnings", es: 'Capital contable y utilidades retenidas' },
+  asset: {
+    en: 'Resources owned by the company (cash, receivables, inventory)',
+    es: 'Recursos propiedad de la empresa (efectivo, cuentas por cobrar, inventario)',
+  },
+  liability: {
+    en: 'Debts and obligations (payables, loans, taxes)',
+    es: 'Deudas y obligaciones (cuentas por pagar, préstamos, impuestos)',
+  },
+  equity: {
+    en: "Owner's equity and retained earnings",
+    es: 'Capital contable y utilidades retenidas',
+  },
   revenue: { en: 'Income from business operations', es: 'Ingresos por operaciones del negocio' },
-  expense: { en: 'Costs incurred in business operations', es: 'Costos incurridos en las operaciones del negocio' },
+  expense: {
+    en: 'Costs incurred in business operations',
+    es: 'Costos incurridos en las operaciones del negocio',
+  },
 };
 
 const BALANCE_HELPERS: Record<string, { en: string; es: string }> = {
-  debit: { en: 'Increases with debits (Assets, Expenses)', es: 'Aumenta con cargos (Activos, Gastos)' },
-  credit: { en: 'Increases with credits (Liabilities, Equity, Revenue)', es: 'Aumenta con abonos (Pasivos, Capital, Ingresos)' },
+  debit: {
+    en: 'Increases with debits (Assets, Expenses)',
+    es: 'Aumenta con cargos (Activos, Gastos)',
+  },
+  credit: {
+    en: 'Increases with credits (Liabilities, Equity, Revenue)',
+    es: 'Aumenta con abonos (Pasivos, Capital, Ingresos)',
+  },
 };
 
 export interface GlAccount {
@@ -160,9 +178,13 @@ export function AccountFormDialog({
                   ))}
                 </SelectContent>
               </Select>
-              {formErrors.accountType && <p className="text-xs text-rose-600">{formErrors.accountType}</p>}
+              {formErrors.accountType && (
+                <p className="text-xs text-rose-600">{formErrors.accountType}</p>
+              )}
               {formData.accountType && (
-                <p className="text-xs text-muted-foreground">{getTypeHelper(formData.accountType)}</p>
+                <p className="text-xs text-muted-foreground">
+                  {getTypeHelper(formData.accountType)}
+                </p>
               )}
             </div>
             <div className="space-y-2">
@@ -179,9 +201,13 @@ export function AccountFormDialog({
                   <SelectItem value="credit">{t('accounts.credit')}</SelectItem>
                 </SelectContent>
               </Select>
-              {formErrors.normalBalance && <p className="text-xs text-rose-600">{formErrors.normalBalance}</p>}
+              {formErrors.normalBalance && (
+                <p className="text-xs text-rose-600">{formErrors.normalBalance}</p>
+              )}
               {formData.normalBalance && (
-                <p className="text-xs text-muted-foreground">{getBalanceHelper(formData.normalBalance)}</p>
+                <p className="text-xs text-muted-foreground">
+                  {getBalanceHelper(formData.normalBalance)}
+                </p>
               )}
             </div>
           </div>
@@ -189,10 +215,7 @@ export function AccountFormDialog({
           {/* Parent Account */}
           <div className="space-y-2">
             <Label>{t('accounts.parentAccount')}</Label>
-            <Select
-              value={formData.parentId}
-              onValueChange={(v) => onFormChange({ parentId: v })}
-            >
+            <Select value={formData.parentId} onValueChange={(v) => onFormChange({ parentId: v })}>
               <SelectTrigger>
                 <SelectValue placeholder="—" />
               </SelectTrigger>

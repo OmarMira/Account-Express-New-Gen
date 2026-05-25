@@ -11,10 +11,7 @@ export async function GET(request: NextRequest) {
     const accountId = searchParams.get('accountId');
 
     if (!companyId) {
-      return NextResponse.json(
-        { error: 'companyId is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'companyId is required' }, { status: 400 });
     }
 
     // Build where clause
@@ -203,7 +200,7 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    const journalDescSet = new Set(entries.map(e => e.description));
+    const journalDescSet = new Set(entries.map((e) => e.description));
 
     for (const tx of reconciledTxs) {
       if (!tx.glAccount) continue;
@@ -266,18 +263,14 @@ export async function GET(request: NextRequest) {
       };
 
       // The assigned GL Account line
-      processVirtualLine(
-        tx.glAccount,
-        isDeposit ? 0 : absAmount,
-        isDeposit ? absAmount : 0
-      );
+      processVirtualLine(tx.glAccount, isDeposit ? 0 : absAmount, isDeposit ? absAmount : 0);
 
       // The Bank Asset Account line (if not filtered out by accountId)
       if (!accountId || accountId === tx.statement.bankAccount.glAccount?.id) {
         processVirtualLine(
           tx.statement.bankAccount.glAccount,
           isDeposit ? absAmount : 0,
-          isDeposit ? 0 : absAmount
+          isDeposit ? 0 : absAmount,
         );
       }
     }
@@ -286,7 +279,7 @@ export async function GET(request: NextRequest) {
 
     // Sort by account code
     const byAccount = Array.from(accountMap.values()).sort((a, b) =>
-      a.accountCode.localeCompare(b.accountCode)
+      a.accountCode.localeCompare(b.accountCode),
     );
 
     // Add net to byAccount
@@ -309,9 +302,7 @@ export async function GET(request: NextRequest) {
       }));
 
     // Limit recent movements to 50 and only those with non-zero amounts
-    const filteredRecent = recentMovements
-      .filter((m) => m.debit > 0 || m.credit > 0)
-      .slice(0, 50);
+    const filteredRecent = recentMovements.filter((m) => m.debit > 0 || m.credit > 0).slice(0, 50);
 
     return NextResponse.json({
       summary: {
@@ -326,9 +317,6 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('Movement summary error:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch movement summary' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to fetch movement summary' }, { status: 500 });
   }
 }

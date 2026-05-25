@@ -1,15 +1,6 @@
-import { PDFParse } from 'pdf-parse';
+import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
 import path from 'path';
 import { pathToFileURL } from 'url';
-
-// Configure the pdf.js worker path for the server context
-try {
-  const workerPath = path.join(process.cwd(), 'node_modules', 'pdfjs-dist', 'legacy', 'build', 'pdf.worker.mjs');
-  const workerUrl = pathToFileURL(workerPath).href;
-  PDFParse.setWorker(workerUrl);
-} catch (e) {
-  console.error('Failed to configure PDF worker:', e);
-}
 
 export interface ParsedTransaction {
   date: Date;
@@ -28,21 +19,65 @@ export interface ParsedPDFResult {
   endDate?: Date;
 }
 
+// Configure worker path statically
+try {
+  const workerPath = path.join(
+    process.cwd(),
+    'node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs',
+  );
+  // Convert to file:// URL for proper Windows support
+  const workerUrl = pathToFileURL(workerPath).toString();
+  pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+} catch (e) {
+  console.error('Failed to configure PDF worker:', e);
+}
+
 export async function parsePDF(buffer: Buffer): Promise<ParsedPDFResult> {
-  const parser = new PDFParse({ data: new Uint8Array(buffer) });
+  const loadingTask = pdfjs.getDocument({
+    data: new Uint8Array(buffer),
+    useWorkerFetch: false,
+    isEvalSupported: false,
+    useSystemFonts: true,
+  });
+
+  const pdf = await loadingTask.promise;
+
   let fullText = '';
-  try {
-    const data = await parser.getText();
-    fullText = data.text || '';
-  } finally {
-    await parser.destroy().catch(() => {});
+  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+    const page = await pdf.getPage(pageNum);
+    const textContent = await page.getTextContent();
+
+    const items = textContent.items as any[];
+    const linesMap = new Map<number, any[]>();
+
+    for (const item of items) {
+      if (!item.str || item.str.trim() === '') continue;
+      const y = Math.round(item.transform[5] * 2) / 2; // Group closely aligned text elements
+      if (!linesMap.has(y)) {
+        linesMap.set(y, []);
+      }
+      linesMap.get(y)!.push(item);
+    }
+
+    const sortedY = Array.from(linesMap.keys()).sort((a, b) => b - a);
+
+    let pageText = '';
+    for (const y of sortedY) {
+      const lineItems = linesMap.get(y)!;
+      lineItems.sort((a, b) => a.transform[4] - b.transform[4]); // Sort left-to-right
+      const lineStr = lineItems.map((item) => item.str).join(' ');
+      pageText += lineStr + '\n';
+    }
+
+    fullText += pageText + '\n';
   }
 
   const lines = fullText.split('\n');
   const transactions: ParsedTransaction[] = [];
 
   // Regex to match a date
-  const dateRegex = /\b(\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4}|\d{4}-\d{1,2}-\d{1,2}|\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{2,4})\b/i;
+  const dateRegex =
+    /\b(\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4}|\d{4}-\d{1,2}-\d{1,2}|\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{2,4})\b/i;
 
   // Regex to match an amount at the end of a line
   const amountRegex = /(?:^|\s)(-?\$?\s*\(?\d+(?:,\d{3})*(?:\.\d{2})?\)?-?)\s*$/;
@@ -52,7 +87,10 @@ export async function parsePDF(buffer: Buffer): Promise<ParsedPDFResult> {
     if (!line) continue;
 
     // Skip balance summary lines so they aren't parsed as transactions
-    if (/balance/i.test(line) && (/(?:beginning|ending|starting|opening|closing|previous|new)/i.test(line))) {
+    if (
+      /balance/i.test(line) &&
+      /(?:beginning|ending|starting|opening|closing|previous|new)/i.test(line)
+    ) {
       continue;
     }
 
@@ -66,7 +104,11 @@ export async function parsePDF(buffer: Buffer): Promise<ParsedPDFResult> {
       const dateIndex = line.indexOf(matchedDateStr);
       const amountIndex = line.lastIndexOf(matchedAmountStr);
 
-      if (dateIndex !== -1 && amountIndex !== -1 && amountIndex > dateIndex + matchedDateStr.length) {
+      if (
+        dateIndex !== -1 &&
+        amountIndex !== -1 &&
+        amountIndex > dateIndex + matchedDateStr.length
+      ) {
         const descRaw = line.substring(dateIndex + matchedDateStr.length, amountIndex).trim();
         const description = descRaw.replace(/^[-_\s\:\.\,]+|[-_\s\:\.\,]+$/g, '').trim();
 
@@ -75,7 +117,15 @@ export async function parsePDF(buffer: Buffer): Promise<ParsedPDFResult> {
           const amount = parseAmount(matchedAmountStr);
 
           if (date && !isNaN(date.getTime()) && !isNaN(amount)) {
-            transactions.push({ date, description, amount });
+            let reference: string | undefined;
+            const zelleMatch = description.match(/Conf#\s*([a-zA-Z0-9]+)/i);
+            const achMatch = description.match(/ID:\s*([a-zA-Z0-9]+)/i);
+            if (zelleMatch) {
+              reference = zelleMatch[1];
+            } else if (achMatch) {
+              reference = achMatch[1];
+            }
+            transactions.push({ date, description, amount, reference });
           }
         }
       }
@@ -86,10 +136,26 @@ export async function parsePDF(buffer: Buffer): Promise<ParsedPDFResult> {
   if (transactions.length === 0) {
     const mockDate = new Date();
     transactions.push(
-      { date: new Date(mockDate.getFullYear(), mockDate.getMonth(), 5), description: 'INTEREST PAYMENT', amount: 0.25 },
-      { date: new Date(mockDate.getFullYear(), mockDate.getMonth(), 10), description: 'SUPERMARKET DEPOSIT', amount: -45.50 },
-      { date: new Date(mockDate.getFullYear(), mockDate.getMonth(), 15), description: 'PAYROLL DIRECT DEP', amount: 2500.00 },
-      { date: new Date(mockDate.getFullYear(), mockDate.getMonth(), 20), description: 'OFFICE SUPPLIES INC', amount: -120.00 }
+      {
+        date: new Date(mockDate.getFullYear(), mockDate.getMonth(), 5),
+        description: 'INTEREST PAYMENT',
+        amount: 0.25,
+      },
+      {
+        date: new Date(mockDate.getFullYear(), mockDate.getMonth(), 10),
+        description: 'SUPERMARKET DEPOSIT',
+        amount: -45.5,
+      },
+      {
+        date: new Date(mockDate.getFullYear(), mockDate.getMonth(), 15),
+        description: 'PAYROLL DIRECT DEP',
+        amount: 2500.0,
+      },
+      {
+        date: new Date(mockDate.getFullYear(), mockDate.getMonth(), 20),
+        description: 'OFFICE SUPPLIES INC',
+        amount: -120.0,
+      },
     );
   }
 
@@ -104,7 +170,9 @@ export async function parsePDF(buffer: Buffer): Promise<ParsedPDFResult> {
   }
 
   let accountNo: string | undefined;
-  const accMatch = fullText.match(/(?:Account number|Account\s*#|Account\s*no\.?|Account\s*Number):\s*([0-9\s\-]+)/i);
+  const accMatch = fullText.match(
+    /(?:Account number|Account\s*#|Account\s*no\.?|Account\s*Number):\s*([0-9\s\-]+)/i,
+  );
   if (accMatch) {
     accountNo = accMatch[1].trim().replace(/\s+/g, ' ');
   }
@@ -114,13 +182,17 @@ export async function parsePDF(buffer: Buffer): Promise<ParsedPDFResult> {
   let startDate: Date | undefined;
   let endDate: Date | undefined;
 
-  const startBalMatch = fullText.match(/Beginning balance on ([A-Za-z]+ \d+, \d{4})\s+\$?([0-9,.-]+)/i);
+  const startBalMatch = fullText.match(
+    /Beginning balance on ([A-Za-z]+ \d+, \d{4})\s+\$?([0-9,.-]+)/i,
+  );
   if (startBalMatch) {
     openingBalance = parseAmount(startBalMatch[2]);
     const d = parseDate(startBalMatch[1]);
     if (d) startDate = d;
   } else {
-    const fallbackStart = fullText.match(/(?:Beginning|Starting|Opening|Previous) balance\s+\$?([0-9,.-]+)/i);
+    const fallbackStart = fullText.match(
+      /(?:Beginning|Starting|Opening|Previous) balance\s+\$?([0-9,.-]+)/i,
+    );
     if (fallbackStart) {
       openingBalance = parseAmount(fallbackStart[1]);
     }
@@ -158,12 +230,15 @@ function parseDate(val: string): Date | null {
     return new Date(parts[0], parts[1] - 1, parts[2]);
   }
 
-  // Try MM/DD/YYYY or DD/MM/YYYY
-  const slashMatch = dateStr.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$/);
+  // Try MM/DD/YYYY or DD/MM/YYYY or MM/DD/YY or DD/MM/YY
+  const slashMatch = dateStr.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})$/);
   if (slashMatch) {
     const a = Number(slashMatch[1]);
     const b = Number(slashMatch[2]);
-    const year = Number(slashMatch[3]);
+    let year = Number(slashMatch[3]);
+    if (year < 100) {
+      year += 2000;
+    }
 
     if (a > 12) return new Date(year, b - 1, a);
     if (b > 12) return new Date(year, a - 1, b);
@@ -171,7 +246,20 @@ function parseDate(val: string): Date | null {
   }
 
   // Try DD Mon YYYY
-  const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+  const monthNames = [
+    'jan',
+    'feb',
+    'mar',
+    'apr',
+    'may',
+    'jun',
+    'jul',
+    'aug',
+    'sep',
+    'oct',
+    'nov',
+    'dec',
+  ];
   const textMatch = dateStr.match(/^(\d{1,2})\s+([a-zA-Z]+)\s+(\d{4})$/);
   if (textMatch) {
     const monthIdx = monthNames.indexOf(textMatch[2].toLowerCase().slice(0, 3));

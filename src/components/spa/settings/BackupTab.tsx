@@ -13,13 +13,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useLanguageStore } from '@/store/language-store';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -176,7 +170,9 @@ export function BackupTab() {
             <HardDrive className="size-3 mr-1" />
             {t('settings.backup.databasePersistent')}
           </Badge>
-          <span className="text-xs text-muted-foreground">{t('settings.backup.persistentDesc')}</span>
+          <span className="text-xs text-muted-foreground">
+            {t('settings.backup.persistentDesc')}
+          </span>
         </div>
       </motion.div>
 
@@ -193,9 +189,13 @@ export function BackupTab() {
           <CardContent className="space-y-4">
             <Button onClick={handleCreateBackup} disabled={creating}>
               {creating ? (
-                <><Loader2 className="size-4 mr-1 animate-spin" /> {t('settings.backup.creating')}</>
+                <>
+                  <Loader2 className="size-4 mr-1 animate-spin" /> {t('settings.backup.creating')}
+                </>
               ) : (
-                <><Database className="size-4 mr-1" /> {t('settings.backup.createBackup')}</>
+                <>
+                  <Database className="size-4 mr-1" /> {t('settings.backup.createBackup')}
+                </>
               )}
             </Button>
             {creating && (
@@ -221,13 +221,19 @@ export function BackupTab() {
           <CardContent className="space-y-4">
             <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-3 flex items-start gap-2">
               <AlertTriangle className="size-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
-              <p className="text-sm text-amber-700 dark:text-amber-300">{t('settings.backup.restoreWarning')}</p>
+              <p className="text-sm text-amber-700 dark:text-amber-300">
+                {t('settings.backup.restoreWarning')}
+              </p>
             </div>
             <Button variant="outline" onClick={handleRestore} disabled={restoring}>
               {restoring ? (
-                <><Loader2 className="size-4 mr-1 animate-spin" /> {t('settings.backup.restoring')}</>
+                <>
+                  <Loader2 className="size-4 mr-1 animate-spin" /> {t('settings.backup.restoring')}
+                </>
               ) : (
-                <><Upload className="size-4 mr-1" /> {t('settings.backup.selectFile')}</>
+                <>
+                  <Upload className="size-4 mr-1" /> {t('settings.backup.selectFile')}
+                </>
               )}
             </Button>
             {restoring && (
@@ -269,7 +275,9 @@ export function BackupTab() {
                     {backups.map((backup) => (
                       <TableRow key={backup.id}>
                         <TableCell className="text-sm">{formatDate(backup.date)}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{backup.size}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {backup.size}
+                        </TableCell>
                         <TableCell>
                           <Badge variant="outline" className="text-xs">
                             {backup.type === 'automatic'

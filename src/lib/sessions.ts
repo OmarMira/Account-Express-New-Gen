@@ -1,44 +1,58 @@
 import { NextRequest } from 'next/server';
+import { db } from '@/lib/db';
 
 /**
- * Shared in-memory session store.
- * We use globalThis to persist sessions across hot-reloads in development.
+ * DB-backed session store using SQLite via Prisma.
  */
-const globalForSessions = globalThis as unknown as {
-  sessions: Map<string, { userId: string; createdAt: number }> | undefined;
-};
 
-const sessions = globalForSessions.sessions ?? new Map<string, { userId: string; createdAt: number }>();
-
-if (process.env.NODE_ENV !== 'production') {
-  globalForSessions.sessions = sessions;
-}
-
-export { sessions as sessionStore };
-
-export function createSession(userId: string): string {
+export async function createSession(userId: string): Promise<string> {
   const token = crypto.randomUUID();
-  sessions.set(token, { userId, createdAt: Date.now() });
+  // Sessions expire after 7 days
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+  // Run cleanup of expired sessions to keep the DB small
+  await db.session
+    .deleteMany({
+      where: {
+        expiresAt: {
+          lt: new Date(),
+        },
+      },
+    })
+    .catch((err) => console.error('[SESSION CLEANUP ERROR]', err));
+
+  await db.session.create({
+    data: {
+      token,
+      userId,
+      expiresAt,
+    },
+  });
+
   return token;
 }
 
-export function getSessionUserId(request: NextRequest): string | null {
-  const token =
-    request.cookies.get('session')?.value ??
-    request.headers.get('authorization')?.replace('Bearer ', '');
+export async function getSessionUserId(request: NextRequest): Promise<string | null> {
+  const token = getSessionToken(request);
   if (!token) return null;
-  const session = sessions.get(token);
+
+  const session = await db.session.findUnique({
+    where: { token },
+  });
+
   if (!session) return null;
-  // Sessions expire after 7 days
-  if (Date.now() - session.createdAt > 7 * 24 * 60 * 60 * 1000) {
-    sessions.delete(token);
+
+  // Check if expired
+  if (session.expiresAt < new Date()) {
+    await db.session.delete({ where: { token } }).catch(() => {});
     return null;
   }
+
   return session.userId;
 }
 
-export function destroySession(token: string): void {
-  sessions.delete(token);
+export async function destroySession(token: string): Promise<void> {
+  await db.session.delete({ where: { token } }).catch(() => {});
 }
 
 export function getSessionToken(request: NextRequest): string | null {

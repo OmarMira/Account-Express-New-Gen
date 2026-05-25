@@ -19,7 +19,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 
 interface User {
@@ -159,7 +165,7 @@ export default function AdminUsersPage() {
   const filteredUsers = users.filter(
     (u) =>
       `${u.firstName} ${u.lastName}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.email.toLowerCase().includes(searchQuery.toLowerCase())
+      u.email.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   return (
@@ -262,7 +268,9 @@ export default function AdminUsersPage() {
                 </div>
 
                 <div className="px-6 py-4 bg-muted/40 border-t border-border flex items-center justify-between">
-                  <span className="text-xs font-mono text-muted-foreground">ID: {u.id.substring(0, 8)}...</span>
+                  <span className="text-xs font-mono text-muted-foreground">
+                    ID: {u.id.substring(0, 8)}...
+                  </span>
                   <div className="flex items-center gap-1">
                     <Button
                       variant="ghost"
@@ -307,7 +315,9 @@ export default function AdminUsersPage() {
           <form onSubmit={handleSubmit} className="space-y-4 py-2">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Nombre *</Label>
+                <Label className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                  Nombre *
+                </Label>
                 <Input
                   required
                   value={formData.firstName}
@@ -317,7 +327,9 @@ export default function AdminUsersPage() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Apellido *</Label>
+                <Label className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                  Apellido *
+                </Label>
                 <Input
                   required
                   value={formData.lastName}
@@ -328,7 +340,9 @@ export default function AdminUsersPage() {
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Email de Contacto *</Label>
+              <Label className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                Email de Contacto *
+              </Label>
               <Input
                 type="email"
                 required
@@ -355,7 +369,9 @@ export default function AdminUsersPage() {
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Rol de Sistema</Label>
+              <Label className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                Rol de Sistema
+              </Label>
               <select
                 required
                 value={formData.role}
@@ -375,7 +391,10 @@ export default function AdminUsersPage() {
                   onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
                   className="size-4 rounded border-slate-700 bg-slate-950 text-indigo-600 focus:ring-indigo-500"
                 />
-                <Label htmlFor="isActiveUserCheck" className="text-slate-300 text-sm font-semibold select-none cursor-pointer">
+                <Label
+                  htmlFor="isActiveUserCheck"
+                  className="text-slate-300 text-sm font-semibold select-none cursor-pointer"
+                >
                   Usuario Activo
                 </Label>
               </div>

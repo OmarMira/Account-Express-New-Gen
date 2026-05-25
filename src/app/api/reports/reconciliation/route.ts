@@ -4,7 +4,7 @@ import { getSessionUserId } from '@/lib/sessions';
 
 export async function GET(request: NextRequest) {
   try {
-    const userId = getSessionUserId(request);
+    const userId = await getSessionUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -13,10 +13,7 @@ export async function GET(request: NextRequest) {
     const bankAccountId = searchParams.get('bankAccountId');
 
     if (!bankAccountId) {
-      return NextResponse.json(
-        { error: 'bankAccountId is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'bankAccountId is required' }, { status: 400 });
     }
 
     // Get the bank account and verify access
@@ -28,10 +25,7 @@ export async function GET(request: NextRequest) {
     });
 
     if (!bankAccount || !bankAccount.company) {
-      return NextResponse.json(
-        { error: 'Bank account not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Bank account not found' }, { status: 404 });
     }
 
     // Verify company membership
@@ -59,14 +53,8 @@ export async function GET(request: NextRequest) {
     const reconciled = transactions.filter((t) => t.isReconciled);
     const unreconciled = transactions.filter((t) => !t.isReconciled);
 
-    const reconciledTotal = reconciled.reduce(
-      (sum, t) => sum + (t.amount || 0),
-      0
-    );
-    const unreconciledTotal = unreconciled.reduce(
-      (sum, t) => sum + (t.amount || 0),
-      0
-    );
+    const reconciledTotal = reconciled.reduce((sum, t) => sum + (t.amount || 0), 0);
+    const unreconciledTotal = unreconciled.reduce((sum, t) => sum + (t.amount || 0), 0);
 
     return NextResponse.json({
       bankAccount: {
@@ -83,9 +71,7 @@ export async function GET(request: NextRequest) {
         reconciledTotal: Math.round(reconciledTotal * 100) / 100,
         unreconciledTotal: Math.round(unreconciledTotal * 100) / 100,
         reconciledPercentage:
-          transactions.length > 0
-            ? Math.round((reconciled.length / transactions.length) * 100)
-            : 0,
+          transactions.length > 0 ? Math.round((reconciled.length / transactions.length) * 100) : 0,
       },
       reconciledTransactions: reconciled.map((t) => ({
         id: t.id,
@@ -113,4 +99,3 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
-

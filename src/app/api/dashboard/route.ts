@@ -3,12 +3,11 @@ import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
 import { hasCompanyAccess } from '@/lib/auth';
 
-
 // ─── GET /api/dashboard?companyId=xxx ──────────────────────────────
 export async function GET(request: NextRequest) {
   try {
     // Auth check
-    const userId = getSessionUserId(request);
+    const userId = await getSessionUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -17,10 +16,7 @@ export async function GET(request: NextRequest) {
     const companyId = searchParams.get('companyId');
 
     if (!companyId) {
-      return NextResponse.json(
-        { error: 'companyId is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'companyId is required' }, { status: 400 });
     }
 
     // Verify the user has access to this company
@@ -142,7 +138,7 @@ export async function GET(request: NextRequest) {
       // We also affect the bank asset account implicitly if we wanted to balance,
       // but the totalBankBalance is already calculated accurately from BankAccount.balance.
       // However, if typeBalances.asset is used to show total assets, we should add the bank balance impact?
-      // Wait, typeBalances.asset includes the JournalLine of the bank account. 
+      // Wait, typeBalances.asset includes the JournalLine of the bank account.
       // If the bank transaction is NOT in JournalLine, the bank asset balance in typeBalances.asset is missing it!
       // So we should also update typeBalances.asset
       const bankAssetNet = isDeposit ? absAmount : -absAmount;
@@ -237,7 +233,20 @@ export async function GET(request: NextRequest) {
     });
 
     const monthMap: Record<string, { income: number; expenses: number }> = {};
-    const MONTH_NAMES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    const MONTH_NAMES = [
+      'Ene',
+      'Feb',
+      'Mar',
+      'Abr',
+      'May',
+      'Jun',
+      'Jul',
+      'Ago',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dic',
+    ];
 
     for (const tx of trendTxs) {
       const d = new Date(tx.date);
@@ -256,12 +265,10 @@ export async function GET(request: NextRequest) {
       }));
 
     // ── Build response ──
-    const accountBalances = Object.entries(typeBalances).map(
-      ([accountType, balance]) => ({
-        accountType,
-        balance: Math.round(balance * 100) / 100,
-      })
-    );
+    const accountBalances = Object.entries(typeBalances).map(([accountType, balance]) => ({
+      accountType,
+      balance: Math.round(balance * 100) / 100,
+    }));
 
     return NextResponse.json({
       totalBankBalance: Math.round(totalBankBalance * 100) / 100,
@@ -292,9 +299,6 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('[DASHBOARD API ERROR]', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

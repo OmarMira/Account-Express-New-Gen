@@ -4,7 +4,7 @@ import { getSessionUserId } from '@/lib/sessions';
 
 export async function GET(request: NextRequest) {
   try {
-    const userId = getSessionUserId(request);
+    const userId = await getSessionUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -26,9 +26,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Parse as-of date (defaults to today)
-    const asOfDate = asOfDateParam
-      ? new Date(asOfDateParam + 'T23:59:59.999Z')
-      : new Date();
+    const asOfDate = asOfDateParam ? new Date(asOfDateParam + 'T23:59:59.999Z') : new Date();
 
     if (isNaN(asOfDate.getTime())) {
       return NextResponse.json({ error: 'Invalid asOfDate format' }, { status: 400 });
@@ -53,10 +51,15 @@ export async function GET(request: NextRequest) {
             isActive: true,
           },
         },
+        entry: {
+          select: {
+            description: true,
+          },
+        },
       },
     });
 
-    const realDescSet = new Set(journalLines.map(l => l.entry?.description).filter(Boolean));
+    const realDescSet = new Set(journalLines.map((l) => l.entry?.description).filter(Boolean));
 
     // Fetch virtual entries from reconciled bank transactions
     const bankTxWhere: any = {
@@ -164,7 +167,7 @@ export async function GET(request: NextRequest) {
     let totalCredits = 0;
 
     const sortedEntries = Array.from(accountBalances.values()).sort((a, b) =>
-      a.code.localeCompare(b.code, undefined, { numeric: true })
+      a.code.localeCompare(b.code, undefined, { numeric: true }),
     );
 
     for (const entry of sortedEntries) {
@@ -203,4 +206,3 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
-

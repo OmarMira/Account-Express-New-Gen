@@ -9,7 +9,7 @@ import { getSessionUserId } from '@/lib/sessions';
  */
 export async function GET(request: NextRequest) {
   try {
-    const userId = getSessionUserId(request);
+    const userId = await getSessionUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -31,10 +31,7 @@ export async function GET(request: NextRequest) {
       !requestingUser ||
       (requestingUser.role !== 'company_admin' && requestingUser.role !== 'super_admin')
     ) {
-      return NextResponse.json(
-        { error: 'Only admins can view users' },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: 'Only admins can view users' }, { status: 403 });
     }
 
     // Verify membership
@@ -86,32 +83,25 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const userId = getSessionUserId(request);
+    const userId = await getSessionUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const body = await request.json();
-    const {
-      companyId,
-      email,
-      firstName,
-      lastName,
-      password,
-      role = 'company_admin',
-    } = body;
+    const { companyId, email, firstName, lastName, password, role = 'company_admin' } = body;
 
     if (!companyId || !email || !firstName || !lastName || !password) {
       return NextResponse.json(
         { error: 'companyId, email, firstName, lastName, and password are required' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (password.length < 8) {
       return NextResponse.json(
         { error: 'Password must be at least 8 characters' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -125,10 +115,7 @@ export async function POST(request: NextRequest) {
       !requestingUser ||
       (requestingUser.role !== 'company_admin' && requestingUser.role !== 'super_admin')
     ) {
-      return NextResponse.json(
-        { error: 'Only admins can invite users' },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: 'Only admins can invite users' }, { status: 403 });
     }
 
     // Verify membership in target company
@@ -153,7 +140,7 @@ export async function POST(request: NextRequest) {
       if (existingMembership) {
         return NextResponse.json(
           { error: 'This user is already a member of this company' },
-          { status: 409 }
+          { status: 409 },
         );
       }
 
@@ -187,7 +174,7 @@ export async function POST(request: NextRequest) {
             role: existingUser.role,
           },
         },
-        { status: 201 }
+        { status: 201 },
       );
     }
 
@@ -233,11 +220,10 @@ export async function POST(request: NextRequest) {
         message: 'User created and added to company',
         user: newUser,
       },
-      { status: 201 }
+      { status: 201 },
     );
   } catch (error) {
     console.error('[USER CREATE ERROR]', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
-

@@ -161,9 +161,7 @@ function StatCard({ title, value, icon, iconBg, trend, loading }: StatCardProps)
                 <p className="text-2xl font-bold tracking-tight">{value}</p>
               )}
             </div>
-            <div
-              className={`flex size-10 items-center justify-center rounded-lg ${iconBg}`}
-            >
+            <div className={`flex size-10 items-center justify-center rounded-lg ${iconBg}`}>
               {icon}
             </div>
           </div>
@@ -174,11 +172,7 @@ function StatCard({ title, value, icon, iconBg, trend, loading }: StatCardProps)
               ) : (
                 <ArrowDownRight className="size-3.5 text-rose-600" />
               )}
-              <span
-                className={
-                  trend === 'up' ? 'text-emerald-600' : 'text-rose-600'
-                }
-              >
+              <span className={trend === 'up' ? 'text-emerald-600' : 'text-rose-600'}>
                 {trend === 'up' ? '+' : '-'}12.5%
               </span>
               <span className="text-muted-foreground">vs last period</span>
@@ -205,10 +199,9 @@ export function DashboardPage() {
     setLoading(true);
     setError(false);
     try {
-      const res = await fetch(
-        `/api/dashboard?companyId=${activeCompany.id}`,
-        { credentials: 'include' }
-      );
+      const res = await fetch(`/api/dashboard?companyId=${activeCompany.id}`, {
+        credentials: 'include',
+      });
       if (res.ok) {
         const json = await res.json();
         setData(json);
@@ -240,21 +233,15 @@ export function DashboardPage() {
   const handleRunReports = () => setCurrentView('reports');
 
   return (
-    <motion.div
-      className="space-y-6"
-      variants={containerVariants}
-      initial="hidden"
-      animate="show"
-    >
+    <motion.div className="space-y-6" variants={containerVariants} initial="hidden" animate="show">
       {/* ── Header ── */}
-      <motion.div variants={itemVariants} className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+      <motion.div
+        variants={itemVariants}
+        className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between"
+      >
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">
-            {t('dashboard.title')}
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            {t('dashboard.overview')}
-          </p>
+          <h2 className="text-2xl font-bold tracking-tight">{t('dashboard.title')}</h2>
+          <p className="text-sm text-muted-foreground">{t('dashboard.overview')}</p>
         </div>
         {error && !loading && (
           <Badge variant="secondary" className="w-fit gap-1 text-amber-600 border-amber-300">
@@ -376,10 +363,18 @@ export function DashboardPage() {
                 <Skeleton className="h-[280px] w-full" />
               ) : (
                 <ChartContainer config={balanceChartConfig} className="h-[280px] w-full">
-                  <BarChart data={balanceChartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                  <BarChart
+                    data={balanceChartData}
+                    margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
+                  >
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="type" tickLine={false} axisLine={false} fontSize={12} />
-                    <YAxis tickLine={false} axisLine={false} fontSize={12} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                    <YAxis
+                      tickLine={false}
+                      axisLine={false}
+                      fontSize={12}
+                      tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+                    />
                     <ChartTooltip content={<ChartTooltipContent />} />
                     <Bar dataKey="asset" fill="hsl(160, 60%, 45%)" radius={[4, 4, 0, 0]} />
                     <Bar dataKey="liability" fill="hsl(38, 92%, 50%)" radius={[4, 4, 0, 0]} />
@@ -411,57 +406,65 @@ export function DashboardPage() {
               {loading ? (
                 <Skeleton className="h-[280px] w-full" />
               ) : d.monthlyTrend && d.monthlyTrend.length > 0 ? (
-              <ChartContainer config={cashFlowChartConfig} className="h-[280px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={d.monthlyTrend} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#0071c5" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="#0071c5" stopOpacity={0}/>
-                      </linearGradient>
-                      <linearGradient id="colorExpenses" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="#f43f5e" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--muted-foreground))" strokeOpacity={0.1} />
-                    <XAxis 
-                      dataKey="month" 
-                      tickLine={false} 
-                      axisLine={false} 
-                      fontSize={10} 
-                      fontWeight={600}
-                      tick={{ fill: 'hsl(var(--muted-foreground))' }}
-                      dy={10}
-                    />
-                    <YAxis 
-                      tickLine={false} 
-                      axisLine={false} 
-                      fontSize={10} 
-                      fontWeight={600}
-                      tick={{ fill: 'hsl(var(--muted-foreground))' }}
-                      tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} 
-                    />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Area
-                      type="monotone"
-                      dataKey="income"
-                      stroke="#0071c5"
-                      strokeWidth={3}
-                      fillOpacity={1}
-                      fill="url(#colorIncome)"
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="expenses"
-                      stroke="#f43f5e"
-                      strokeWidth={3}
-                      fillOpacity={1}
-                      fill="url(#colorExpenses)"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </ChartContainer>
+                <ChartContainer config={cashFlowChartConfig} className="h-[280px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart
+                      data={d.monthlyTrend}
+                      margin={{ top: 5, right: 10, left: 0, bottom: 0 }}
+                    >
+                      <defs>
+                        <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#0071c5" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="#0071c5" stopOpacity={0} />
+                        </linearGradient>
+                        <linearGradient id="colorExpenses" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="#f43f5e" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        vertical={false}
+                        stroke="hsl(var(--muted-foreground))"
+                        strokeOpacity={0.1}
+                      />
+                      <XAxis
+                        dataKey="month"
+                        tickLine={false}
+                        axisLine={false}
+                        fontSize={10}
+                        fontWeight={600}
+                        tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                        dy={10}
+                      />
+                      <YAxis
+                        tickLine={false}
+                        axisLine={false}
+                        fontSize={10}
+                        fontWeight={600}
+                        tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                        tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+                      />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Area
+                        type="monotone"
+                        dataKey="income"
+                        stroke="#0071c5"
+                        strokeWidth={3}
+                        fillOpacity={1}
+                        fill="url(#colorIncome)"
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="expenses"
+                        stroke="#f43f5e"
+                        strokeWidth={3}
+                        fillOpacity={1}
+                        fill="url(#colorExpenses)"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
               ) : (
                 <div className="flex h-[280px] items-center justify-center text-sm text-muted-foreground">
                   {t('common.noData') ?? 'Sin datos disponibles para el período'}
@@ -479,7 +482,9 @@ export function DashboardPage() {
             <AlertTriangle className="size-5 shrink-0 text-amber-600" />
             <div className="flex-1 text-sm">
               <span className="font-medium text-amber-800 dark:text-amber-300">
-                {d.upcomingPeriodEnds.map((p) => `${p.name} — ends ${formatDate(p.endDate)}`).join(', ')}
+                {d.upcomingPeriodEnds
+                  .map((p) => `${p.name} — ends ${formatDate(p.endDate)}`)
+                  .join(', ')}
               </span>
             </div>
           </div>
@@ -521,24 +526,21 @@ export function DashboardPage() {
                           <div>
                             <p className="font-medium">{tx.description}</p>
                             {tx.glAccount && (
-                              <p className="text-xs text-muted-foreground">
-                                {tx.glAccount.name}
-                              </p>
+                              <p className="text-xs text-muted-foreground">{tx.glAccount.name}</p>
                             )}
                           </div>
                         </TableCell>
                         <TableCell className="text-right font-mono font-medium">
-                          <span
-                            className={
-                              tx.amount >= 0 ? 'text-emerald-600' : 'text-rose-600'
-                            }
-                          >
+                          <span className={tx.amount >= 0 ? 'text-emerald-600' : 'text-rose-600'}>
                             {formatCurrency(tx.amount)}
                           </span>
                         </TableCell>
                         <TableCell className="text-center">
                           {tx.isReconciled ? (
-                            <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">
+                            <Badge
+                              variant="secondary"
+                              className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400"
+                            >
                               <CheckCircle2 className="size-3 mr-1" />
                               {t('reconciliation.reconciled')}
                             </Badge>
@@ -568,28 +570,24 @@ export function DashboardPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {loading ? (
-                Array.from({ length: 3 }).map((_, i) => (
-                  <Skeleton key={i} className="h-16 w-full" />
-                ))
-              ) : (
-                d.bankAccounts.map((account) => (
-                  <div
-                    key={account.id}
-                    className="flex items-center justify-between rounded-lg border p-3 transition-colors hover:bg-muted/50"
-                  >
-                    <div className="space-y-0.5">
-                      <p className="text-sm font-medium">{account.accountName}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {account.bankName}
+              {loading
+                ? Array.from({ length: 3 }).map((_, i) => (
+                    <Skeleton key={i} className="h-16 w-full" />
+                  ))
+                : d.bankAccounts.map((account) => (
+                    <div
+                      key={account.id}
+                      className="flex items-center justify-between rounded-lg border p-3 transition-colors hover:bg-muted/50"
+                    >
+                      <div className="space-y-0.5">
+                        <p className="text-sm font-medium">{account.accountName}</p>
+                        <p className="text-xs text-muted-foreground">{account.bankName}</p>
+                      </div>
+                      <p className="text-sm font-semibold font-mono">
+                        {formatCurrency(account.balance)}
                       </p>
                     </div>
-                    <p className="text-sm font-semibold font-mono">
-                      {formatCurrency(account.balance)}
-                    </p>
-                  </div>
-                ))
-              )}
+                  ))}
             </CardContent>
           </Card>
 
@@ -599,10 +597,7 @@ export function DashboardPage() {
               <CardTitle>{t('dashboard.quickActions')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <Button
-                className="w-full justify-start gap-2"
-                onClick={handleNewEntry}
-              >
+              <Button className="w-full justify-start gap-2" onClick={handleNewEntry}>
                 <FileText className="size-4" />
                 {t('journal.newEntry')}
               </Button>

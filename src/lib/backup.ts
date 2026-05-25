@@ -167,29 +167,39 @@ export async function createBackup(companyId: string): Promise<{
     db.fiscalPeriod.findMany({ where: { companyId } }),
     db.companyMember.findMany({
       where: { companyId },
-      include: { user: { select: { id: true, email: true, firstName: true, lastName: true, role: true, isActive: true, createdAt: true, updatedAt: true } } },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+            isActive: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+      },
     }),
   ]);
 
   // Collect unique user IDs from company members
   const userIds = [...new Set(companyMembers.map((m) => m.userId))];
-  const users = userIds.length > 0
-    ? await db.user.findMany({
-        where: { id: { in: userIds } },
-      })
-    : [];
+  const users =
+    userIds.length > 0
+      ? await db.user.findMany({
+          where: { id: { in: userIds } },
+        })
+      : [];
 
   // Collect statement IDs for filtering transactions
   const statementIds = bankStatements.map((s) => s.id);
-  const companyTransactions = bankTransactions.filter((t) =>
-    statementIds.includes(t.statementId)
-  );
+  const companyTransactions = bankTransactions.filter((t) => statementIds.includes(t.statementId));
 
   // Collect entry IDs for filtering journal lines
   const entryIds = journalEntries.map((e) => e.id);
-  const companyJournalLines = journalLines.filter((l) =>
-    entryIds.includes(l.entryId)
-  );
+  const companyJournalLines = journalLines.filter((l) => entryIds.includes(l.entryId));
 
   const now = new Date();
   const backupId = crypto.randomUUID();
@@ -367,9 +377,17 @@ export function validateBackup(backupData: BackupData): { valid: boolean; errors
 
   // Check required data sections
   const requiredSections = [
-    'company', 'glAccounts', 'bankAccounts', 'bankStatements',
-    'bankTransactions', 'bankRules', 'journalEntries', 'journalLines',
-    'fiscalPeriods', 'companyMembers', 'users',
+    'company',
+    'glAccounts',
+    'bankAccounts',
+    'bankStatements',
+    'bankTransactions',
+    'bankRules',
+    'journalEntries',
+    'journalLines',
+    'fiscalPeriods',
+    'companyMembers',
+    'users',
   ] as const;
 
   for (const section of requiredSections) {
@@ -392,7 +410,7 @@ export function validateBackup(backupData: BackupData): { valid: boolean; errors
  */
 export async function restoreBackup(
   companyId: string,
-  backupData: BackupData
+  backupData: BackupData,
 ): Promise<{ success: boolean; message: string; restoredCounts: Record<string, number> }> {
   const validation = validateBackup(backupData);
   if (!validation.valid) {
@@ -473,7 +491,7 @@ export async function restoreBackup(
       const glAccountIdMap = new Map<string, string>();
       // First pass: accounts without parent
       const topLevelAccounts = backupData.data.glAccounts.filter(
-        (a) => !(a as Record<string, unknown>).parentId
+        (a) => !(a as Record<string, unknown>).parentId,
       );
       for (const account of topLevelAccounts) {
         const clean = sanitizeForRestore(account as Record<string, unknown>);
@@ -482,7 +500,7 @@ export async function restoreBackup(
       }
       // Second pass: accounts with parent
       const childAccounts = backupData.data.glAccounts.filter(
-        (a) => (a as Record<string, unknown>).parentId
+        (a) => (a as Record<string, unknown>).parentId,
       );
       for (const account of childAccounts) {
         const clean = sanitizeForRestore(account as Record<string, unknown>);

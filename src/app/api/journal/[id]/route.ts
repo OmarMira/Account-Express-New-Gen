@@ -4,11 +4,8 @@ import { getSessionUserId } from '@/lib/sessions';
 
 // ─── GET /api/journal/[id] ──────────────────────────────────────────
 // Get a single journal entry with all lines and GL account info.
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const userId = getSessionUserId(request);
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const userId = await getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -57,11 +54,8 @@ export async function GET(
 
 // ─── PUT /api/journal/[id] ──────────────────────────────────────────
 // Update a draft journal entry. Posted/void entries cannot be modified.
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const userId = getSessionUserId(request);
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const userId = await getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -80,10 +74,7 @@ export async function PUT(
     }
 
     if (existing.status !== 'draft') {
-      return NextResponse.json(
-        { error: 'Only draft entries can be modified' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Only draft entries can be modified' }, { status: 400 });
     }
 
     // Verify access
@@ -108,27 +99,24 @@ export async function PUT(
       if (!Array.isArray(lines) || lines.length < 2) {
         return NextResponse.json(
           { error: 'At least 2 journal lines are required' },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
       for (const line of lines) {
         if (!line.glAccountId) {
-          return NextResponse.json(
-            { error: 'Each line must have a glAccountId' },
-            { status: 400 }
-          );
+          return NextResponse.json({ error: 'Each line must have a glAccountId' }, { status: 400 });
         }
         if (typeof line.debit !== 'number' || typeof line.credit !== 'number') {
           return NextResponse.json(
             { error: 'Each line must have debit and credit amounts' },
-            { status: 400 }
+            { status: 400 },
           );
         }
         if (line.debit < 0 || line.credit < 0) {
           return NextResponse.json(
             { error: 'Debit and credit amounts must be non-negative' },
-            { status: 400 }
+            { status: 400 },
           );
         }
       }
@@ -138,8 +126,10 @@ export async function PUT(
 
       if (Math.abs(totalDebits - totalCredits) > 0.005) {
         return NextResponse.json(
-          { error: `Entry must balance. Total debits (${totalDebits.toFixed(2)}) must equal total credits (${totalCredits.toFixed(2)})` },
-          { status: 400 }
+          {
+            error: `Entry must balance. Total debits (${totalDebits.toFixed(2)}) must equal total credits (${totalCredits.toFixed(2)})`,
+          },
+          { status: 400 },
         );
       }
 
@@ -151,7 +141,7 @@ export async function PUT(
       if (accounts.length !== new Set(accountIds).size) {
         return NextResponse.json(
           { error: 'One or more GL accounts not found or do not belong to this company' },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
@@ -168,12 +158,19 @@ export async function PUT(
           ...updateData,
           ...(lines !== undefined && {
             lines: {
-              create: lines.map((l: { glAccountId: string; description?: string; debit: number; credit: number }) => ({
-                glAccountId: l.glAccountId,
-                description: l.description || null,
-                debit: l.debit,
-                credit: l.credit,
-              })),
+              create: lines.map(
+                (l: {
+                  glAccountId: string;
+                  description?: string;
+                  debit: number;
+                  credit: number;
+                }) => ({
+                  glAccountId: l.glAccountId,
+                  description: l.description || null,
+                  debit: l.debit,
+                  credit: l.credit,
+                }),
+              ),
             },
           }),
         },
@@ -205,21 +202,15 @@ export async function PUT(
     });
   } catch (error) {
     console.error('[JOURNAL UPDATE ERROR]', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
 // ─── POST /api/journal/[id] ─────────────────────────────────────────
 // Actions: post | void
 // Body: { action: 'post' | 'void' }
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const userId = getSessionUserId(request);
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const userId = await getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -249,10 +240,7 @@ export async function POST(
 
     if (action === 'post') {
       if (entry.status !== 'draft') {
-        return NextResponse.json(
-          { error: 'Only draft entries can be posted' },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: 'Only draft entries can be posted' }, { status: 400 });
       }
 
       const updated = await db.journalEntry.update({
@@ -285,10 +273,7 @@ export async function POST(
 
     if (action === 'void') {
       if (entry.status !== 'posted') {
-        return NextResponse.json(
-          { error: 'Only posted entries can be voided' },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: 'Only posted entries can be voided' }, { status: 400 });
       }
 
       const updated = await db.journalEntry.update({
@@ -319,15 +304,9 @@ export async function POST(
       });
     }
 
-    return NextResponse.json(
-      { error: 'Invalid action. Use "post" or "void".' },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: 'Invalid action. Use "post" or "void".' }, { status: 400 });
   } catch (error) {
     console.error('[JOURNAL ACTION ERROR]', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

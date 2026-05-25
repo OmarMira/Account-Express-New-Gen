@@ -31,25 +31,30 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLanguageStore } from '@/store/language-store';
 import { useAuthStore } from '@/store/auth-store';
 import { BalanceBadge } from '@/components/spa/accounts/BalanceBadge';
-import type { GlAccount as GlAccountType, AccountFormData } from '@/components/spa/accounts/AccountFormDialog';
+import type {
+  GlAccount as GlAccountType,
+  AccountFormData,
+} from '@/components/spa/accounts/AccountFormDialog';
 
 // ── Lazy-loaded modals — not included in the initial bundle ──────────
 const AccountFormDialog = dynamic(
-  () => import('@/components/spa/accounts/AccountFormDialog').then((m) => ({ default: m.AccountFormDialog })),
-  { ssr: false, loading: () => null }
+  () =>
+    import('@/components/spa/accounts/AccountFormDialog').then((m) => ({
+      default: m.AccountFormDialog,
+    })),
+  { ssr: false, loading: () => null },
 );
 const AccountDeleteDialog = dynamic(
-  () => import('@/components/spa/accounts/AccountDeleteDialog').then((m) => ({ default: m.AccountDeleteDialog })),
-  { ssr: false, loading: () => null }
+  () =>
+    import('@/components/spa/accounts/AccountDeleteDialog').then((m) => ({
+      default: m.AccountDeleteDialog,
+    })),
+  { ssr: false, loading: () => null },
 );
 
 /* ─── Types (re-exported from AccountFormDialog) ─── */
@@ -141,7 +146,6 @@ const TYPE_SECTION_CONFIG: TypeSectionConfig[] = [
     iconColor: 'text-rose-600 dark:text-rose-400',
   },
 ];
-
 
 /* ─── Code color per type ─── */
 const CODE_COLORS: Record<string, string> = {
@@ -247,7 +251,10 @@ export function AccountsPage() {
       if (account.parentId) {
         const existing = map.get(account.parentId) ?? [];
         existing.push(account);
-        map.set(account.parentId, existing.sort((a, b) => a.code.localeCompare(b.code)));
+        map.set(
+          account.parentId,
+          existing.sort((a, b) => a.code.localeCompare(b.code)),
+        );
       }
     }
     return map;
@@ -408,7 +415,6 @@ export function AccountsPage() {
     }
   }
 
-
   /* ── Render account row within a type section ── */
   function renderAccountRow(
     account: GlAccount,
@@ -431,10 +437,7 @@ export function AccountsPage() {
         exit="exit"
         layout
       >
-        <Collapsible
-          open={isExpanded}
-          onOpenChange={() => toggleExpand(account.id)}
-        >
+        <Collapsible open={isExpanded} onOpenChange={() => toggleExpand(account.id)}>
           <div
             className={cn(
               'group flex items-center gap-2 rounded-md px-3 py-2 transition-colors',
@@ -496,10 +499,7 @@ export function AccountsPage() {
 
             {/* Name */}
             <span
-              className={cn(
-                'flex-1 truncate',
-                isRoot ? 'font-semibold' : 'font-medium text-sm',
-              )}
+              className={cn('flex-1 truncate', isRoot ? 'font-semibold' : 'font-medium text-sm')}
             >
               {account.isSystem && (
                 <Lock className="inline size-3 mr-1 text-amber-500" aria-label="System account" />
@@ -571,11 +571,17 @@ export function AccountsPage() {
   }
 
   /* ── Render a type section ── */
-  function renderTypeSection(config: TypeSectionConfig, typeAccounts: GlAccount[], sectionIndex: number) {
+  function renderTypeSection(
+    config: TypeSectionConfig,
+    typeAccounts: GlAccount[],
+    sectionIndex: number,
+  ) {
     const typeLabel = t(config.i18nKey);
     const isCollapsed = collapsedTypes.has(config.key);
     const Icon = config.icon;
-    const rootAccounts = typeAccounts.filter((a) => !a.parentId).sort((a, b) => a.code.localeCompare(b.code));
+    const rootAccounts = typeAccounts
+      .filter((a) => !a.parentId)
+      .sort((a, b) => a.code.localeCompare(b.code));
     const accountCount = typeAccounts.length;
 
     return (
@@ -587,10 +593,7 @@ export function AccountsPage() {
         animate="visible"
         layout
       >
-        <Collapsible
-          open={!isCollapsed}
-          onOpenChange={() => toggleTypeSection(config.key)}
-        >
+        <Collapsible open={!isCollapsed} onOpenChange={() => toggleTypeSection(config.key)}>
           <div className={cn('rounded-xl border overflow-hidden', config.accentBorder)}>
             {/* Section header */}
             <CollapsibleTrigger asChild>
@@ -625,9 +628,7 @@ export function AccountsPage() {
             {/* Section content */}
             <CollapsibleContent>
               <div className="p-2 space-y-0.5 bg-muted/20">
-                {rootAccounts.map((account, i) =>
-                  renderAccountRow(account, 0, i, config),
-                )}
+                {rootAccounts.map((account, i) => renderAccountRow(account, 0, i, config))}
                 {rootAccounts.length === 0 && typeAccounts.length === 0 && (
                   <div className="py-6 text-center text-sm text-muted-foreground">
                     {t('common.noData')}
@@ -662,7 +663,10 @@ export function AccountsPage() {
             {totalAccounts} {totalAccounts === 1 ? 'account' : 'accounts'}
           </p>
         </div>
-        <Button onClick={openCreateModal} className="bg-teal-600 hover:bg-teal-700 text-white shrink-0">
+        <Button
+          onClick={openCreateModal}
+          className="bg-teal-600 hover:bg-teal-700 text-white shrink-0"
+        >
           <Plus className="size-4 mr-2" />
           {t('accounts.newAccount')}
         </Button>
@@ -722,7 +726,10 @@ export function AccountsPage() {
               >
                 <Icon className="size-3" />
                 {t(config.i18nKey)}
-                <Badge variant="secondary" className="ml-0.5 text-[10px] px-1.5 py-0 h-4 min-w-[18px] flex items-center justify-center">
+                <Badge
+                  variant="secondary"
+                  className="ml-0.5 text-[10px] px-1.5 py-0 h-4 min-w-[18px] flex items-center justify-center"
+                >
                   {count}
                 </Badge>
               </button>

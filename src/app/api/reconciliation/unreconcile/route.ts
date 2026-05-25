@@ -6,7 +6,7 @@ import { getSessionUserId } from '@/lib/sessions';
 // Undo reconciliation for selected transactions.
 // Body: { companyId, bankAccountId, transactionIds: string[] }
 export async function POST(request: NextRequest) {
-  const userId = getSessionUserId(request);
+  const userId = await getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -18,14 +18,14 @@ export async function POST(request: NextRequest) {
     if (!companyId || !bankAccountId) {
       return NextResponse.json(
         { error: 'companyId and bankAccountId are required' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!Array.isArray(transactionIds) || transactionIds.length === 0) {
       return NextResponse.json(
         { error: 'transactionIds array is required and must not be empty' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -42,10 +42,7 @@ export async function POST(request: NextRequest) {
       where: { id: bankAccountId, companyId },
     });
     if (!bankAccount) {
-      return NextResponse.json(
-        { error: 'Bank account not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Bank account not found' }, { status: 404 });
     }
 
     // Count how many were actually reconciled
@@ -98,9 +95,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('[UNRECONCILE ERROR]', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

@@ -212,9 +212,7 @@ export function BankRulesPage() {
   const fetchAccounts = useCallback(async () => {
     if (!activeCompany?.id) return;
     try {
-      const res = await fetch(
-        `/api/journal/accounts?companyId=${activeCompany.id}`
-      );
+      const res = await fetch(`/api/journal/accounts?companyId=${activeCompany.id}`);
       if (res.ok) {
         const data = await res.json();
         setAccounts(data.data ?? data);
@@ -229,9 +227,7 @@ export function BankRulesPage() {
     if (!activeCompany?.id) return;
     setLoading(true);
     try {
-      const res = await fetch(
-        `/api/bank-rules?companyId=${activeCompany.id}`
-      );
+      const res = await fetch(`/api/bank-rules?companyId=${activeCompany.id}`);
       if (res.ok) {
         const data = await res.json();
         setRules(data.data ?? []);
@@ -254,7 +250,7 @@ export function BankRulesPage() {
   };
 
   const sortedRules = [...rules].sort((a, b) =>
-    sortDir === 'asc' ? a.priority - b.priority : b.priority - a.priority
+    sortDir === 'asc' ? a.priority - b.priority : b.priority - a.priority,
   );
 
   // Open create modal
@@ -287,9 +283,7 @@ export function BankRulesPage() {
     try {
       const url = editingRule ? `/api/bank-rules/${editingRule.id}` : '/api/bank-rules';
       const method = editingRule ? 'PUT' : 'POST';
-      const body = editingRule
-        ? { ...form }
-        : { companyId: activeCompany.id, ...form };
+      const body = editingRule ? { ...form } : { companyId: activeCompany.id, ...form };
 
       const res = await fetch(url, {
         method,
@@ -373,9 +367,7 @@ export function BankRulesPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">{t('bankRules.title')}</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            {t('bankRules.rulesDescription')}
-          </p>
+          <p className="text-sm text-muted-foreground mt-1">{t('bankRules.rulesDescription')}</p>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -411,9 +403,7 @@ export function BankRulesPage() {
               <div className="flex size-14 items-center justify-center rounded-2xl bg-muted mb-4">
                 <Zap className="size-7 text-muted-foreground" />
               </div>
-              <p className="text-sm text-muted-foreground">
-                {t('bankRules.noRules')}
-              </p>
+              <p className="text-sm text-muted-foreground">{t('bankRules.noRules')}</p>
               <Button size="sm" onClick={handleCreate} className="mt-4 gap-2">
                 <Plus className="size-4" />
                 {t('bankRules.newRule')}
@@ -516,9 +506,7 @@ export function BankRulesPage() {
               {editingRule ? t('bankRules.editRule') : t('bankRules.newRule')}
             </DialogTitle>
             <DialogDescription>
-              {editingRule
-                ? t('bankRules.editRuleDesc')
-                : t('bankRules.newRuleDesc')}
+              {editingRule ? t('bankRules.editRuleDesc') : t('bankRules.newRuleDesc')}
             </DialogDescription>
           </DialogHeader>
 
@@ -540,9 +528,7 @@ export function BankRulesPage() {
                 <Label>{t('bankRules.conditionType')}</Label>
                 <Select
                   value={form.conditionType}
-                  onValueChange={(v) =>
-                    setForm((f) => ({ ...f, conditionType: v }))
-                  }
+                  onValueChange={(v) => setForm((f) => ({ ...f, conditionType: v }))}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -550,7 +536,9 @@ export function BankRulesPage() {
                   <SelectContent>
                     {conditionTypes.map((ct) => (
                       <SelectItem key={ct} value={ct}>
-                        {t(`bankRules.${ct === 'starts_with' ? 'startsWith' : ct === 'ends_with' ? 'endsWith' : ct}`)}
+                        {t(
+                          `bankRules.${ct === 'starts_with' ? 'startsWith' : ct === 'ends_with' ? 'endsWith' : ct}`,
+                        )}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -560,14 +548,8 @@ export function BankRulesPage() {
                 <Label>{t('bankRules.conditionValue')}</Label>
                 <Input
                   value={form.conditionValue}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, conditionValue: e.target.value }))
-                  }
-                  placeholder={
-                    form.conditionType.startsWith('amount')
-                      ? '1000'
-                      : 'WALMART'
-                  }
+                  onChange={(e) => setForm((f) => ({ ...f, conditionValue: e.target.value }))}
+                  placeholder={form.conditionType.startsWith('amount') ? '1000' : 'WALMART'}
                 />
               </div>
             </div>
@@ -577,9 +559,7 @@ export function BankRulesPage() {
               <Label>{t('bankRules.direction')}</Label>
               <Select
                 value={form.transactionDirection}
-                onValueChange={(v) =>
-                  setForm((f) => ({ ...f, transactionDirection: v }))
-                }
+                onValueChange={(v) => setForm((f) => ({ ...f, transactionDirection: v }))}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -589,12 +569,8 @@ export function BankRulesPage() {
                     <SelectItem key={d} value={d}>
                       {t(
                         `bankRules.${
-                          d === 'any'
-                            ? 'anyDirection'
-                            : d === 'debit'
-                            ? 'debit'
-                            : 'credit'
-                        }`
+                          d === 'any' ? 'anyDirection' : d === 'debit' ? 'debit' : 'credit'
+                        }`,
                       )}
                     </SelectItem>
                   ))}
@@ -608,9 +584,7 @@ export function BankRulesPage() {
               <AccountSelector
                 accounts={accounts}
                 value={form.glAccountId}
-                onChange={(id) =>
-                  setForm((f) => ({ ...f, glAccountId: id }))
-                }
+                onChange={(id) => setForm((f) => ({ ...f, glAccountId: id }))}
                 placeholder={t('journal.selectAccount')}
               />
             </div>
@@ -637,9 +611,7 @@ export function BankRulesPage() {
                 <div className="flex items-center gap-2 h-9">
                   <Switch
                     checked={form.isActive}
-                    onCheckedChange={(v) =>
-                      setForm((f) => ({ ...f, isActive: v }))
-                    }
+                    onCheckedChange={(v) => setForm((f) => ({ ...f, isActive: v }))}
                   />
                   <span className="text-sm text-muted-foreground">
                     {form.isActive ? t('common.active') : t('common.inactive')}
@@ -654,9 +626,7 @@ export function BankRulesPage() {
                 <p className="text-xs text-muted-foreground mb-1">
                   {t('bankRules.conditionPreview')}
                 </p>
-                <p className="text-sm font-medium">
-                  {getConditionPreview(form, t)}
-                </p>
+                <p className="text-sm font-medium">{getConditionPreview(form, t)}</p>
               </CardContent>
             </Card>
           </div>
@@ -681,9 +651,7 @@ export function BankRulesPage() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t('bankRules.confirmDelete')}
-            </AlertDialogTitle>
+            <AlertDialogTitle>{t('bankRules.confirmDelete')}</AlertDialogTitle>
             <AlertDialogDescription>
               {deletingRule && (
                 <>
@@ -712,9 +680,7 @@ export function BankRulesPage() {
         <DialogContent className="sm:max-w-[420px]">
           <DialogHeader>
             <DialogTitle>{t('bankRules.applyAllTitle')}</DialogTitle>
-            <DialogDescription>
-              {t('bankRules.applyAllDesc')}
-            </DialogDescription>
+            <DialogDescription>{t('bankRules.applyAllDesc')}</DialogDescription>
           </DialogHeader>
 
           {applyResult ? (
@@ -730,9 +696,7 @@ export function BankRulesPage() {
                 </CardContent>
               </Card>
               <DialogFooter>
-                <Button onClick={() => setApplyDialogOpen(false)}>
-                  {t('common.confirm')}
-                </Button>
+                <Button onClick={() => setApplyDialogOpen(false)}>{t('common.confirm')}</Button>
               </DialogFooter>
             </div>
           ) : (
@@ -740,11 +704,7 @@ export function BankRulesPage() {
               <Button variant="outline" onClick={() => setApplyDialogOpen(false)}>
                 {t('common.cancel')}
               </Button>
-              <Button
-                onClick={handleApplyAll}
-                disabled={applying}
-                className="gap-2"
-              >
+              <Button onClick={handleApplyAll} disabled={applying} className="gap-2">
                 {applying && <Loader2 className="size-4 animate-spin" />}
                 <Zap className="size-4" />
                 {t('bankRules.applyAll')}

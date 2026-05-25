@@ -9,7 +9,7 @@ function transactionMatchesRule(
     conditionType: string;
     conditionValue: string;
     transactionDirection: string;
-  }
+  },
 ): boolean {
   if (rule.transactionDirection === 'debit' && tx.amount >= 0) return false;
   if (rule.transactionDirection === 'credit' && tx.amount < 0) return false;
@@ -39,7 +39,7 @@ function transactionMatchesRule(
 // Auto-reconcile using bank rules + amount matching with journal entries.
 // Body: { companyId, bankAccountId, createJournalEntries?, periodId?, matchByAmount? }
 export async function POST(request: NextRequest) {
-  const userId = getSessionUserId(request);
+  const userId = await getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     if (!companyId || !bankAccountId) {
       return NextResponse.json(
         { error: 'companyId and bankAccountId are required' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -79,10 +79,7 @@ export async function POST(request: NextRequest) {
       },
     });
     if (!bankAccount) {
-      return NextResponse.json(
-        { error: 'Bank account not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Bank account not found' }, { status: 404 });
     }
 
     // Get active rules sorted by priority
@@ -154,7 +151,10 @@ export async function POST(request: NextRequest) {
       });
 
       // Build a map of journal entry amounts (net per entry on bank account)
-      const journalEntryMap = new Map<string, { amount: number; date: string; description: string; counterGlAccountId: string }>();
+      const journalEntryMap = new Map<
+        string,
+        { amount: number; date: string; description: string; counterGlAccountId: string }
+      >();
 
       for (const jl of journalLines) {
         const existing = journalEntryMap.get(jl.entryId);
@@ -225,12 +225,10 @@ export async function POST(request: NextRequest) {
         // Create journal entry only for rule-matched, not amount-matched (those already have entries)
         if (createJournalEntries && match.ruleId) {
           const amount = Math.abs(transaction.amount);
-          const debitAccountId = transaction.amount > 0
-            ? bankAccount.glAccountId
-            : match.glAccountId;
-          const creditAccountId = transaction.amount > 0
-            ? match.glAccountId
-            : bankAccount.glAccountId;
+          const debitAccountId =
+            transaction.amount > 0 ? bankAccount.glAccountId : match.glAccountId;
+          const creditAccountId =
+            transaction.amount > 0 ? match.glAccountId : bankAccount.glAccountId;
 
           const description = `Auto-reconcile: ${transaction.description} (Rule: ${match.ruleName})`;
 
@@ -292,9 +290,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('[AUTO RECONCILIATION ERROR]', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

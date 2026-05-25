@@ -1,24 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import {
-  Users,
-  Plus,
-  Loader2,
-  MoreVertical,
-  Trash2,
-  Mail,
-} from 'lucide-react';
+import { Users, Plus, Loader2, MoreVertical, Trash2, Mail } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useLanguageStore } from '@/store/language-store';
 import { useAuthStore } from '@/store/auth-store';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -106,14 +93,25 @@ export function UsersTab() {
           const data = await res.json();
           setUsers(data.users || []);
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
       if (!cancelled) setLoading(false);
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [companyId]);
 
   async function handleInvite() {
-    if (!companyId || !inviteForm.email || !inviteForm.firstName || !inviteForm.lastName || !inviteForm.password) return;
+    if (
+      !companyId ||
+      !inviteForm.email ||
+      !inviteForm.firstName ||
+      !inviteForm.lastName ||
+      !inviteForm.password
+    )
+      return;
     setInviting(true);
     try {
       const res = await fetch('/api/users', {
@@ -137,7 +135,13 @@ export function UsersTab() {
           },
           ...prev,
         ]);
-        setInviteForm({ email: '', firstName: '', lastName: '', password: '', role: 'company_admin' });
+        setInviteForm({
+          email: '',
+          firstName: '',
+          lastName: '',
+          password: '',
+          role: 'company_admin',
+        });
         setInviteOpen(false);
         toast.success(t('users.userCreated'));
       } else {
@@ -170,9 +174,7 @@ export function UsersTab() {
                   <Users className="size-4" />
                   {t('settings.userManagement')}
                 </CardTitle>
-                <CardDescription className="mt-1">
-                  {t('users.inviteDesc')}
-                </CardDescription>
+                <CardDescription className="mt-1">{t('users.inviteDesc')}</CardDescription>
               </div>
               <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
                 <DialogTrigger asChild>
@@ -192,14 +194,18 @@ export function UsersTab() {
                         <Label>{t('users.firstName')}</Label>
                         <Input
                           value={inviteForm.firstName}
-                          onChange={(e) => setInviteForm((p) => ({ ...p, firstName: e.target.value }))}
+                          onChange={(e) =>
+                            setInviteForm((p) => ({ ...p, firstName: e.target.value }))
+                          }
                         />
                       </div>
                       <div className="space-y-1.5">
                         <Label>{t('users.lastName')}</Label>
                         <Input
                           value={inviteForm.lastName}
-                          onChange={(e) => setInviteForm((p) => ({ ...p, lastName: e.target.value }))}
+                          onChange={(e) =>
+                            setInviteForm((p) => ({ ...p, lastName: e.target.value }))
+                          }
                         />
                       </div>
                     </div>
@@ -226,12 +232,22 @@ export function UsersTab() {
                     </Button>
                     <Button
                       onClick={handleInvite}
-                      disabled={inviting || !inviteForm.email || !inviteForm.firstName || !inviteForm.lastName || !inviteForm.password}
+                      disabled={
+                        inviting ||
+                        !inviteForm.email ||
+                        !inviteForm.firstName ||
+                        !inviteForm.lastName ||
+                        !inviteForm.password
+                      }
                     >
                       {inviting ? (
-                        <><Loader2 className="size-4 mr-1 animate-spin" /> {t('settings.saving')}</>
+                        <>
+                          <Loader2 className="size-4 mr-1 animate-spin" /> {t('settings.saving')}
+                        </>
                       ) : (
-                        <><Mail className="size-4 mr-1" /> {t('users.inviteUser')}</>
+                        <>
+                          <Mail className="size-4 mr-1" /> {t('users.inviteUser')}
+                        </>
                       )}
                     </Button>
                   </DialogFooter>
@@ -247,9 +263,7 @@ export function UsersTab() {
                 ))}
               </div>
             ) : users.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">
-                {t('users.noUsers')}
-              </p>
+              <p className="text-sm text-muted-foreground text-center py-8">{t('users.noUsers')}</p>
             ) : (
               <div className="rounded-md border">
                 <Table>
@@ -278,7 +292,9 @@ export function UsersTab() {
                         <TableCell className="text-muted-foreground">{u.email}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className="text-xs">
-                            {u.role === 'super_admin' ? t('users.superAdmin') : t('users.companyAdmin')}
+                            {u.role === 'super_admin'
+                              ? t('users.superAdmin')
+                              : t('users.companyAdmin')}
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -290,7 +306,11 @@ export function UsersTab() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Button variant="ghost" size="icon" className="size-8 text-muted-foreground hover:text-destructive">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-8 text-muted-foreground hover:text-destructive"
+                          >
                             <Trash2 className="size-3.5" />
                           </Button>
                         </TableCell>

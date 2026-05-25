@@ -21,13 +21,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -61,11 +55,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Command,
   CommandEmpty,
@@ -214,9 +204,7 @@ export function BanksPage() {
     if (!activeCompany) return;
     setLoading(true);
     try {
-      const res = await fetch(
-        `/api/banks?companyId=${activeCompany.id}`
-      );
+      const res = await fetch(`/api/banks?companyId=${activeCompany.id}`);
       if (res.ok) {
         const data = await res.json();
         setAccounts(data.accounts);
@@ -231,15 +219,13 @@ export function BanksPage() {
   async function fetchAssetAccounts() {
     if (!activeCompany) return;
     try {
-      const res = await fetch(
-        `/api/journal/accounts?companyId=${activeCompany.id}`
-      );
+      const res = await fetch(`/api/journal/accounts?companyId=${activeCompany.id}`);
       if (res.ok) {
         const data = await res.json();
         setAssetAccounts(
           (data.data || data.accounts || []).filter(
-            (a: GlAccountOption) => a.accountType === 'asset'
-          )
+            (a: GlAccountOption) => a.accountType === 'asset',
+          ),
         );
       }
     } catch (err) {
@@ -274,8 +260,16 @@ export function BanksPage() {
     setFormAccountNo(account.accountNo || '');
     setFormRoutingNo(account.routingNo || '');
     setFormGlAccountId(account.glAccountId);
-    const rawBalance = ((account as any).startingBalance !== undefined ? (account as any).startingBalance : account.balance) as number;
-    setFormBalance(typeof rawBalance === 'number' ? formatNumberWithComas(Number(rawBalance.toFixed(2)).toString()) : '');
+    const rawBalance = (
+      (account as any).startingBalance !== undefined
+        ? (account as any).startingBalance
+        : account.balance
+    ) as number;
+    setFormBalance(
+      typeof rawBalance === 'number'
+        ? formatNumberWithComas(Number(rawBalance.toFixed(2)).toString())
+        : '',
+    );
     setFormCurrency(account.currency);
     setFormError('');
     setModalOpen(true);
@@ -309,9 +303,7 @@ export function BanksPage() {
         currency: formCurrency,
       };
 
-      const url = editingAccount
-        ? `/api/banks/${editingAccount.id}`
-        : '/api/banks';
+      const url = editingAccount ? `/api/banks/${editingAccount.id}` : '/api/banks';
       const method = editingAccount ? 'PUT' : 'POST';
 
       const res = await fetch(url, {
@@ -383,9 +375,7 @@ export function BanksPage() {
 
   async function fetchAccountDetail(accountId: string) {
     try {
-      const res = await fetch(
-        `/api/banks/${accountId}?companyId=${activeCompany!.id}`
-      );
+      const res = await fetch(`/api/banks/${accountId}?companyId=${activeCompany!.id}`);
       if (res.ok) {
         const data = await res.json();
         setRecentTransactions(data.account.recentTransactions || []);
@@ -399,7 +389,7 @@ export function BanksPage() {
 
   const totalBalance = useMemo(
     () => accounts.filter((a) => a.isActive).reduce((s, a) => s + a.balance, 0),
-    [accounts]
+    [accounts],
   );
 
   // ─── Active accounts ─────────────────────────────────────────────
@@ -451,11 +441,7 @@ export function BanksPage() {
                 </CardDescription>
               </div>
               <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => openEditModal(selectedAccount)}
-                >
+                <Button variant="outline" size="sm" onClick={() => openEditModal(selectedAccount)}>
                   <Pencil className="size-3.5 mr-1" />
                   {t('common.edit')}
                 </Button>
@@ -468,12 +454,14 @@ export function BanksPage() {
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">
                   {t('banks.currentBalance')}
                 </p>
-                <p className={cn(
-                  'text-xl font-bold font-mono',
-                  selectedAccount.balance >= 0
-                    ? 'text-emerald-600 dark:text-emerald-400'
-                    : 'text-red-600 dark:text-red-400'
-                )}>
+                <p
+                  className={cn(
+                    'text-xl font-bold font-mono',
+                    selectedAccount.balance >= 0
+                      ? 'text-emerald-600 dark:text-emerald-400'
+                      : 'text-red-600 dark:text-red-400',
+                  )}
+                >
                   {fmtCurrency(selectedAccount.balance)}
                 </p>
               </div>
@@ -492,14 +480,10 @@ export function BanksPage() {
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">
                   {t('banks.statements')}
                 </p>
-                <p className="text-sm font-medium">
-                  {selectedAccount._count.statements}
-                </p>
+                <p className="text-sm font-medium">{selectedAccount._count.statements}</p>
               </div>
               <div className="space-y-1">
-                <p className="text-xs text-muted-foreground uppercase tracking-wide">
-                  Status
-                </p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Status</p>
                 <Badge
                   variant="outline"
                   className={
@@ -536,7 +520,9 @@ export function BanksPage() {
                       <TableHead>{t('common.date')}</TableHead>
                       <TableHead>{t('common.description')}</TableHead>
                       <TableHead className="text-right">{t('common.amount')}</TableHead>
-                      <TableHead className="text-center">{t('reconciliation.reconciled')}</TableHead>
+                      <TableHead className="text-center">
+                        {t('reconciliation.reconciled')}
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -555,12 +541,14 @@ export function BanksPage() {
                             )}
                           </div>
                         </TableCell>
-                        <TableCell className={cn(
-                          'text-right font-mono text-sm font-medium',
-                          txn.amount >= 0
-                            ? 'text-emerald-600 dark:text-emerald-400'
-                            : 'text-red-600 dark:text-red-400'
-                        )}>
+                        <TableCell
+                          className={cn(
+                            'text-right font-mono text-sm font-medium',
+                            txn.amount >= 0
+                              ? 'text-emerald-600 dark:text-emerald-400'
+                              : 'text-red-600 dark:text-red-400',
+                          )}
+                        >
                           {fmtCurrency(txn.amount)}
                         </TableCell>
                         <TableCell className="text-center">
@@ -589,15 +577,13 @@ export function BanksPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold tracking-tight">
-            {t('banks.title')}
-          </h2>
+          <h2 className="text-xl font-semibold tracking-tight">{t('banks.title')}</h2>
           <p className="text-sm text-muted-foreground">
             {activeAccounts.length} {t('common.active').toLowerCase()} account
             {activeAccounts.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <Button 
+        <Button
           onClick={() => setCurrentView('import')}
           className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-700 dark:hover:bg-indigo-600 text-white border-none shadow-sm hover:shadow transition-all"
         >
@@ -620,12 +606,14 @@ export function BanksPage() {
             <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
               Total Bank Balance
             </p>
-            <p className={cn(
-              'text-2xl font-bold font-mono',
-              totalBalance >= 0
-                ? 'text-teal-700 dark:text-teal-300'
-                : 'text-red-700 dark:text-red-300'
-            )}>
+            <p
+              className={cn(
+                'text-2xl font-bold font-mono',
+                totalBalance >= 0
+                  ? 'text-teal-700 dark:text-teal-300'
+                  : 'text-red-700 dark:text-red-300',
+              )}
+            >
               {fmtCurrency(totalBalance)}
             </p>
           </div>
@@ -719,12 +707,14 @@ export function BanksPage() {
                     </div>
                   </CardHeader>
                   <CardContent className="pt-0 space-y-2">
-                    <div className={cn(
-                      'text-xl font-bold font-mono',
-                      account.balance >= 0
-                        ? 'text-emerald-600 dark:text-emerald-400'
-                        : 'text-red-600 dark:text-red-400'
-                    )}>
+                    <div
+                      className={cn(
+                        'text-xl font-bold font-mono',
+                        account.balance >= 0
+                          ? 'text-emerald-600 dark:text-emerald-400'
+                          : 'text-red-600 dark:text-red-400',
+                      )}
+                    >
                       {fmtCurrency(account.balance)}
                     </div>
                     <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
@@ -815,14 +805,10 @@ export function BanksPage() {
         <DialogContent className="sm:max-w-[480px]">
           <DialogHeader>
             <DialogTitle>
-              {editingAccount
-                ? t('banks.editBankAccount')
-                : t('banks.newBankAccount')}
+              {editingAccount ? t('banks.editBankAccount') : t('banks.newBankAccount')}
             </DialogTitle>
             <DialogDescription>
-              {editingAccount
-                ? t('banks.editAccountDesc')
-                : t('banks.newAccountDesc')}
+              {editingAccount ? t('banks.editAccountDesc') : t('banks.newAccountDesc')}
             </DialogDescription>
           </DialogHeader>
 
@@ -854,9 +840,7 @@ export function BanksPage() {
             {/* Account Number + Routing */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <label className="text-sm font-medium">
-                  {t('banks.accountNumber')}
-                </label>
+                <label className="text-sm font-medium">{t('banks.accountNumber')}</label>
                 <Input
                   placeholder="e.g. 123456789"
                   value={formAccountNo}
@@ -864,9 +848,7 @@ export function BanksPage() {
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-medium">
-                  {t('banks.routingNumber')}
-                </label>
+                <label className="text-sm font-medium">{t('banks.routingNumber')}</label>
                 <Input
                   placeholder="e.g. 021000021"
                   value={formRoutingNo}
@@ -886,17 +868,13 @@ export function BanksPage() {
                 onChange={setFormGlAccountId}
                 placeholder="Select asset account"
               />
-              <p className="text-xs text-muted-foreground">
-                {t('banks.linkedAccountHelp')}
-              </p>
+              <p className="text-xs text-muted-foreground">{t('banks.linkedAccountHelp')}</p>
             </div>
 
             {/* Starting Balance + Currency */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <label className="text-sm font-medium">
-                  {t('banks.startingBalance')}
-                </label>
+                <label className="text-sm font-medium">{t('banks.startingBalance')}</label>
                 <Input
                   type="text"
                   placeholder="0.00"
@@ -923,9 +901,7 @@ export function BanksPage() {
             </div>
 
             {/* Error */}
-            {formError && (
-              <p className="text-sm text-red-600 dark:text-red-400">{formError}</p>
-            )}
+            {formError && <p className="text-sm text-red-600 dark:text-red-400">{formError}</p>}
           </div>
 
           <DialogFooter>
@@ -952,9 +928,7 @@ export function BanksPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>
-              {t('common.cancel')}
-            </AlertDialogCancel>
+            <AlertDialogCancel disabled={deleting}>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={executeDelete}
               disabled={deleting}

@@ -3,10 +3,9 @@ import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
 import { hasCompanyAccess } from '@/lib/auth';
 
-
 // ─── GET /api/banks?companyId=xxx ──────────────────────────────────────
 export async function GET(request: NextRequest) {
-  const userId = getSessionUserId(request);
+  const userId = await getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -15,10 +14,7 @@ export async function GET(request: NextRequest) {
   const companyId = searchParams.get('companyId');
 
   if (!companyId) {
-    return NextResponse.json(
-      { error: 'companyId is required' },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: 'companyId is required' }, { status: 400 });
   }
 
   // Verify access
@@ -44,16 +40,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ accounts });
   } catch (error) {
     console.error('[BANKS LIST ERROR]', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch bank accounts' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to fetch bank accounts' }, { status: 500 });
   }
 }
 
 // ─── POST /api/banks ──────────────────────────────────────────────────
 export async function POST(request: NextRequest) {
-  const userId = getSessionUserId(request);
+  const userId = await getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -75,10 +68,9 @@ export async function POST(request: NextRequest) {
     if (!companyId || !accountName || !bankName || !glAccountId) {
       return NextResponse.json(
         {
-          error:
-            'companyId, accountName, bankName, and glAccountId are required',
+          error: 'companyId, accountName, bankName, and glAccountId are required',
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -93,18 +85,14 @@ export async function POST(request: NextRequest) {
       where: { id: glAccountId, companyId, isActive: true },
     });
     if (!glAccount) {
-      return NextResponse.json(
-        { error: 'GL account not found or inactive' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'GL account not found or inactive' }, { status: 404 });
     }
     if (glAccount.accountType !== 'asset') {
       return NextResponse.json(
         {
-          error:
-            'Bank accounts must be linked to an asset-type GL account',
+          error: 'Bank accounts must be linked to an asset-type GL account',
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -130,9 +118,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ account }, { status: 201 });
   } catch (error) {
     console.error('[BANKS CREATE ERROR]', error);
-    return NextResponse.json(
-      { error: 'Failed to create bank account' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to create bank account' }, { status: 500 });
   }
 }

@@ -13,11 +13,7 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useLanguageStore } from '@/store/language-store';
 
 export interface GlAccountOption {
@@ -95,7 +91,7 @@ export function AccountSelector({
           className={cn(
             'w-full justify-between font-normal h-9',
             !selectedAccount && 'text-muted-foreground',
-            disabled && 'opacity-50 cursor-not-allowed'
+            disabled && 'opacity-50 cursor-not-allowed',
           )}
           disabled={disabled}
         >
@@ -107,9 +103,7 @@ export function AccountSelector({
               <span className="truncate">{selectedAccount.name}</span>
             </span>
           ) : (
-            <span className="truncate">
-              {placeholder ?? t('journal.selectAccount')}
-            </span>
+            <span className="truncate">{placeholder ?? t('journal.selectAccount')}</span>
           )}
           {selectedAccount && !disabled && (
             <X
@@ -154,7 +148,7 @@ export function AccountSelector({
                       <Check
                         className={cn(
                           'mr-2 size-4 shrink-0',
-                          value === account.id ? 'opacity-100' : 'opacity-0'
+                          value === account.id ? 'opacity-100' : 'opacity-0',
                         )}
                       />
                       <span className="font-mono text-xs text-teal-600 dark:text-teal-400 shrink-0 w-14 text-right mr-2">

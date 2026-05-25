@@ -4,7 +4,7 @@ import { getSessionUserId } from '@/lib/sessions';
 
 // ─── GET /api/accounts?companyId=xxx&accountType=xxx&search=xxx ─────────
 export async function GET(request: NextRequest) {
-  const userId = getSessionUserId(request);
+  const userId = await getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -15,10 +15,7 @@ export async function GET(request: NextRequest) {
   const search = searchParams.get('search');
 
   if (!companyId) {
-    return NextResponse.json(
-      { error: 'companyId is required' },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: 'companyId is required' }, { status: 400 });
   }
 
   try {
@@ -29,10 +26,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (search && search.trim()) {
-      where.OR = [
-        { code: { contains: search.trim() } },
-        { name: { contains: search.trim() } },
-      ];
+      where.OR = [{ code: { contains: search.trim() } }, { name: { contains: search.trim() } }];
     }
 
     const rawAccounts = await db.glAccount.findMany({
@@ -45,19 +39,19 @@ export async function GET(request: NextRequest) {
           select: { children: true, journalLines: true },
         },
         journalLines: {
-          select: { debit: true, credit: true }
-        }
+          select: { debit: true, credit: true },
+        },
       },
       orderBy: [{ code: 'asc' }],
     });
 
-    const accounts = rawAccounts.map(account => {
+    const accounts = rawAccounts.map((account) => {
       let balance = 0;
       for (const line of account.journalLines) {
         if (account.normalBalance === 'debit') {
-          balance += (line.debit - line.credit);
+          balance += line.debit - line.credit;
         } else {
-          balance += (line.credit - line.debit);
+          balance += line.credit - line.debit;
         }
       }
       const { journalLines, ...rest } = account;
@@ -67,16 +61,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ accounts });
   } catch (error) {
     console.error('[ACCOUNTS LIST ERROR]', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch accounts' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to fetch accounts' }, { status: 500 });
   }
 }
 
 // ─── POST /api/accounts ────────────────────────────────────────────────
 export async function POST(request: NextRequest) {
-  const userId = getSessionUserId(request);
+  const userId = await getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -89,7 +80,7 @@ export async function POST(request: NextRequest) {
     if (!companyId || !code || !name || !accountType || !normalBalance) {
       return NextResponse.json(
         { error: 'companyId, code, name, accountType, and normalBalance are required' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -98,7 +89,7 @@ export async function POST(request: NextRequest) {
     if (!validTypes.includes(accountType)) {
       return NextResponse.json(
         { error: `Invalid accountType. Must be one of: ${validTypes.join(', ')}` },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -106,7 +97,7 @@ export async function POST(request: NextRequest) {
     if (!['debit', 'credit'].includes(normalBalance)) {
       return NextResponse.json(
         { error: 'Invalid normalBalance. Must be debit or credit' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -123,7 +114,7 @@ export async function POST(request: NextRequest) {
     if (existing) {
       return NextResponse.json(
         { error: 'An account with this code already exists in this company' },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
@@ -133,10 +124,7 @@ export async function POST(request: NextRequest) {
         where: { id: parentId, companyId },
       });
       if (!parentAccount) {
-        return NextResponse.json(
-          { error: 'Parent account not found' },
-          { status: 404 }
-        );
+        return NextResponse.json({ error: 'Parent account not found' }, { status: 404 });
       }
     }
 
@@ -164,9 +152,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ account }, { status: 201 });
   } catch (error) {
     console.error('[ACCOUNTS CREATE ERROR]', error);
-    return NextResponse.json(
-      { error: 'Failed to create account' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to create account' }, { status: 500 });
   }
 }

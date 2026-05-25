@@ -1,15 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
+import { apiHandler } from '@/lib/api-handler';
+import { validateRequest } from '@/lib/validate-request';
+import { createReconciliationSchema } from '@/lib/validations/reconciliation';
+import { AuthError, ForbiddenError, NotFoundError, ValidationError } from '@/lib/api-error';
+import { ReconciliationService } from '@/services/reconciliation.service';
 
 // ─── GET /api/reconciliation ───────────────────────────────────────
 // Get reconciliation data for a bank account with filters.
-// Query params: bankAccountId (required), companyId (required)
-// Optional: startDate, endDate, status (all|unreconciled|reconciled), search, statementId, showReconciled
-export async function GET(request: NextRequest) {
-  const userId = getSessionUserId(request);
+export const GET = apiHandler(async (request: NextRequest) => {
+  const userId = await getSessionUserId(request);
   if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    throw new AuthError();
   }
 
   const { searchParams } = new URL(request.url);
@@ -22,10 +25,7 @@ export async function GET(request: NextRequest) {
   const statementId = searchParams.get('statementId');
 
   if (!bankAccountId || !companyId) {
-    return NextResponse.json(
-      { error: 'bankAccountId and companyId are required' },
-      { status: 400 }
-    );
+    throw new ValidationError('bankAccountId and companyId are required');
   }
 
   // Verify access
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     where: { userId_companyId: { userId, companyId } },
   });
   if (!membership) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    throw new ForbiddenError();
   }
 
   // Get bank account with GL account info
@@ -47,10 +47,7 @@ export async function GET(request: NextRequest) {
   });
 
   if (!bankAccount) {
-    return NextResponse.json(
-      { error: 'Bank account not found' },
-      { status: 404 }
-    );
+    throw new NotFoundError('Bank account not found');
   }
 
   // Get latest statement (closing balance)
@@ -63,7 +60,15 @@ export async function GET(request: NextRequest) {
   // Get all statements for this bank account
   const statements = await db.bankStatement.findMany({
     where: { bankAccountId },
-    select: { id: true, startDate: true, endDate: true, openingBalance: true, closingBalance: true, format: true, fileName: true },
+    select: {
+      id: true,
+      startDate: true,
+      endDate: true,
+      openingBalance: true,
+      closingBalance: true,
+      format: true,
+      fileName: true,
+    },
     orderBy: { startDate: 'desc' },
   });
   const statementIds = statements.map((s) => s.id);
@@ -79,7 +84,6 @@ export async function GET(request: NextRequest) {
   } else if (statusFilter === 'reconciled') {
     txWhere.isReconciled = true;
   }
-  // 'all' = no filter
 
   // Statement filter
   if (statementId) {
@@ -89,16 +93,15 @@ export async function GET(request: NextRequest) {
   // Date range filter
   if (startDate || endDate) {
     txWhere.date = {};
-    if (startDate) (txWhere.date as Record<string, unknown>).gte = new Date(startDate + 'T00:00:00.000Z');
-    if (endDate) (txWhere.date as Record<string, unknown>).lte = new Date(endDate + 'T23:59:59.999Z');
+    if (startDate)
+      (txWhere.date as Record<string, unknown>).gte = new Date(startDate + 'T00:00:00.000Z');
+    if (endDate)
+      (txWhere.date as Record<string, unknown>).lte = new Date(endDate + 'T23:59:59.999Z');
   }
 
   // Search filter
   if (search) {
-    txWhere.OR = [
-      { description: { contains: search } },
-      { reference: { contains: search } },
-    ];
+    txWhere.OR = [{ description: { contains: search } }, { reference: { contains: search } }];
   }
 
   // Get transactions
@@ -218,210 +221,48 @@ export async function GET(request: NextRequest) {
       reconciledAt: tx.reconciledAt?.toISOString() ?? null,
     })),
   });
-}
+});
 
 // ─── POST /api/reconciliation ──────────────────────────────────────
 // Reconcile transactions. Sets isReconciled=true and updates glAccountId.
-// Can optionally create journal entries.
-// Body: { companyId, bankAccountId, transactions: [{ id, glAccountId }], createJournalEntries?: boolean, periodId?: string }
-export async function POST(request: NextRequest) {
-  const userId = getSessionUserId(request);
+export const POST = apiHandler(async (request: NextRequest) => {
+  const userId = await getSessionUserId(request);
   if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    throw new AuthError();
   }
 
-  try {
-    const body = await request.json();
-    const {
+  const body = await validateRequest(request, createReconciliationSchema);
+  const { companyId, bankAccountId, periodId } = body;
+
+  // Verify access
+  const membership = await db.companyMember.findUnique({
+    where: { userId_companyId: { userId, companyId } },
+  });
+  if (!membership) {
+    throw new ForbiddenError();
+  }
+
+  const { reconciledCount, journalEntriesCreated } = await ReconciliationService.reconcile(body);
+
+  // Audit log
+  await db.auditLog.create({
+    data: {
       companyId,
-      bankAccountId,
-      transactions,
-      createJournalEntries = false,
-      periodId,
-    } = body;
+      userId,
+      action: 'reconcile_transactions',
+      entity: 'BankTransaction',
+      details: JSON.stringify({
+        bankAccountId,
+        count: reconciledCount,
+        journalEntriesCreated,
+        periodId,
+      }),
+    },
+  });
 
-    if (!companyId || !bankAccountId) {
-      return NextResponse.json(
-        { error: 'companyId and bankAccountId are required' },
-        { status: 400 }
-      );
-    }
-
-    if (!Array.isArray(transactions) || transactions.length === 0) {
-      return NextResponse.json(
-        { error: 'transactions array is required and must not be empty' },
-        { status: 400 }
-      );
-    }
-
-    // Verify access
-    const membership = await db.companyMember.findUnique({
-      where: { userId_companyId: { userId, companyId } },
-    });
-    if (!membership) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
-    // Verify bank account with GL account info
-    const bankAccount = await db.bankAccount.findFirst({
-      where: { id: bankAccountId, companyId },
-      include: {
-        glAccount: {
-          select: { id: true, code: true, name: true, normalBalance: true },
-        },
-      },
-    });
-    if (!bankAccount) {
-      return NextResponse.json(
-        { error: 'Bank account not found' },
-        { status: 404 }
-      );
-    }
-
-    let reconciledCount = 0;
-    let journalEntriesCreated = 0;
-
-    await db.$transaction(async (tx) => {
-      for (const txn of transactions) {
-        if (!txn.id) continue;
-
-        const bankTx = await tx.bankTransaction.findUnique({
-          where: { id: txn.id },
-        });
-        if (!bankTx || bankTx.isReconciled) continue;
-
-        const updateData: Record<string, unknown> = {
-          isReconciled: true,
-          reconciledAt: new Date(),
-        };
-
-        // If splits are provided, we use the first split's GL account as the main one for the bank transaction record
-        const mainGlId = txn.splits && txn.splits.length > 0 
-          ? txn.splits[0].glAccountId 
-          : txn.glAccountId;
-
-        if (mainGlId) {
-          const glAccount = await tx.glAccount.findFirst({
-            where: { id: mainGlId, companyId },
-          });
-          if (glAccount) {
-            updateData.glAccountId = mainGlId;
-          }
-        }
-
-        if (periodId) {
-          updateData.reconciliationPeriodId = periodId;
-        }
-
-        await tx.bankTransaction.update({
-          where: { id: txn.id },
-          data: updateData,
-        });
-
-        // Create journal entry if requested
-        if (createJournalEntries) {
-          const amount = Math.abs(bankTx.amount);
-          const isDeposit = bankTx.amount > 0;
-          const description = `Reconciliation: ${bankTx.description}`;
-
-          // Case 1: Splits provided
-          if (txn.splits && txn.splits.length > 0) {
-            const lines: any[] = [];
-            
-            // The bank side line
-            lines.push({
-              glAccountId: bankAccount.glAccountId,
-              description,
-              debit: isDeposit ? amount : 0,
-              credit: isDeposit ? 0 : amount,
-            });
-
-            // The split side lines
-            for (const split of txn.splits) {
-              const splitAmount = Math.abs(split.amount);
-              lines.push({
-                glAccountId: split.glAccountId,
-                description: split.description || description,
-                debit: isDeposit ? 0 : splitAmount,
-                credit: isDeposit ? splitAmount : 0,
-              });
-            }
-
-            await tx.journalEntry.create({
-              data: {
-                companyId,
-                date: bankTx.date,
-                description,
-                status: 'posted',
-                lines: { create: lines },
-              },
-            });
-            journalEntriesCreated++;
-          } 
-          // Case 2: No splits, but glAccountId provided
-          else if (mainGlId) {
-            const debitAccountId = isDeposit ? bankAccount.glAccountId : mainGlId;
-            const creditAccountId = isDeposit ? mainGlId : bankAccount.glAccountId;
-
-            await tx.journalEntry.create({
-              data: {
-                companyId,
-                date: bankTx.date,
-                description,
-                status: 'posted',
-                lines: {
-                  create: [
-                    { glAccountId: debitAccountId, description, debit: amount, credit: 0 },
-                    { glAccountId: creditAccountId, description, debit: 0, credit: amount },
-                  ],
-                },
-              },
-            });
-            journalEntriesCreated++;
-          }
-        }
-
-        reconciledCount++;
-      }
-
-      // Update period transaction count if period provided
-      if (periodId) {
-        const periodTxCount = await tx.bankTransaction.count({
-          where: { reconciliationPeriodId: periodId },
-        });
-        await tx.reconciliationPeriod.update({
-          where: { id: periodId },
-          data: { transactionCount: periodTxCount },
-        });
-      }
-    });
-
-    // Audit log
-    await db.auditLog.create({
-      data: {
-        companyId,
-        userId,
-        action: 'reconcile_transactions',
-        entity: 'BankTransaction',
-        details: JSON.stringify({
-          bankAccountId,
-          count: reconciledCount,
-          journalEntriesCreated,
-          periodId,
-        }),
-      },
-    });
-
-    return NextResponse.json({
-      success: true,
-      reconciled: reconciledCount,
-      journalEntriesCreated,
-    });
-  } catch (error) {
-    console.error('[RECONCILIATION ERROR]', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
-}
+  return NextResponse.json({
+    success: true,
+    reconciled: reconciledCount,
+    journalEntriesCreated,
+  });
+});

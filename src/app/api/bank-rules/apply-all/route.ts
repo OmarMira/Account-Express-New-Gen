@@ -9,7 +9,7 @@ function transactionMatchesRule(
     conditionType: string;
     conditionValue: string;
     transactionDirection: string;
-  }
+  },
 ): boolean {
   // Check direction first
   if (rule.transactionDirection === 'debit' && tx.amount >= 0) return false;
@@ -42,7 +42,7 @@ function transactionMatchesRule(
 // First match wins per transaction.
 // Body: { companyId }
 export async function POST(request: NextRequest) {
-  const userId = getSessionUserId(request);
+  const userId = await getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -52,10 +52,7 @@ export async function POST(request: NextRequest) {
     const { companyId } = body;
 
     if (!companyId) {
-      return NextResponse.json(
-        { error: 'companyId is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'companyId is required' }, { status: 400 });
     }
 
     // Verify access
@@ -105,7 +102,7 @@ export async function POST(request: NextRequest) {
     // Process each rule in priority order
     for (const rule of rules) {
       const txsForThisRule = unmatchedTransactions.filter(
-        (tx) => !matchedTxIds.has(tx.id) && transactionMatchesRule(tx, rule)
+        (tx) => !matchedTxIds.has(tx.id) && transactionMatchesRule(tx, rule),
       );
 
       if (txsForThisRule.length > 0) {
@@ -136,9 +133,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('[BANK RULES APPLY ALL ERROR]', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

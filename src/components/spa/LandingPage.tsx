@@ -24,12 +24,7 @@ import {
   KeyRound,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ThemeToggle } from '@/components/spa/ThemeToggle';
 import { LanguageSelector } from '@/components/spa/LanguageSelector';
 import { useLanguageStore } from '@/store/language-store';
@@ -115,9 +110,7 @@ function StatCounter({
         {count.toLocaleString()}
         {suffix}
       </span>
-      <span className="text-sm font-medium text-muted-foreground">
-        {t(labelKey)}
-      </span>
+      <span className="text-sm font-medium text-muted-foreground">{t(labelKey)}</span>
     </div>
   );
 }
@@ -144,7 +137,11 @@ function SecurityBadge({
   t: (key: string) => string;
 }) {
   return (
-    <motion.div variants={scaleIn} custom={0} className="flex items-center gap-2.5 rounded-xl border bg-card px-4 py-3 transition-shadow hover:shadow-md">
+    <motion.div
+      variants={scaleIn}
+      custom={0}
+      className="flex items-center gap-2.5 rounded-xl border bg-card px-4 py-3 transition-shadow hover:shadow-md"
+    >
       <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10">
         <Icon className="size-4 text-primary" />
       </div>
@@ -240,9 +237,7 @@ export function LandingPage() {
             <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm">
               AE
             </div>
-            <span className="text-lg font-semibold tracking-tight">
-              {t('common.appName')}
-            </span>
+            <span className="text-lg font-semibold tracking-tight">{t('common.appName')}</span>
           </div>
           <div className="flex items-center gap-1">
             <LanguageSelector />
@@ -255,10 +250,7 @@ export function LandingPage() {
             >
               {t('auth.login')}
             </Button>
-            <Button
-              size="sm"
-              onClick={() => setCurrentView('register')}
-            >
+            <Button size="sm" onClick={() => setCurrentView('register')}>
               {t('auth.register')}
             </Button>
           </div>
@@ -344,9 +336,7 @@ export function LandingPage() {
                     size="lg"
                     className="font-medium px-8"
                     onClick={() => {
-                      document
-                        .getElementById('features')
-                        ?.scrollIntoView({ behavior: 'smooth' });
+                      document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' });
                     }}
                   >
                     {t('auth.learnMore')}
@@ -407,11 +397,7 @@ export function LandingPage() {
               >
                 {t('landing.statsTitle')}
               </motion.h2>
-              <motion.p
-                custom={1}
-                variants={fadeUp}
-                className="mt-3 text-muted-foreground text-lg"
-              >
+              <motion.p custom={1} variants={fadeUp} className="mt-3 text-muted-foreground text-lg">
                 {t('landing.statsSubtitle')}
               </motion.p>
             </motion.div>
@@ -566,9 +552,7 @@ export function LandingPage() {
                   <div className="mb-3 flex size-14 items-center justify-center rounded-2xl bg-primary/10">
                     <step.icon className="size-7 text-primary" />
                   </div>
-                  <h3 className="text-lg font-semibold mb-2">
-                    {t(step.titleKey)}
-                  </h3>
+                  <h3 className="text-lg font-semibold mb-2">{t(step.titleKey)}</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed max-w-xs">
                     {t(step.descKey)}
                   </p>
@@ -614,9 +598,7 @@ export function LandingPage() {
                   <div className="flex size-12 items-center justify-center rounded-full bg-primary/10">
                     <item.icon className="size-6 text-primary" />
                   </div>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    {t(item.labelKey)}
-                  </p>
+                  <p className="text-sm font-medium text-muted-foreground">{t(item.labelKey)}</p>
                 </motion.div>
               ))}
             </motion.div>
@@ -656,11 +638,7 @@ export function LandingPage() {
             >
               {securityBadges.map((badge, i) => (
                 <motion.div key={i} custom={i} variants={scaleIn}>
-                  <SecurityBadge
-                    icon={badge.icon}
-                    labelKey={badge.labelKey}
-                    t={t}
-                  />
+                  <SecurityBadge icon={badge.icon} labelKey={badge.labelKey} t={t} />
                 </motion.div>
               ))}
             </motion.div>
@@ -681,11 +659,7 @@ export function LandingPage() {
           </div>
 
           <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 sm:py-24 lg:px-8 text-center">
-            <motion.div
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true }}
-            >
+            <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }}>
               <motion.h2
                 custom={0}
                 variants={fadeUp}
@@ -734,20 +708,19 @@ export function LandingPage() {
               <div className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground font-bold text-xs">
                 AE
               </div>
-              <span className="text-sm font-medium">
-                {t('common.appName')}
-              </span>
+              <span className="text-sm font-medium">{t('common.appName')}</span>
             </div>
             <p className="text-xs text-muted-foreground">
-              &copy; {new Date().getFullYear()} {t('common.appName')}.{' '}
-              {t('landing.copyright')}
+              &copy; {new Date().getFullYear()} {t('common.appName')}. {t('landing.copyright')}
             </p>
           </div>
         </div>
       </footer>
 
       {/* ── Global Styles for Gradient Animation ── */}
-      <style dangerouslySetInnerHTML={{ __html: `
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
         @keyframes gradient-shift {
           0% { background-position: 0% 50%; }
           50% { background-position: 100% 50%; }
@@ -759,7 +732,9 @@ export function LandingPage() {
         .animate-gradient-shift-slow {
           animation: gradient-shift 12s ease infinite reverse;
         }
-      ` }} />
+      `,
+        }}
+      />
     </div>
   );
 }

@@ -6,13 +6,7 @@ import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ThemeToggle } from '@/components/spa/ThemeToggle';
 import { LanguageSelector } from '@/components/spa/LanguageSelector';
 import { useLanguageStore } from '@/store/language-store';
@@ -100,9 +94,7 @@ export function SelectCompanyPage() {
             <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm">
               AE
             </div>
-            <span className="text-lg font-semibold tracking-tight">
-              {t('common.appName')}
-            </span>
+            <span className="text-lg font-semibold tracking-tight">{t('common.appName')}</span>
           </div>
           <div className="flex items-center gap-1">
             <LanguageSelector />
@@ -117,15 +109,14 @@ export function SelectCompanyPage() {
           <Card>
             <CardHeader className="text-center">
               <CardTitle className="text-2xl">{t('auth.selectCompany')}</CardTitle>
-              <CardDescription>
-                {t('selectCompany.subtitle')}
-              </CardDescription>
+              <CardDescription>{t('selectCompany.subtitle')}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {user && (
                 <div className="mb-4 text-center">
                   <p className="text-sm text-muted-foreground">
-                    {t('selectCompany.welcome')}, <span className="font-medium text-foreground">{user.firstName}</span>
+                    {t('selectCompany.welcome')},{' '}
+                    <span className="font-medium text-foreground">{user.firstName}</span>
                   </p>
                 </div>
               )}
@@ -133,7 +124,10 @@ export function SelectCompanyPage() {
               {loading ? (
                 <div className="space-y-3">
                   {[1, 2].map((i) => (
-                    <div key={i} className="flex items-center gap-3 rounded-lg border p-4 animate-pulse">
+                    <div
+                      key={i}
+                      className="flex items-center gap-3 rounded-lg border p-4 animate-pulse"
+                    >
                       <div className="size-10 rounded-lg bg-muted shrink-0" />
                       <div className="flex-1 space-y-2">
                         <div className="h-4 bg-muted rounded w-3/4" />
@@ -199,9 +193,7 @@ export function SelectCompanyPage() {
                         <Building2 className="size-5 text-primary" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">
-                          {company.legalName}
-                        </p>
+                        <p className="font-medium truncate">{company.legalName}</p>
                         {company.taxId && (
                           <p className="text-xs text-muted-foreground">
                             {t('auth.taxId')}: {company.taxId}
@@ -237,12 +229,7 @@ export function SelectCompanyPage() {
               )}
 
               <div className="pt-4 border-t">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full gap-2"
-                  onClick={handleLogout}
-                >
+                <Button variant="outline" size="sm" className="w-full gap-2" onClick={handleLogout}>
                   <LogOut className="size-4" />
                   {t('auth.logout')}
                 </Button>
@@ -256,8 +243,7 @@ export function SelectCompanyPage() {
       <footer className="border-t">
         <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 text-center">
           <p className="text-xs text-muted-foreground">
-            &copy; {new Date().getFullYear()} {t('common.appName')}.{' '}
-            {t('landing.copyright')}
+            &copy; {new Date().getFullYear()} {t('common.appName')}. {t('landing.copyright')}
           </p>
         </div>
       </footer>

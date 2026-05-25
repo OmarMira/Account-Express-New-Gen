@@ -95,8 +95,7 @@ export const useAuthStore = create<AuthState>()(
           isProcessing: false,
         }),
 
-      setActiveCompany: (company: Company) =>
-        set({ activeCompany: company }),
+      setActiveCompany: (company: Company) => set({ activeCompany: company }),
 
       setCurrentView: (view: ViewName) => set({ currentView: view }),
 
@@ -104,8 +103,7 @@ export const useAuthStore = create<AuthState>()(
 
       setAiAssistantOpen: (open: boolean) => set({ aiAssistantOpen: open }),
 
-      setAdminSelectedCompanyId: (id: string | null) =>
-        set({ adminSelectedCompanyId: id }),
+      setAdminSelectedCompanyId: (id: string | null) => set({ adminSelectedCompanyId: id }),
 
       startProcessing: (message) =>
         set({ isProcessing: true, processingMessage: message || 'Procesando...' }),
@@ -121,7 +119,7 @@ export const useAuthStore = create<AuthState>()(
             const data = await res.json();
             if (data.user) {
               const currentStore = get();
-              
+
               set({
                 user: data.user,
                 isAuthenticated: true,
@@ -146,7 +144,7 @@ export const useAuthStore = create<AuthState>()(
               } else if (currentStore.activeCompany) {
                 // Verify the active company is still valid
                 const stillExists = data.companies?.some(
-                  (c: Company) => c.id === currentStore.activeCompany?.id
+                  (c: Company) => c.id === currentStore.activeCompany?.id,
                 );
                 if (!stillExists) {
                   set({
@@ -170,6 +168,6 @@ export const useAuthStore = create<AuthState>()(
         sidebarOpen: state.sidebarOpen,
         adminSelectedCompanyId: state.adminSelectedCompanyId,
       }),
-    }
-  )
+    },
+  ),
 );

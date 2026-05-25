@@ -3,10 +3,9 @@ import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
 import { hasCompanyAccess } from '@/lib/auth';
 
-
 export async function GET(request: NextRequest) {
   try {
-    const userId = getSessionUserId(request);
+    const userId = await getSessionUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -124,15 +123,17 @@ export async function GET(request: NextRequest) {
     }
 
     const firstAccount = bankAccounts[0];
-    const bankAccountInfo = firstAccount ? {
-      accountName: firstAccount.accountName,
-      bankName: firstAccount.bankName,
-      accountNo: firstAccount.accountNo || '',
-    } : null;
+    const bankAccountInfo = firstAccount
+      ? {
+          accountName: firstAccount.accountName,
+          bankName: firstAccount.bankName,
+          accountNo: firstAccount.accountNo || '',
+        }
+      : null;
 
     // Calculate MoM trends based on distinct months
     const months = Array.from(
-      new Set(formattedTransactions.map((t) => t.fecha.substring(0, 7)))
+      new Set(formattedTransactions.map((t) => t.fecha.substring(0, 7))),
     ).sort();
 
     let revenueTrend = 0;
@@ -159,10 +160,14 @@ export async function GET(request: NextRequest) {
         .reduce((s, t) => s + t.monto, 0);
 
       if (prevMonthCredits > 0) {
-        revenueTrend = Number((((lastMonthCredits - prevMonthCredits) / prevMonthCredits) * 100).toFixed(1));
+        revenueTrend = Number(
+          (((lastMonthCredits - prevMonthCredits) / prevMonthCredits) * 100).toFixed(1),
+        );
       }
       if (prevMonthDebits > 0) {
-        expenseTrend = Number((((lastMonthDebits - prevMonthDebits) / prevMonthDebits) * 100).toFixed(1));
+        expenseTrend = Number(
+          (((lastMonthDebits - prevMonthDebits) / prevMonthDebits) * 100).toFixed(1),
+        );
       }
     }
 

@@ -7,17 +7,11 @@ export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, SALT_ROUNDS);
 }
 
-export async function verifyPassword(
-  password: string,
-  hash: string
-): Promise<boolean> {
+export async function verifyPassword(password: string, hash: string): Promise<boolean> {
   return bcrypt.compare(password, hash);
 }
 
-export async function hasCompanyAccess(
-  userId: string,
-  companyId: string
-): Promise<boolean> {
+export async function hasCompanyAccess(userId: string, companyId: string): Promise<boolean> {
   const user = await db.user.findUnique({
     where: { id: userId },
     select: { role: true },
@@ -35,4 +29,3 @@ export async function hasCompanyAccess(
 
   return !!membership;
 }
-

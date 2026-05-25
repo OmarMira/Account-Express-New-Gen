@@ -6,7 +6,7 @@ import { getSessionUserId } from '@/lib/sessions';
 // Create, complete, or cancel a reconciliation period.
 // Body: { companyId, bankAccountId, action: 'start'|'complete'|'cancel', periodId?, notes? }
 export async function POST(request: NextRequest) {
-  const userId = getSessionUserId(request);
+  const userId = await getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     if (!companyId || !bankAccountId || !action) {
       return NextResponse.json(
         { error: 'companyId, bankAccountId, and action are required' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -46,11 +46,14 @@ export async function POST(request: NextRequest) {
           where: { bankAccountId, companyId, status: 'open' },
         });
         if (existing) {
-          return NextResponse.json({
-            success: false,
-            error: 'An open reconciliation period already exists for this account.',
-            period: existing,
-          }, { status: 409 });
+          return NextResponse.json(
+            {
+              success: false,
+              error: 'An open reconciliation period already exists for this account.',
+              period: existing,
+            },
+            { status: 409 },
+          );
         }
 
         // Calculate statement balance
@@ -100,7 +103,12 @@ export async function POST(request: NextRequest) {
             action: 'start_reconciliation_period',
             entity: 'ReconciliationPeriod',
             entityId: period.id,
-            details: JSON.stringify({ bankAccountId, statementBalance: stmtBalance, bookBalance, difference: stmtBalance - bookBalance }),
+            details: JSON.stringify({
+              bankAccountId,
+              statementBalance: stmtBalance,
+              bookBalance,
+              difference: stmtBalance - bookBalance,
+            }),
           },
         });
 
@@ -109,14 +117,20 @@ export async function POST(request: NextRequest) {
 
       case 'complete': {
         if (!periodId) {
-          return NextResponse.json({ error: 'periodId is required for complete action' }, { status: 400 });
+          return NextResponse.json(
+            { error: 'periodId is required for complete action' },
+            { status: 400 },
+          );
         }
 
         const period = await db.reconciliationPeriod.findFirst({
           where: { id: periodId, bankAccountId, companyId, status: 'open' },
         });
         if (!period) {
-          return NextResponse.json({ error: 'Open reconciliation period not found' }, { status: 404 });
+          return NextResponse.json(
+            { error: 'Open reconciliation period not found' },
+            { status: 404 },
+          );
         }
 
         // Recalculate balances
@@ -164,7 +178,11 @@ export async function POST(request: NextRequest) {
             action: 'complete_reconciliation_period',
             entity: 'ReconciliationPeriod',
             entityId: periodId,
-            details: JSON.stringify({ statementBalance: stmtBalance, bookBalance, difference: stmtBalance - bookBalance }),
+            details: JSON.stringify({
+              statementBalance: stmtBalance,
+              bookBalance,
+              difference: stmtBalance - bookBalance,
+            }),
           },
         });
 
@@ -173,14 +191,20 @@ export async function POST(request: NextRequest) {
 
       case 'cancel': {
         if (!periodId) {
-          return NextResponse.json({ error: 'periodId is required for cancel action' }, { status: 400 });
+          return NextResponse.json(
+            { error: 'periodId is required for cancel action' },
+            { status: 400 },
+          );
         }
 
         const period = await db.reconciliationPeriod.findFirst({
           where: { id: periodId, bankAccountId, companyId, status: 'open' },
         });
         if (!period) {
-          return NextResponse.json({ error: 'Open reconciliation period not found' }, { status: 404 });
+          return NextResponse.json(
+            { error: 'Open reconciliation period not found' },
+            { status: 404 },
+          );
         }
 
         // Unlink transactions from this period
@@ -210,22 +234,19 @@ export async function POST(request: NextRequest) {
       default:
         return NextResponse.json(
           { error: 'Invalid action. Use: start, complete, or cancel' },
-          { status: 400 }
+          { status: 400 },
         );
     }
   } catch (error) {
     console.error('[RECONCILIATION PERIODS ERROR]', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
 // ─── GET /api/reconciliation/periods ──────────────────────────────
 // Get reconciliation history for a bank account.
 export async function GET(request: NextRequest) {
-  const userId = getSessionUserId(request);
+  const userId = await getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -237,7 +258,7 @@ export async function GET(request: NextRequest) {
   if (!bankAccountId || !companyId) {
     return NextResponse.json(
       { error: 'bankAccountId and companyId are required' },
-      { status: 400 }
+      { status: 400 },
     );
   }
 

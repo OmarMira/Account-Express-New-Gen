@@ -1,28 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import {
-  Zap,
-  Search,
-  CheckCircle2,
-  Loader2,
-  Brain,
-  ArrowRight,
-  Eye,
-  X,
-  Save,
-} from 'lucide-react';
+import { Zap, Search, CheckCircle2, Loader2, Brain, ArrowRight, Eye, X, Save } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLanguageStore } from '@/store/language-store';
 import { useAuthStore } from '@/store/auth-store';
 import { toast } from 'sonner';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
@@ -115,7 +99,10 @@ function RuleModal({
               {pattern.occurrences} ocurrencias detectadas
             </p>
           </div>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
+          <button
+            onClick={onClose}
+            className="text-muted-foreground hover:text-foreground transition-colors"
+          >
             <X className="size-5" />
           </button>
         </div>
@@ -124,7 +111,9 @@ function RuleModal({
         <div className="px-6 py-5 space-y-4">
           {/* Name */}
           <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1 block">Nombre de la Regla</label>
+            <label className="text-xs font-medium text-muted-foreground mb-1 block">
+              Nombre de la Regla
+            </label>
             <input
               className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
               value={rule.name}
@@ -135,7 +124,9 @@ function RuleModal({
           {/* Condition */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">Tipo de Condición</label>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                Tipo de Condición
+              </label>
               <select
                 className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
                 value={rule.conditionType}
@@ -159,7 +150,9 @@ function RuleModal({
 
           {/* Direction */}
           <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1 block">Dirección</label>
+            <label className="text-xs font-medium text-muted-foreground mb-1 block">
+              Dirección
+            </label>
             <select
               className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
               value={rule.transactionDirection}
@@ -174,7 +167,9 @@ function RuleModal({
           {/* GL Account */}
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">Código GL</label>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                Código GL
+              </label>
               <input
                 className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
                 value={rule.glAccountCode}
@@ -182,7 +177,9 @@ function RuleModal({
               />
             </div>
             <div className="col-span-2">
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">Cuenta GL</label>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                Cuenta GL
+              </label>
               <input
                 className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
                 value={rule.glAccountName}
@@ -253,7 +250,7 @@ export function AIRulesGeneratorTab() {
       });
 
       if (res.ok) {
-        const data = await res.json() as { patterns?: DetectedPattern[] };
+        const data = (await res.json()) as { patterns?: DetectedPattern[] };
         setPatterns(data.patterns || []);
         setScanned(true);
         if ((data.patterns || []).length > 0) {
@@ -332,7 +329,7 @@ export function AIRulesGeneratorTab() {
       try {
         await handleSaveRule(pattern);
       } catch (err) {
-        console.error("Error saving pattern rule:", pattern.description, err);
+        console.error('Error saving pattern rule:', pattern.description, err);
       }
     }
     setIsSavingAll(false);
@@ -371,9 +368,7 @@ export function AIRulesGeneratorTab() {
                 <Brain className="size-5 text-violet-500" />
                 {t('settings.aiRules.title')}
               </h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                {t('settings.aiRules.subtitle')}
-              </p>
+              <p className="text-sm text-muted-foreground mt-1">{t('settings.aiRules.subtitle')}</p>
             </div>
             {scanned && patterns.length > 0 && (
               <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 border-0 self-start">
@@ -411,10 +406,7 @@ export function AIRulesGeneratorTab() {
 
         {/* Empty State */}
         {scanned && patterns.length === 0 && !scanning && (
-          <motion.div
-            variants={itemVariants}
-            className="text-center py-16"
-          >
+          <motion.div variants={itemVariants} className="text-center py-16">
             <div className="flex flex-col items-center gap-3">
               <div className="flex items-center justify-center size-16 rounded-full bg-emerald-100 dark:bg-emerald-900/30">
                 <CheckCircle2 className="size-8 text-emerald-500" />
@@ -463,10 +455,13 @@ export function AIRulesGeneratorTab() {
                     <div className="space-y-1">
                       <p className="text-sm font-medium">{pattern.description}</p>
                       <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                        <span>{pattern.occurrences} {t('settings.aiRules.occurrences')}</span>
+                        <span>
+                          {pattern.occurrences} {t('settings.aiRules.occurrences')}
+                        </span>
                         <span className="flex items-center gap-1">
                           <ArrowRight className="size-3" />
-                          {t('settings.aiRules.suggestedAccount')}: {pattern.suggestedAccountCode} - {pattern.suggestedAccount}
+                          {t('settings.aiRules.suggestedAccount')}: {pattern.suggestedAccountCode} -{' '}
+                          {pattern.suggestedAccount}
                         </span>
                       </div>
                     </div>

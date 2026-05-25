@@ -8,7 +8,7 @@ import { getSessionUserId } from '@/lib/sessions';
  */
 export async function GET(request: NextRequest) {
   try {
-    const userId = getSessionUserId(request);
+    const userId = await getSessionUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -47,8 +47,11 @@ export async function GET(request: NextRequest) {
         break;
       default:
         return NextResponse.json(
-          { error: 'Invalid type. Use: trial_balance, transactions, reconciliation, chart_of_accounts' },
-          { status: 400 }
+          {
+            error:
+              'Invalid type. Use: trial_balance, transactions, reconciliation, chart_of_accounts',
+          },
+          { status: 400 },
         );
     }
 
@@ -70,31 +73,45 @@ export async function GET(request: NextRequest) {
 
 async function generateTrialBalanceCSV(
   companyId: string,
-  searchParams: URLSearchParams
+  searchParams: URLSearchParams,
 ): Promise<{ csvContent: string; filename: string }> {
   const asOfDateParam = searchParams.get('asOfDate');
-  const asOfDate = asOfDateParam
-    ? new Date(asOfDateParam + 'T23:59:59.999Z')
-    : new Date();
+  const asOfDate = asOfDateParam ? new Date(asOfDateParam + 'T23:59:59.999Z') : new Date();
 
   const journalLines = await db.journalLine.findMany({
     where: {
       entry: { companyId, status: 'posted', date: { lte: asOfDate } },
     },
     include: {
-      glAccount: { select: { code: true, name: true, accountType: true, normalBalance: true, isActive: true } },
+      glAccount: {
+        select: { code: true, name: true, accountType: true, normalBalance: true, isActive: true },
+      },
     },
   });
 
-  const accountBalances = new Map<string, { code: string; name: string; accountType: string; debitTotal: number; creditTotal: number; normalBalance: string }>();
+  const accountBalances = new Map<
+    string,
+    {
+      code: string;
+      name: string;
+      accountType: string;
+      debitTotal: number;
+      creditTotal: number;
+      normalBalance: string;
+    }
+  >();
 
   for (const line of journalLines) {
     const acc = line.glAccount;
     if (!acc || !acc.isActive) continue;
     if (!accountBalances.has(acc.code)) {
       accountBalances.set(acc.code, {
-        code: acc.code, name: acc.name, accountType: acc.accountType,
-        debitTotal: 0, creditTotal: 0, normalBalance: acc.normalBalance,
+        code: acc.code,
+        name: acc.name,
+        accountType: acc.accountType,
+        debitTotal: 0,
+        creditTotal: 0,
+        normalBalance: acc.normalBalance,
       });
     }
     const entry = accountBalances.get(acc.code)!;
@@ -110,7 +127,7 @@ async function generateTrialBalanceCSV(
   let totalCredit = 0;
 
   const sorted = Array.from(accountBalances.values()).sort((a, b) =>
-    a.code.localeCompare(b.code, undefined, { numeric: true })
+    a.code.localeCompare(b.code, undefined, { numeric: true }),
   );
 
   for (const entry of sorted) {
@@ -148,7 +165,7 @@ async function generateTrialBalanceCSV(
 
 async function generateTransactionsCSV(
   companyId: string,
-  searchParams: URLSearchParams
+  searchParams: URLSearchParams,
 ): Promise<{ csvContent: string; filename: string }> {
   const startDateParam = searchParams.get('startDate');
   const endDateParam = searchParams.get('endDate');
@@ -156,8 +173,10 @@ async function generateTransactionsCSV(
   const where: Record<string, unknown> = { companyId, status: 'posted' };
   if (startDateParam || endDateParam) {
     where.date = {};
-    if (startDateParam) (where.date as Record<string, unknown>).gte = new Date(startDateParam + 'T00:00:00.000Z');
-    if (endDateParam) (where.date as Record<string, unknown>).lte = new Date(endDateParam + 'T23:59:59.999Z');
+    if (startDateParam)
+      (where.date as Record<string, unknown>).gte = new Date(startDateParam + 'T00:00:00.000Z');
+    if (endDateParam)
+      (where.date as Record<string, unknown>).lte = new Date(endDateParam + 'T23:59:59.999Z');
   }
 
   const entries = await db.journalEntry.findMany({
@@ -174,7 +193,16 @@ async function generateTransactionsCSV(
   });
 
   const rows: string[][] = [
-    ['Date', 'Reference', 'Entry Description', 'Account Code', 'Account Name', 'Line Description', 'Debit', 'Credit'],
+    [
+      'Date',
+      'Reference',
+      'Entry Description',
+      'Account Code',
+      'Account Name',
+      'Line Description',
+      'Debit',
+      'Credit',
+    ],
   ];
 
   for (const entry of entries) {
@@ -203,7 +231,7 @@ async function generateTransactionsCSV(
 
 async function generateReconciliationCSV(
   companyId: string,
-  searchParams: URLSearchParams
+  searchParams: URLSearchParams,
 ): Promise<{ csvContent: string; filename: string }> {
   const bankAccountId = searchParams.get('bankAccountId');
   if (!bankAccountId) {
@@ -244,7 +272,7 @@ async function generateReconciliationCSV(
 /* ─── Chart of Accounts CSV ─────────────────────────────────── */
 
 async function generateChartOfAccountsCSV(
-  companyId: string
+  companyId: string,
 ): Promise<{ csvContent: string; filename: string }> {
   const accounts = await db.glAccount.findMany({
     where: { companyId },
@@ -252,12 +280,16 @@ async function generateChartOfAccountsCSV(
     orderBy: { code: 'asc' },
   });
 
-  const rows: string[][] = [
-    ['Account Code', 'Account Name', 'Type', 'Normal Balance', 'Active'],
-  ];
+  const rows: string[][] = [['Account Code', 'Account Name', 'Type', 'Normal Balance', 'Active']];
 
   for (const acc of accounts) {
-    rows.push([acc.code, `"${acc.name}"`, acc.accountType, acc.normalBalance, acc.isActive ? 'Yes' : 'No']);
+    rows.push([
+      acc.code,
+      `"${acc.name}"`,
+      acc.accountType,
+      acc.normalBalance,
+      acc.isActive ? 'Yes' : 'No',
+    ]);
   }
 
   return {
@@ -265,4 +297,3 @@ async function generateChartOfAccountsCSV(
     filename: 'chart_of_accounts.csv',
   };
 }
-

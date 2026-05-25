@@ -26,12 +26,7 @@ import {
 import { useLanguageStore } from '@/store/language-store';
 import { useAuthStore } from '@/store/auth-store';
 import { formatCurrency, formatDate } from '@/lib/format';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -129,18 +124,32 @@ const TYPE_CHART_COLORS = ['#0891b2', '#d97706', '#7c3aed', '#059669', '#dc2626'
 
 function accountTypeColor(type: string): string {
   switch (type) {
-    case 'asset': return 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400';
-    case 'liability': return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400';
-    case 'equity': return 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400';
-    case 'revenue': return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400';
-    case 'expense': return 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400';
-    default: return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400';
+    case 'asset':
+      return 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400';
+    case 'liability':
+      return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400';
+    case 'equity':
+      return 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400';
+    case 'revenue':
+      return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400';
+    case 'expense':
+      return 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400';
+    default:
+      return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400';
   }
 }
 
 /* ─── Custom Tooltip for Chart ────────────────────────────────── */
 
-function CustomChartTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) {
+function CustomChartTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: Array<{ name: string; value: number; color: string }>;
+  label?: string;
+}) {
   if (!active || !payload || payload.length === 0) return null;
   const t = useLanguageStore.getState().t;
   return (
@@ -181,12 +190,10 @@ export function MovementSummaryPage() {
     let cancelled = false;
     void (async () => {
       try {
-        const res = await fetch(
-          `/api/journal/accounts?companyId=${activeCompany.id}`
-        );
+        const res = await fetch(`/api/journal/accounts?companyId=${activeCompany.id}`);
         if (res.ok && !cancelled) {
           const json = await res.json();
-          const list: GlAccount[] = Array.isArray(json) ? json : json.data ?? [];
+          const list: GlAccount[] = Array.isArray(json) ? json : (json.data ?? []);
           setGlAccounts(list);
         }
       } catch {
@@ -269,12 +276,8 @@ export function MovementSummaryPage() {
       {/* Header */}
       <motion.div variants={itemVariants}>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            {t('movementSummary.title')}
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {t('movementSummary.subtitle')}
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight">{t('movementSummary.title')}</h1>
+          <p className="text-sm text-muted-foreground mt-1">{t('movementSummary.subtitle')}</p>
         </div>
       </motion.div>
 
@@ -303,9 +306,7 @@ export function MovementSummaryPage() {
           <CardContent className="pt-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:flex-wrap">
               <div className="flex items-center gap-2">
-                <Label className="text-sm whitespace-nowrap">
-                  {t('movementSummary.fromDate')}
-                </Label>
+                <Label className="text-sm whitespace-nowrap">{t('movementSummary.fromDate')}</Label>
                 <Input
                   type="date"
                   value={fromDate}
@@ -314,9 +315,7 @@ export function MovementSummaryPage() {
                 />
               </div>
               <div className="flex items-center gap-2">
-                <Label className="text-sm whitespace-nowrap">
-                  {t('movementSummary.toDate')}
-                </Label>
+                <Label className="text-sm whitespace-nowrap">{t('movementSummary.toDate')}</Label>
                 <Input
                   type="date"
                   value={toDate}
@@ -325,20 +324,13 @@ export function MovementSummaryPage() {
                 />
               </div>
               <div className="flex items-center gap-2">
-                <Label className="text-sm whitespace-nowrap">
-                  {t('movementSummary.account')}
-                </Label>
-                <Select
-                  value={accountId || '__all__'}
-                  onValueChange={setAccountId}
-                >
+                <Label className="text-sm whitespace-nowrap">{t('movementSummary.account')}</Label>
+                <Select value={accountId || '__all__'} onValueChange={setAccountId}>
                   <SelectTrigger className="w-56">
                     <SelectValue placeholder={t('movementSummary.allAccounts')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__all__">
-                      {t('movementSummary.allAccounts')}
-                    </SelectItem>
+                    <SelectItem value="__all__">{t('movementSummary.allAccounts')}</SelectItem>
                     {glAccounts.map((acc) => (
                       <SelectItem key={acc.id} value={acc.id}>
                         <span className="font-mono text-teal-600 dark:text-teal-400">
@@ -353,12 +345,12 @@ export function MovementSummaryPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => { setRefreshKey((k) => k + 1); }}
+                onClick={() => {
+                  setRefreshKey((k) => k + 1);
+                }}
                 disabled={loading}
               >
-                <RefreshCw
-                  className={`size-4 mr-1 ${loading ? 'animate-spin' : ''}`}
-                />
+                <RefreshCw className={`size-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
                 {t('common.filter')}
               </Button>
             </div>
@@ -378,9 +370,7 @@ export function MovementSummaryPage() {
               <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
                 <TrendingUp className="size-4 text-emerald-600 dark:text-emerald-400" />
               </div>
-              <p className="text-xs text-muted-foreground">
-                {t('movementSummary.totalDebits')}
-              </p>
+              <p className="text-xs text-muted-foreground">{t('movementSummary.totalDebits')}</p>
             </div>
             {loading ? (
               <Skeleton className="h-8 w-32 mt-1" />
@@ -399,9 +389,7 @@ export function MovementSummaryPage() {
               <div className="flex size-8 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/30">
                 <TrendingDown className="size-4 text-amber-600 dark:text-amber-400" />
               </div>
-              <p className="text-xs text-muted-foreground">
-                {t('movementSummary.totalCredits')}
-              </p>
+              <p className="text-xs text-muted-foreground">{t('movementSummary.totalCredits')}</p>
             </div>
             {loading ? (
               <Skeleton className="h-8 w-32 mt-1" />
@@ -420,9 +408,7 @@ export function MovementSummaryPage() {
               <div className="flex size-8 items-center justify-center rounded-lg bg-teal-100 dark:bg-teal-900/30">
                 <ArrowUpDown className="size-4 text-teal-600 dark:text-teal-400" />
               </div>
-              <p className="text-xs text-muted-foreground">
-                {t('movementSummary.netMovement')}
-              </p>
+              <p className="text-xs text-muted-foreground">{t('movementSummary.netMovement')}</p>
             </div>
             {loading ? (
               <Skeleton className="h-8 w-32 mt-1" />
@@ -454,19 +440,14 @@ export function MovementSummaryPage() {
             {loading ? (
               <Skeleton className="h-8 w-32 mt-1" />
             ) : (
-              <p className="text-2xl font-bold">
-                {data?.summary.transactionCount ?? 0}
-              </p>
+              <p className="text-2xl font-bold">{data?.summary.transactionCount ?? 0}</p>
             )}
           </CardContent>
         </Card>
       </motion.div>
 
       {/* Two-column: Recent Movements + Chart */}
-      <motion.div
-        variants={itemVariants}
-        className="grid grid-cols-1 gap-6 lg:grid-cols-3"
-      >
+      <motion.div variants={itemVariants} className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Recent Movements Table (2/3 width) */}
         <Card className="lg:col-span-2">
           <CardHeader>
@@ -487,9 +468,7 @@ export function MovementSummaryPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[100px]">
-                        {t('common.date')}
-                      </TableHead>
+                      <TableHead className="w-[100px]">{t('common.date')}</TableHead>
                       <TableHead>{t('common.description')}</TableHead>
                       <TableHead className="hidden md:table-cell">
                         {t('movementSummary.account')}
@@ -508,24 +487,16 @@ export function MovementSummaryPage() {
                   <TableBody>
                     {data.recentMovements.map((mv) => (
                       <TableRow key={`${mv.id}-${mv.account}`}>
-                        <TableCell className="whitespace-nowrap">
-                          {formatDate(mv.date)}
-                        </TableCell>
-                        <TableCell className="max-w-[200px] truncate">
-                          {mv.description}
-                        </TableCell>
+                        <TableCell className="whitespace-nowrap">{formatDate(mv.date)}</TableCell>
+                        <TableCell className="max-w-[200px] truncate">{mv.description}</TableCell>
                         <TableCell className="hidden md:table-cell font-mono text-teal-600 dark:text-teal-400 text-xs">
                           {mv.account}
                         </TableCell>
                         <TableCell className="text-right font-mono">
-                          {mv.debit > 0
-                            ? formatCurrency(mv.debit)
-                            : ''}
+                          {mv.debit > 0 ? formatCurrency(mv.debit) : ''}
                         </TableCell>
                         <TableCell className="text-right font-mono">
-                          {mv.credit > 0
-                            ? formatCurrency(mv.credit)
-                            : ''}
+                          {mv.credit > 0 ? formatCurrency(mv.credit) : ''}
                         </TableCell>
                         <TableCell className="hidden sm:table-cell text-muted-foreground text-xs">
                           {mv.reference || '—'}
@@ -538,9 +509,7 @@ export function MovementSummaryPage() {
             ) : (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <Filter className="size-12 text-muted-foreground/30 mb-3" />
-                <p className="text-muted-foreground">
-                  {t('movementSummary.noData')}
-                </p>
+                <p className="text-muted-foreground">{t('movementSummary.noData')}</p>
               </div>
             )}
           </CardContent>
@@ -549,25 +518,16 @@ export function MovementSummaryPage() {
         {/* By Account Type Chart (1/3 width) */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">
-              {t('movementSummary.byType')}
-            </CardTitle>
+            <CardTitle className="text-base">{t('movementSummary.byType')}</CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? (
               <Skeleton className="h-64 w-full" />
             ) : chartData.length > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart
-                  data={chartData}
-                  margin={{ top: 5, right: 10, left: -10, bottom: 5 }}
-                >
+                <BarChart data={chartData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis
-                    dataKey="name"
-                    tick={{ fontSize: 11 }}
-                    className="fill-muted-foreground"
-                  />
+                  <XAxis dataKey="name" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
                   <YAxis
                     tick={{ fontSize: 11 }}
                     className="fill-muted-foreground"
@@ -576,27 +536,15 @@ export function MovementSummaryPage() {
                     }
                   />
                   <Tooltip content={<CustomChartTooltip />} />
-                  <Legend
-                    wrapperStyle={{ fontSize: 12 }}
-                  />
-                  <Bar
-                    dataKey={t('movementSummary.debit')}
-                    fill="#0891b2"
-                    radius={[4, 4, 0, 0]}
-                  />
-                  <Bar
-                    dataKey={t('movementSummary.credit')}
-                    fill="#f59e0b"
-                    radius={[4, 4, 0, 0]}
-                  />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  <Bar dataKey={t('movementSummary.debit')} fill="#0891b2" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey={t('movementSummary.credit')} fill="#f59e0b" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <Filter className="size-12 text-muted-foreground/30 mb-3" />
-                <p className="text-muted-foreground">
-                  {t('movementSummary.noData')}
-                </p>
+                <p className="text-muted-foreground">{t('movementSummary.noData')}</p>
               </div>
             )}
           </CardContent>
@@ -607,9 +555,7 @@ export function MovementSummaryPage() {
       <motion.div variants={itemVariants}>
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">
-              {t('movementSummary.byAccount')}
-            </CardTitle>
+            <CardTitle className="text-base">{t('movementSummary.byAccount')}</CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -623,13 +569,9 @@ export function MovementSummaryPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[100px]">
-                        {t('accounts.accountCode')}
-                      </TableHead>
+                      <TableHead className="w-[100px]">{t('accounts.accountCode')}</TableHead>
                       <TableHead>{t('accounts.accountName')}</TableHead>
-                      <TableHead className="w-[110px]">
-                        {t('accounts.accountType')}
-                      </TableHead>
+                      <TableHead className="w-[110px]">{t('accounts.accountType')}</TableHead>
                       <TableHead className="text-right w-[120px]">
                         {t('movementSummary.debit')}
                       </TableHead>
@@ -647,14 +589,9 @@ export function MovementSummaryPage() {
                         <TableCell className="font-mono text-teal-600 dark:text-teal-400">
                           {acc.accountCode}
                         </TableCell>
-                        <TableCell className="font-medium">
-                          {acc.accountName}
-                        </TableCell>
+                        <TableCell className="font-medium">{acc.accountName}</TableCell>
                         <TableCell>
-                          <Badge
-                            variant="secondary"
-                            className={accountTypeColor(acc.accountType)}
-                          >
+                          <Badge variant="secondary" className={accountTypeColor(acc.accountType)}>
                             {t(`accounts.${acc.accountType}`)}
                           </Badge>
                         </TableCell>
@@ -697,9 +634,7 @@ export function MovementSummaryPage() {
             ) : (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <Filter className="size-12 text-muted-foreground/30 mb-3" />
-                <p className="text-muted-foreground">
-                  {t('movementSummary.noData')}
-                </p>
+                <p className="text-muted-foreground">{t('movementSummary.noData')}</p>
               </div>
             )}
           </CardContent>

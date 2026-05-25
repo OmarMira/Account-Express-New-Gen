@@ -2,15 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import {
-  Activity,
-  Search,
-  Loader2,
-  Calendar,
-  Building,
-  User,
-  Info,
-} from 'lucide-react';
+import { Activity, Search, Loader2, Calendar, Building, User, Info } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { formatDate } from '@/lib/format';
 
@@ -122,11 +114,21 @@ export default function AdminAuditLogsPage() {
             <table className="min-w-full divide-y divide-border">
               <thead className="bg-muted/50">
                 <tr>
-                  <th className="px-6 py-3.5 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">Fecha y Hora</th>
-                  <th className="px-6 py-3.5 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">Usuario</th>
-                  <th className="px-6 py-3.5 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">Acción / Módulo</th>
-                  <th className="px-6 py-3.5 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">Empresa</th>
-                  <th className="px-6 py-3.5 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">Detalles</th>
+                  <th className="px-6 py-3.5 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    Fecha y Hora
+                  </th>
+                  <th className="px-6 py-3.5 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    Usuario
+                  </th>
+                  <th className="px-6 py-3.5 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    Acción / Módulo
+                  </th>
+                  <th className="px-6 py-3.5 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    Empresa
+                  </th>
+                  <th className="px-6 py-3.5 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    Detalles
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border bg-card">
@@ -162,7 +164,9 @@ export default function AdminAuditLogsPage() {
                       <div className="font-mono text-xs text-indigo-700 dark:text-indigo-400 font-bold bg-indigo-500/10 border border-indigo-500/20 px-2 py-1 rounded-md inline-block">
                         {log.action}
                       </div>
-                      <div className="text-xs text-muted-foreground mt-1">Entidad: {log.entity}</div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Entidad: {log.entity}
+                      </div>
                     </td>
 
                     {/* Company */}

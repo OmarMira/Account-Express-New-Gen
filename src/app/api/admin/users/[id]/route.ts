@@ -3,12 +3,9 @@ import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
 import { hashPassword } from '@/lib/auth';
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const sessionUserId = getSessionUserId(request);
+    const sessionUserId = await getSessionUserId(request);
     if (!sessionUserId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -64,10 +61,10 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const sessionUserId = getSessionUserId(request);
+    const sessionUserId = await getSessionUserId(request);
     if (!sessionUserId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

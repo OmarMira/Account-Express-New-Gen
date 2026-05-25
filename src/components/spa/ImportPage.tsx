@@ -21,12 +21,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -108,32 +103,25 @@ function getFileIcon(fileName: string) {
 function getFormatBadge(format: string) {
   const config: Record<string, { className: string; label: string }> = {
     csv: {
-      className:
-        'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
+      className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
       label: 'CSV',
     },
     ofx: {
-      className:
-        'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300',
+      className: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300',
       label: 'OFX',
     },
     qfx: {
-      className:
-        'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300',
+      className: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300',
       label: 'QFX',
     },
     pdf: {
-      className:
-        'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
+      className: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
       label: 'PDF',
     },
   };
   const c = config[format] || config.csv;
   return (
-    <Badge
-      variant="outline"
-      className={cn('text-[10px] font-semibold uppercase', c.className)}
-    >
+    <Badge variant="outline" className={cn('text-[10px] font-semibold uppercase', c.className)}>
       {c.label}
     </Badge>
   );
@@ -152,23 +140,19 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 const FORMAT_BADGES: { label: string; className: string }[] = [
   {
     label: 'CSV',
-    className:
-      'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
+    className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
   },
   {
     label: 'OFX',
-    className:
-      'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300',
+    className: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300',
   },
   {
     label: 'QFX',
-    className:
-      'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300',
+    className: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300',
   },
   {
     label: 'PDF',
-    className:
-      'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
+    className: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
   },
 ];
 
@@ -209,16 +193,14 @@ export function ImportPage() {
       const res = await fetch(`/api/banks?companyId=${activeCompany.id}`);
       if (res.ok) {
         const data = await res.json();
-        const active = (data.accounts || []).filter(
-          (a: { isActive: boolean }) => a.isActive
-        );
+        const active = (data.accounts || []).filter((a: { isActive: boolean }) => a.isActive);
         setBankAccounts(
           active.map((a: BankAccountOption) => ({
             id: a.id,
             accountName: a.accountName,
             bankName: a.bankName,
             accountNo: a.accountNo,
-          }))
+          })),
         );
       }
     } catch (err) {
@@ -230,9 +212,7 @@ export function ImportPage() {
     if (!activeCompany) return;
     setLoadingHistory(true);
     try {
-      const res = await fetch(
-        `/api/import/history?companyId=${activeCompany.id}`
-      );
+      const res = await fetch(`/api/import/history?companyId=${activeCompany.id}`);
       if (res.ok) {
         const data = await res.json();
         setHistory(data.statements || []);
@@ -342,7 +322,7 @@ export function ImportPage() {
 
       for (let i = 0; i < selectedFiles.length; i++) {
         const file = selectedFiles[i];
-        
+
         // Progress weight for each file
         const startProgress = (i / selectedFiles.length) * 100;
         const endProgress = ((i + 1) / selectedFiles.length) * 100;
@@ -408,12 +388,8 @@ export function ImportPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h2 className="text-xl font-semibold tracking-tight">
-          {t('banks.importStatement')}
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          {t('banks.importStatement')}
-        </p>
+        <h2 className="text-xl font-semibold tracking-tight">{t('banks.importStatement')}</h2>
+        <p className="text-sm text-muted-foreground">{t('banks.importStatement')}</p>
       </div>
 
       {/* Upload Card */}
@@ -429,7 +405,7 @@ export function ImportPage() {
                   : selectedFiles.length > 0
                     ? 'border-emerald-300 dark:border-emerald-700 bg-emerald-50/50 dark:bg-emerald-950/20'
                     : 'border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/50',
-                uploading && 'pointer-events-none opacity-60'
+                uploading && 'pointer-events-none opacity-60',
               )}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
@@ -437,7 +413,10 @@ export function ImportPage() {
               onClick={(e) => {
                 if (uploading) return;
                 // Only click if we clicked the dropzone itself, not children buttons
-                if ((e.target as HTMLElement).tagName === 'BUTTON' || (e.target as HTMLElement).closest('button')) {
+                if (
+                  (e.target as HTMLElement).tagName === 'BUTTON' ||
+                  (e.target as HTMLElement).closest('button')
+                ) {
                   return;
                 }
                 fileInputRef.current?.click();
@@ -457,11 +436,16 @@ export function ImportPage() {
                 <div className="flex flex-col items-center gap-4 w-full max-w-md mx-auto">
                   <div className="w-full space-y-2 max-h-[200px] overflow-y-auto pr-1">
                     {selectedFiles.map((file, idx) => (
-                      <div key={idx} className="flex items-center justify-between p-2 rounded-lg border bg-background text-left">
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between p-2 rounded-lg border bg-background text-left"
+                      >
                         <div className="flex items-center gap-2.5 min-w-0">
                           {getFileIcon(file.name)}
                           <div className="min-w-0">
-                            <p className="text-sm font-medium truncate max-w-[200px]">{file.name}</p>
+                            <p className="text-sm font-medium truncate max-w-[200px]">
+                              {file.name}
+                            </p>
                             <p className="text-xs text-muted-foreground">
                               {formatFileSize(file.size)}
                             </p>
@@ -504,18 +488,14 @@ export function ImportPage() {
                   <div
                     className={cn(
                       'flex size-14 items-center justify-center rounded-full transition-colors',
-                      isDragging
-                        ? 'bg-primary/10 text-primary'
-                        : 'bg-muted text-muted-foreground'
+                      isDragging ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground',
                     )}
                   >
                     <Upload className="size-6" />
                   </div>
                   <div>
                     <p className="text-sm font-medium">
-                      {isDragging
-                        ? t('banks.dragDrop')
-                        : t('banks.dragDrop')}
+                      {isDragging ? t('banks.dragDrop') : t('banks.dragDrop')}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
                       {t('banks.supportedFormats')}
@@ -527,10 +507,7 @@ export function ImportPage() {
                       <Badge
                         key={fmt.label}
                         variant="outline"
-                        className={cn(
-                          'text-xs font-bold px-3 py-1',
-                          fmt.className
-                        )}
+                        className={cn('text-xs font-bold px-3 py-1', fmt.className)}
                       >
                         {fmt.label}
                       </Badge>
@@ -558,9 +535,7 @@ export function ImportPage() {
             {uploadError && (
               <div className="flex items-start gap-2 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 p-3">
                 <AlertCircle className="size-4 text-red-500 shrink-0 mt-0.5" />
-                <p className="text-sm text-red-700 dark:text-red-400">
-                  {uploadError}
-                </p>
+                <p className="text-sm text-red-700 dark:text-red-400">{uploadError}</p>
               </div>
             )}
 
@@ -584,9 +559,7 @@ export function ImportPage() {
                   </>
                 )}
               </Button>
-              <p className="text-xs text-muted-foreground">
-                {t('banks.autoDetect')}
-              </p>
+              <p className="text-xs text-muted-foreground">{t('banks.autoDetect')}</p>
             </div>
           </div>
         </CardContent>
@@ -596,9 +569,7 @@ export function ImportPage() {
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-base font-semibold">
-              {t('banks.importHistory')}
-            </CardTitle>
+            <CardTitle className="text-base font-semibold">{t('banks.importHistory')}</CardTitle>
             <Button
               variant="ghost"
               size="sm"
@@ -618,9 +589,7 @@ export function ImportPage() {
           ) : history.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <Clock className="size-10 text-muted-foreground/50 mb-3" />
-              <p className="text-sm text-muted-foreground">
-                {t('banks.noImportHistory')}
-              </p>
+              <p className="text-sm text-muted-foreground">{t('banks.noImportHistory')}</p>
             </div>
           ) : (
             <div className="rounded-lg border overflow-hidden">
@@ -630,12 +599,8 @@ export function ImportPage() {
                     <TableHead>{t('common.date')}</TableHead>
                     <TableHead>{t('common.name')}</TableHead>
                     <TableHead>{t('common.type')}</TableHead>
-                    <TableHead className="hidden sm:table-cell">
-                      {t('banks.title')}
-                    </TableHead>
-                    <TableHead className="text-center">
-                      {t('banks.transactionsImported')}
-                    </TableHead>
+                    <TableHead className="hidden sm:table-cell">{t('banks.title')}</TableHead>
+                    <TableHead className="text-center">{t('banks.transactionsImported')}</TableHead>
                     <TableHead className="text-center hidden md:table-cell">
                       {t('banks.autoCategorized')}
                     </TableHead>
@@ -663,10 +628,7 @@ export function ImportPage() {
                         </span>
                       </TableCell>
                       <TableCell className="text-center">
-                        <Badge
-                          variant="outline"
-                          className="font-mono text-xs"
-                        >
+                        <Badge variant="outline" className="font-mono text-xs">
                           {stmt.transactionCount}
                         </Badge>
                       </TableCell>
@@ -680,7 +642,7 @@ export function ImportPage() {
                                 ? 'text-emerald-600 dark:text-emerald-400'
                                 : stmt.autoCategorizedPercent >= 40
                                   ? 'text-amber-600 dark:text-amber-400'
-                                  : 'text-muted-foreground'
+                                  : 'text-muted-foreground',
                             )}
                           >
                             {stmt.autoCategorizedPercent}%
@@ -725,37 +687,26 @@ export function ImportPage() {
                   <p className="text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400">
                     {importResult.transactionCount > 0
                       ? Math.round(
-                          (importResult.autoCategorizedCount /
-                            importResult.transactionCount) *
-                            100
+                          (importResult.autoCategorizedCount / importResult.transactionCount) * 100,
                         )
                       : 0}
                     %
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {t('banks.autoCategorized')}
-                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">{t('banks.autoCategorized')}</p>
                 </div>
               </div>
 
               {/* Details */}
               <div className="rounded-lg border p-3 space-y-2">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">
-                    {t('banks.autoCategorized')}
-                  </span>
+                  <span className="text-muted-foreground">{t('banks.autoCategorized')}</span>
                   <span className="font-medium">
-                    {importResult.autoCategorizedCount} /{' '}
-                    {importResult.transactionCount}
+                    {importResult.autoCategorizedCount} / {importResult.transactionCount}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">
-                    {t('banks.title')}
-                  </span>
-                  <span className="font-medium">
-                    {importResult.bankAccountName}
-                  </span>
+                  <span className="text-muted-foreground">{t('banks.title')}</span>
+                  <span className="font-medium">{importResult.bankAccountName}</span>
                 </div>
                 {importResult.newAccountCreated && (
                   <div className="flex items-center gap-2 rounded-md bg-teal-50 dark:bg-teal-950/30 p-2 text-sm">
@@ -787,21 +738,17 @@ export function ImportPage() {
                       style={{
                         width: `${
                           importResult.transactionCount > 0
-                            ? (importResult.autoCategorizedCount /
-                                importResult.transactionCount) *
+                            ? (importResult.autoCategorizedCount / importResult.transactionCount) *
                               100
                             : 0
                         }%`,
                       }}
                     />
                   </div>
-                  {importResult.autoCategorizedCount <
-                    importResult.transactionCount && (
+                  {importResult.autoCategorizedCount < importResult.transactionCount && (
                     <p className="text-xs text-amber-600 dark:text-amber-400">
-                      {importResult.transactionCount -
-                        importResult.autoCategorizedCount}{' '}
-                      {t('banks.transactions').toLowerCase()}{' '}
-                      {t('banks.uncategorizedNote')}
+                      {importResult.transactionCount - importResult.autoCategorizedCount}{' '}
+                      {t('banks.transactions').toLowerCase()} {t('banks.uncategorizedNote')}
                     </p>
                   )}
                 </div>

@@ -9,7 +9,7 @@ function transactionMatchesRule(
     conditionType: string;
     conditionValue: string;
     transactionDirection: string;
-  }
+  },
 ): boolean {
   // Check direction first
   if (rule.transactionDirection === 'debit' && tx.amount >= 0) return false;
@@ -37,11 +37,8 @@ function transactionMatchesRule(
 }
 
 // ─── GET /api/bank-rules/[id] ──────────────────────────────────────
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const userId = getSessionUserId(request);
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const userId = await getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -81,11 +78,8 @@ export async function GET(
 }
 
 // ─── PUT /api/bank-rules/[id] ──────────────────────────────────────
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const userId = getSessionUserId(request);
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const userId = await getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -120,10 +114,7 @@ export async function PUT(
 
     // Validate fields if provided
     if (name !== undefined && !name.trim()) {
-      return NextResponse.json(
-        { error: 'name cannot be empty' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'name cannot be empty' }, { status: 400 });
     }
 
     const validConditionTypes = [
@@ -137,15 +128,12 @@ export async function PUT(
     if (conditionType !== undefined && !validConditionTypes.includes(conditionType)) {
       return NextResponse.json(
         { error: `conditionType must be one of: ${validConditionTypes.join(', ')}` },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (conditionValue !== undefined && !conditionValue.trim()) {
-      return NextResponse.json(
-        { error: 'conditionValue cannot be empty' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'conditionValue cannot be empty' }, { status: 400 });
     }
 
     if (glAccountId !== undefined) {
@@ -155,7 +143,7 @@ export async function PUT(
       if (!glAccount) {
         return NextResponse.json(
           { error: 'GL account not found or does not belong to this company' },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
@@ -163,10 +151,7 @@ export async function PUT(
     if (priority !== undefined) {
       const p = Math.round(priority);
       if (p < 0 || p > 20) {
-        return NextResponse.json(
-          { error: 'priority must be between 0 and 20' },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: 'priority must be between 0 and 20' }, { status: 400 });
       }
     }
 
@@ -200,19 +185,16 @@ export async function PUT(
     });
   } catch (error) {
     console.error('[BANK RULE UPDATE ERROR]', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
 // ─── DELETE /api/bank-rules/[id] ───────────────────────────────────
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const userId = getSessionUserId(request);
+  const userId = await getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -244,21 +226,15 @@ export async function DELETE(
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('[BANK RULE DELETE ERROR]', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
 // ─── POST /api/bank-rules/[id] (action=apply) ──────────────────────
 // Apply this single rule to all unmatched transactions.
 // Body: { action: 'apply' }
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const userId = getSessionUserId(request);
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const userId = await getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -270,10 +246,7 @@ export async function POST(
     const { action } = body;
 
     if (action !== 'apply') {
-      return NextResponse.json(
-        { error: "Invalid action. Use 'apply'." },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Invalid action. Use 'apply'." }, { status: 400 });
     }
 
     const rule = await db.bankRule.findUnique({
@@ -284,10 +257,7 @@ export async function POST(
     }
 
     if (!rule.isActive) {
-      return NextResponse.json(
-        { error: 'Cannot apply an inactive rule' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Cannot apply an inactive rule' }, { status: 400 });
     }
 
     // Verify access
@@ -336,9 +306,6 @@ export async function POST(
     });
   } catch (error) {
     console.error('[BANK RULE APPLY ERROR]', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

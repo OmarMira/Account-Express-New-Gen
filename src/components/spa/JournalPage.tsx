@@ -90,15 +90,18 @@ function StatusBadge({ status }: { status: string }) {
   const t = useLanguageStore((s) => s.t);
   const config: Record<string, { className: string; label: string }> = {
     draft: {
-      className: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 border-gray-200 dark:border-gray-700',
+      className:
+        'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 border-gray-200 dark:border-gray-700',
       label: t('journal.draft'),
     },
     posted: {
-      className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
+      className:
+        'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
       label: t('journal.posted'),
     },
     void: {
-      className: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 border-red-200 dark:border-red-800',
+      className:
+        'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 border-red-200 dark:border-red-800',
       label: t('journal.void'),
     },
   };
@@ -208,9 +211,7 @@ export function JournalPage() {
   async function fetchAccounts() {
     if (!activeCompany) return;
     try {
-      const res = await fetch(
-        `/api/journal/accounts?companyId=${activeCompany.id}`
-      );
+      const res = await fetch(`/api/journal/accounts?companyId=${activeCompany.id}`);
       if (res.ok) {
         const data = await res.json();
         setAccounts(data.data);
@@ -269,7 +270,7 @@ export function JournalPage() {
         description: l.description ?? '',
         debit: l.debit,
         credit: l.credit,
-      }))
+      })),
     );
     setModalOpen(true);
   }
@@ -285,14 +286,8 @@ export function JournalPage() {
     });
   }
 
-  function updateLine(
-    lineId: string,
-    field: keyof JournalLineData,
-    value: unknown
-  ) {
-    setFormLines((prev) =>
-      prev.map((l) => (l.id === lineId ? { ...l, [field]: value } : l))
-    );
+  function updateLine(lineId: string, field: keyof JournalLineData, value: unknown) {
+    setFormLines((prev) => prev.map((l) => (l.id === lineId ? { ...l, [field]: value } : l)));
   }
 
   const totalDebits = formLines.reduce((s, l) => s + (l.debit || 0), 0);
@@ -333,9 +328,7 @@ export function JournalPage() {
         })),
       };
 
-      const url = editingEntryId
-        ? `/api/journal/${editingEntryId}`
-        : '/api/journal';
+      const url = editingEntryId ? `/api/journal/${editingEntryId}` : '/api/journal';
       const method = editingEntryId ? 'PUT' : 'POST';
 
       const res = await fetch(url, {
@@ -465,18 +458,11 @@ export function JournalPage() {
             <div className="flex items-center gap-2">
               {selectedEntry.status === 'draft' && (
                 <>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => openEditModal(selectedEntry)}
-                  >
+                  <Button variant="outline" size="sm" onClick={() => openEditModal(selectedEntry)}>
                     <Pencil className="size-3.5 mr-1" />
                     {t('common.edit')}
                   </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => requestAction(selectedEntry.id, 'post')}
-                  >
+                  <Button size="sm" onClick={() => requestAction(selectedEntry.id, 'post')}>
                     <SendHorizonal className="size-3.5 mr-1" />
                     {t('journal.postEntry')}
                   </Button>
@@ -556,9 +542,7 @@ export function JournalPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold tracking-tight">{t('journal.title')}</h2>
-          <p className="text-sm text-muted-foreground">
-            {t('journal.subtitle')}
-          </p>
+          <p className="text-sm text-muted-foreground">{t('journal.subtitle')}</p>
         </div>
         <Button onClick={openNewModal}>
           <Plus className="size-4 mr-1" />
@@ -643,8 +627,12 @@ export function JournalPage() {
                 <TableHead>{t('common.date')}</TableHead>
                 <TableHead className="hidden sm:table-cell">{t('common.reference')}</TableHead>
                 <TableHead>{t('common.description')}</TableHead>
-                <TableHead className="text-right hidden md:table-cell">{t('journal.debitTotal')}</TableHead>
-                <TableHead className="text-right hidden md:table-cell">{t('journal.creditTotal')}</TableHead>
+                <TableHead className="text-right hidden md:table-cell">
+                  {t('journal.debitTotal')}
+                </TableHead>
+                <TableHead className="text-right hidden md:table-cell">
+                  {t('journal.creditTotal')}
+                </TableHead>
                 <TableHead>{t('common.status')}</TableHead>
                 <TableHead className="text-right">{t('common.actions')}</TableHead>
               </TableRow>
@@ -656,15 +644,11 @@ export function JournalPage() {
                   className="cursor-pointer"
                   onClick={() => openDetail(entry)}
                 >
-                  <TableCell className="font-medium">
-                    {formatDate(entry.date)}
-                  </TableCell>
+                  <TableCell className="font-medium">{formatDate(entry.date)}</TableCell>
                   <TableCell className="hidden sm:table-cell text-muted-foreground">
                     {entry.reference || '—'}
                   </TableCell>
-                  <TableCell className="max-w-[250px] truncate">
-                    {entry.description}
-                  </TableCell>
+                  <TableCell className="max-w-[250px] truncate">{entry.description}</TableCell>
                   <TableCell className="text-right font-mono hidden md:table-cell">
                     {fmt(entry._totalDebit ?? 0)}
                   </TableCell>
@@ -756,9 +740,7 @@ export function JournalPage() {
                 {editingEntryId ? t('journal.editEntry') : t('journal.newEntry')}
               </DialogTitle>
               <DialogDescription>
-                {editingEntryId
-                  ? t('journal.editEntryDesc')
-                  : t('journal.newEntryDesc')}
+                {editingEntryId ? t('journal.editEntryDesc') : t('journal.newEntryDesc')}
               </DialogDescription>
             </DialogHeader>
 
@@ -766,11 +748,7 @@ export function JournalPage() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1.5">
                 <label className="text-sm font-medium">{t('journal.entryDate')}</label>
-                <Input
-                  type="date"
-                  value={formDate}
-                  onChange={(e) => setFormDate(e.target.value)}
-                />
+                <Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} />
               </div>
               <div className="space-y-1.5">
                 <label className="text-sm font-medium">{t('journal.entryReference')}</label>
@@ -796,7 +774,9 @@ export function JournalPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[45%]">{t('journal.account')}</TableHead>
-                    <TableHead className="hidden sm:table-cell">{t('common.description')}</TableHead>
+                    <TableHead className="hidden sm:table-cell">
+                      {t('common.description')}
+                    </TableHead>
                     <TableHead className="w-[120px] text-right">{t('accounts.debit')}</TableHead>
                     <TableHead className="w-[120px] text-right">{t('accounts.credit')}</TableHead>
                     <TableHead className="w-[40px]" />
@@ -816,9 +796,7 @@ export function JournalPage() {
                       <TableCell className="hidden sm:table-cell">
                         <Input
                           value={line.description}
-                          onChange={(e) =>
-                            updateLine(line.id, 'description', e.target.value)
-                          }
+                          onChange={(e) => updateLine(line.id, 'description', e.target.value)}
                           placeholder="—"
                           className="h-9"
                         />
@@ -895,11 +873,7 @@ export function JournalPage() {
 
             {/* Actions */}
             <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2">
-              <Button
-                variant="outline"
-                onClick={() => setModalOpen(false)}
-                disabled={saving}
-              >
+              <Button variant="outline" onClick={() => setModalOpen(false)} disabled={saving}>
                 {t('common.cancel')}
               </Button>
               <Button
@@ -927,9 +901,7 @@ export function JournalPage() {
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
             <DialogTitle>
-              {confirmAction === 'post'
-                ? t('journal.confirmPost')
-                : t('journal.confirmVoid')}
+              {confirmAction === 'post' ? t('journal.confirmPost') : t('journal.confirmVoid')}
             </DialogTitle>
             <DialogDescription>
               {confirmAction === 'post'
@@ -951,9 +923,7 @@ export function JournalPage() {
               disabled={actionLoading}
             >
               {actionLoading && <Loader2 className="size-4 mr-1 animate-spin" />}
-              {confirmAction === 'post'
-                ? t('journal.postEntry')
-                : t('journal.voidEntry')}
+              {confirmAction === 'post' ? t('journal.postEntry') : t('journal.voidEntry')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -961,5 +931,3 @@ export function JournalPage() {
     </div>
   );
 }
-
-

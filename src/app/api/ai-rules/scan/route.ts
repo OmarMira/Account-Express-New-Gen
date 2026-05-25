@@ -13,12 +13,12 @@ import { hasCompanyAccess } from '@/lib/auth';
  */
 export async function POST(request: NextRequest) {
   try {
-    const userId = getSessionUserId(request);
+    const userId = await getSessionUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await request.json() as { companyId?: string };
+    const body = (await request.json()) as { companyId?: string };
     const companyId = body?.companyId;
 
     if (!companyId) {
@@ -50,8 +50,8 @@ export async function POST(request: NextRequest) {
         id: true,
         description: true,
         amount: true,
-        matchedRuleId: true,   // skip already-ruled transactions
-        glAccountId: true,     // skip already-classified transactions
+        matchedRuleId: true, // skip already-ruled transactions
+        glAccountId: true, // skip already-classified transactions
       },
     });
 
@@ -62,9 +62,9 @@ export async function POST(request: NextRequest) {
     // both normalize to "Zelle payment to omar mira"
     function normalize(raw: string): string {
       return raw
-        .replace(/conf#?\s*\S+/gi, '')        // remove Conf# codes
-        .replace(/\b[a-z0-9]{8,}\b/gi, '')    // remove long alphanumeric tokens
-        .replace(/\b\d[\d.,/\-]*\b/g, '')     // remove numbers / amounts
+        .replace(/conf#?\s*\S+/gi, '') // remove Conf# codes
+        .replace(/\b[a-z0-9]{8,}\b/gi, '') // remove long alphanumeric tokens
+        .replace(/\b\d[\d.,/\-]*\b/g, '') // remove numbers / amounts
         .replace(/\s{2,}/g, ' ')
         .trim()
         .toLowerCase();
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
 
     interface Entry {
       count: number;
-      sample: string;        // original description sample
+      sample: string; // original description sample
       totalAmount: number;
       debitCount: number;
       creditCount: number;
@@ -90,7 +90,8 @@ export async function POST(request: NextRequest) {
       if (existing) {
         existing.count++;
         existing.totalAmount += Math.abs(tx.amount);
-        if (isDebit) existing.debitCount++; else existing.creditCount++;
+        if (isDebit) existing.debitCount++;
+        else existing.creditCount++;
       } else {
         map.set(key, {
           count: 1,
@@ -107,19 +108,22 @@ export async function POST(request: NextRequest) {
     // Fetch existing active rules to avoid suggesting them
     const existingRules = await db.bankRule.findMany({
       where: { companyId, isActive: true },
-      select: { conditionValue: true, conditionType: true }
+      select: { conditionValue: true, conditionType: true },
     });
 
     // Fetch existing GL accounts to match against
     const glAccounts = await db.glAccount.findMany({
       where: { companyId, isActive: true },
-      select: { id: true, name: true, code: true, accountType: true }
+      select: { id: true, name: true, code: true, accountType: true },
     });
 
     // Heuristic GL account suggestions based on keywords mapping to actual GL accounts
-    function suggestAccount(sample: string, isDebit: boolean): { name: string; code: string; id: string } | null {
+    function suggestAccount(
+      sample: string,
+      isDebit: boolean,
+    ): { name: string; code: string; id: string } | null {
       const desc = sample.toLowerCase();
-      let matchedAcc = null;
+      let matchedAcc: { id: string; name: string; code: string; accountType: string } | null = null;
 
       // Basic heuristic keywords
       const keywords = {
@@ -138,21 +142,28 @@ export async function POST(request: NextRequest) {
         comision: 'gasto',
         rent: 'gasto',
         insurance: 'gasto',
-        seguro: 'gasto'
+        seguro: 'gasto',
       };
 
       for (const [kw, typeHint] of Object.entries(keywords)) {
         if (desc.includes(kw)) {
           // Find an account whose name contains the keyword, or matches the hint
-          matchedAcc = glAccounts.find(a => a.name.toLowerCase().includes(kw)) ||
-                       glAccounts.find(a => typeHint === 'gasto' ? a.accountType === 'expense' : a.accountType === 'revenue');
+          matchedAcc =
+            glAccounts.find((a) => a.name.toLowerCase().includes(kw)) ||
+            glAccounts.find((a) =>
+              typeHint === 'gasto' ? a.accountType === 'expense' : a.accountType === 'revenue',
+            ) ||
+            null;
           if (matchedAcc) break;
         }
       }
 
       // Fallback
       if (!matchedAcc) {
-        matchedAcc = glAccounts.find(a => isDebit ? a.accountType === 'expense' : a.accountType === 'revenue');
+        matchedAcc =
+          glAccounts.find((a) =>
+            isDebit ? a.accountType === 'expense' : a.accountType === 'revenue',
+          ) || null;
       }
 
       if (matchedAcc) {
@@ -162,13 +173,13 @@ export async function POST(request: NextRequest) {
       return null;
     }
 
-    const patterns = [];
+    const patterns: any[] = [];
 
     for (const [key, entry] of map.entries()) {
       if (entry.count < MIN_OCCURRENCES) continue;
 
       // Skip if an existing rule covers this pattern
-      const alreadyHasRule = existingRules.some(r => {
+      const alreadyHasRule = existingRules.some((r) => {
         const cond = r.conditionValue.toLowerCase().trim();
         const k = key.toLowerCase().trim();
         if (r.conditionType === 'contains') return k.includes(cond) || cond.includes(k);

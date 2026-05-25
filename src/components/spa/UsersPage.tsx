@@ -1,27 +1,12 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import {
-  Users,
-  UserPlus,
-  Shield,
-  Mail,
-  Calendar,
-  Loader2,
-  CheckCircle2,
-  X,
-} from 'lucide-react';
+import { Users, UserPlus, Shield, Mail, Calendar, Loader2, CheckCircle2, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useLanguageStore } from '@/store/language-store';
 import { useAuthStore } from '@/store/auth-store';
 import { formatDate } from '@/lib/format';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -125,7 +110,9 @@ export function UsersPage() {
       } else if (res.status === 403) {
         setAccessDenied(true);
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     setLoading(false);
   }, [companyId, isAdmin]);
 
@@ -139,7 +126,12 @@ export function UsersPage() {
     setInviting(true);
     setInviteSuccess(false);
 
-    if (!inviteForm.email || !inviteForm.firstName || !inviteForm.lastName || !inviteForm.password) {
+    if (
+      !inviteForm.email ||
+      !inviteForm.firstName ||
+      !inviteForm.lastName ||
+      !inviteForm.password
+    ) {
       setInviteError('All fields are required.');
       setInviting(false);
       return;
@@ -228,7 +220,9 @@ export function UsersPage() {
                   <Input
                     id="inv-firstName"
                     value={inviteForm.firstName}
-                    onChange={(e) => setInviteForm((prev) => ({ ...prev, firstName: e.target.value }))}
+                    onChange={(e) =>
+                      setInviteForm((prev) => ({ ...prev, firstName: e.target.value }))
+                    }
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -236,7 +230,9 @@ export function UsersPage() {
                   <Input
                     id="inv-lastName"
                     value={inviteForm.lastName}
-                    onChange={(e) => setInviteForm((prev) => ({ ...prev, lastName: e.target.value }))}
+                    onChange={(e) =>
+                      setInviteForm((prev) => ({ ...prev, lastName: e.target.value }))
+                    }
                   />
                 </div>
               </div>
@@ -275,9 +271,13 @@ export function UsersPage() {
               </Button>
               <Button onClick={handleInvite} disabled={inviting || inviteSuccess}>
                 {inviting ? (
-                  <><Loader2 className="size-4 mr-1 animate-spin" /> {t('settings.saving')}</>
+                  <>
+                    <Loader2 className="size-4 mr-1 animate-spin" /> {t('settings.saving')}
+                  </>
                 ) : (
-                  <><UserPlus className="size-4 mr-1" /> {t('users.inviteUser')}</>
+                  <>
+                    <UserPlus className="size-4 mr-1" /> {t('users.inviteUser')}
+                  </>
                 )}
               </Button>
             </DialogFooter>
@@ -327,12 +327,17 @@ export function UsersPage() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="secondary" className={
-                            u.role === 'super_admin'
-                              ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-                              : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                          }>
-                            {u.role === 'super_admin' ? t('users.superAdmin') : t('users.companyAdmin')}
+                          <Badge
+                            variant="secondary"
+                            className={
+                              u.role === 'super_admin'
+                                ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                                : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                            }
+                          >
+                            {u.role === 'super_admin'
+                              ? t('users.superAdmin')
+                              : t('users.companyAdmin')}
                           </Badge>
                         </TableCell>
                         <TableCell className="hidden md:table-cell text-muted-foreground">
@@ -342,11 +347,14 @@ export function UsersPage() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant={u.isActive ? 'default' : 'secondary'} className={
-                            u.isActive
-                              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                              : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
-                          }>
+                          <Badge
+                            variant={u.isActive ? 'default' : 'secondary'}
+                            className={
+                              u.isActive
+                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                                : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
+                            }
+                          >
                             {u.isActive ? t('users.active') : t('users.inactive')}
                           </Badge>
                         </TableCell>

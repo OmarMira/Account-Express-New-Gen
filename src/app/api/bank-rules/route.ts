@@ -5,7 +5,7 @@ import { getSessionUserId } from '@/lib/sessions';
 // ─── GET /api/bank-rules ───────────────────────────────────────────
 // List bank rules for a company, sorted by priority. Includes GL account info.
 export async function GET(request: NextRequest) {
-  const userId = getSessionUserId(request);
+  const userId = await getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -14,10 +14,7 @@ export async function GET(request: NextRequest) {
   const companyId = searchParams.get('companyId');
 
   if (!companyId) {
-    return NextResponse.json(
-      { error: 'companyId is required' },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: 'companyId is required' }, { status: 400 });
   }
 
   // Verify user has access to this company
@@ -55,7 +52,7 @@ export async function GET(request: NextRequest) {
 // Create a new bank rule.
 // Body: { companyId, name, conditionType, conditionValue, transactionDirection?, glAccountId, priority?, isActive? }
 export async function POST(request: NextRequest) {
-  const userId = getSessionUserId(request);
+  const userId = await getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -76,15 +73,12 @@ export async function POST(request: NextRequest) {
 
     // Validate required fields
     if (!companyId || !name?.trim()) {
-      return NextResponse.json(
-        { error: 'companyId and name are required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'companyId and name are required' }, { status: 400 });
     }
 
     if (!glAccountId && glAccountCode) {
       const dbAcc = await db.glAccount.findFirst({
-        where: { code: String(glAccountCode), companyId }
+        where: { code: String(glAccountCode), companyId },
       });
       if (dbAcc) {
         glAccountId = dbAcc.id;
@@ -102,30 +96,24 @@ export async function POST(request: NextRequest) {
     if (!validConditionTypes.includes(conditionType)) {
       return NextResponse.json(
         { error: `conditionType must be one of: ${validConditionTypes.join(', ')}` },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!conditionValue?.trim()) {
-      return NextResponse.json(
-        { error: 'conditionValue is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'conditionValue is required' }, { status: 400 });
     }
 
     const validDirections = ['any', 'debit', 'credit'];
     if (!validDirections.includes(transactionDirection)) {
       return NextResponse.json(
         { error: `transactionDirection must be one of: ${validDirections.join(', ')}` },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!glAccountId) {
-      return NextResponse.json(
-        { error: 'glAccountId is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'glAccountId is required' }, { status: 400 });
     }
 
     // Verify company access
@@ -143,7 +131,7 @@ export async function POST(request: NextRequest) {
     if (!glAccount) {
       return NextResponse.json(
         { error: 'GL account not found or does not belong to this company' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -154,17 +142,14 @@ export async function POST(request: NextRequest) {
     ) {
       return NextResponse.json(
         { error: 'conditionValue must be a number for amount conditions' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     // Validate priority range
     const p = typeof priority === 'number' ? Math.round(priority) : 10;
     if (p < 0 || p > 20) {
-      return NextResponse.json(
-        { error: 'priority must be between 0 and 20' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'priority must be between 0 and 20' }, { status: 400 });
     }
 
     const rule = await db.bankRule.create({
@@ -192,13 +177,10 @@ export async function POST(request: NextRequest) {
         updatedAt: rule.updatedAt.toISOString(),
         _matchCount: 0,
       },
-      { status: 201 }
+      { status: 201 },
     );
   } catch (error) {
     console.error('[BANK RULE CREATE ERROR]', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

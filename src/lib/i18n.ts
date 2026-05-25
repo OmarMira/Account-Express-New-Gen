@@ -23,7 +23,7 @@ export const localeNames: Record<Locale, string> = {
 export function getTranslation(
   translations: Record<string, unknown>,
   key: string,
-  fallback?: string
+  fallback?: string,
 ): string {
   const keys = key.split('.');
   let current: unknown = translations;

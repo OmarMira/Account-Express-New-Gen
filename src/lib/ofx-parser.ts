@@ -40,7 +40,8 @@ export function parseOFX(content: string): ParsedOFX {
 
 function parseXML(content: string): ParsedOFX {
   // Use DOMParser-like regex extraction for Node.js compatibility
-  const bankName = extractXmlValue(content, 'BANKNAME') || extractXmlValue(content, 'ORG') || 'Unknown Bank';
+  const bankName =
+    extractXmlValue(content, 'BANKNAME') || extractXmlValue(content, 'ORG') || 'Unknown Bank';
   const accountNumber = extractXmlValue(content, 'ACCTID') || '';
   const acctType = extractXmlValue(content, 'ACCTTYPE') || 'CHECKING';
 
@@ -63,11 +64,15 @@ function parseXML(content: string): ParsedOFX {
   transactions.sort((a, b) => a.date.getTime() - b.date.getTime());
 
   const startDate = startDateVal ? parseOFXDate(startDateVal) : transactions[0].date;
-  const endDate = endDateVal ? parseOFXDate(endDateVal) : transactions[transactions.length - 1].date;
+  const endDate = endDateVal
+    ? parseOFXDate(endDateVal)
+    : transactions[transactions.length - 1].date;
 
   // Calculate opening balance from closing balance
   const totalCredits = transactions.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0);
-  const totalDebits = transactions.filter((t) => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
+  const totalDebits = transactions
+    .filter((t) => t.amount < 0)
+    .reduce((s, t) => s + Math.abs(t.amount), 0);
   const openingBalance = closingBalance - totalCredits + totalDebits;
 
   return {
@@ -123,7 +128,8 @@ function parseSGML(content: string): ParsedOFX {
   const body = headerEnd > -1 ? content.slice(headerEnd) : content;
 
   // Extract bank info
-  const bankName = extractTagValue(body, 'BANKNAME') || extractTagValue(body, 'ORG') || 'Unknown Bank';
+  const bankName =
+    extractTagValue(body, 'BANKNAME') || extractTagValue(body, 'ORG') || 'Unknown Bank';
   const accountNumber = extractTagValue(body, 'ACCTID') || '';
   const acctType = extractTagValue(body, 'ACCTTYPE') || 'CHECKING';
 
@@ -146,11 +152,15 @@ function parseSGML(content: string): ParsedOFX {
   transactions.sort((a, b) => a.date.getTime() - b.date.getTime());
 
   const startDate = startDateStr ? parseOFXDate(startDateStr) : transactions[0].date;
-  const endDate = endDateStr ? parseOFXDate(endDateStr) : transactions[transactions.length - 1].date;
+  const endDate = endDateStr
+    ? parseOFXDate(endDateStr)
+    : transactions[transactions.length - 1].date;
 
   // Calculate opening balance
   const totalCredits = transactions.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0);
-  const totalDebits = transactions.filter((t) => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
+  const totalDebits = transactions
+    .filter((t) => t.amount < 0)
+    .reduce((s, t) => s + Math.abs(t.amount), 0);
   const openingBalance = closingBalance - totalCredits + totalDebits;
 
   return {

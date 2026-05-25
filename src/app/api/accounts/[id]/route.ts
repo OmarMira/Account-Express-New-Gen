@@ -7,10 +7,7 @@ interface RouteParams {
 }
 
 // ─── GET /api/accounts/[id] ────────────────────────────────────────────
-export async function GET(
-  _request: NextRequest,
-  { params }: RouteParams
-) {
+export async function GET(_request: NextRequest, { params }: RouteParams) {
   const userId = getSessionUserId(_request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -43,28 +40,19 @@ export async function GET(
     });
 
     if (!account) {
-      return NextResponse.json(
-        { error: 'Account not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Account not found' }, { status: 404 });
     }
 
     return NextResponse.json({ account });
   } catch (error) {
     console.error('[ACCOUNT GET ERROR]', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch account' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to fetch account' }, { status: 500 });
   }
 }
 
 // ─── PUT /api/accounts/[id] ────────────────────────────────────────────
-export async function PUT(
-  request: NextRequest,
-  { params }: RouteParams
-) {
-  const userId = getSessionUserId(request);
+export async function PUT(request: NextRequest, { params }: RouteParams) {
+  const userId = await getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -78,10 +66,7 @@ export async function PUT(
     // Check account exists
     const existing = await db.glAccount.findUnique({ where: { id } });
     if (!existing) {
-      return NextResponse.json(
-        { error: 'Account not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Account not found' }, { status: 404 });
     }
 
     // Build update data with only provided fields
@@ -89,10 +74,7 @@ export async function PUT(
 
     if (name !== undefined) {
       if (!name.trim()) {
-        return NextResponse.json(
-          { error: 'Account name cannot be empty' },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: 'Account name cannot be empty' }, { status: 400 });
       }
       updateData.name = name.trim();
     }
@@ -104,10 +86,7 @@ export async function PUT(
     if (code !== undefined) {
       const trimmedCode = code.trim();
       if (!trimmedCode) {
-        return NextResponse.json(
-          { error: 'Account code cannot be empty' },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: 'Account code cannot be empty' }, { status: 400 });
       }
       // Check uniqueness within company (excluding current account)
       const duplicate = await db.glAccount.findFirst({
@@ -120,7 +99,7 @@ export async function PUT(
       if (duplicate) {
         return NextResponse.json(
           { error: 'An account with this code already exists in this company' },
-          { status: 409 }
+          { status: 409 },
         );
       }
       updateData.code = trimmedCode;
@@ -131,7 +110,7 @@ export async function PUT(
       if (!validTypes.includes(accountType)) {
         return NextResponse.json(
           { error: `Invalid accountType. Must be one of: ${validTypes.join(', ')}` },
-          { status: 400 }
+          { status: 400 },
         );
       }
       updateData.accountType = accountType;
@@ -141,7 +120,7 @@ export async function PUT(
       if (!['debit', 'credit'].includes(normalBalance)) {
         return NextResponse.json(
           { error: 'Invalid normalBalance. Must be debit or credit' },
-          { status: 400 }
+          { status: 400 },
         );
       }
       updateData.normalBalance = normalBalance;
@@ -156,16 +135,13 @@ export async function PUT(
           where: { id: parentId, companyId: existing.companyId },
         });
         if (!parentAccount) {
-          return NextResponse.json(
-            { error: 'Parent account not found' },
-            { status: 404 }
-          );
+          return NextResponse.json({ error: 'Parent account not found' }, { status: 404 });
         }
         // Prevent circular reference
         if (parentId === id) {
           return NextResponse.json(
             { error: 'An account cannot be its own parent' },
-            { status: 400 }
+            { status: 400 },
           );
         }
         updateData.parentId = parentId;
@@ -173,10 +149,7 @@ export async function PUT(
     }
 
     if (Object.keys(updateData).length === 0) {
-      return NextResponse.json(
-        { error: 'No valid fields to update' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
     }
 
     const account = await db.glAccount.update({
@@ -195,19 +168,13 @@ export async function PUT(
     return NextResponse.json({ account });
   } catch (error) {
     console.error('[ACCOUNT UPDATE ERROR]', error);
-    return NextResponse.json(
-      { error: 'Failed to update account' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to update account' }, { status: 500 });
   }
 }
 
 // ─── DELETE /api/accounts/[id] (hard delete) ───────────────────────────
-export async function DELETE(
-  request: NextRequest,
-  { params }: RouteParams
-) {
-  const userId = getSessionUserId(request);
+export async function DELETE(request: NextRequest, { params }: RouteParams) {
+  const userId = await getSessionUserId(request);
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -231,25 +198,22 @@ export async function DELETE(
     });
 
     if (!account) {
-      return NextResponse.json(
-        { error: 'Account not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Account not found' }, { status: 404 });
     }
 
     // Cannot delete system accounts
     if (account.isSystem) {
-      return NextResponse.json(
-        { error: 'System accounts cannot be deleted' },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: 'System accounts cannot be deleted' }, { status: 403 });
     }
 
     // Cannot delete accounts with children
     if (account._count.children > 0) {
       return NextResponse.json(
-        { error: 'This account has sub-accounts and cannot be deleted. Delete or reassign sub-accounts first.' },
-        { status: 409 }
+        {
+          error:
+            'This account has sub-accounts and cannot be deleted. Delete or reassign sub-accounts first.',
+        },
+        { status: 409 },
       );
     }
 
@@ -257,7 +221,7 @@ export async function DELETE(
     if (account._count.journalLines > 0) {
       return NextResponse.json(
         { error: 'This account has journal entries and cannot be deleted' },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
@@ -265,7 +229,7 @@ export async function DELETE(
     if (account._count.bankAccounts > 0) {
       return NextResponse.json(
         { error: 'This account is linked to a bank account and cannot be deleted' },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
@@ -273,7 +237,7 @@ export async function DELETE(
     if (account._count.bankRules > 0) {
       return NextResponse.json(
         { error: 'This account is linked to a bank rule and cannot be deleted' },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
@@ -281,7 +245,7 @@ export async function DELETE(
     if (account._count.transactions > 0) {
       return NextResponse.json(
         { error: 'This account is linked to bank transactions and cannot be deleted' },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
@@ -293,9 +257,6 @@ export async function DELETE(
     return NextResponse.json({ account: deleted });
   } catch (error) {
     console.error('[ACCOUNT DELETE ERROR]', error);
-    return NextResponse.json(
-      { error: 'Failed to delete account' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to delete account' }, { status: 500 });
   }
 }

@@ -66,7 +66,8 @@ const en = {
     selectCompany: 'Select a Company',
     noCompanies: 'No companies found',
     landingTitle: 'Professional Accounting Made Simple',
-    landingSubtitle: 'Streamline your financial management with powerful tools for accounts, journals, bank reconciliation, and reporting.',
+    landingSubtitle:
+      'Streamline your financial management with powerful tools for accounts, journals, bank reconciliation, and reporting.',
     getStarted: 'Get Started',
     learnMore: 'Learn More',
     features: 'Features',
@@ -121,7 +122,8 @@ const en = {
     hasChildren: 'This account has sub-accounts and cannot be deleted.',
     hasTransactions: 'This account has transactions and cannot be deleted.',
     systemAccountCannotBeDeleted: 'This is a system required account and cannot be deleted.',
-    accountHasBalanceCannotBeDeleted: 'This account has active balance assigned and cannot be deleted.',
+    accountHasBalanceCannotBeDeleted:
+      'This account has active balance assigned and cannot be deleted.',
     expandedView: 'Expanded View',
     collapsedView: 'Collapsed View',
     searchAccounts: 'Search accounts...',
@@ -160,7 +162,8 @@ const en = {
     saveDraft: 'Save as Draft',
     saveAndPost: 'Save & Post',
     confirmPost: 'Post this journal entry?',
-    confirmPostDesc: 'This will change the entry status to "Posted". Posted entries cannot be edited.',
+    confirmPostDesc:
+      'This will change the entry status to "Posted". Posted entries cannot be edited.',
     confirmVoid: 'Void this journal entry?',
     confirmVoidDesc: 'This will mark the entry as "Void". This action cannot be undone.',
     confirmDelete: 'Are you sure you want to delete this entry?',
@@ -201,15 +204,18 @@ const en = {
     processing: 'Processing...',
     categorizationProgress: 'Categorization Progress',
     transactionsImported: 'Transactions Imported',
-    importSuccessMessage: 'Your bank statement has been imported and transactions have been created.',
-    uncategorizedNote: 'need manual categorization. Set up bank rules to improve auto-categorization.',
+    importSuccessMessage:
+      'Your bank statement has been imported and transactions have been created.',
+    uncategorizedNote:
+      'need manual categorization. Set up bank rules to improve auto-categorization.',
     editAccountDesc: 'Update bank account information',
     newAccountDesc: 'Add a new bank account for your company',
     linkedAccountHelp: 'Bank accounts must be linked to an asset-type GL account',
     startingBalance: 'Starting Balance',
     currency: 'Currency',
     deactivateTitle: 'Deactivate Bank Account',
-    deactivateDesc: 'Are you sure you want to deactivate "{name}" at "{bank}"? This will mark the account as inactive. Existing statements and transactions will be preserved.',
+    deactivateDesc:
+      'Are you sure you want to deactivate "{name}" at "{bank}"? This will mark the account as inactive. Existing statements and transactions will be preserved.',
     deactivateAction: 'Deactivate',
   },
   bankRules: {
@@ -237,7 +243,8 @@ const en = {
     rulesDescription: 'Automatically categorize bank transactions based on rules.',
     applyAll: 'Apply All Rules',
     applyAllTitle: 'Apply Bank Rules',
-    applyAllDesc: 'Apply all active rules to unmatched transactions. Rules are processed in priority order — first match wins.',
+    applyAllDesc:
+      'Apply all active rules to unmatched transactions. Rules are processed in priority order — first match wins.',
     transactionsCategorized: 'transactions auto-categorized',
     autoMatches: 'Auto-matches',
     priorityCritical: 'Critical',
@@ -285,11 +292,13 @@ const en = {
     deselectAll: 'Deselect All',
     reconcileSelected: 'Reconcile Selected',
     autoMatchTitle: 'Auto-Match Transactions',
-    autoMatchDesc: 'Apply bank rules to automatically categorize and match unreconciled transactions.',
+    autoMatchDesc:
+      'Apply bank rules to automatically categorize and match unreconciled transactions.',
     transactionsMatched: 'transactions matched',
     stillUnmatched: 'transactions still unmatched',
     confirmReconcile: 'Confirm Reconciliation',
-    confirmReconcileDesc: 'Mark {count} selected transaction(s) as reconciled. This action updates their status to reconciled.',
+    confirmReconcileDesc:
+      'Mark {count} selected transaction(s) as reconciled. This action updates their status to reconciled.',
     transactionsReconciled: 'transactions reconciled',
     // New features
     showReconciled: 'Show Reconciled',
@@ -301,11 +310,13 @@ const en = {
     allStatements: 'All Statements',
     unreconcileSelected: 'Unreconcile Selected',
     confirmUnreconcile: 'Confirm Undo Reconciliation',
-    confirmUnreconcileDesc: 'Remove reconciliation status from {count} transaction(s). This will not delete any journal entries that were created.',
+    confirmUnreconcileDesc:
+      'Remove reconciliation status from {count} transaction(s). This will not delete any journal entries that were created.',
     transactionsUnreconciled: 'transactions un-reconciled',
     createAdjustment: 'Create Adjustment',
     adjustmentTitle: 'Reconciliation Adjustment',
-    adjustmentDesc: 'Create a journal entry to adjust the book balance and reconcile the difference.',
+    adjustmentDesc:
+      'Create a journal entry to adjust the book balance and reconcile the difference.',
     adjustmentDate: 'Date',
     adjustmentDescription: 'Description',
     adjustmentDebitAccount: 'Debit Account',
@@ -314,7 +325,8 @@ const en = {
     adjustmentNotes: 'Notes (optional)',
     adjustmentCreated: 'Adjustment entry created successfully',
     createJournalEntries: 'Create Journal Entries',
-    createJournalEntriesDesc: 'Automatically create posted journal entries for each reconciled transaction.',
+    createJournalEntriesDesc:
+      'Automatically create posted journal entries for each reconciled transaction.',
     startPeriod: 'Start Period',
     completePeriod: 'Complete Period',
     cancelPeriod: 'Cancel Period',
@@ -484,7 +496,8 @@ const en = {
       supportedFormats: 'Supported format: .json (AccountExpress backup)',
       records: 'records',
       confirmRestore: 'Confirm Restore',
-      confirmRestoreDesc: 'This will permanently replace ALL current data with the backup. This action cannot be undone.',
+      confirmRestoreDesc:
+        'This will permanently replace ALL current data with the backup. This action cannot be undone.',
       lastBackup: 'Last backup',
       noRecords: 'No records',
       errorInvalidFile: 'Invalid backup file. Please select a valid AccountExpress backup.',
@@ -588,8 +601,10 @@ const en = {
     trialBalanceDesc: 'Complete trial balance with all account balances as of a selected date.',
     generalLedgerDesc: 'Detailed journal entries with all debit/credit lines for a date range.',
     transactionDetailDesc: 'Individual transaction lines with account codes and amounts.',
-    reconciliationReportDesc: 'Bank reconciliation status showing reconciled vs unreconciled transactions.',
-    allDataDesc: 'Complete export of all company data including accounts, entries, and transactions.',
+    reconciliationReportDesc:
+      'Bank reconciliation status showing reconciled vs unreconciled transactions.',
+    allDataDesc:
+      'Complete export of all company data including accounts, entries, and transactions.',
     recentExports: 'Recent Exports',
     noRecentExports: 'No recent exports.',
     format: 'Format',
@@ -629,15 +644,18 @@ const en = {
   landing: {
     featuresSubtitle: 'Everything you need to manage your finances in one powerful platform.',
     featureImport: 'Bulk Import',
-    featureImportDesc: 'Import accounts, journal entries, and bank statements from CSV, OFX, and Excel files.',
+    featureImportDesc:
+      'Import accounts, journal entries, and bank statements from CSV, OFX, and Excel files.',
     featureMultilang: 'Multi-Language',
-    featureMultilangDesc: 'Full English and Spanish support with locale-specific formats for dates and currency.',
+    featureMultilangDesc:
+      'Full English and Spanish support with locale-specific formats for dates and currency.',
     trustSecurity: 'Enterprise-grade security with 256-bit encryption',
     trustFast: 'Lightning-fast performance optimized for large datasets',
     trustUptime: '99.9% uptime guarantee with redundant infrastructure',
     trustUsers: 'Trusted by thousands of accountants worldwide',
     ctaTitle: 'Ready to Simplify Your Accounting?',
-    ctaSubtitle: 'Join thousands of businesses that trust AccountExpress for their financial management.',
+    ctaSubtitle:
+      'Join thousands of businesses that trust AccountExpress for their financial management.',
     copyright: 'All rights reserved.',
     comingSoon: 'Coming soon...',
     loginSubtitle: 'Enter your credentials to access your account',
@@ -696,7 +714,8 @@ const en = {
     inputPlaceholder: 'Type your question... (Enter to send)',
     shiftEnterHint: 'Shift+Enter for new line',
     ruleTitle: 'To create a bank rule:',
-    ruleInstructions: 'Describe the rule in natural language and AI will analyze the text to suggest a rule automatically.',
+    ruleInstructions:
+      'Describe the rule in natural language and AI will analyze the text to suggest a rule automatically.',
     ruleExample: 'E.g.: \'Contains "AMAZON", account "Office Supplies", priority 5\'',
     createRuleButton: 'Create Rule',
     saveRule: 'Save Rule',
@@ -751,8 +770,8 @@ const en = {
     historicalSync: 'Historical ledger synchronization',
     periods: {
       '6m': 'Last 6 Months',
-      'ytd': 'Year to Date',
-      '12m': '12 Month History'
+      ytd: 'Year to Date',
+      '12m': '12 Month History',
     },
     months: {
       jan: 'Jan',
@@ -766,8 +785,8 @@ const en = {
       sep: 'Sep',
       oct: 'Oct',
       nov: 'Nov',
-      dic: 'Dec'
-    }
+      dic: 'Dec',
+    },
   },
 };
 

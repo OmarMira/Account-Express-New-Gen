@@ -14,10 +14,10 @@ export interface ParsedTransaction {
 }
 
 interface ColumnMapping {
-  date: number;        // column index for date
+  date: number; // column index for date
   description: number; // column index for description
-  amount: number;      // column index for amount
-  reference?: number;  // column index for reference (optional)
+  amount: number; // column index for amount
+  reference?: number; // column index for reference (optional)
 }
 
 // ─── Main export ─────────────────────────────────────────────────────
@@ -30,13 +30,16 @@ export function parseCSV(content: string): ParsedTransaction[] {
 
   const delimiter = detectDelimiter(lines[0]);
   const headers = parseLine(lines[0], delimiter).map((h) =>
-    h.trim().toLowerCase().replace(/[^a-z0-9]/g, '')
+    h
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, ''),
   );
   const mapping = mapColumns(headers);
 
   if (mapping === null) {
     throw new Error(
-      'Could not detect column mapping. Ensure headers include columns for date, description, and amount.'
+      'Could not detect column mapping. Ensure headers include columns for date, description, and amount.',
     );
   }
 
@@ -149,10 +152,55 @@ function detectDelimiter(headerLine: string): string {
 
 // ─── Column mapping ──────────────────────────────────────────────────
 
-const DATE_HEADERS = ['date', 'transactiondate', 'postingdate', 'dtPosted', 'trandate', 'postdate', 'fecha', 'fechaoperacion', 'fechavalor', 'valuedate'];
-const DESC_HEADERS = ['description', 'desc', 'memo', 'particulars', 'details', 'narration', 'payee', 'transactiondescription', 'concepto', 'descripcion', 'descripcionmovimiento'];
-const AMOUNT_HEADERS = ['amount', 'transactionamount', 'withdrawal', 'deposit', 'debit', 'credit', 'monto', 'cargo', 'abono', 'valor', 'importe'];
-const REF_HEADERS = ['reference', 'ref', 'checknumber', 'chequeno', 'transactionref', 'trnref', 'referencia', 'nofactura', 'referencianum'];
+const DATE_HEADERS = [
+  'date',
+  'transactiondate',
+  'postingdate',
+  'dtPosted',
+  'trandate',
+  'postdate',
+  'fecha',
+  'fechaoperacion',
+  'fechavalor',
+  'valuedate',
+];
+const DESC_HEADERS = [
+  'description',
+  'desc',
+  'memo',
+  'particulars',
+  'details',
+  'narration',
+  'payee',
+  'transactiondescription',
+  'concepto',
+  'descripcion',
+  'descripcionmovimiento',
+];
+const AMOUNT_HEADERS = [
+  'amount',
+  'transactionamount',
+  'withdrawal',
+  'deposit',
+  'debit',
+  'credit',
+  'monto',
+  'cargo',
+  'abono',
+  'valor',
+  'importe',
+];
+const REF_HEADERS = [
+  'reference',
+  'ref',
+  'checknumber',
+  'chequeno',
+  'transactionref',
+  'trnref',
+  'referencia',
+  'nofactura',
+  'referencianum',
+];
 
 function mapColumns(headers: string[]): ColumnMapping | null {
   const dateIdx = headers.findIndex((h) => DATE_HEADERS.includes(h));
@@ -202,7 +250,20 @@ function parseDate(val: string): Date | null {
   }
 
   // Try DD Mon YYYY (e.g., 15 Jan 2026)
-  const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+  const monthNames = [
+    'jan',
+    'feb',
+    'mar',
+    'apr',
+    'may',
+    'jun',
+    'jul',
+    'aug',
+    'sep',
+    'oct',
+    'nov',
+    'dec',
+  ];
   const textMatch = dateStr.match(/^(\d{1,2})\s+([a-zA-Z]+)\s+(\d{4})$/);
   if (textMatch) {
     const monthIdx = monthNames.indexOf(textMatch[2].toLowerCase().slice(0, 3));
