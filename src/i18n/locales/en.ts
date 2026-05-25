@@ -464,6 +464,7 @@ const en = {
     systemBackup: 'System Backups',
     aiRuleGenerator: 'AI Rule Generator',
     diagnosticsTab: 'Diagnostics',
+    aiConfigTab: 'AI Configuration',
     backup: {
       createBackup: 'Create Backup',
       createBackupDesc: 'Generate a complete backup of all company data.',

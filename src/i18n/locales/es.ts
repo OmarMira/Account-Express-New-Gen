@@ -468,6 +468,7 @@ const es = {
     systemBackup: 'Respaldos del Sistema',
     aiRuleGenerator: 'Generador de Reglas IA',
     diagnosticsTab: 'Diagnóstico',
+    aiConfigTab: 'Configuración IA',
     backup: {
       createBackup: 'Crear Respaldo',
       createBackupDesc: 'Genera una copia de seguridad completa de todos los datos de la empresa.',

@@ -95,11 +95,16 @@ export function AIAssistantModal() {
     }
   }, [chatMessages]);
 
-  // Reset to chat mode when opening
+  // Reset to chat mode and clear history when opening
   useEffect(() => {
     if (aiAssistantOpen) {
       setMode('chat');
       setError('');
+      setChatMessages([]);
+      setChatInput('');
+      setRuleInput('');
+      setRuleReply('');
+      setParsedRule(null);
       setTimeout(() => {
         chatInputRef.current?.focus();
       }, 300);
@@ -137,7 +142,7 @@ export function AIAssistantModal() {
       const res = await fetch('/api/ai-assistant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: trimmed, mode: 'chat' }),
+        body: JSON.stringify({ message: trimmed, mode: 'chat', companyId: activeCompany?.id }),
       });
 
       const data = await res.json();
@@ -160,7 +165,7 @@ export function AIAssistantModal() {
       setIsLoading(false);
       chatInputRef.current?.focus();
     }
-  }, [chatInput, isLoading, t]);
+  }, [chatInput, isLoading, t, activeCompany]);
 
   /* ─── Rule Submit ─────────────────────────────────────────────── */
   const handleRuleSubmit = useCallback(async () => {
@@ -176,7 +181,11 @@ export function AIAssistantModal() {
       const res = await fetch('/api/ai-assistant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: trimmed, mode: 'create-rule' }),
+        body: JSON.stringify({
+          message: trimmed,
+          mode: 'create-rule',
+          companyId: activeCompany?.id,
+        }),
       });
 
       const data = await res.json();
@@ -195,7 +204,7 @@ export function AIAssistantModal() {
     } finally {
       setIsLoading(false);
     }
-  }, [ruleInput, isLoading, t]);
+  }, [ruleInput, isLoading, t, activeCompany]);
 
   /* ─── Save Rule ───────────────────────────────────────────────── */
   const handleSaveRule = useCallback(async () => {
@@ -292,7 +301,7 @@ export function AIAssistantModal() {
 
           {/* Modal */}
           <motion.div
-            className="relative z-10 flex w-[90%] max-w-4xl flex-col overflow-hidden rounded-2xl shadow-2xl"
+            className="relative z-10 flex w-[90%] max-w-4xl max-h-[90vh] h-[800px] flex-col overflow-hidden rounded-2xl shadow-2xl"
             style={{ backgroundColor: '#1a2332' }}
             variants={modalVariants}
             initial="hidden"
@@ -324,6 +333,12 @@ export function AIAssistantModal() {
                       setMode('chat');
                       setError('');
                     }}
+                    onDoubleClick={() => {
+                      setMode('chat');
+                      setError('');
+                      setChatMessages([]);
+                      setChatInput('');
+                    }}
                     className={cn(
                       'flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
                       mode === 'chat'
@@ -338,6 +353,14 @@ export function AIAssistantModal() {
                     onClick={() => {
                       setMode('create-rule');
                       setError('');
+                      setTimeout(() => ruleInputRef.current?.focus(), 100);
+                    }}
+                    onDoubleClick={() => {
+                      setMode('create-rule');
+                      setError('');
+                      setRuleInput('');
+                      setRuleReply('');
+                      setParsedRule(null);
                       setTimeout(() => ruleInputRef.current?.focus(), 100);
                     }}
                     className={cn(
