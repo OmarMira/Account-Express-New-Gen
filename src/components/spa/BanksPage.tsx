@@ -87,6 +87,7 @@ interface BankAccountData {
   routingNo: string | null;
   glAccountId: string;
   balance: number;
+  initialBalance: number;
   currency: string;
   isActive: boolean;
   createdAt: string;
@@ -261,8 +262,8 @@ export function BanksPage() {
     setFormRoutingNo(account.routingNo || '');
     setFormGlAccountId(account.glAccountId);
     const rawBalance = (
-      (account as any).startingBalance !== undefined
-        ? (account as any).startingBalance
+      account.initialBalance !== undefined
+        ? account.initialBalance
         : account.balance
     ) as number;
     setFormBalance(
@@ -707,15 +708,30 @@ export function BanksPage() {
                     </div>
                   </CardHeader>
                   <CardContent className="pt-0 space-y-2">
-                    <div
-                      className={cn(
-                        'text-xl font-bold font-mono',
-                        account.balance >= 0
-                          ? 'text-emerald-600 dark:text-emerald-400'
-                          : 'text-red-600 dark:text-red-400',
-                      )}
-                    >
-                      {fmtCurrency(account.balance)}
+                    <div className="grid grid-cols-2 gap-2 border-b border-border/40 pb-2 mb-1">
+                      <div>
+                        <span className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                          {t('banks.startingBalance')}
+                        </span>
+                        <span className="text-sm font-semibold font-mono text-slate-600 dark:text-slate-300">
+                          {fmtCurrency(account.initialBalance)}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                          {t('banks.currentBalance')}
+                        </span>
+                        <span
+                          className={cn(
+                            'text-base font-extrabold font-mono block',
+                            account.balance >= 0
+                              ? 'text-emerald-600 dark:text-emerald-400'
+                              : 'text-red-600 dark:text-red-400',
+                          )}
+                        >
+                          {fmtCurrency(account.balance)}
+                        </span>
+                      </div>
                     </div>
                     <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1">
