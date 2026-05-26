@@ -104,22 +104,61 @@ export const GET = apiHandler(async (request: NextRequest) => {
     txWhere.OR = [{ description: { contains: search } }, { reference: { contains: search } }];
   }
 
-  // Get transactions
-  const transactions = await db.bankTransaction.findMany({
-    where: txWhere,
-    orderBy: { date: 'asc' },
-    include: {
-      glAccount: {
-        select: { id: true, code: true, name: true },
+  // Get transactions (optionally paginated if cursor or limit are requested)
+  const cursorParam = searchParams.get('cursor');
+  const limitParam = searchParams.get('limit');
+  const limit = limitParam ? Math.min(100, Math.max(1, parseInt(limitParam, 10) || 50)) : null;
+
+  let transactions;
+  let nextCursor: string | null = null;
+  let hasMore = false;
+
+  if (limit) {
+    transactions = await db.bankTransaction.findMany({
+      where: txWhere,
+      orderBy: [
+        { date: 'asc' },
+        { id: 'asc' }
+      ],
+      take: limit + 1,
+      cursor: cursorParam ? { id: cursorParam } : undefined,
+      skip: cursorParam ? 1 : undefined,
+      include: {
+        glAccount: {
+          select: { id: true, code: true, name: true },
+        },
+        matchedRule: {
+          select: { id: true, name: true },
+        },
+        reconciliationPeriod: {
+          select: { id: true, startedAt: true, completedAt: true },
+        },
       },
-      matchedRule: {
-        select: { id: true, name: true },
+    });
+
+    hasMore = transactions.length > limit;
+    if (hasMore) {
+      transactions.pop();
+    }
+    nextCursor = hasMore ? transactions[transactions.length - 1].id : null;
+  } else {
+    // Original behavior: get all transactions for matching/export
+    transactions = await db.bankTransaction.findMany({
+      where: txWhere,
+      orderBy: { date: 'asc' },
+      include: {
+        glAccount: {
+          select: { id: true, code: true, name: true },
+        },
+        matchedRule: {
+          select: { id: true, name: true },
+        },
+        reconciliationPeriod: {
+          select: { id: true, startedAt: true, completedAt: true },
+        },
       },
-      reconciliationPeriod: {
-        select: { id: true, startedAt: true, completedAt: true },
-      },
-    },
-  });
+    });
+  }
 
   // Get overall counts (all statements, no date/search filter)
   const reconciledCount = await db.bankTransaction.count({
@@ -220,6 +259,8 @@ export const GET = apiHandler(async (request: NextRequest) => {
       createdAt: tx.createdAt.toISOString(),
       reconciledAt: tx.reconciledAt?.toISOString() ?? null,
     })),
+    nextCursor,
+    hasMore,
   });
 });
 

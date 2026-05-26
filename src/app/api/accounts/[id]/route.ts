@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
+import { journalAccountsCache } from '@/lib/cache';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -165,6 +166,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       },
     });
 
+    journalAccountsCache.invalidate(existing.companyId);
+
     return NextResponse.json({ account });
   } catch (error) {
     console.error('[ACCOUNT UPDATE ERROR]', error);
@@ -253,6 +256,8 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     const deleted = await db.glAccount.delete({
       where: { id },
     });
+
+    journalAccountsCache.invalidate(account.companyId);
 
     return NextResponse.json({ account: deleted });
   } catch (error) {

@@ -51,6 +51,91 @@ export const GET = apiHandler(async (request: NextRequest) => {
     where.description = { contains: search };
   }
 
+  const cursor = searchParams.get('cursor');
+
+  if (cursor) {
+    // Cursor-based pagination (Infinito Scroll)
+    const entries = await db.journalEntry.findMany({
+      where,
+      orderBy: [
+        { date: 'desc' },
+        { id: 'desc' }
+      ],
+      take: limit + 1,
+      cursor: { id: cursor },
+      skip: 1, // Skip the cursor element itself
+      include: {
+        lines: {
+          include: {
+            glAccount: {
+              select: { id: true, code: true, name: true },
+            },
+          },
+        },
+      },
+    });
+
+    const hasMore = entries.length > limit;
+    if (hasMore) {
+      entries.pop();
+    }
+
+    const entriesWithTotals = entries.map((entry) => ({
+      ...entry,
+      date: entry.date.toISOString(),
+      createdAt: entry.createdAt.toISOString(),
+      updatedAt: entry.updatedAt.toISOString(),
+      _totalDebit: entry.lines.reduce((sum, l) => sum + l.debit, 0),
+      _totalCredit: entry.lines.reduce((sum, l) => sum + l.credit, 0),
+    }));
+
+    return NextResponse.json({
+      data: entriesWithTotals,
+      nextCursor: hasMore ? entries[entries.length - 1].id : null,
+      hasMore,
+    });
+  } else if (searchParams.has('cursor')) {
+    // Initial fetch for cursor-based pagination (no cursor value but parameter exists)
+    const entries = await db.journalEntry.findMany({
+      where,
+      orderBy: [
+        { date: 'desc' },
+        { id: 'desc' }
+      ],
+      take: limit + 1,
+      include: {
+        lines: {
+          include: {
+            glAccount: {
+              select: { id: true, code: true, name: true },
+            },
+          },
+        },
+      },
+    });
+
+    const hasMore = entries.length > limit;
+    if (hasMore) {
+      entries.pop();
+    }
+
+    const entriesWithTotals = entries.map((entry) => ({
+      ...entry,
+      date: entry.date.toISOString(),
+      createdAt: entry.createdAt.toISOString(),
+      updatedAt: entry.updatedAt.toISOString(),
+      _totalDebit: entry.lines.reduce((sum, l) => sum + l.debit, 0),
+      _totalCredit: entry.lines.reduce((sum, l) => sum + l.credit, 0),
+    }));
+
+    return NextResponse.json({
+      data: entriesWithTotals,
+      nextCursor: hasMore ? entries[entries.length - 1].id : null,
+      hasMore,
+    });
+  }
+
+  // Fallback: Offset-based pagination
   const [entries, total] = await Promise.all([
     db.journalEntry.findMany({
       where,
@@ -70,7 +155,6 @@ export const GET = apiHandler(async (request: NextRequest) => {
     db.journalEntry.count({ where }),
   ]);
 
-  // Calculate totals per entry
   const entriesWithTotals = entries.map((entry) => ({
     ...entry,
     date: entry.date.toISOString(),

@@ -1,9 +1,10 @@
 import { db } from '@/lib/db';
 import { NotFoundError } from '@/lib/api-error';
 import { CreateReconciliationInput } from '@/lib/validations/reconciliation';
+import { withTiming } from '@/lib/timing';
 
 export class ReconciliationService {
-  static async reconcile(input: CreateReconciliationInput) {
+  static reconcile = withTiming(async (input: CreateReconciliationInput) => {
     const { companyId, bankAccountId, transactions, createJournalEntries, periodId } = input;
 
     // Verify bank account with GL account info
@@ -140,5 +141,5 @@ export class ReconciliationService {
       reconciledCount,
       journalEntriesCreated,
     };
-  }
+  }, 'ReconciliationService.reconcile');
 }

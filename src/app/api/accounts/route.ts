@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
+import { journalAccountsCache } from '@/lib/cache';
 
 // ─── GET /api/accounts?companyId=xxx&accountType=xxx&search=xxx ─────────
 export async function GET(request: NextRequest) {
@@ -148,6 +149,8 @@ export async function POST(request: NextRequest) {
         },
       },
     });
+
+    journalAccountsCache.invalidate(companyId);
 
     return NextResponse.json({ account }, { status: 201 });
   } catch (error) {

@@ -64,6 +64,7 @@ export async function createTestBankAccount(companyId: string, glAccountId: stri
       bankName,
       glAccountId,
       balance: 1000.0,
+      initialBalance: 1000.0,
       isActive: true,
     },
   });

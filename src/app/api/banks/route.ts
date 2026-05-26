@@ -105,6 +105,7 @@ export async function POST(request: NextRequest) {
         routingNo: routingNo?.trim() || null,
         glAccountId,
         balance: parseFloat(balance) || 0,
+        initialBalance: parseFloat(balance) || 0,
         currency: currency || 'USD',
         isActive: true,
       },

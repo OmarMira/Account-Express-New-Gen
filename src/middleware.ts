@@ -114,10 +114,15 @@ export async function middleware(request: NextRequest) {
     response.headers.set(key, value);
   });
 
+  // Optimización de cache para assets estáticos de Next.js
+  if (request.nextUrl.pathname.startsWith('/_next/static')) {
+    response.headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+  }
+
   return response;
 }
 
 // Configuración del matcher del middleware
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  matcher: ['/((?!_next/image|favicon.ico).*)'],
 };

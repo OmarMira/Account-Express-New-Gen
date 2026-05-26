@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import {
   ArrowLeftRight,
   Check,
@@ -228,6 +229,23 @@ export function ReconciliationPage() {
   const [currentSplits, setCurrentSplits] = useState<
     { glAccountId: string; amount: number; description: string }[]
   >([]);
+
+  // Refs & Virtualizers for table virtualization
+  const depositsParentRef = useRef<HTMLDivElement>(null);
+  const depositsVirtualizer = useVirtualizer({
+    count: deposits.length,
+    getScrollElement: () => depositsParentRef.current,
+    estimateSize: () => 53, // Estimated height of TableRow (53px)
+    overscan: 5,
+  });
+
+  const paymentsParentRef = useRef<HTMLDivElement>(null);
+  const paymentsVirtualizer = useVirtualizer({
+    count: payments.length,
+    getScrollElement: () => paymentsParentRef.current,
+    estimateSize: () => 53, // Estimated height of TableRow (53px)
+    overscan: 5,
+  });
 
   // Build query params
   const queryParams = useMemo(() => {
@@ -636,13 +654,13 @@ export function ReconciliationPage() {
   };
 
   // Transaction row component
-  const TxRow = ({ tx, type }: { tx: Transaction; type: 'deposit' | 'payment' }) => {
+  const TxRow = ({ tx, type, style }: { tx: Transaction; type: 'deposit' | 'payment'; style?: React.CSSProperties }) => {
     const isSelected = selectedTxIds.has(tx.id);
     const assignedGl = txGlAssignments[tx.id] || tx.glAccountId || null;
     const isReconciled = !!tx.reconciledAt;
 
     return (
-      <TableRow className={cn(isSelected && 'bg-primary/5', isReconciled && 'opacity-75')}>
+      <TableRow className={cn(isSelected && 'bg-primary/5', isReconciled && 'opacity-75')} style={style}>
         <TableCell className="w-10">
           <Checkbox checked={isSelected} onCheckedChange={() => toggleTx(tx.id)} />
         </TableCell>
@@ -1225,9 +1243,9 @@ export function ReconciliationPage() {
                   {t('reconciliation.noTransactions')}
                 </div>
               ) : (
-                <div className="overflow-x-auto">
+                <div ref={depositsParentRef} className="max-h-[400px] overflow-y-auto overflow-x-auto relative">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 bg-background z-10 shadow-sm">
                       <TableRow>
                         <TableHead className="w-10" />
                         <TableHead>{t('common.date')}</TableHead>
@@ -1240,10 +1258,25 @@ export function ReconciliationPage() {
                         )}
                       </TableRow>
                     </TableHeader>
-                    <TableBody>
-                      {deposits.map((tx) => (
-                        <TxRow key={tx.id} tx={tx} type="deposit" />
-                      ))}
+                    <TableBody style={{ height: `${depositsVirtualizer.getTotalSize()}px`, position: 'relative' }}>
+                      {depositsVirtualizer.getVirtualItems().map((virtualRow) => {
+                        const tx = deposits[virtualRow.index];
+                        return (
+                          <TxRow
+                            key={tx.id}
+                            tx={tx}
+                            type="deposit"
+                            style={{
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              width: '100%',
+                              height: `${virtualRow.size}px`,
+                              transform: `translateY(${virtualRow.start}px)`,
+                            }}
+                          />
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
@@ -1289,9 +1322,9 @@ export function ReconciliationPage() {
                   {t('reconciliation.noTransactions')}
                 </div>
               ) : (
-                <div className="overflow-x-auto">
+                <div ref={paymentsParentRef} className="max-h-[400px] overflow-y-auto overflow-x-auto relative">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 bg-background z-10 shadow-sm">
                       <TableRow>
                         <TableHead className="w-10" />
                         <TableHead>{t('common.date')}</TableHead>
@@ -1304,10 +1337,25 @@ export function ReconciliationPage() {
                         )}
                       </TableRow>
                     </TableHeader>
-                    <TableBody>
-                      {payments.map((tx) => (
-                        <TxRow key={tx.id} tx={tx} type="payment" />
-                      ))}
+                    <TableBody style={{ height: `${paymentsVirtualizer.getTotalSize()}px`, position: 'relative' }}>
+                      {paymentsVirtualizer.getVirtualItems().map((virtualRow) => {
+                        const tx = payments[virtualRow.index];
+                        return (
+                          <TxRow
+                            key={tx.id}
+                            tx={tx}
+                            type="payment"
+                            style={{
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              width: '100%',
+                              height: `${virtualRow.size}px`,
+                              transform: `translateY(${virtualRow.start}px)`,
+                            }}
+                          />
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>

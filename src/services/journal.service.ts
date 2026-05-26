@@ -1,9 +1,10 @@
 import { db } from '@/lib/db';
 import { ValidationError } from '@/lib/api-error';
 import { CreateJournalEntryInput } from '@/lib/validations/journal';
+import { withTiming } from '@/lib/timing';
 
 export class JournalService {
-  static async create(input: CreateJournalEntryInput) {
+  static create = withTiming(async (input: CreateJournalEntryInput) => {
     const { companyId, date, description, reference, status, lines } = input;
 
     if (!lines || lines.length < 2) {
@@ -78,5 +79,5 @@ export class JournalService {
     });
 
     return entry;
-  }
+  }, 'JournalService.create');
 }

@@ -82,6 +82,8 @@ model GlAccount {
   transactions BankTransaction[]
 
   @@unique([companyId, code])
+  @@index([companyId, parentId])
+  @@index([companyId, accountType])
 }
 
 model BankAccount {
@@ -92,11 +94,12 @@ model BankAccount {
   accountNo   String?
   routingNo   String?
   glAccountId String
-  balance     Float    @default(0)
-  currency    String   @default("USD")
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  balance        Float    @default(0)
+  initialBalance Float    @default(0)
+  currency       String   @default("USD")
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   company    Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
   glAccount  GlAccount              @relation(fields: [glAccountId], references: [id])
@@ -105,6 +108,7 @@ model BankAccount {
 
   @@index([companyId])
   @@index([glAccountId])
+  @@index([companyId, accountNo])
 }
 
 model BankStatement {
@@ -124,6 +128,9 @@ model BankStatement {
   company    Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
   bankAccount BankAccount     @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
   transactions BankTransaction[]
+
+  @@unique([bankAccountId, startDate, endDate])
+  @@index([bankAccountId, endDate])
 }
 
 model BankTransaction {
@@ -149,6 +156,9 @@ model BankTransaction {
   @@index([statementId])
   @@index([glAccountId])
   @@index([isReconciled])
+  @@index([statementId, isReconciled, date])
+  @@index([reference])
+  @@index([statementId, date])
 }
 
 model ReconciliationPeriod {
@@ -221,6 +231,7 @@ model JournalLine {
 
   @@index([entryId])
   @@index([glAccountId])
+  @@index([glAccountId, entryId])
 }
 
 model FiscalPeriod {
@@ -251,6 +262,8 @@ model AuditLog {
   user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   @@index([companyId])
   @@index([createdAt])
+  @@index([companyId, createdAt])
+  @@index([userId, createdAt])
 }
 
 model Session {
@@ -264,5 +277,6 @@ model Session {
 
   @@index([userId])
   @@index([token])
+  @@index([userId, expiresAt])
 }
 

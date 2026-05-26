@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
+import { journalAccountsCache } from '@/lib/cache';
 
 // ─── GET /api/journal/accounts ──────────────────────────────────────
 // List active GL accounts for a company (used in account selector dropdown).
@@ -27,6 +28,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
+  // Try cache first
+  const cached = journalAccountsCache.get(companyId);
+  if (cached) {
+    return NextResponse.json({ data: cached });
+  }
+
   // Fetch active accounts ordered by code
   const accounts = await db.glAccount.findMany({
     where: {
@@ -42,6 +49,9 @@ export async function GET(request: NextRequest) {
     },
     orderBy: { code: 'asc' },
   });
+
+  // Save to cache
+  journalAccountsCache.set(companyId, accounts);
 
   return NextResponse.json({ data: accounts });
 }

@@ -8,6 +8,14 @@ const nextConfig: NextConfig = {
   transpilePackages: ["recharts"],
   reactStrictMode: false,
   serverExternalPackages: ['pdf-parse', 'pdfjs-dist'],
+  experimental: {
+    optimizePackageImports: [
+      'lucide-react',
+      'recharts',
+      '@radix-ui/react-icons',
+      '@radix-ui/themes',
+    ],
+  },
 };
 
 export default withNextIntl(nextConfig);

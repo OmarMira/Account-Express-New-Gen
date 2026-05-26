@@ -2,9 +2,10 @@ import { db } from '@/lib/db';
 import { verifyPassword, hashPassword } from '@/lib/auth';
 import { AuthError, ValidationError } from '@/lib/api-error';
 import { LoginInput, RegisterInput } from '@/lib/validations/auth';
+import { withTiming } from '@/lib/timing';
 
 export class AuthService {
-  static async login(input: LoginInput) {
+  static login = withTiming(async (input: LoginInput) => {
     const { email, password } = input;
     const user = await db.user.findUnique({
       where: { email: email.toLowerCase().trim() },
@@ -47,9 +48,9 @@ export class AuthService {
       },
       companies,
     };
-  }
+  }, 'AuthService.login');
 
-  static async register(input: RegisterInput) {
+  static register = withTiming(async (input: RegisterInput) => {
     const { email, password, firstName, lastName, companyName, taxId } = input;
     const normalizedEmail = email.toLowerCase().trim();
 
@@ -101,7 +102,7 @@ export class AuthService {
     });
 
     return result;
-  }
+  }, 'AuthService.register');
 
   private static async seedChartOfAccounts(tx: any, companyId: string) {
     const CHART_OF_ACCOUNTS = [

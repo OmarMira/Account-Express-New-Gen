@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
+import { companySettingsCache } from '@/lib/cache';
 
 /**
  * GET /api/settings — Get company settings
@@ -28,44 +29,61 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
-    // Get company info
-    const company = await db.company.findUnique({
-      where: { id: companyId },
-      select: {
-        id: true,
-        legalName: true,
-        taxId: true,
-        address: true,
-        phone: true,
-        email: true,
-        logo: true,
-        isActive: true,
-        createdAt: true,
-      },
-    });
+    // Try cache first for company data
+    let companyData = companySettingsCache.get(companyId);
 
-    if (!company) {
-      return NextResponse.json({ error: 'Company not found' }, { status: 404 });
+    if (!companyData) {
+      // Get company info
+      const company = await db.company.findUnique({
+        where: { id: companyId },
+        select: {
+          id: true,
+          legalName: true,
+          taxId: true,
+          address: true,
+          phone: true,
+          email: true,
+          logo: true,
+          isActive: true,
+          createdAt: true,
+        },
+      });
+
+      if (!company) {
+        return NextResponse.json({ error: 'Company not found' }, { status: 404 });
+      }
+
+      // Get user count and member count
+      const memberCount = await db.companyMember.count({
+        where: { companyId },
+      });
+
+      // Get GL account count
+      const accountCount = await db.glAccount.count({
+        where: { companyId },
+      });
+
+      // Get fiscal periods
+      const periods = await db.fiscalPeriod.findMany({
+        where: { companyId },
+        orderBy: { startDate: 'asc' },
+        select: { id: true, name: true, startDate: true, endDate: true, isLocked: true },
+      });
+
+      companyData = {
+        company,
+        stats: {
+          memberCount,
+          accountCount,
+          periodCount: periods.length,
+        },
+        periods,
+      };
+
+      companySettingsCache.set(companyId, companyData);
     }
 
-    // Get user count and member count
-    const memberCount = await db.companyMember.count({
-      where: { companyId },
-    });
-
-    // Get GL account count
-    const accountCount = await db.glAccount.count({
-      where: { companyId },
-    });
-
-    // Get fiscal periods
-    const periods = await db.fiscalPeriod.findMany({
-      where: { companyId },
-      orderBy: { startDate: 'asc' },
-      select: { id: true, name: true, startDate: true, endDate: true, isLocked: true },
-    });
-
-    // Get current user info
+    // Get current user info (not cached, user-specific)
     const user = await db.user.findUnique({
       where: { id: userId },
       select: {
@@ -79,14 +97,10 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.json({
-      company,
+      company: companyData.company,
       user,
-      stats: {
-        memberCount,
-        accountCount,
-        periodCount: periods.length,
-      },
-      periods,
+      stats: companyData.stats,
+      periods: companyData.periods,
     });
   } catch (error) {
     console.error('[SETTINGS GET ERROR]', error);
@@ -167,6 +181,8 @@ export async function PUT(request: NextRequest) {
         details: JSON.stringify(updateData),
       },
     });
+
+    companySettingsCache.invalidate(companyId);
 
     return NextResponse.json({
       message: 'Settings updated successfully',

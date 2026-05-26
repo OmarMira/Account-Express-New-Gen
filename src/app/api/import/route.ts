@@ -4,6 +4,7 @@ import { getSessionUserId } from '@/lib/sessions';
 import { apiHandler } from '@/lib/api-handler';
 import { AuthError, ForbiddenError, ValidationError } from '@/lib/api-error';
 import { ImportService } from '@/services/import.service';
+import { trackAPIResponseTime } from '@/lib/metrics';
 
 // ─── POST /api/import ─────────────────────────────────────────────────
 // Accepts multipart/form-data with a file field.
@@ -46,6 +47,7 @@ export const POST = apiHandler(async (request: NextRequest) => {
   const buffer = Buffer.from(await file.arrayBuffer());
   const content = buffer.toString('utf-8');
 
+  const importStart = performance.now();
   const result = await ImportService.importFile({
     companyId,
     bankAccountId,
@@ -54,6 +56,7 @@ export const POST = apiHandler(async (request: NextRequest) => {
     buffer,
     content,
   });
+  trackAPIResponseTime('ImportService.importFile', 'POST', performance.now() - importStart);
 
   return NextResponse.json(result);
 });
