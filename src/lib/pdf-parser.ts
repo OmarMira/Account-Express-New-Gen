@@ -19,18 +19,8 @@ export interface ParsedPDFResult {
   endDate?: Date;
 }
 
-// Configure worker path statically
-try {
-  const workerPath = path.join(
-    process.cwd(),
-    'node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs',
-  );
-  // Convert to file:// URL for proper Windows support
-  const workerUrl = pathToFileURL(workerPath).toString();
-  pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
-} catch (e) {
-  console.error('Failed to configure PDF worker:', e);
-}
+// Force pdfjs-dist to use standard in-thread fake worker mode in Node.js to prevent worker thread loader crashes
+pdfjs.GlobalWorkerOptions.workerSrc = '';
 
 export async function parsePDF(buffer: Buffer): Promise<ParsedPDFResult> {
   const loadingTask = pdfjs.getDocument({
