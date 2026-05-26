@@ -128,9 +128,30 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (accountNo !== undefined) updateData.accountNo = accountNo?.trim() || null;
     if (routingNo !== undefined) updateData.routingNo = routingNo?.trim() || null;
     if (glAccountId !== undefined) updateData.glAccountId = glAccountId;
-    if (balance !== undefined) updateData.balance = parseFloat(balance) || 0;
     if (currency !== undefined) updateData.currency = currency;
     if (isActive !== undefined) updateData.isActive = isActive;
+
+    if (balance !== undefined) {
+      const hasStatements = await db.bankStatement.count({
+        where: { bankAccountId: id },
+      });
+
+      if (hasStatements > 0) {
+        const statements = await db.bankStatement.findMany({
+          where: { bankAccountId: id },
+          orderBy: [
+            { startDate: 'asc' },
+            { endDate: 'asc' },
+          ],
+        });
+        updateData.initialBalance = statements[0].openingBalance;
+        updateData.balance = statements[statements.length - 1].closingBalance;
+      } else {
+        const parsedInitial = parseFloat(balance) || 0;
+        updateData.initialBalance = parsedInitial;
+        updateData.balance = parsedInitial;
+      }
+    }
 
     const account = await db.bankAccount.update({
       where: { id },

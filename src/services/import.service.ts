@@ -1,8 +1,10 @@
 import { db } from '@/lib/db';
 import { parseCSV } from '@/lib/csv-parser';
 import { parseOFX } from '@/lib/ofx-parser';
-import { parsePDF } from '@/lib/pdf-parser';
+import { parsePDFAsync } from '@/lib/pdf-processor';
 import { ValidationError, NotFoundError } from '@/lib/api-error';
+import { trackPDFParseDuration } from '@/lib/metrics';
+import { withTiming } from '@/lib/timing';
 
 export interface ImportResult {
   statementId: string;
@@ -42,7 +44,9 @@ export class ImportService {
       let endDate: Date | undefined;
 
       try {
-        const parsed = await parsePDF(buffer);
+        const pdfStart = performance.now();
+        const parsed = await parsePDFAsync(buffer);
+        trackPDFParseDuration(fileName, performance.now() - pdfStart);
         transactions = parsed.transactions;
         bankName = parsed.bankName || this.extractBankNameFromFilename(fileName);
         accountNo = parsed.accountNo;
@@ -322,7 +326,7 @@ export class ImportService {
 
       let autoCategorizedCount = 0;
 
-      for (const txn of uniqueTransactions) {
+      const transactionsToInsert = uniqueTransactions.map((txn) => {
         const { matchedRuleId, glAccountId } = this.applyBankRule(
           txn.description,
           txn.amount,
@@ -331,39 +335,23 @@ export class ImportService {
 
         if (matchedRuleId) autoCategorizedCount++;
 
-        await tx.bankTransaction.create({
-          data: {
-            statementId: statement.id,
-            date: txn.date,
-            description: txn.description,
-            amount: txn.amount,
-            reference: txn.reference || null,
-            isReconciled: false,
-            glAccountId: glAccountId || null,
-            matchedRuleId: matchedRuleId || null,
-          },
-        });
-      }
-
-      const currentAccount = await tx.bankAccount.findUnique({
-        where: { id: bankAccountId },
-        select: { balance: true, createdAt: true, updatedAt: true },
+        return {
+          statementId: statement.id,
+          date: txn.date,
+          description: txn.description,
+          amount: txn.amount,
+          reference: txn.reference || null,
+          isReconciled: false,
+          glAccountId: glAccountId || null,
+          matchedRuleId: matchedRuleId || null,
+        };
       });
 
-      const isNew =
-        currentAccount &&
-        (currentAccount.createdAt.getTime() === currentAccount.updatedAt.getTime() ||
-          currentAccount.balance === 0);
-      const netChange = Number((totalCredits - totalDebits).toFixed(2));
-
-      await tx.bankAccount.update({
-        where: { id: bankAccountId },
-        data: {
-          balance: isNew
-            ? Number((openingBalance + netChange).toFixed(2))
-            : { increment: netChange },
-        },
+      await tx.bankTransaction.createMany({
+        data: transactionsToInsert,
       });
+
+      await ImportService.recalculateBalances(tx, bankAccountId);
 
       return { statementId: statement.id, autoCategorizedCount };
     });
@@ -461,5 +449,28 @@ export class ImportService {
     }
 
     return 'Cuenta Bancaria Importada';
+  }
+
+  public static async recalculateBalances(tx: any, bankAccountId: string) {
+    const statements = await tx.bankStatement.findMany({
+      where: { bankAccountId },
+      orderBy: [
+        { startDate: 'asc' },
+        { endDate: 'asc' },
+      ],
+    });
+
+    if (statements.length === 0) return;
+
+    const oldest = statements[0];
+    const newest = statements[statements.length - 1];
+
+    await tx.bankAccount.update({
+      where: { id: bankAccountId },
+      data: {
+        initialBalance: oldest.openingBalance,
+        balance: newest.closingBalance,
+      },
+    });
   }
 }
