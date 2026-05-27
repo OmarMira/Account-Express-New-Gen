@@ -12,6 +12,8 @@ export class LRUCache<K, V> {
   private max: number;
   private ttl: number;
   private channel: BroadcastChannel | null = null;
+  private hits = 0;
+  private misses = 0;
 
   constructor(max = 200, ttlMs = 5 * 60 * 1000, channelName = 'app-cache-sync') {
     this.max = max;
@@ -31,17 +33,31 @@ export class LRUCache<K, V> {
 
   get(key: K): V | null {
     const cached = this.cache.get(key);
-    if (!cached) return null;
-
-    if (Date.now() > cached.expiry) {
-      this.cache.delete(key);
+    if (!cached) {
+      this.misses++;
       return null;
     }
 
+    if (Date.now() > cached.expiry) {
+      this.cache.delete(key);
+      this.misses++;
+      return null;
+    }
+
+    this.hits++;
     // Refresh position to maintain LRU property
     this.cache.delete(key);
     this.cache.set(key, cached);
     return cached.value;
+  }
+
+  getMetrics() {
+    const total = this.hits + this.misses;
+    return {
+      hits: this.hits,
+      misses: this.misses,
+      hitRate: total > 0 ? this.hits / total : 0,
+    };
   }
 
   set(key: K, value: V) {
@@ -89,5 +105,13 @@ export class LRUCache<K, V> {
 }
 
 // Global cached instances
-export const journalAccountsCache = new LRUCache<string, any[]>(100, 5 * 60 * 1000, 'journal-accounts-cache-sync');
-export const companySettingsCache = new LRUCache<string, any>(100, 5 * 60 * 1000, 'company-settings-cache-sync');
+export const journalAccountsCache = new LRUCache<string, any[]>(
+  100,
+  5 * 60 * 1000,
+  'journal-accounts-cache-sync',
+);
+export const companySettingsCache = new LRUCache<string, any>(
+  100,
+  5 * 60 * 1000,
+  'company-settings-cache-sync',
+);

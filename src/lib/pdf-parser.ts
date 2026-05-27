@@ -19,8 +19,19 @@ export interface ParsedPDFResult {
   endDate?: Date;
 }
 
-// Force pdfjs-dist to use standard in-thread fake worker mode in Node.js to prevent worker thread loader crashes
-pdfjs.GlobalWorkerOptions.workerSrc = '';
+// Force pdfjs-dist to use standard in-thread fake worker mode in Node/Bun to prevent worker thread loader crashes
+if (typeof window === 'undefined') {
+  try {
+    const workerPath = pathToFileURL(
+      path.join(process.cwd(), 'node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs'),
+    ).href;
+    pdfjs.GlobalWorkerOptions.workerSrc = workerPath;
+  } catch (err) {
+    pdfjs.GlobalWorkerOptions.workerSrc = '';
+  }
+} else {
+  pdfjs.GlobalWorkerOptions.workerSrc = '';
+}
 
 export async function parsePDF(buffer: Buffer): Promise<ParsedPDFResult> {
   const loadingTask = pdfjs.getDocument({

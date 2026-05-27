@@ -50,6 +50,10 @@ import {
 import { useLanguageStore } from '@/store/language-store';
 import { useAuthStore } from '@/store/auth-store';
 import { formatCurrency, formatDate } from '@/lib/format';
+import { useAccountingFlow } from '@/hooks/useAccountingFlow';
+import { FlowKpiCards } from '@/components/accounting-flow/FlowKpiCards';
+import { FlowErrorBoundary } from '@/components/accounting-flow/FlowErrorBoundary';
+import { AuditSection } from '@/components/audit/AuditSection';
 
 /* ─── Types ─── */
 interface DashboardData {
@@ -194,6 +198,17 @@ export function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
+  // Hook de Accounting Flow (Fase 2)
+  const {
+    data: flowData,
+    isLoading: flowLoading,
+    refetch: refetchFlow,
+  } = useAccountingFlow({
+    companyId: activeCompany?.id,
+    startDate: '2025-01-01',
+    endDate: '2025-05-31',
+  });
+
   const fetchDashboard = useCallback(async () => {
     if (!activeCompany) return;
     setLoading(true);
@@ -285,6 +300,34 @@ export function DashboardPage() {
           loading={loading}
         />
       </div>
+
+      {/* ── Accounting Flow KPIs (Fase 2) ── */}
+      <motion.div variants={itemVariants}>
+        <FlowErrorBoundary>
+          {flowData && (
+            <FlowKpiCards
+              summary={flowData.summary}
+              companyId={activeCompany?.id}
+              startDate="2025-01-01"
+              endDate="2025-05-31"
+              isLoading={flowLoading}
+              onRefresh={refetchFlow}
+            />
+          )}
+        </FlowErrorBoundary>
+      </motion.div>
+
+      {/* ── Módulo de Auditoría de Flujo (Fase 3) ── */}
+      {flowData && (
+        <motion.div variants={itemVariants}>
+          <AuditSection
+            transactions={flowData.transactions}
+            companyId={activeCompany?.id}
+            isLoading={flowLoading}
+            onRefresh={refetchFlow}
+          />
+        </motion.div>
+      )}
 
       {/* ── Summary Mini-Cards ── */}
       <motion.div variants={itemVariants} className="grid grid-cols-2 gap-4 lg:grid-cols-4">

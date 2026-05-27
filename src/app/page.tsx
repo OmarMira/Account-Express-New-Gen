@@ -39,12 +39,14 @@ const UnauthView = ({ view }: { view: string }) => {
 function AppContent() {
   const { isAuthenticated, activeCompany, currentView, hydrate } = useAuthStore();
   const [hydrating, setHydrating] = useState(true);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     hydrate().finally(() => setHydrating(false));
   }, [hydrate]);
 
-  if (hydrating) {
+  if (!mounted || hydrating) {
     return <LoadingScreen />;
   }
 

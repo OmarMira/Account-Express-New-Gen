@@ -145,6 +145,8 @@ model BankTransaction {
   matchedRuleId   String?
   reconciledAt    DateTime?
   reconciliationPeriodId String?
+  importHash      String?   @unique  // SHA-256 para idempotencia en importación
+  journalLineId   String?   @unique  // Vínculo a JournalLine para evitar doble conteo
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -159,6 +161,8 @@ model BankTransaction {
   @@index([statementId, isReconciled, date])
   @@index([reference])
   @@index([statementId, date])
+  @@index([importHash])
+  @@index([isReconciled, journalLineId, date]) // Optimiza query de flujo contable
 }
 
 model ReconciliationPeriod {

@@ -11,7 +11,7 @@ export function apiHandler(handler: ApiHandler) {
     try {
       return await handler(request, context);
     } catch (error: any) {
-      if (error instanceof AppError) {
+      if (error instanceof AppError || (error && typeof error.statusCode === 'number')) {
         return NextResponse.json(
           {
             error: error.message,

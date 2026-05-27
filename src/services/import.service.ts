@@ -5,6 +5,8 @@ import { parsePDFAsync } from '@/lib/pdf-processor';
 import { ValidationError, NotFoundError } from '@/lib/api-error';
 import { trackPDFParseDuration } from '@/lib/metrics';
 import { withTiming } from '@/lib/timing';
+import { generateImportHash } from '@/lib/accounting/import-hash';
+import { toStatementMonth, toDateString } from '@/lib/accounting/date-window';
 
 export interface ImportResult {
   statementId: string;
@@ -261,26 +263,34 @@ export class ImportService {
     const openingBalance = balanceInfo?.openingBalance ?? 0;
     const closingBalance = balanceInfo?.closingBalance ?? 0;
 
-    const existingStatements = await db.bankStatement.findMany({
-      where: { bankAccountId },
-      select: { id: true },
+    const bankAccount = await db.bankAccount.findFirst({
+      where: { id: bankAccountId },
+      select: { accountNo: true },
     });
-    const existingStatementIds = existingStatements.map((s) => s.id);
-    const existingTransactions = await db.bankTransaction.findMany({
-      where: { statementId: { in: existingStatementIds } },
-      select: { date: true, amount: true, description: true, reference: true },
-    });
+    const accountNumber = bankAccount?.accountNo || 'unknown';
+    const statementMonth = toStatementMonth(startDate);
 
-    const existingKeys = new Set<string>();
-    for (const et of existingTransactions) {
-      const key = `${et.date.toISOString().split('T')[0]}|${et.amount}|${et.description.substring(0, 30).toUpperCase()}`;
-      existingKeys.add(key);
-    }
+    // ─── Deduplicación por importHash (SHA-256) ───────────────────────
+    // Detecta reimportaciones del mismo extracto sin cargar todo en memoria.
+    const hashList = sorted.map((txn) =>
+      generateImportHash({
+        companyId,
+        accountNumber,
+        statementMonth,
+        txDate: toDateString(txn.date),
+        amount: txn.amount,
+        description: txn.description,
+      }),
+    );
 
-    const uniqueTransactions = sorted.filter((txn) => {
-      const key = `${txn.date.toISOString().split('T')[0]}|${txn.amount}|${txn.description.substring(0, 30).toUpperCase()}`;
-      return !existingKeys.has(key);
+    const existingHashes = await db.bankTransaction.findMany({
+      where: { importHash: { in: hashList } },
+      select: { importHash: true },
     });
+    const existingHashSet = new Set(existingHashes.map((t) => t.importHash));
+
+    const uniqueTransactions = sorted.filter((_txn, idx) => !existingHashSet.has(hashList[idx]));
+    const uniqueHashes = hashList.filter((_, idx) => !existingHashSet.has(hashList[idx]));
 
     const duplicatesSkipped = sorted.length - uniqueTransactions.length;
 
@@ -326,7 +336,7 @@ export class ImportService {
 
       let autoCategorizedCount = 0;
 
-      const transactionsToInsert = uniqueTransactions.map((txn) => {
+      const transactionsToInsert = uniqueTransactions.map((txn, idx) => {
         const { matchedRuleId, glAccountId } = this.applyBankRule(
           txn.description,
           txn.amount,
@@ -344,6 +354,7 @@ export class ImportService {
           isReconciled: false,
           glAccountId: glAccountId || null,
           matchedRuleId: matchedRuleId || null,
+          importHash: uniqueHashes[idx], // SHA-256 para idempotencia
         };
       });
 
@@ -454,10 +465,7 @@ export class ImportService {
   public static async recalculateBalances(tx: any, bankAccountId: string) {
     const statements = await tx.bankStatement.findMany({
       where: { bankAccountId },
-      orderBy: [
-        { startDate: 'asc' },
-        { endDate: 'asc' },
-      ],
+      orderBy: [{ startDate: 'asc' }, { endDate: 'asc' }],
     });
 
     if (statements.length === 0) return;
