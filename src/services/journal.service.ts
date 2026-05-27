@@ -1,5 +1,5 @@
 import { db } from '@/lib/db';
-import { ValidationError } from '@/lib/api-error';
+import { ValidationError, ForbiddenError } from '@/lib/api-error';
 import { CreateJournalEntryInput } from '@/lib/validations/journal';
 import { withTiming } from '@/lib/timing';
 
@@ -15,12 +15,23 @@ export class JournalService {
     const totalDebits = lines.reduce((sum, l) => sum + l.debit, 0);
     const totalCredits = lines.reduce((sum, l) => sum + l.credit, 0);
 
-    if (Math.abs(totalDebits - totalCredits) > 0.005) {
-      throw new ValidationError(
-        `El asiento contable debe estar cuadrado. El total de débitos (${totalDebits.toFixed(
-          2,
-        )}) debe ser igual al total de créditos (${totalCredits.toFixed(2)})`,
-      );
+    if (Math.abs(totalDebits - totalCredits) > 0.01) {
+      throw new ValidationError('Unbalanced journal entry. Debits must equal Credits.');
+    }
+
+    // Check if the fiscal period for the entry date is closed/locked
+    const entryDate = new Date(date);
+    const lockedPeriod = await db.fiscalPeriod.findFirst({
+      where: {
+        companyId,
+        startDate: { lte: entryDate },
+        endDate: { gte: entryDate },
+        isLocked: true,
+      },
+    });
+
+    if (lockedPeriod) {
+      throw new ForbiddenError('Cannot post transactions to a closed period.');
     }
 
     // Verify all GL accounts belong to the company and are active

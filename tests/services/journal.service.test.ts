@@ -54,7 +54,37 @@ describe('JournalService', () => {
           { glAccountId: equity.id, debit: 0.0, credit: 900.0 }, // Descuadrado por 100
         ],
       })
-    ).rejects.toThrow('El asiento contable debe estar cuadrado');
+    ).rejects.toThrow('Unbalanced journal entry. Debits must equal Credits.');
+  });
+
+  it('debe fallar al crear un asiento contable en un periodo fiscal cerrado', async () => {
+    const company = await createTestCompany();
+    const cash = await createTestGlAccount({ companyId: company.id, code: '1010', name: 'Cash' });
+    const equity = await createTestGlAccount({ companyId: company.id, code: '3010', name: 'Capital' });
+
+    // Create a closed fiscal period for May 2026
+    await db.fiscalPeriod.create({
+      data: {
+        companyId: company.id,
+        name: 'May 2026',
+        startDate: new Date('2026-05-01T00:00:00.000Z'),
+        endDate: new Date('2026-05-31T23:59:59.999Z'),
+        isLocked: true,
+      },
+    });
+
+    await expect(
+      JournalService.create({
+        companyId: company.id,
+        date: '2026-05-25',
+        description: 'Entry in closed period',
+        status: 'draft',
+        lines: [
+          { glAccountId: cash.id, debit: 1000.0, credit: 0.0 },
+          { glAccountId: equity.id, debit: 0.0, credit: 1000.0 },
+        ],
+      })
+    ).rejects.toThrow('Cannot post transactions to a closed period.');
   });
 
   it('debe fallar al crear un asiento con menos de 2 líneas', async () => {

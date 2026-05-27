@@ -16,6 +16,16 @@ Retorna:
 - Métricas de parseo de PDFs
 - Ventana deslizante de últimas 1000 requests
 
+### Monitoreo de Salud (Health Check)
+
+**Endpoint:** `GET /api/health` (Público, sin autenticación)
+
+Retorna el estado de salud del sistema, incluyendo:
+- Latencia y estado de la base de datos SQLite
+- Uptime del proceso
+- Uso de memoria (Heap Used y Heap Total)
+- Timestamp actual e información de versión
+
 ### Uso en Desarrollo
 
 ```bash
@@ -46,6 +56,17 @@ El sistema emite logs en formato JSON estructurado compatible con CloudWatch, Da
 ### Alertas Automáticas
 
 Queries que exceden 500ms generan alertas batch cada 60 segundos via webhook (configurar `ALERT_WEBHOOK_URL` en `.env`).
+
+### Monitoreo de Errores con Sentry (Producción)
+
+El sistema integra Sentry APM para capturar excepciones críticas y problemas de rendimiento en tiempo real (por ejemplo, descuadres contables o fallas en el bloqueo de períodos).
+
+Para configurarlo, añade en tu archivo de entorno local:
+```env
+NEXT_PUBLIC_SENTRY_DSN=https://your-key@sentry.io/your-project-id
+SENTRY_DSN=https://your-key@sentry.io/your-project-id
+SENTRY_AUTH_TOKEN=sntrys_your_auth_token_here
+```
 
 ### Graceful Shutdown
 
@@ -123,3 +144,28 @@ cp backup-TIMESTAMP.db prisma/dev.db
 ```
 
 **Nota:** Los backups se guardan en la carpeta `backups/`. Esta carpeta está en `.gitignore` para evitar subir datos sensibles al repositorio.
+
+---
+
+## ⚡ Pruebas de Carga (k6)
+
+El sistema incluye scripts para realizar pruebas de carga bajo escenarios de alta concurrencia contable (Health Check, autenticación y consulta de reportes).
+
+### Requisitos
+*   [k6](https://k6.io) instalado en el sistema.
+
+### Ejecución de Pruebas
+1. Inicie el servidor en modo producción local:
+   ```bash
+   bun run build
+   $env:NODE_ENV="production"; bun .next/standalone/server.js
+   ```
+2. Ejecute el test de carga con k6:
+   ```bash
+   k6 run scripts/load-test.js
+   ```
+
+### Umbrales de Aceptación (Thresholds)
+*   **http_req_duration (p95):** < 500ms
+*   **http_req_failed (Tasa de error):** < 5%
+
