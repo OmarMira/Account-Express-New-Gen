@@ -76,3 +76,50 @@ Si escalas a PostgreSQL + múltiples instancias, reemplazar `src/lib/cache.ts` c
 bun add ioredis
 # Modificar cache.ts para usar Redis en lugar de LRUCache
 ```
+
+---
+
+## 💾 Backups
+
+El script crea copias comprimidas de la base de datos SQLite con retención automática de 30 backups.
+
+### Ejecución manual
+
+```bash
+bun run scripts/backup-db.ts
+```
+
+Output esperado:
+```
+✅ Backup creado: backups/backup-2025-01-27T14-30-00-000Z.tar.gz
+📦 Total backups almacenados: 1
+```
+
+### Automatizar con cron (Linux/Mac)
+
+```bash
+# Editar crontab
+crontab -e
+
+# Agregar línea (backup diario a las 2 AM)
+0 2 * * * cd /ruta/al/proyecto && bun run scripts/backup-db.ts >> /var/log/db-backup.log 2>&1
+```
+
+### Automatizar con Task Scheduler (Windows)
+
+```powershell
+# Crear tarea programada diaria a las 2 AM
+schtasks /create /tn "AccountExpressBackup" /tr "bun run scripts/backup-db.ts" /sc daily /st 02:00 /sd 01/01/2025
+```
+
+### Restaurar un backup
+
+```bash
+# Extraer backup
+tar -xzf backups/backup-TIMESTAMP.tar.gz
+
+# Detener el servidor primero, luego copiar
+cp backup-TIMESTAMP.db prisma/dev.db
+```
+
+**Nota:** Los backups se guardan en la carpeta `backups/`. Esta carpeta está en `.gitignore` para evitar subir datos sensibles al repositorio.

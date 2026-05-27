@@ -2,7 +2,7 @@ import { db } from '@/lib/db';
 import { parseCSV } from '@/lib/csv-parser';
 import { parseOFX } from '@/lib/ofx-parser';
 import { parsePDFAsync } from '@/lib/pdf-processor';
-import { ValidationError, NotFoundError } from '@/lib/api-error';
+import { ValidationError, NotFoundError, ConflictError } from '@/lib/api-error';
 import { trackPDFParseDuration } from '@/lib/metrics';
 import { withTiming } from '@/lib/timing';
 import { generateImportHash } from '@/lib/accounting/import-hash';
@@ -269,6 +269,16 @@ export class ImportService {
     });
     const accountNumber = bankAccount?.accountNo || 'unknown';
     const statementMonth = toStatementMonth(startDate);
+
+    // ─── Validar statement duplicado ANTES de insertar ───────────────
+    const existingStatement = await db.bankStatement.findFirst({
+      where: { bankAccountId, startDate, endDate },
+    });
+    if (existingStatement) {
+      throw new ConflictError(
+        `Statement for period ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]} was already imported on ${existingStatement.createdAt.toISOString().split('T')[0]}`,
+      );
+    }
 
     // ─── Deduplicación por importHash (SHA-256) ───────────────────────
     // Detecta reimportaciones del mismo extracto sin cargar todo en memoria.
