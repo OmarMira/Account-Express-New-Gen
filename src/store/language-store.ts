@@ -9,22 +9,32 @@ interface LanguageState {
   t: (key: string) => string;
 }
 
+const createTranslator = (lang: Locale) => (key: string): string => {
+  const localeTranslations = translations[lang] as Record<string, unknown>;
+  return getTranslation(localeTranslations, key, key);
+};
+
 export const useLanguageStore = create<LanguageState>()(
   persist(
     (set, get) => ({
       language: 'es' as Locale,
 
-      setLanguage: (lang: Locale) => set({ language: lang }),
+      setLanguage: (lang: Locale) =>
+        set({
+          language: lang,
+          t: createTranslator(lang),
+        }),
 
-      t: (key: string): string => {
-        const { language } = get();
-        const localeTranslations = translations[language] as Record<string, unknown>;
-        return getTranslation(localeTranslations, key, key);
-      },
+      t: createTranslator('es' as Locale),
     }),
     {
       name: 'accountexpress-language',
       partialize: (state) => ({ language: state.language }),
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          state.t = createTranslator(state.language);
+        }
+      },
     },
   ),
 );
