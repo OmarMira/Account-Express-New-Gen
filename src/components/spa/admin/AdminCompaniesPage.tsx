@@ -44,8 +44,86 @@ interface Company {
   createdAt: string;
 }
 
+const LOCAL_TRANSLATIONS: Record<string, Record<string, string>> = {
+  en: {
+    title: 'Global Companies',
+    subtitle: 'Centralized administration and entity isolation in AccountExpress.',
+    createBtn: 'Create Company',
+    searchPlaceholder: 'Search company by name or EIN/Tax ID...',
+    loading: 'Loading companies catalog...',
+    noCompanies: 'No companies found.',
+    statusActive: 'Active',
+    statusInactive: 'Inactive',
+    createdDate: 'Created:',
+    editTitle: 'Edit Company',
+    newTitle: 'New Company',
+    labelLegalName: 'Legal Name *',
+    labelTaxId: 'EIN / Tax ID',
+    labelEmail: 'Contact Email',
+    labelPhone: 'Phone',
+    labelAddress: 'Physical Address',
+    labelActive: 'Active Company',
+    cancelBtn: 'Cancel',
+    saveBtn: 'Save Company',
+    savingBtn: 'Saving...',
+    deleteTitle: 'Warning: Delete Company',
+    deleteConfirm: 'Are you sure you want to permanently delete the company "{name}"?',
+    deleteWarning:
+      'This action will purge all catalogs if it is safe to do so. This operation is irreversible.',
+    deleteBtn: 'Yes, Delete Company',
+    deletingBtn: 'Deleting...',
+    placeholderLegalName: 'e.g. AccountExpress Inc.',
+    placeholderTaxId: 'e.g. 12-3456789',
+    placeholderEmail: 'e.g. admin@company.com',
+    placeholderPhone: 'e.g. +1 555-0199',
+    placeholderAddress: 'e.g. 123 Main Street',
+  },
+  es: {
+    title: 'Empresas Globales',
+    subtitle: 'Administración centralizada y aislamiento de entidades en AccountExpress.',
+    createBtn: 'Crear Empresa',
+    searchPlaceholder: 'Buscar empresa por nombre o EIN/Tax ID...',
+    loading: 'Cargando catálogo de empresas...',
+    noCompanies: 'No se encontraron empresas.',
+    statusActive: 'Activa',
+    statusInactive: 'Inactiva',
+    createdDate: 'Creado el:',
+    editTitle: 'Editar Empresa',
+    newTitle: 'Nueva Empresa',
+    labelLegalName: 'Nombre Legal *',
+    labelTaxId: 'EIN / Tax ID',
+    labelEmail: 'Email de Contacto',
+    labelPhone: 'Teléfono',
+    labelAddress: 'Dirección Física',
+    labelActive: 'Empresa Activa',
+    cancelBtn: 'Cancelar',
+    saveBtn: 'Guardar Empresa',
+    savingBtn: 'Guardando...',
+    deleteTitle: 'Advertencia: Eliminar Empresa',
+    deleteConfirm: '¿Estás seguro de que deseas eliminar permanentemente la empresa "{name}"?',
+    deleteWarning:
+      'Esta acción purgará todo el catálogo si es seguro hacerlo. Esta operación es irreversible.',
+    deleteBtn: 'Sí, Eliminar Empresa',
+    deletingBtn: 'Eliminando...',
+    placeholderLegalName: 'Ej. AccountExpress S.A.',
+    placeholderTaxId: 'Ej. 12-3456789',
+    placeholderEmail: 'Ej. admin@empresa.com',
+    placeholderPhone: 'Ej. +1 555-0199',
+    placeholderAddress: 'Ej. Calle Principal 123',
+  },
+};
+
 export default function AdminCompaniesPage() {
   const t = useLanguageStore((s) => s.t);
+  const language = useLanguageStore((s) => s.language) || 'es';
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const activeLang = mounted ? language : 'es';
+  const dt = LOCAL_TRANSLATIONS[activeLang] || LOCAL_TRANSLATIONS.es;
   const { setCurrentView, setAdminSelectedCompanyId } = useAuthStore();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
@@ -174,18 +252,16 @@ export default function AdminCompaniesPage() {
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-foreground flex items-center gap-3">
             <Building2 className="size-8 text-indigo-600 animate-pulse" />
-            Empresas Globales
+            {dt.title}
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Administración centralizada y aislamiento de entidades en AccountExpress.
-          </p>
+          <p className="text-sm text-muted-foreground mt-1">{dt.subtitle}</p>
         </div>
         <Button
           onClick={handleOpenCreate}
           className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-lg shadow-indigo-500/20 transition-all gap-2 self-start sm:self-center"
         >
           <Plus className="size-5" />
-          Crear Empresa
+          {dt.createBtn}
         </Button>
       </div>
 
@@ -193,7 +269,7 @@ export default function AdminCompaniesPage() {
       <div className="relative">
         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-5 text-muted-foreground" />
         <Input
-          placeholder="Buscar empresa por nombre o EIN/Tax ID..."
+          placeholder={dt.searchPlaceholder}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="pl-11 rounded-xl bg-card border-input text-foreground placeholder-muted-foreground focus:ring-2 focus:ring-indigo-500"
@@ -204,7 +280,7 @@ export default function AdminCompaniesPage() {
       {loading ? (
         <div className="flex flex-col items-center justify-center py-20 gap-4">
           <Loader2 className="size-10 text-indigo-500 animate-spin" />
-          <p className="text-muted-foreground text-sm">Cargando catálogo de empresas...</p>
+          <p className="text-muted-foreground text-sm">{dt.loading}</p>
         </div>
       ) : filteredCompanies.length > 0 ? (
         <motion.div
@@ -245,7 +321,7 @@ export default function AdminCompaniesPage() {
                           : 'bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/20'
                       }
                     >
-                      {company.isActive ? 'Activa' : 'Inactiva'}
+                      {company.isActive ? dt.statusActive : dt.statusInactive}
                     </Badge>
                   </div>
 
@@ -284,7 +360,9 @@ export default function AdminCompaniesPage() {
                 <div className="px-6 py-4 bg-muted/40 border-t border-border flex items-center justify-between">
                   <div className="text-xs text-muted-foreground flex items-center gap-1">
                     <Calendar className="size-3.5" />
-                    <span>{new Date(company.createdAt).toLocaleDateString()}</span>
+                    <span>
+                      {dt.createdDate} {new Date(company.createdAt).toLocaleDateString()}
+                    </span>
                   </div>
                   <div className="flex items-center gap-1">
                     <Button
@@ -325,7 +403,7 @@ export default function AdminCompaniesPage() {
       ) : (
         <div className="flex flex-col items-center justify-center py-20 bg-muted/20 rounded-2xl border border-border">
           <Building2 className="size-16 text-muted-foreground/60 mb-4" />
-          <p className="text-muted-foreground">No se encontraron empresas.</p>
+          <p className="text-muted-foreground">{dt.noCompanies}</p>
         </div>
       )}
 
@@ -335,64 +413,64 @@ export default function AdminCompaniesPage() {
           <DialogHeader>
             <DialogTitle className="text-xl font-bold flex items-center gap-2 text-indigo-600 dark:text-indigo-400">
               <Building2 className="size-6" />
-              {editingCompany ? 'Editar Empresa' : 'Nueva Empresa'}
+              {editingCompany ? dt.editTitle : dt.newTitle}
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4 py-2">
             <div className="space-y-1.5">
               <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
-                Nombre Legal *
+                {dt.labelLegalName}
               </Label>
               <Input
                 required
                 value={formData.legalName}
                 onChange={(e) => setFormData({ ...formData, legalName: e.target.value })}
-                placeholder="Ej. AccountExpress S.A."
+                placeholder={dt.placeholderLegalName}
                 className="bg-card border-input text-foreground placeholder-muted-foreground rounded-xl focus:ring-indigo-500"
               />
             </div>
             <div className="space-y-1.5">
               <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
-                EIN / Tax ID
+                {dt.labelTaxId}
               </Label>
               <Input
                 value={formData.taxId}
                 onChange={(e) => setFormData({ ...formData, taxId: e.target.value })}
-                placeholder="Ej. 12-3456789"
+                placeholder={dt.placeholderTaxId}
                 className="bg-card border-input text-foreground placeholder-muted-foreground rounded-xl focus:ring-indigo-500"
               />
             </div>
             <div className="space-y-1.5">
               <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
-                Email de Contacto
+                {dt.labelEmail}
               </Label>
               <Input
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="Ej. admin@empresa.com"
+                placeholder={dt.placeholderEmail}
                 className="bg-card border-input text-foreground placeholder-muted-foreground rounded-xl focus:ring-indigo-500"
               />
             </div>
             <div className="space-y-1.5">
               <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
-                Teléfono
+                {dt.labelPhone}
               </Label>
               <Input
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                placeholder="Ej. +1 555-0199"
+                placeholder={dt.placeholderPhone}
                 className="bg-card border-input text-foreground placeholder-muted-foreground rounded-xl focus:ring-indigo-500"
               />
             </div>
             <div className="space-y-1.5">
               <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
-                Dirección Física
+                {dt.labelAddress}
               </Label>
               <Input
                 value={formData.address}
                 onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                placeholder="Ej. Calle Principal 123"
+                placeholder={dt.placeholderAddress}
                 className="bg-card border-input text-foreground placeholder-muted-foreground rounded-xl focus:ring-indigo-500"
               />
             </div>
@@ -409,7 +487,7 @@ export default function AdminCompaniesPage() {
                   htmlFor="isActiveCheck"
                   className="text-foreground/90 text-sm font-semibold select-none cursor-pointer"
                 >
-                  Empresa Activa
+                  {dt.labelActive}
                 </Label>
               </div>
             )}
@@ -420,14 +498,14 @@ export default function AdminCompaniesPage() {
                 onClick={() => setModalOpen(false)}
                 className="text-slate-500 hover:text-foreground hover:bg-muted rounded-xl"
               >
-                Cancelar
+                {dt.cancelBtn}
               </Button>
               <Button
                 type="submit"
                 disabled={submitting}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl shadow-lg shadow-indigo-500/20"
               >
-                {submitting ? 'Guardando...' : 'Guardar Empresa'}
+                {submitting ? dt.savingBtn : dt.saveBtn}
               </Button>
             </DialogFooter>
           </form>
@@ -440,16 +518,14 @@ export default function AdminCompaniesPage() {
           <DialogHeader>
             <DialogTitle className="text-xl font-bold flex items-center gap-2 text-rose-600 dark:text-rose-400">
               <ShieldAlert className="size-6 text-rose-600 animate-bounce" />
-              Advertencia: Eliminar Empresa
+              {dt.deleteTitle}
             </DialogTitle>
           </DialogHeader>
           <div className="py-2 text-sm text-foreground/80">
-            ¿Estás seguro de que deseas eliminar permanentemente la empresa{' '}
-            <span className="font-extrabold text-foreground">{deleteTarget?.legalName}</span>?
+            {dt.deleteConfirm.replace('{name}', deleteTarget?.legalName || '')}
             <br />
             <br />
-            Esta acción purgará todo el catálogo si es seguro hacerlo. Esta operación es
-            irreversible.
+            {dt.deleteWarning}
           </div>
           <DialogFooter className="pt-4 border-t border-border">
             <Button
@@ -458,7 +534,7 @@ export default function AdminCompaniesPage() {
               onClick={() => setDeleteTarget(null)}
               className="text-slate-500 hover:text-foreground hover:bg-muted rounded-xl"
             >
-              Cancelar
+              {dt.cancelBtn}
             </Button>
             <Button
               type="button"
@@ -466,7 +542,7 @@ export default function AdminCompaniesPage() {
               onClick={executeDelete}
               className="bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-xl shadow-lg shadow-rose-500/20"
             >
-              {deleting ? 'Eliminando...' : 'Sí, Eliminar Empresa'}
+              {deleting ? dt.deletingBtn : dt.deleteBtn}
             </Button>
           </DialogFooter>
         </DialogContent>

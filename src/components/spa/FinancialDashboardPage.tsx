@@ -315,10 +315,15 @@ export function FinancialDashboardPage() {
   const setCurrentView = useAuthStore((s) => s.setCurrentView);
 
   // States
+  const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [dbTransactions, setDbTransactions] = useState<Transaction[]>([]);
   const [initialBalanceInput, setInitialBalanceInput] = useState<number>(0);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   const [initialBalanceDisplay, setInitialBalanceDisplay] = useState<string>('0.00');
   const apiInitialBalance = React.useRef<number>(0);
   const [bankAccountInfo, setBankAccountInfo] = useState<{
@@ -1351,13 +1356,15 @@ export function FinancialDashboardPage() {
     document.body.removeChild(link);
   };
 
-  if (loading) {
+  if (!mounted || loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[450px]">
         <RefreshCw className="w-10 h-10 animate-spin text-teal-600 dark:text-teal-400 mb-4" />
-        <span className="text-sm font-bold text-slate-500 uppercase tracking-widest animate-pulse">
-          {dt.loadingMetrics}
-        </span>
+        {mounted && (
+          <span className="text-sm font-bold text-slate-500 uppercase tracking-widest animate-pulse">
+            {dt.loadingMetrics}
+          </span>
+        )}
       </div>
     );
   }

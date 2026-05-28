@@ -926,10 +926,7 @@ export function ImportPage() {
         <DialogContent className="sm:max-w-[480px]">
           <DialogHeader>
             <DialogTitle>{t('banks.newBankAccount')}</DialogTitle>
-            <DialogDescription>
-              Se detectó una cuenta bancaria en el extracto. Por favor, confírmela y vincúlela a una
-              cuenta contable antes de importar.
-            </DialogDescription>
+            <DialogDescription>{t('banks.newBankAccountDetectDesc')}</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-2">

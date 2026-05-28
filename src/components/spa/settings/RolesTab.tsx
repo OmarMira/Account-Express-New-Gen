@@ -32,24 +32,45 @@ function PermissionItem({ label }: { label: string }) {
 
 export function RolesTab() {
   const t = useLanguageStore((s) => s.t);
+  const language = useLanguageStore((s) => s.language) || 'es';
 
-  const superAdminPermissions = [
-    'Gestionar todas las empresas del sistema',
-    'Crear, editar y eliminar usuarios',
-    'Acceso completo a cuentas, libro mayor y reportes',
-    'Configurar períodos fiscales y respaldos',
-    'Acceso al diagnóstico del sistema',
-    'Gestionar roles y permisos',
-  ];
+  const superAdminPermissions =
+    language === 'en'
+      ? [
+          'Manage all system companies',
+          'Create, edit and delete users',
+          'Full access to accounts, general ledger and reports',
+          'Configure fiscal periods and backups',
+          'Access system diagnostics',
+          'Manage roles and permissions',
+        ]
+      : [
+          'Gestionar todas las empresas del sistema',
+          'Crear, editar y eliminar usuarios',
+          'Acceso completo a cuentas, libro mayor y reportes',
+          'Configurar períodos fiscales y respaldos',
+          'Acceso al diagnóstico del sistema',
+          'Gestionar roles y permisos',
+        ];
 
-  const companyAdminPermissions = [
-    'Acceso completo a la empresa asignada',
-    'Crear y gestionar cuentas contables',
-    'Crear y registrar asientos en el libro mayor',
-    'Conciliación bancaria',
-    'Generación de reportes financieros',
-    'Importación de estados de cuenta',
-  ];
+  const companyAdminPermissions =
+    language === 'en'
+      ? [
+          'Full access to assigned company',
+          'Create and manage GL accounts',
+          'Create and post entries to the general ledger',
+          'Bank reconciliation',
+          'Financial reports generation',
+          'Bank statement import',
+        ]
+      : [
+          'Acceso completo a la empresa asignada',
+          'Crear y gestionar cuentas contables',
+          'Crear y registrar asientos en el libro mayor',
+          'Conciliación bancaria',
+          'Generación de reportes financieros',
+          'Importación de estados de cuenta',
+        ];
 
   return (
     <motion.div

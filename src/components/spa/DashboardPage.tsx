@@ -446,10 +446,10 @@ export function DashboardPage() {
               <CardTitle className="text-base font-bold">{t('dashboard.monthlyTrend')}</CardTitle>
               <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                 <div className="flex items-center gap-1.5">
-                  <div className="size-2 rounded-full bg-[#0071c5]" /> Ingresos
+                  <div className="size-2 rounded-full bg-[#0071c5]" /> {t('dashboard.income')}
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <div className="size-2 rounded-full bg-[#f43f5e]" /> Gastos
+                  <div className="size-2 rounded-full bg-[#f43f5e]" /> {t('dashboard.expenses')}
                 </div>
               </div>
             </CardHeader>

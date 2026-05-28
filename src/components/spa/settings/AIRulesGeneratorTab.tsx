@@ -58,6 +58,32 @@ function RuleModal({
   onClose: () => void;
   onSave: (rule: EditableRule) => Promise<void>;
 }) {
+  const language = useLanguageStore((s) => s.language) || 'es';
+  const isEn = language === 'en';
+
+  const dt = {
+    viewEditRule: isEn ? 'View / Edit Rule' : 'Ver / Editar Regla',
+    occurrencesDetected: isEn ? 'occurrences detected' : 'ocurrencias detectadas',
+    ruleName: isEn ? 'Rule Name' : 'Nombre de la Regla',
+    conditionType: isEn ? 'Condition Type' : 'Tipo de Condición',
+    contains: isEn ? 'Contains' : 'Contiene',
+    startsWith: isEn ? 'Starts with' : 'Empieza con',
+    endsWith: isEn ? 'Ends with' : 'Termina con',
+    equals: isEn ? 'Equals' : 'Igual a',
+    value: isEn ? 'Value' : 'Valor',
+    direction: isEn ? 'Direction' : 'Dirección',
+    debit: isEn ? 'Debit (outflow)' : 'Débito (egreso)',
+    credit: isEn ? 'Credit (inflow)' : 'Crédito (ingreso)',
+    any: isEn ? 'Both' : 'Ambos',
+    glCode: isEn ? 'GL Code' : 'Código GL',
+    glAccount: isEn ? 'GL Account' : 'Cuenta GL',
+    priority: isEn ? 'Priority' : 'Prioridad',
+    lowest: isEn ? 'lowest' : 'menor',
+    highest: isEn ? 'highest' : 'mayor',
+    cancel: isEn ? 'Cancel' : 'Cancelar',
+    saveRule: isEn ? 'Save Rule' : 'Guardar Regla',
+  };
+
   const [saving, setSaving] = useState(false);
   const [rule, setRule] = useState<EditableRule>({
     name: pattern.description,
@@ -93,10 +119,10 @@ function RuleModal({
           <div>
             <h3 className="font-semibold text-base flex items-center gap-2">
               <Eye className="size-4 text-violet-500" />
-              Ver / Editar Regla
+              {dt.viewEditRule}
             </h3>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {pattern.occurrences} ocurrencias detectadas
+              {pattern.occurrences} {dt.occurrencesDetected}
             </p>
           </div>
           <button
@@ -112,7 +138,7 @@ function RuleModal({
           {/* Name */}
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1 block">
-              Nombre de la Regla
+              {dt.ruleName}
             </label>
             <input
               className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
@@ -125,21 +151,23 @@ function RuleModal({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                Tipo de Condición
+                {dt.conditionType}
               </label>
               <select
                 className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
                 value={rule.conditionType}
                 onChange={(e) => field('conditionType', e.target.value)}
               >
-                <option value="contains">Contiene</option>
-                <option value="starts_with">Empieza con</option>
-                <option value="ends_with">Termina con</option>
-                <option value="equals">Igual a</option>
+                <option value="contains">{dt.contains}</option>
+                <option value="starts_with">{dt.startsWith}</option>
+                <option value="ends_with">{dt.endsWith}</option>
+                <option value="equals">{dt.equals}</option>
               </select>
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">Valor</label>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                {dt.value}
+              </label>
               <input
                 className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
                 value={rule.conditionValue}
@@ -151,16 +179,16 @@ function RuleModal({
           {/* Direction */}
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1 block">
-              Dirección
+              {dt.direction}
             </label>
             <select
               className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
               value={rule.transactionDirection}
               onChange={(e) => field('transactionDirection', e.target.value)}
             >
-              <option value="debit">Débito (egreso)</option>
-              <option value="credit">Crédito (ingreso)</option>
-              <option value="any">Ambos</option>
+              <option value="debit">{dt.debit}</option>
+              <option value="credit">{dt.credit}</option>
+              <option value="any">{dt.any}</option>
             </select>
           </div>
 
@@ -168,7 +196,7 @@ function RuleModal({
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                Código GL
+                {dt.glCode}
               </label>
               <input
                 className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
@@ -178,7 +206,7 @@ function RuleModal({
             </div>
             <div className="col-span-2">
               <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                Cuenta GL
+                {dt.glAccount}
               </label>
               <input
                 className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
@@ -191,7 +219,7 @@ function RuleModal({
           {/* Priority */}
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1 block">
-              Prioridad: <span className="text-foreground font-semibold">{rule.priority}</span>
+              {dt.priority}: <span className="text-foreground font-semibold">{rule.priority}</span>
             </label>
             <input
               type="range"
@@ -202,8 +230,8 @@ function RuleModal({
               className="w-full accent-violet-500"
             />
             <div className="flex justify-between text-xs text-muted-foreground mt-0.5">
-              <span>0 (menor)</span>
-              <span>20 (mayor)</span>
+              <span>0 ({dt.lowest})</span>
+              <span>20 ({dt.highest})</span>
             </div>
           </div>
         </div>
@@ -211,11 +239,11 @@ function RuleModal({
         {/* Footer */}
         <div className="flex justify-end gap-2 px-6 py-4 border-t">
           <Button variant="outline" size="sm" onClick={onClose} disabled={saving}>
-            Cancelar
+            {dt.cancel}
           </Button>
           <Button size="sm" onClick={handleSave} disabled={saving} className="gap-1.5">
             {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
-            Guardar Regla
+            {dt.saveRule}
           </Button>
         </div>
       </motion.div>
@@ -228,6 +256,19 @@ function RuleModal({
 export function AIRulesGeneratorTab() {
   const t = useLanguageStore((s) => s.t);
   const activeCompany = useAuthStore((s) => s.activeCompany);
+  const language = useLanguageStore((s) => s.language) || 'es';
+  const isEn = language === 'en';
+
+  const dt = {
+    ruleSaved: isEn ? 'Rule saved' : 'Regla guardada',
+    saveFailed: isEn
+      ? 'Could not save the rule. Verify that the GL account exists.'
+      : 'No se pudo guardar la regla. Verifique que la cuenta GL exista.',
+    selectAccountBeforeSaving: isEn
+      ? 'Must select a GL account before saving.'
+      : 'Debe seleccionar una cuenta GL antes de guardar.',
+    viewRule: isEn ? 'View Rule' : 'Ver Regla',
+  };
 
   const [patterns, setPatterns] = useState<DetectedPattern[]>([]);
   const [scanning, setScanning] = useState(false);
@@ -287,10 +328,10 @@ export function AIRulesGeneratorTab() {
         }),
       });
       if (!res.ok) throw new Error();
-      toast?.success?.(`Regla guardada: ${rule.name}`);
+      toast?.success?.(`${dt.ruleSaved}: ${rule.name}`);
       setPatterns((prev) => prev.filter((p) => p.id !== patternId));
     } catch {
-      toast?.error?.('No se pudo guardar la regla. Verifique que la cuenta GL exista.');
+      toast?.error?.(dt.saveFailed);
       throw new Error('Save failed');
     } finally {
       setSavingRules((prev) => prev.filter((id) => id !== patternId));
@@ -300,7 +341,7 @@ export function AIRulesGeneratorTab() {
   async function handleSaveRule(pattern: DetectedPattern) {
     if (!pattern.suggestedAccountCode && !pattern.suggestedAccountId) {
       setViewingPattern(pattern);
-      toast?.error?.('Debe seleccionar una cuenta GL antes de guardar.');
+      toast?.error?.(dt.selectAccountBeforeSaving);
       return;
     }
     try {
@@ -476,7 +517,7 @@ export function AIRulesGeneratorTab() {
                         className="gap-1.5"
                       >
                         <Eye className="size-3.5" />
-                        Ver Regla
+                        {dt.viewRule}
                       </Button>
 
                       {/* Guardar Regla */}

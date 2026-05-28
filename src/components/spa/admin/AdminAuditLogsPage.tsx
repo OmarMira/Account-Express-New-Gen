@@ -29,7 +29,51 @@ interface AuditLog {
   company: CompanyDetail | null;
 }
 
+const LOCAL_TRANSLATIONS: Record<string, Record<string, string>> = {
+  en: {
+    title: 'Audit Trail',
+    subtitle:
+      'Global register of administrative actions and integrity of the AccountExpress system.',
+    searchPlaceholder: 'Search logs by action, entity, user or company...',
+    loading: 'Loading audit trail...',
+    noLogs: 'No audit logs found.',
+    thTimestamp: 'Date & Time',
+    thUser: 'User',
+    thAction: 'Action / Module',
+    thCompany: 'Company',
+    thDetails: 'Details',
+    systemAnonymous: 'System / Anonymous',
+    entityLabel: 'Entity:',
+  },
+  es: {
+    title: 'Bitácora de Auditoría',
+    subtitle:
+      'Registro global de acciones administrativas e integridad del sistema AccountExpress.',
+    searchPlaceholder: 'Buscar logs por acción, entidad, usuario o empresa...',
+    loading: 'Cargando bitácora de auditoría...',
+    noLogs: 'No se encontraron logs de auditoría.',
+    thTimestamp: 'Fecha y Hora',
+    thUser: 'Usuario',
+    thAction: 'Acción / Módulo',
+    thCompany: 'Empresa',
+    thDetails: 'Detalles',
+    systemAnonymous: 'Sistema / Anónimo',
+    entityLabel: 'Entidad:',
+  },
+};
+
+import { useLanguageStore } from '@/store/language-store';
+
 export default function AdminAuditLogsPage() {
+  const language = useLanguageStore((s) => s.language) || 'es';
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const activeLang = mounted ? language : 'es';
+  const dt = LOCAL_TRANSLATIONS[activeLang] || LOCAL_TRANSLATIONS.es;
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -79,11 +123,9 @@ export default function AdminAuditLogsPage() {
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-foreground flex items-center gap-3">
             <Activity className="size-8 text-indigo-600 animate-pulse" />
-            Bitácora de Auditoría
+            {dt.title}
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Registro global de acciones administrativas e integridad del sistema AccountExpress.
-          </p>
+          <p className="text-sm text-muted-foreground mt-1">{dt.subtitle}</p>
         </div>
       </div>
 
@@ -91,7 +133,7 @@ export default function AdminAuditLogsPage() {
       <div className="relative">
         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-5 text-muted-foreground" />
         <Input
-          placeholder="Buscar logs por acción, entidad, usuario o empresa..."
+          placeholder={dt.searchPlaceholder}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="pl-11 rounded-xl bg-card border-input text-foreground placeholder-muted-foreground focus:ring-2 focus:ring-indigo-500"
@@ -102,7 +144,7 @@ export default function AdminAuditLogsPage() {
       {loading ? (
         <div className="flex flex-col items-center justify-center py-20 gap-4">
           <Loader2 className="size-10 text-indigo-500 animate-spin" />
-          <p className="text-muted-foreground text-sm">Cargando bitácora de auditoría...</p>
+          <p className="text-muted-foreground text-sm">{dt.loading}</p>
         </div>
       ) : filteredLogs.length > 0 ? (
         <motion.div
@@ -115,19 +157,19 @@ export default function AdminAuditLogsPage() {
               <thead className="bg-muted/50">
                 <tr>
                   <th className="px-6 py-3.5 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                    Fecha y Hora
+                    {dt.thTimestamp}
                   </th>
                   <th className="px-6 py-3.5 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                    Usuario
+                    {dt.thUser}
                   </th>
                   <th className="px-6 py-3.5 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                    Acción / Módulo
+                    {dt.thAction}
                   </th>
                   <th className="px-6 py-3.5 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                    Empresa
+                    {dt.thCompany}
                   </th>
                   <th className="px-6 py-3.5 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                    Detalles
+                    {dt.thDetails}
                   </th>
                 </tr>
               </thead>
@@ -155,7 +197,7 @@ export default function AdminAuditLogsPage() {
                           </div>
                         </div>
                       ) : (
-                        <span className="text-muted-foreground italic">Sistema / Anónimo</span>
+                        <span className="text-muted-foreground italic">{dt.systemAnonymous}</span>
                       )}
                     </td>
 
@@ -165,7 +207,7 @@ export default function AdminAuditLogsPage() {
                         {log.action}
                       </div>
                       <div className="text-xs text-muted-foreground mt-1">
-                        Entidad: {log.entity}
+                        {dt.entityLabel} {log.entity}
                       </div>
                     </td>
 
@@ -197,7 +239,7 @@ export default function AdminAuditLogsPage() {
       ) : (
         <div className="flex flex-col items-center justify-center py-20 bg-muted/20 rounded-2xl border border-border">
           <Activity className="size-16 text-muted-foreground/60 mb-4" />
-          <p className="text-muted-foreground">No se encontraron logs de auditoría.</p>
+          <p className="text-muted-foreground">{dt.noLogs}</p>
         </div>
       )}
     </div>

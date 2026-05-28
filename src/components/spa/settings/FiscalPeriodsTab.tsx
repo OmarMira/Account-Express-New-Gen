@@ -76,6 +76,69 @@ interface FiscalPeriod {
 
 export function FiscalPeriodsTab() {
   const t = useLanguageStore((s) => s.t);
+  const language = useLanguageStore((s) => s.language) || 'es';
+  const isEn = language === 'en';
+
+  const dt = {
+    fiscalPeriods: isEn ? 'Fiscal Periods' : 'Periodos Fiscales',
+    fiscalYear: isEn ? 'Fiscal Year' : 'Año Fiscal',
+    autoGeneration: isEn ? 'Automatic Generation' : 'Generación Automática',
+    generatePeriods: isEn ? 'Generate Periods' : 'Generación de Períodos',
+    autoGenDesc: isEn
+      ? 'Intelligently and automatically create the entire fiscal year with dynamic patterns.'
+      : 'Crea de forma inteligente y automatizada el año fiscal completo con patrones dinámicos.',
+    closingAccount: isEn ? 'Closing Account' : 'Cuenta de Cierre',
+    calculationStrategy: isEn ? 'Calculation Strategy' : 'Estrategia de Cálculo',
+    calendarStandard: isEn ? 'Standard Calendar (Jan - Dec)' : 'Calendario Estándar (Ene - Dic)',
+    customMonths: isEn ? 'Custom Months' : 'Meses Personalizados',
+    week5253: isEn ? '52/53 Week Rule' : 'Regla 52/53 Semanas',
+    startMonth: isEn ? 'Start Month (1-12)' : 'Mes de Inicio (1-12)',
+    generateFiscalYear: isEn ? 'Generate Fiscal Year' : 'Generar Año Fiscal',
+    yearEndClose: isEn ? 'Year End Closing' : 'Cierre de Ejercicio',
+    yearEndCloseTitle: isEn ? 'Accounting Year-End Closing' : 'Cierre de Ejercicio Contable',
+    yearEndCloseDesc: isEn
+      ? 'This action is immutable and atomic. It will generate the closing journal entry for P&L and lock the periods.'
+      : 'Esta acción es inmutable y atómica. Generará el asiento contable de cierre del PyG y bloqueará los períodos.',
+    yearToClose: isEn ? 'Year to Close' : 'Año a Cerrar',
+    accountingWarning: isEn ? '⚠️ Accounting Warning:' : '⚠️ Advertencia Contable:',
+    warning1: isEn
+      ? '1. All periods of the year to close must be previously locked.'
+      : '1. Todos los períodos del año a cerrar deben estar previamente bloqueados (Locks).',
+    warning2: isEn
+      ? '2. All journal entries must be in "Posted" status and completely balanced.'
+      : '2. Todos los asientos deben estar en estado "Posted" y completamente balanceados.',
+    executeClose: isEn ? 'Execute Accounting Close' : 'Ejecutar Cierre Contable',
+    status: isEn ? 'Status' : 'Estado',
+    closed: isEn ? '🔒 Closed' : '🔒 Cerrado',
+    open: isEn ? '🟢 Open' : '🟢 Abierto',
+    unlock: isEn ? 'Unlock' : 'Desbloquear',
+    lock: isEn ? 'Lock' : 'Bloquear',
+    unlockPeriodDesc: (name: string) =>
+      isEn
+        ? `Open period "${name}"? You will be able to create and modify journal entries.`
+        : `¿Abrir el período "${name}"? Se podrán crear y modificar asientos.`,
+    confirmUnlock: isEn ? 'Confirm Unlock' : 'Confirmar Desbloqueo',
+    confirmLock: isEn ? 'Confirm Lock' : 'Confirmar Bloqueo',
+    conflictWarning: isEn
+      ? 'Period conflict or duplicate name detected.'
+      : 'Conflicto de período o nombre duplicado detectado.',
+    generationSuccess: isEn
+      ? 'Fiscal periods generated successfully!'
+      : '¡Períodos fiscales generados exitosamente!',
+    generationError: isEn ? 'Error generating periods' : 'Error al generar períodos',
+    networkError: isEn
+      ? 'Network error connecting to server'
+      : 'Error de red al conectar con el servidor',
+    closeSuccess: isEn
+      ? 'Accounting year-end closed successfully!'
+      : '¡Cierre de ejercicio contable ejecutado con éxito!',
+    closeError: isEn ? 'Error performing year-end close' : 'Error al realizar el cierre',
+    operationError: isEn ? 'Error performing the operation' : 'Error al realizar la operación',
+    periodUnlocked: isEn ? 'Period unlocked' : 'Período desbloqueado',
+    periodLocked: isEn ? 'Period locked' : 'Período bloqueado',
+    lockError: isEn ? 'Error changing lock status' : 'Error al cambiar estado de bloqueo',
+  };
+
   const activeCompany = useAuthStore((s) => s.activeCompany);
   const companyId = activeCompany?.id;
 
@@ -172,22 +235,22 @@ export function FiscalPeriodsTab() {
       });
 
       if (res.status === 409) {
-        toast.warning('Conflicto de período o nombre duplicado detectado.');
+        toast.warning(dt.conflictWarning);
         await fetchPeriods();
         setGenOpen(false);
         return;
       }
 
       if (res.ok) {
-        toast.success('¡Períodos fiscales generados exitosamente!');
+        toast.success(dt.generationSuccess);
         setGenOpen(false);
         await fetchPeriods();
       } else {
         const data = await res.json();
-        toast.error(data.error || 'Error al generar períodos');
+        toast.error(data.error || dt.generationError);
       }
     } catch {
-      toast.error('Error de red al conectar con el servidor');
+      toast.error(dt.networkError);
     } finally {
       setGenerating(false);
     }
@@ -212,15 +275,15 @@ export function FiscalPeriodsTab() {
       });
 
       if (res.ok) {
-        toast.success('¡Cierre de ejercicio contable ejecutado con éxito!');
+        toast.success(dt.closeSuccess);
         setCloseOpen(false);
         await fetchPeriods();
       } else {
         const data = await res.json();
-        toast.error(data.error || 'Error al realizar el cierre');
+        toast.error(data.error || dt.closeError);
       }
     } catch {
-      toast.error('Error al realizar la operación');
+      toast.error(dt.operationError);
     } finally {
       setClosing(false);
     }
@@ -236,14 +299,14 @@ export function FiscalPeriodsTab() {
         body: JSON.stringify({ companyId, isLocked: !period.isLocked }),
       });
       if (res.ok) {
-        toast.success(period.isLocked ? 'Período desbloqueado' : 'Período bloqueado');
+        toast.success(period.isLocked ? dt.periodUnlocked : dt.periodLocked);
         await fetchPeriods();
       } else {
         const data = await res.json();
-        toast.error(data.error || 'Error al cambiar estado de bloqueo');
+        toast.error(data.error || dt.lockError);
       }
     } catch {
-      toast.error('Error al conectar con el servidor');
+      toast.error(dt.networkError);
     } finally {
       setToggling(false);
       setLockTarget(null);
@@ -278,24 +341,21 @@ export function FiscalPeriodsTab() {
                       className="border-indigo-200 hover:border-indigo-300 dark:border-indigo-900/50"
                     >
                       <Sparkles className="size-3.5 mr-1.5 text-indigo-500 animate-pulse" />
-                      Generación Automática
+                      {dt.autoGeneration}
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-[425px]">
                     <DialogHeader>
                       <DialogTitle className="flex items-center gap-2">
                         <Sparkles className="size-5 text-indigo-500" />
-                        Generación de Períodos
+                        {dt.generatePeriods}
                       </DialogTitle>
-                      <DialogDescription>
-                        Crea de forma inteligente y automatizada el año fiscal completo con patrones
-                        dinámicos.
-                      </DialogDescription>
+                      <DialogDescription>{dt.autoGenDesc}</DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1.5">
-                          <Label>Año Fiscal</Label>
+                          <Label>{dt.fiscalYear}</Label>
                           <Input
                             type="number"
                             value={genYear}
@@ -303,7 +363,7 @@ export function FiscalPeriodsTab() {
                           />
                         </div>
                         <div className="space-y-1.5">
-                          <Label>Cuenta de Cierre</Label>
+                          <Label>{dt.closingAccount}</Label>
                           <Input
                             value={closingAccountCode}
                             onChange={(e) => setClosingAccountCode(e.target.value)}
@@ -312,23 +372,21 @@ export function FiscalPeriodsTab() {
                         </div>
                       </div>
                       <div className="space-y-1.5">
-                        <Label>Estrategia de Cálculo</Label>
+                        <Label>{dt.calculationStrategy}</Label>
                         <Select value={genType} onValueChange={(v: any) => setGenType(v)}>
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="CALENDAR">
-                              Calendario Estándar (Ene - Dic)
-                            </SelectItem>
-                            <SelectItem value="CUSTOM_MONTHS">Meses Personalizados</SelectItem>
-                            <SelectItem value="WEEK_52_53">Regla 52/53 Semanas</SelectItem>
+                            <SelectItem value="CALENDAR">{dt.calendarStandard}</SelectItem>
+                            <SelectItem value="CUSTOM_MONTHS">{dt.customMonths}</SelectItem>
+                            <SelectItem value="WEEK_52_53">{dt.week5253}</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                       {genType === 'CUSTOM_MONTHS' && (
                         <div className="space-y-1.5">
-                          <Label>Mes de Inicio (1-12)</Label>
+                          <Label>{dt.startMonth}</Label>
                           <Input
                             type="number"
                             min={1}
@@ -349,7 +407,7 @@ export function FiscalPeriodsTab() {
                         className="bg-indigo-600 hover:bg-indigo-700"
                       >
                         {generating ? <Loader2 className="size-4 animate-spin mr-1" /> : null}
-                        Generar Año Fiscal
+                        {dt.generateFiscalYear}
                       </Button>
                     </DialogFooter>
                   </DialogContent>
@@ -364,23 +422,20 @@ export function FiscalPeriodsTab() {
                       className="bg-amber-600 hover:bg-amber-700 text-white border-none"
                     >
                       <Lock className="size-3.5 mr-1.5" />
-                      Cierre de Ejercicio
+                      {dt.yearEndClose}
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-[425px]">
                     <DialogHeader>
                       <DialogTitle className="flex items-center gap-2 text-amber-600">
                         <AlertTriangle className="size-5 text-amber-500 animate-bounce" />
-                        Cierre de Ejercicio Contable
+                        {dt.yearEndCloseTitle}
                       </DialogTitle>
-                      <DialogDescription>
-                        Esta acción es inmutable y atómica. Generará el asiento contable de cierre
-                        del PyG y bloqueará los períodos.
-                      </DialogDescription>
+                      <DialogDescription>{dt.yearEndCloseDesc}</DialogDescription>
                     </DialogHeader>
                     <div className="py-4 space-y-4">
                       <div className="space-y-1.5">
-                        <Label>Año a Cerrar</Label>
+                        <Label>{dt.yearToClose}</Label>
                         <Input
                           type="number"
                           value={closeYear}
@@ -388,15 +443,9 @@ export function FiscalPeriodsTab() {
                         />
                       </div>
                       <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 p-3 border border-amber-200/40 text-amber-800 dark:text-amber-300 text-xs leading-relaxed space-y-1">
-                        <p className="font-semibold">⚠️ Advertencia Contable:</p>
-                        <p>
-                          1. Todos los períodos del año a cerrar deben estar previamente bloqueados
-                          (Locks).
-                        </p>
-                        <p>
-                          2. Todos los asientos deben estar en estado "Posted" y completamente
-                          balanceados.
-                        </p>
+                        <p className="font-semibold">{dt.accountingWarning}</p>
+                        <p>{dt.warning1}</p>
+                        <p>{dt.warning2}</p>
                       </div>
                     </div>
                     <DialogFooter>
@@ -409,7 +458,7 @@ export function FiscalPeriodsTab() {
                         className="bg-amber-600 hover:bg-amber-700 text-white"
                       >
                         {closing ? <Loader2 className="size-4 animate-spin mr-1" /> : null}
-                        Ejecutar Cierre Contable
+                        {dt.executeClose}
                       </Button>
                     </DialogFooter>
                   </DialogContent>
@@ -509,7 +558,7 @@ export function FiscalPeriodsTab() {
                       {t('settings.periods.startDate')}
                     </TableHead>
                     <TableHead className="font-semibold">{t('settings.periods.endDate')}</TableHead>
-                    <TableHead className="font-semibold">Estado</TableHead>
+                    <TableHead className="font-semibold">{dt.status}</TableHead>
                     <TableHead className="font-semibold text-right px-6">
                       {t('settings.companies.actions')}
                     </TableHead>
@@ -534,7 +583,7 @@ export function FiscalPeriodsTab() {
                               : 'border-emerald-200/50 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400'
                           }`}
                         >
-                          {period.isLocked ? '🔒 Cerrado' : '🟢 Abierto'}
+                          {period.isLocked ? dt.closed : dt.open}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right px-6">
@@ -552,12 +601,12 @@ export function FiscalPeriodsTab() {
                           {period.isLocked ? (
                             <>
                               <Unlock className="size-3.5 mr-1.5" />
-                              Desbloquear
+                              {dt.unlock}
                             </>
                           ) : (
                             <>
                               <Lock className="size-3.5 mr-1.5" />
-                              Bloquear
+                              {dt.lock}
                             </>
                           )}
                         </Button>
@@ -587,7 +636,7 @@ export function FiscalPeriodsTab() {
             </AlertDialogTitle>
             <AlertDialogDescription>
               {lockTarget?.isLocked
-                ? `¿Abrir el período "${lockTarget.name}"? Se podrán crear y modificar asientos.`
+                ? dt.unlockPeriodDesc(lockTarget.name)
                 : t('settings.periods.confirmLockDesc')}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -601,7 +650,7 @@ export function FiscalPeriodsTab() {
                   : 'bg-amber-600 hover:bg-amber-700 text-white'
               }
             >
-              {lockTarget?.isLocked ? 'Confirmar Desbloqueo' : 'Confirmar Bloqueo'}
+              {lockTarget?.isLocked ? dt.confirmUnlock : dt.confirmLock}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -1140,12 +1140,12 @@ export function ReconciliationPage() {
           <Dialog open={splitDialogOpen} onOpenChange={setSplitDialogOpen}>
             <DialogContent className="max-w-2xl">
               <DialogHeader>
-                <DialogTitle>
-                  {t('reconciliation.splitTransaction') || 'Distribuir Transacción'}
-                </DialogTitle>
+                <DialogTitle>{t('reconciliation.splitTransaction')}</DialogTitle>
                 <DialogDescription>
-                  Divide el monto de <strong>{formatCurrency(splittingTx?.amount || 0)}</strong> en
-                  múltiples cuentas.
+                  {t('reconciliation.splitTransactionDesc').replace(
+                    '{amount}',
+                    formatCurrency(splittingTx?.amount || 0),
+                  )}
                 </DialogDescription>
               </DialogHeader>
 
@@ -1227,18 +1227,18 @@ export function ReconciliationPage() {
                   }}
                 >
                   <PlusCircle className="size-4" />
-                  Agregar Distribución
+                  {t('reconciliation.addSplit')}
                 </Button>
 
                 <div className="flex items-center justify-between p-4 rounded-xl bg-primary/5 border border-primary/10">
                   <div className="text-sm">
-                    <p className="text-muted-foreground">Total Distribuido</p>
+                    <p className="text-muted-foreground">{t('reconciliation.totalSplit')}</p>
                     <p className="font-bold text-lg">
                       {formatCurrency(currentSplits.reduce((sum, s) => sum + s.amount, 0))}
                     </p>
                   </div>
                   <div className="text-right text-sm">
-                    <p className="text-muted-foreground">Diferencia Pendiente</p>
+                    <p className="text-muted-foreground">{t('reconciliation.pendingDifference')}</p>
                     <p
                       className={cn(
                         'font-bold text-lg',
@@ -1261,7 +1261,7 @@ export function ReconciliationPage() {
 
               <DialogFooter>
                 <Button variant="outline" onClick={() => setSplitDialogOpen(false)}>
-                  Cancelar
+                  {t('common.cancel')}
                 </Button>
                 <Button
                   onClick={saveSplits}
@@ -1272,7 +1272,7 @@ export function ReconciliationPage() {
                     ) > 0.01
                   }
                 >
-                  Confirmar Distribución
+                  {t('reconciliation.confirmSplit')}
                 </Button>
               </DialogFooter>
             </DialogContent>

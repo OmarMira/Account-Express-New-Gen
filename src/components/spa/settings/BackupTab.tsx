@@ -145,9 +145,11 @@ export function BackupTab() {
     toast.info(t('settings.backup.download'));
   }
 
+  const language = useLanguageStore((s) => s.language) || 'es';
+
   function formatDate(dateStr: string) {
     const d = new Date(dateStr);
-    return d.toLocaleDateString('es-MX', {
+    return d.toLocaleDateString(language === 'en' ? 'en-US' : 'es-MX', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',

@@ -95,8 +95,9 @@ const en = {
     period: 'Period',
     cashBalance: 'Cash Balance',
     receivables: 'Accounts Receivable',
-    payables: 'Accounts Payable',
     monthlyTrend: 'Monthly Trend',
+    income: 'Income',
+    expenses: 'Expenses',
   },
   accounts: {
     title: 'Chart of Accounts',
@@ -217,6 +218,8 @@ const en = {
     deactivateDesc:
       'Are you sure you want to deactivate "{name}" at "{bank}"? This will mark the account as inactive. Existing statements and transactions will be preserved.',
     deactivateAction: 'Deactivate',
+    newBankAccountDetectDesc:
+      'A bank account was detected in the statement. Please confirm and link it to a GL account before importing.',
   },
   bankRules: {
     title: 'Bank Rules',
@@ -337,6 +340,12 @@ const en = {
     noOpenPeriod: 'No active reconciliation period',
     history: 'History',
     historyTitle: 'Reconciliation History',
+    splitTransaction: 'Split Transaction',
+    splitTransactionDesc: 'Split the amount of {amount} into multiple accounts.',
+    addSplit: 'Add Split',
+    confirmSplit: 'Confirm Split',
+    totalSplit: 'Total Split',
+    pendingDifference: 'Pending Difference',
     noHistory: 'No reconciliation history found.',
     startedBy: 'Started by',
     periodStatus: 'Status',
@@ -750,6 +759,13 @@ const en = {
   selectCompany: {
     subtitle: 'Please select a company to continue.',
     welcome: 'Welcome',
+    noCompanies: 'No associated companies',
+    createFirstCompany: 'Create your first company below to start',
+    companyName: 'Company Name',
+    taxIdPlaceholder: 'e.g. Tax ID 12345',
+    createCompanyBtn: 'Create Company & Continue',
+    adminConsole: 'Administration Console',
+    adminConsoleDesc: 'Manage companies, user access, and system audit logs',
   },
   financialDashboard: {
     title: 'Financial Health',

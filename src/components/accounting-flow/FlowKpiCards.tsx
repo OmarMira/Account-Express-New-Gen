@@ -4,6 +4,7 @@ import { motion, type Variants } from 'framer-motion';
 import { ArrowUpRight, ArrowDownRight, Layers, Activity, RefreshCw, Download } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { formatCurrency } from '@/lib/format';
+import { useLanguageStore } from '@/store/language-store';
 
 interface FlowKpiCardsProps {
   summary: {
@@ -41,17 +42,30 @@ export function FlowKpiCards({
   onRefresh,
 }: FlowKpiCardsProps) {
   const { totalInflows, totalOutflows, netFlow, transactionCount } = summary;
+  const language = useLanguageStore((s) => s.language) || 'es';
+  const isEn = language === 'en';
+
+  const dt = {
+    title: isEn ? 'Real Cash Flow in Staging' : 'Flujo de Caja Real en Staging',
+    subtitle: isEn
+      ? 'Based on posted journal entries and reconciled non-duplicated movements'
+      : 'Basado en asientos contables y movimientos conciliados no duplicados',
+    exportCsv: isEn ? 'Export CSV' : 'Exportar CSV',
+    refreshFlow: isEn ? 'Refresh flow' : 'Actualizar flujo',
+    inflows: isEn ? 'Inflows' : 'Entradas (Inflows)',
+    outflows: isEn ? 'Outflows' : 'Salidas (Outflows)',
+    netFlow: isEn ? 'Net Flow' : 'Flujo Neto',
+    transactions: isEn ? 'Transactions' : 'Transacciones',
+  };
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground">
-            Flujo de Caja Real en Staging
+            {dt.title}
           </h3>
-          <p className="text-xs text-muted-foreground">
-            Basado en asientos contables y movimientos conciliados no duplicados
-          </p>
+          <p className="text-xs text-muted-foreground">{dt.subtitle}</p>
         </div>
         <div className="flex items-center gap-2">
           {companyId && startDate && endDate && (
@@ -61,7 +75,7 @@ export function FlowKpiCards({
               className="flex items-center gap-1.5 rounded-md border bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground transition-all hover:bg-accent hover:text-accent-foreground"
             >
               <Download className="size-3 text-muted-foreground" />
-              Exportar CSV
+              {dt.exportCsv}
             </a>
           )}
           {onRefresh && (
@@ -71,7 +85,7 @@ export function FlowKpiCards({
               className="flex items-center gap-1.5 rounded-md border bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground transition-all hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
             >
               <RefreshCw className={`size-3 ${isLoading ? 'animate-spin' : ''}`} />
-              Actualizar flujo
+              {dt.refreshFlow}
             </button>
           )}
         </div>
@@ -90,7 +104,7 @@ export function FlowKpiCards({
               <div className="flex items-start justify-between">
                 <div className="space-y-1">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    Entradas (Inflows)
+                    {dt.inflows}
                   </p>
                   <p className="text-2xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
                     {formatCurrency(totalInflows)}
@@ -111,7 +125,7 @@ export function FlowKpiCards({
               <div className="flex items-start justify-between">
                 <div className="space-y-1">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    Salidas (Outflows)
+                    {dt.outflows}
                   </p>
                   <p className="text-2xl font-bold tracking-tight text-rose-600 dark:text-rose-400">
                     {formatCurrency(totalOutflows)}
@@ -134,7 +148,7 @@ export function FlowKpiCards({
               <div className="flex items-start justify-between">
                 <div className="space-y-1">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    Flujo Neto
+                    {dt.netFlow}
                   </p>
                   <p
                     className={`text-2xl font-bold tracking-tight ${netFlow >= 0 ? 'text-primary' : 'text-rose-500'}`}
@@ -159,7 +173,7 @@ export function FlowKpiCards({
               <div className="flex items-start justify-between">
                 <div className="space-y-1">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    Transacciones
+                    {dt.transactions}
                   </p>
                   <p className="text-2xl font-bold tracking-tight text-sky-600 dark:text-sky-400">
                     {transactionCount}

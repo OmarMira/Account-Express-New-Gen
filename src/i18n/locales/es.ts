@@ -97,8 +97,9 @@ const es = {
     period: 'Período',
     cashBalance: 'Saldo de Efectivo',
     receivables: 'Cuentas por Cobrar',
-    payables: 'Cuentas por Pagar',
     monthlyTrend: 'Tendencia Mensual',
+    income: 'Ingresos',
+    expenses: 'Gastos',
   },
   accounts: {
     title: 'Plan de Cuentas',
@@ -220,6 +221,8 @@ const es = {
     deactivateDesc:
       '¿Estás seguro de que deseas desactivar "{name}" en "{bank}"? Esto marcará la cuenta como inactiva. Los estados de cuenta y transacciones existentes se conservarán.',
     deactivateAction: 'Desactivar',
+    newBankAccountDetectDesc:
+      'Se detectó una cuenta bancaria en el extracto. Por favor, confírmela y vincúlela a una cuenta contable antes de importar.',
   },
   bankRules: {
     title: 'Reglas Bancarias',
@@ -337,6 +340,12 @@ const es = {
     periodStarted: 'Período iniciado el {date}',
     periodCompleted: 'Completado el {date} por {user}',
     periodTransactions: 'Transacciones en este período',
+    splitTransaction: 'Distribuir Transacción',
+    splitTransactionDesc: 'Divide el monto de {amount} en múltiples cuentas.',
+    addSplit: 'Agregar Distribución',
+    confirmSplit: 'Confirmar Distribución',
+    totalSplit: 'Total Distribuido',
+    pendingDifference: 'Diferencia Pendiente',
     noOpenPeriod: 'No hay período de conciliación activo',
     history: 'Historial',
     historyTitle: 'Historial de Conciliación',
@@ -760,6 +769,13 @@ const es = {
   selectCompany: {
     subtitle: 'Por favor, selecciona una empresa para continuar.',
     welcome: 'Bienvenido',
+    noCompanies: 'No tienes empresas asociadas',
+    createFirstCompany: 'Crea tu primera empresa a continuación para comenzar',
+    companyName: 'Nombre de la Empresa',
+    taxIdPlaceholder: 'Ej. RFC123456789',
+    createCompanyBtn: 'Crear Empresa y Continuar',
+    adminConsole: 'Consola de Administración',
+    adminConsoleDesc: 'Gestionar empresas, accesos de usuarios y bitácoras',
   },
   financialDashboard: {
     title: 'Estado Financiero',

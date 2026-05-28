@@ -403,8 +403,10 @@ export function CompanyDataTab() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="font-semibold">EMPRESA</TableHead>
-                        <TableHead className="font-semibold">EIN</TableHead>
+                        <TableHead className="font-semibold">{t('settings.company')}</TableHead>
+                        <TableHead className="font-semibold">
+                          {t('settings.companies.ein')}
+                        </TableHead>
                         <TableHead className="font-semibold">
                           {t('settings.companies.contact')}
                         </TableHead>

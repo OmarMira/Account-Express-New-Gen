@@ -53,7 +53,75 @@ interface Company {
   isActive: boolean;
 }
 
+const LOCAL_TRANSLATIONS: Record<string, Record<string, string>> = {
+  en: {
+    loading: 'Loading company details...',
+    errorNotFound: 'Company not found.',
+    errorNetwork: 'Network error loading data.',
+    backBtn: 'Back to Companies',
+    statusActive: 'Active',
+    statusInactive: 'Inactive',
+    assignBtn: 'Assign User',
+    identityCardTitle: 'Identity Record',
+    fiscalYearLabel: 'Fiscal Year: January - December',
+    authorizedAccessTitle: 'Authorized Accesses ({count})',
+    thUser: 'User',
+    thEmail: 'Email',
+    thRole: 'Assigned Role',
+    thActions: 'Actions',
+    badgeSuperAdmin: 'Super Admin',
+    badgeCompanyAdmin: 'Company Admin',
+    revokeBtn: 'Revoke',
+    noAssignedUsers: 'No users assigned to this company.',
+    modalTitle: 'Assign User',
+    selectUserLabel: 'Select User',
+    chooseUserOption: '-- Choose a system user --',
+    roleLabel: 'Company Role',
+    cancelBtn: 'Cancel',
+    assigningBtn: 'Assigning...',
+    confirmBtn: 'Confirm Assignment',
+  },
+  es: {
+    loading: 'Cargando detalles de la empresa...',
+    errorNotFound: 'Empresa no encontrada.',
+    errorNetwork: 'Error de red al cargar datos.',
+    backBtn: 'Volver a Empresas',
+    statusActive: 'Activa',
+    statusInactive: 'Inactiva',
+    assignBtn: 'Asignar Usuario',
+    identityCardTitle: 'Ficha de Identidad',
+    fiscalYearLabel: 'Año Fiscal: Enero - Diciembre',
+    authorizedAccessTitle: 'Accesos Autorizados ({count})',
+    thUser: 'Usuario',
+    thEmail: 'Email',
+    thRole: 'Rol Asignado',
+    thActions: 'Acciones',
+    badgeSuperAdmin: 'Super Admin',
+    badgeCompanyAdmin: 'Admin de Empresa',
+    revokeBtn: 'Revocar',
+    noAssignedUsers: 'No hay usuarios asignados a esta empresa.',
+    modalTitle: 'Asignar Usuario',
+    selectUserLabel: 'Seleccionar Usuario',
+    chooseUserOption: '-- Elige un usuario del sistema --',
+    roleLabel: 'Rol de Empresa',
+    cancelBtn: 'Cancelar',
+    assigningBtn: 'Asignando...',
+    confirmBtn: 'Confirmar Asignación',
+  },
+};
+
+import { useLanguageStore } from '@/store/language-store';
+
 export default function AdminCompanyDetailPage() {
+  const language = useLanguageStore((s) => s.language) || 'es';
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const activeLang = mounted ? language : 'es';
+  const dt = LOCAL_TRANSLATIONS[activeLang] || LOCAL_TRANSLATIONS.es;
   const { setCurrentView, adminSelectedCompanyId } = useAuthStore();
   const [company, setCompany] = useState<Company | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
@@ -159,7 +227,7 @@ export default function AdminCompanyDetailPage() {
     return (
       <div className="flex flex-col items-center justify-center py-40 gap-4">
         <Loader2 className="size-10 text-indigo-500 animate-spin" />
-        <p className="text-muted-foreground text-sm">Cargando detalles de la empresa...</p>
+        <p className="text-muted-foreground text-sm">{dt.loading}</p>
       </div>
     );
   }
@@ -169,13 +237,17 @@ export default function AdminCompanyDetailPage() {
       <div className="flex flex-col items-center justify-center py-20 bg-card text-card-foreground rounded-2xl border shadow-sm max-w-lg mx-auto">
         <Shield className="size-16 text-rose-500/80 mb-4" />
         <p className="text-rose-600 dark:text-rose-400 font-bold">
-          {error || 'Empresa no encontrada'}
+          {error
+            ? error === 'Empresa no encontrada.'
+              ? dt.errorNotFound
+              : error
+            : dt.errorNotFound}
         </p>
         <Button
           onClick={() => setCurrentView('admin-companies')}
           className="mt-6 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md"
         >
-          Volver a Empresas
+          {dt.backBtn}
         </Button>
       </div>
     );
@@ -192,7 +264,7 @@ export default function AdminCompanyDetailPage() {
         className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
       >
         <ArrowLeft className="size-4" />
-        Volver a Empresas
+        {dt.backBtn}
       </button>
 
       {/* Main Info Header */}
@@ -205,7 +277,7 @@ export default function AdminCompanyDetailPage() {
             <h1 className="text-2xl font-bold text-foreground leading-snug">{company.legalName}</h1>
             <div className="flex items-center gap-2 mt-1">
               <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
-                {company.isActive ? 'Activa' : 'Inactiva'}
+                {company.isActive ? dt.statusActive : dt.statusInactive}
               </Badge>
               {company.taxId && (
                 <span className="text-xs font-mono text-muted-foreground">
@@ -220,7 +292,7 @@ export default function AdminCompanyDetailPage() {
           className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-lg shadow-indigo-500/20 gap-2"
         >
           <UserPlus className="size-4.5" />
-          Asignar Usuario
+          {dt.assignBtn}
         </Button>
       </div>
 
@@ -230,7 +302,7 @@ export default function AdminCompanyDetailPage() {
         <div className="space-y-6 lg:col-span-1">
           <div className="p-6 bg-card text-card-foreground rounded-2xl border shadow-sm space-y-4">
             <h2 className="text-sm font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
-              Ficha de Identidad
+              {dt.identityCardTitle}
             </h2>
             <div className="space-y-3.5 text-sm">
               {company.email && (
@@ -253,7 +325,7 @@ export default function AdminCompanyDetailPage() {
               )}
               <div className="flex items-center gap-3 text-foreground/80">
                 <Calendar className="size-4.5 text-muted-foreground shrink-0" />
-                <span>Año Fiscal: Enero - Diciembre</span>
+                <span>{dt.fiscalYearLabel}</span>
               </div>
             </div>
           </div>
@@ -264,7 +336,7 @@ export default function AdminCompanyDetailPage() {
           <div className="p-6 bg-card text-card-foreground rounded-2xl border shadow-sm">
             <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
               <Key className="size-5.5 text-indigo-600 dark:text-indigo-400" />
-              Accesos Autorizados ({members.length})
+              {dt.authorizedAccessTitle.replace('{count}', members.length.toString())}
             </h2>
 
             {members.length > 0 ? (
@@ -273,16 +345,16 @@ export default function AdminCompanyDetailPage() {
                   <thead className="bg-muted/50">
                     <tr>
                       <th className="px-6 py-3.5 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                        Usuario
+                        {dt.thUser}
                       </th>
                       <th className="px-6 py-3.5 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                        Email
+                        {dt.thEmail}
                       </th>
                       <th className="px-6 py-3.5 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                        Rol Asignado
+                        {dt.thRole}
                       </th>
                       <th className="px-6 py-3.5 text-right text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                        Acciones
+                        {dt.thActions}
                       </th>
                     </tr>
                   </thead>
@@ -297,7 +369,9 @@ export default function AdminCompanyDetailPage() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                           <Badge className="bg-indigo-500/15 text-indigo-700 dark:text-indigo-400 border border-indigo-500/20">
-                            {member.role === 'super_admin' ? 'Super Admin' : 'Admin de Empresa'}
+                            {member.role === 'super_admin'
+                              ? dt.badgeSuperAdmin
+                              : dt.badgeCompanyAdmin}
                           </Badge>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
@@ -313,7 +387,7 @@ export default function AdminCompanyDetailPage() {
                             ) : (
                               <UserMinus className="size-3.5" />
                             )}
-                            Revocar
+                            {dt.revokeBtn}
                           </Button>
                         </td>
                       </tr>
@@ -324,7 +398,7 @@ export default function AdminCompanyDetailPage() {
             ) : (
               <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-2">
                 <Shield className="size-12 opacity-40" />
-                <p className="text-sm">No hay usuarios asignados a esta empresa.</p>
+                <p className="text-sm">{dt.noAssignedUsers}</p>
               </div>
             )}
           </div>
@@ -337,21 +411,21 @@ export default function AdminCompanyDetailPage() {
           <DialogHeader>
             <DialogTitle className="text-xl font-bold flex items-center gap-2 text-indigo-400">
               <UserPlus className="size-6" />
-              Asignar Usuario
+              {dt.modalTitle}
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleAssign} className="space-y-4 py-2">
             <div className="space-y-1.5">
               <Label className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
-                Seleccionar Usuario
+                {dt.selectUserLabel}
               </Label>
               <select
                 required
                 value={selectedUserId}
                 onChange={(e) => setSelectedUserId(e.target.value)}
-                className="block w-full rounded-xl border border-white/10 bg-slate-950 text-white px-4 py-2.5 text-sm focus:ring-indigo-500 outline-none"
+                className="block w-full rounded-xl border border-white/10 bg-slate-950 text-white px-4 py-2.5 text-sm focus:ring-indigo-500 outline-none cursor-pointer"
               >
-                <option value="">-- Elige un usuario del sistema --</option>
+                <option value="">{dt.chooseUserOption}</option>
                 {unassignedUsers.map((u) => (
                   <option key={u.id} value={u.id}>
                     {u.firstName} {u.lastName} ({u.email})
@@ -361,16 +435,16 @@ export default function AdminCompanyDetailPage() {
             </div>
             <div className="space-y-1.5">
               <Label className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
-                Rol de Empresa
+                {dt.roleLabel}
               </Label>
               <select
                 required
                 value={selectedRole}
                 onChange={(e) => setSelectedRole(e.target.value)}
-                className="block w-full rounded-xl border border-white/10 bg-slate-950 text-white px-4 py-2.5 text-sm focus:ring-indigo-500 outline-none"
+                className="block w-full rounded-xl border border-white/10 bg-slate-950 text-white px-4 py-2.5 text-sm focus:ring-indigo-500 outline-none cursor-pointer"
               >
-                <option value="company_admin">Admin de Empresa</option>
-                <option value="super_admin">Super Admin</option>
+                <option value="company_admin">{dt.badgeCompanyAdmin}</option>
+                <option value="super_admin">{dt.badgeSuperAdmin}</option>
               </select>
             </div>
             <DialogFooter className="pt-4 border-t border-white/5">
@@ -380,14 +454,14 @@ export default function AdminCompanyDetailPage() {
                 onClick={() => setAssignOpen(false)}
                 className="text-slate-400 hover:text-white rounded-xl"
               >
-                Cancelar
+                {dt.cancelBtn}
               </Button>
               <Button
                 type="submit"
                 disabled={assigning || !selectedUserId}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl shadow-lg shadow-indigo-500/20"
               >
-                {assigning ? 'Asignando...' : 'Confirmar Asignación'}
+                {assigning ? dt.assigningBtn : dt.confirmBtn}
               </Button>
             </DialogFooter>
           </form>

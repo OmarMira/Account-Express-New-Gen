@@ -140,10 +140,10 @@ export function SelectCompanyPage() {
                 <div className="space-y-4">
                   <div className="rounded-xl border border-dashed border-amber-500/20 bg-amber-500/5 p-4 text-center">
                     <p className="text-sm text-amber-600 dark:text-amber-400 font-medium">
-                      No tienes empresas asociadas
+                      {t('selectCompany.noCompanies')}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Crea tu primera empresa a continuación para comenzar
+                      {t('selectCompany.createFirstCompany')}
                     </p>
                   </div>
 
@@ -154,7 +154,7 @@ export function SelectCompanyPage() {
                       </div>
                     )}
                     <div className="space-y-1.5">
-                      <Label htmlFor="create-legalName">Nombre de la Empresa</Label>
+                      <Label htmlFor="create-legalName">{t('selectCompany.companyName')}</Label>
                       <Input
                         id="create-legalName"
                         value={legalName}
@@ -164,17 +164,19 @@ export function SelectCompanyPage() {
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="create-taxId">RFC / NIT (Opcional)</Label>
+                      <Label htmlFor="create-taxId">
+                        {t('auth.taxId')} ({t('common.optional') || 'Opcional'})
+                      </Label>
                       <Input
                         id="create-taxId"
                         value={taxId}
                         onChange={(e) => setTaxId(e.target.value)}
-                        placeholder="Ej. RFC123456789"
+                        placeholder={t('selectCompany.taxIdPlaceholder')}
                       />
                     </div>
                     <Button type="submit" className="w-full mt-2" disabled={creating}>
                       {creating && <Loader2 className="size-4 animate-spin mr-2" />}
-                      Crear Empresa y Continuar
+                      {t('selectCompany.createCompanyBtn')}
                     </Button>
                   </form>
                 </div>
@@ -217,10 +219,10 @@ export function SelectCompanyPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-sm text-indigo-600 dark:text-indigo-400">
-                        Consola de Administración
+                        {t('selectCompany.adminConsole')}
                       </p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        Gestionar empresas, accesos de usuarios y bitácoras
+                        {t('selectCompany.adminConsoleDesc')}
                       </p>
                     </div>
                     <ChevronRight className="size-4 text-indigo-500/60 group-hover:text-indigo-500 group-hover:translate-x-1 transition-all" />
