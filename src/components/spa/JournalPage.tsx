@@ -48,6 +48,7 @@ import {
 import { useAuthStore } from '@/store/auth-store';
 import { useLanguageStore } from '@/store/language-store';
 import { AccountSelector, type GlAccountOption } from './journal/AccountSelector';
+import { isPeriodLocked } from '@/lib/fiscal-period/utils';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -178,6 +179,20 @@ export function JournalPage() {
 
   // Accounts
   const [accounts, setAccounts] = useState<GlAccountOption[]>([]);
+  const [fiscalPeriods, setFiscalPeriods] = useState<any[]>([]);
+
+  async function fetchFiscalPeriods() {
+    if (!activeCompany) return;
+    try {
+      const res = await fetch(`/api/settings?companyId=${activeCompany.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setFiscalPeriods(data.periods || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch fiscal periods:', err);
+    }
+  }
 
   // Confirmation dialog
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -223,6 +238,7 @@ export function JournalPage() {
 
   useEffect(() => {
     fetchAccounts();
+    fetchFiscalPeriods();
   }, [activeCompany]);
 
   useEffect(() => {
@@ -312,6 +328,13 @@ export function JournalPage() {
       return;
     }
 
+    // ⛔ Validación de período bloqueado
+    const entryDate = new Date(formDate);
+    if (isPeriodLocked(entryDate, fiscalPeriods)) {
+      alert('No se pueden registrar asientos en períodos fiscales cerrados. Contacte a auditoría.');
+      return;
+    }
+
     setSaving(true);
     try {
       const body = {
@@ -366,6 +389,16 @@ export function JournalPage() {
 
   async function executeAction() {
     if (!confirmTarget || !confirmAction) return;
+
+    if (confirmAction === 'post') {
+      const entryToPost = entries.find((e) => e.id === confirmTarget);
+      if (entryToPost && isPeriodLocked(new Date(entryToPost.date), fiscalPeriods)) {
+        alert('No se pueden postear asientos en períodos fiscales cerrados.');
+        setConfirmOpen(false);
+        return;
+      }
+    }
+
     setActionLoading(true);
     try {
       const res = await fetch(`/api/journal/${confirmTarget}`, {

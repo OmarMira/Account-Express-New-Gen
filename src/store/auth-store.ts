@@ -13,6 +13,7 @@ export interface Company {
   id: string;
   legalName: string;
   taxId: string | null;
+  isOnboardingComplete: boolean;
 }
 
 export type ViewName =
@@ -142,11 +143,13 @@ export const useAuthStore = create<AuthState>()(
                   currentView: 'dashboard',
                 });
               } else if (currentStore.activeCompany) {
-                // Verify the active company is still valid
-                const stillExists = data.companies?.some(
+                // Verify the active company is still valid and refresh its data
+                const freshCompany = data.companies?.find(
                   (c: Company) => c.id === currentStore.activeCompany?.id,
                 );
-                if (!stillExists) {
+                if (freshCompany) {
+                  set({ activeCompany: freshCompany });
+                } else {
                   set({
                     activeCompany: data.companies?.[0] || null,
                     currentView: data.companies?.[0] ? 'dashboard' : 'select-company',

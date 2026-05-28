@@ -41,6 +41,15 @@ import {
 import { Check } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
 import { useLanguageStore } from '@/store/language-store';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { AccountSelector, type GlAccountOption } from './journal/AccountSelector';
 
 // ─── Types ────────────────────────────────────────────────────────────
 
@@ -137,6 +146,14 @@ function formatDateShort(iso: string): string {
 const ACCEPTED_TYPES = ['.csv', '.tsv', '.txt', '.ofx', '.qfx', '.pdf'];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
+const CURRENCIES = [
+  { value: 'USD', label: 'USD ($)' },
+  { value: 'EUR', label: 'EUR (€)' },
+  { value: 'GBP', label: 'GBP (£)' },
+  { value: 'MXN', label: 'MXN ($)' },
+  { value: 'CAD', label: 'CAD ($)' },
+];
+
 const FORMAT_BADGES: { label: string; className: string }[] = [
   {
     label: 'CSV',
@@ -172,6 +189,19 @@ export function ImportPage() {
   const [history, setHistory] = useState<ImportStatement[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
 
+  // Bank Account Creation Modal State (when required by the import)
+  const [bankModalOpen, setBankModalOpen] = useState(false);
+  const [formAccountName, setFormAccountName] = useState('');
+  const [formBankName, setFormBankName] = useState('');
+  const [formAccountNo, setFormAccountNo] = useState('');
+  const [formRoutingNo, setFormRoutingNo] = useState('');
+  const [formGlAccountId, setFormGlAccountId] = useState<string | null>(null);
+  const [formBalance, setFormBalance] = useState('');
+  const [formCurrency, setFormCurrency] = useState('USD');
+  const [formError, setFormError] = useState('');
+  const [savingBank, setSavingBank] = useState(false);
+  const [assetAccounts, setAssetAccounts] = useState<GlAccountOption[]>([]);
+
   // Upload state
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -184,6 +214,18 @@ export function ImportPage() {
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ─── Helpers ────────────────────────────────────────────────────────
+  function formatNumberWithComas(val: string): string {
+    const cleaned = val.replace(/[^0-9.]/g, '');
+    const parts = cleaned.split('.');
+    if (parts.length > 2) return val;
+    const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    if (parts.length === 2) {
+      return `${integerPart}.${parts[1].slice(0, 2)}`;
+    }
+    return integerPart;
+  }
 
   // ─── Fetch data ───────────────────────────────────────────────────
 
@@ -208,6 +250,23 @@ export function ImportPage() {
     }
   }
 
+  async function fetchAssetAccounts() {
+    if (!activeCompany) return;
+    try {
+      const res = await fetch(`/api/journal/accounts?companyId=${activeCompany.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setAssetAccounts(
+          (data.data || data.accounts || []).filter(
+            (a: GlAccountOption) => a.accountType === 'asset',
+          ),
+        );
+      }
+    } catch (err) {
+      console.error('Failed to fetch GL accounts:', err);
+    }
+  }
+
   async function fetchHistory() {
     if (!activeCompany) return;
     setLoadingHistory(true);
@@ -227,6 +286,7 @@ export function ImportPage() {
   useEffect(() => {
     fetchBankAccounts();
     fetchHistory();
+    fetchAssetAccounts();
   }, [activeCompany]);
 
   // ─── Drag & Drop ─────────────────────────────────────────────────
@@ -344,6 +404,30 @@ export function ImportPage() {
           const contentType = res.headers.get('content-type');
           if (contentType && contentType.includes('application/json')) {
             const err = await res.json();
+
+            // Check if bank account creation is required!
+            if (err.code === 'BANK_CREATION_REQUIRED') {
+              const meta = err.details;
+              setFormAccountName(meta.bankName || 'Business Checking');
+              setFormBankName(meta.bankName || '');
+              setFormAccountNo(meta.accountNo || '');
+              setFormRoutingNo('');
+              setFormGlAccountId(null);
+              setFormBalance(
+                meta.openingBalance !== undefined
+                  ? formatNumberWithComas(Number(meta.openingBalance.toFixed(2)).toString())
+                  : '0.00',
+              );
+              setFormCurrency(meta.currency || 'USD');
+              setFormError('');
+              setBankModalOpen(true);
+
+              setUploading(false);
+              setUploadProgress(0);
+              stopProcessing();
+              return;
+            }
+
             throw new Error(err.error || `${file.name}: ${t('banks.importFailed')}`);
           } else {
             throw new Error(`${file.name}: Error del servidor (${res.status})`);
@@ -379,6 +463,60 @@ export function ImportPage() {
       setUploading(false);
       setUploadProgress(0);
       stopProcessing();
+    }
+  }
+
+  async function handleSaveBank() {
+    if (!formAccountName.trim()) {
+      setFormError('El nombre de la cuenta es requerido');
+      return;
+    }
+    if (!formBankName.trim()) {
+      setFormError('El nombre del banco es requerido');
+      return;
+    }
+    if (!formGlAccountId) {
+      setFormError('La cuenta contable vinculada es requerida');
+      return;
+    }
+
+    setSavingBank(true);
+    setFormError('');
+    try {
+      const body = {
+        companyId: activeCompany!.id,
+        accountName: formAccountName,
+        bankName: formBankName,
+        accountNo: formAccountNo || null,
+        routingNo: formRoutingNo || null,
+        glAccountId: formGlAccountId,
+        balance: parseFloat(formBalance.replace(/,/g, '')) || 0,
+        currency: formCurrency,
+      };
+
+      const res = await fetch('/api/banks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      if (res.ok) {
+        setBankModalOpen(false);
+        await fetchBankAccounts();
+
+        // Auto-resume import process!
+        setTimeout(() => {
+          handleUpload();
+        }, 100);
+      } else {
+        const err = await res.json();
+        setFormError(err.error || 'No se pudo guardar la cuenta bancaria');
+      }
+    } catch (err) {
+      console.error('Failed to save bank account:', err);
+      setFormError('Ocurrió un error inesperado');
+    } finally {
+      setSavingBank(false);
     }
   }
 
@@ -773,6 +911,126 @@ export function ImportPage() {
             >
               <ArrowLeftRight className="size-4 mr-1" />
               {t('banks.goToReconciliation')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Pre-filled Bank Account Creation Dialog ───────────────── */}
+      <Dialog
+        open={bankModalOpen}
+        onOpenChange={(open) => {
+          setBankModalOpen(open);
+        }}
+      >
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>{t('banks.newBankAccount')}</DialogTitle>
+            <DialogDescription>
+              Se detectó una cuenta bancaria en el extracto. Por favor, confírmela y vincúlela a una
+              cuenta contable antes de importar.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {/* Account Name */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">
+                {t('common.name')} <span className="text-red-500">*</span>
+              </label>
+              <Input
+                placeholder="e.g. Business Checking"
+                value={formAccountName}
+                onChange={(e) => setFormAccountName(e.target.value)}
+              />
+            </div>
+
+            {/* Bank Name */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">
+                {t('banks.bankName')} <span className="text-red-500">*</span>
+              </label>
+              <Input
+                placeholder="e.g. Chase Bank"
+                value={formBankName}
+                onChange={(e) => setFormBankName(e.target.value)}
+              />
+            </div>
+
+            {/* Account Number + Routing */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">{t('banks.accountNumber')}</label>
+                <Input
+                  placeholder="e.g. 123456789"
+                  value={formAccountNo}
+                  onChange={(e) => setFormAccountNo(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">{t('banks.routingNumber')}</label>
+                <Input
+                  placeholder="e.g. 021000021"
+                  value={formRoutingNo}
+                  onChange={(e) => setFormRoutingNo(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* GL Account */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">
+                {t('banks.linkedAccount')} <span className="text-red-500">*</span>
+              </label>
+              <AccountSelector
+                accounts={assetAccounts}
+                value={formGlAccountId}
+                onChange={setFormGlAccountId}
+                placeholder="Select asset account"
+              />
+              <p className="text-xs text-muted-foreground">{t('banks.linkedAccountHelp')}</p>
+            </div>
+
+            {/* Starting Balance + Currency */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">{t('banks.startingBalance')}</label>
+                <Input
+                  type="text"
+                  placeholder="0.00"
+                  value={formBalance}
+                  onChange={(e) => setFormBalance(formatNumberWithComas(e.target.value))}
+                  className="font-mono text-right"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">{t('banks.currency')}</label>
+                <Select value={formCurrency} onValueChange={setFormCurrency}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CURRENCIES.map((c) => (
+                      <SelectItem key={c.value} value={c.value}>
+                        {c.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Error */}
+            {formError && <p className="text-sm text-red-600 dark:text-red-400">{formError}</p>}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBankModalOpen(false)} disabled={savingBank}>
+              {t('common.cancel')}
+            </Button>
+            <Button onClick={handleSaveBank} disabled={savingBank}>
+              {savingBank && <Loader2 className="size-4 mr-1 animate-spin" />}
+              {t('common.save')}
             </Button>
           </DialogFooter>
         </DialogContent>

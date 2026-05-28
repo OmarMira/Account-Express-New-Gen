@@ -201,6 +201,7 @@ export function ReconciliationPage() {
     matchedByRule: number;
     matchedByAmount: number;
   } | null>(null);
+  const [autoMatchPreviewCount, setAutoMatchPreviewCount] = useState<number | null>(null);
 
   const [reconcileDialogOpen, setReconcileDialogOpen] = useState(false);
   const [reconciling, setReconciling] = useState(false);
@@ -351,6 +352,40 @@ export function ReconciliationPage() {
       fetchReconciliation();
     }
   }, [selectedAccountId, fetchReconciliation]);
+
+  useEffect(() => {
+    if (!activeCompany?.id || !selectedAccountId) return;
+    if (!summary || summary.unreconciledCount === 0) {
+      setAutoMatchPreviewCount(null);
+      return;
+    }
+    let isMounted = true;
+    const fetchPreview = async () => {
+      try {
+        const res = await fetch('/api/reconciliation/auto-preview', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            companyId: activeCompany.id,
+            bankAccountId: selectedAccountId,
+            matchByAmount: true,
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (isMounted && data.success) {
+            setAutoMatchPreviewCount(data.matched);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch auto-preview', err);
+      }
+    };
+    fetchPreview();
+    return () => {
+      isMounted = false;
+    };
+  }, [activeCompany?.id, selectedAccountId, summary?.unreconciledCount]);
 
   // Toggle transaction selection
   const toggleTx = (id: string) => {
@@ -654,13 +689,24 @@ export function ReconciliationPage() {
   };
 
   // Transaction row component
-  const TxRow = ({ tx, type, style }: { tx: Transaction; type: 'deposit' | 'payment'; style?: React.CSSProperties }) => {
+  const TxRow = ({
+    tx,
+    type,
+    style,
+  }: {
+    tx: Transaction;
+    type: 'deposit' | 'payment';
+    style?: React.CSSProperties;
+  }) => {
     const isSelected = selectedTxIds.has(tx.id);
     const assignedGl = txGlAssignments[tx.id] || tx.glAccountId || null;
     const isReconciled = !!tx.reconciledAt;
 
     return (
-      <TableRow className={cn(isSelected && 'bg-primary/5', isReconciled && 'opacity-75')} style={style}>
+      <TableRow
+        className={cn(isSelected && 'bg-primary/5', isReconciled && 'opacity-75')}
+        style={style}
+      >
         <TableCell className="w-10">
           <Checkbox checked={isSelected} onCheckedChange={() => toggleTx(tx.id)} />
         </TableCell>
@@ -1010,12 +1056,29 @@ export function ReconciliationPage() {
                       variant="outline"
                       size="sm"
                       onClick={() => {
+                        if (autoMatchPreviewCount === 0) {
+                          toast.info(
+                            t('reconciliation.noAutoMatches') ||
+                              'No hay reglas ni montos que coincidan.',
+                          );
+                          return;
+                        }
                         setAutoMatchResult(null);
                         setAutoMatchDialogOpen(true);
                       }}
-                      className="gap-2"
+                      className={cn(
+                        'gap-2 transition-all',
+                        autoMatchPreviewCount && autoMatchPreviewCount > 0
+                          ? 'animate-pulse border-emerald-500 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-950/30 dark:hover:bg-emerald-900/50 shadow-sm'
+                          : '',
+                      )}
                     >
-                      <Play className="size-4" />
+                      <Play
+                        className={cn(
+                          'size-4',
+                          autoMatchPreviewCount && autoMatchPreviewCount > 0 && 'fill-emerald-500',
+                        )}
+                      />
                       {t('reconciliation.autoMatch')}
                     </Button>
                     <Button
@@ -1243,7 +1306,10 @@ export function ReconciliationPage() {
                   {t('reconciliation.noTransactions')}
                 </div>
               ) : (
-                <div ref={depositsParentRef} className="max-h-[400px] overflow-y-auto overflow-x-auto relative">
+                <div
+                  ref={depositsParentRef}
+                  className="max-h-[400px] overflow-y-auto overflow-x-auto relative"
+                >
                   <Table>
                     <TableHeader className="sticky top-0 bg-background z-10 shadow-sm">
                       <TableRow>
@@ -1258,7 +1324,12 @@ export function ReconciliationPage() {
                         )}
                       </TableRow>
                     </TableHeader>
-                    <TableBody style={{ height: `${depositsVirtualizer.getTotalSize()}px`, position: 'relative' }}>
+                    <TableBody
+                      style={{
+                        height: `${depositsVirtualizer.getTotalSize()}px`,
+                        position: 'relative',
+                      }}
+                    >
                       {depositsVirtualizer.getVirtualItems().map((virtualRow) => {
                         const tx = deposits[virtualRow.index];
                         return (
@@ -1322,7 +1393,10 @@ export function ReconciliationPage() {
                   {t('reconciliation.noTransactions')}
                 </div>
               ) : (
-                <div ref={paymentsParentRef} className="max-h-[400px] overflow-y-auto overflow-x-auto relative">
+                <div
+                  ref={paymentsParentRef}
+                  className="max-h-[400px] overflow-y-auto overflow-x-auto relative"
+                >
                   <Table>
                     <TableHeader className="sticky top-0 bg-background z-10 shadow-sm">
                       <TableRow>
@@ -1337,7 +1411,12 @@ export function ReconciliationPage() {
                         )}
                       </TableRow>
                     </TableHeader>
-                    <TableBody style={{ height: `${paymentsVirtualizer.getTotalSize()}px`, position: 'relative' }}>
+                    <TableBody
+                      style={{
+                        height: `${paymentsVirtualizer.getTotalSize()}px`,
+                        position: 'relative',
+                      }}
+                    >
                       {paymentsVirtualizer.getVirtualItems().map((virtualRow) => {
                         const tx = payments[virtualRow.index];
                         return (

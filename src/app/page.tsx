@@ -9,6 +9,7 @@ import { RegisterPage } from '@/components/spa/RegisterPage';
 import { SelectCompanyPage } from '@/components/spa/SelectCompanyPage';
 import { AppShell } from '@/components/spa/AppShell';
 import SuperAdminDashboardPage from '@/components/spa/admin/SuperAdminDashboardPage';
+import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard';
 
 /* ── Loading Spinner ── */
 function LoadingScreen() {
@@ -70,6 +71,11 @@ function AppContent() {
 
   if ((currentView === 'select-company' || !activeCompany) && !isAdminView) {
     return <SelectCompanyPage />;
+  }
+
+  // Intercept if onboarding is incomplete
+  if (activeCompany && !activeCompany.isOnboardingComplete && !isAdminView) {
+    return <OnboardingWizard />;
   }
 
   // Fully authenticated → show app shell

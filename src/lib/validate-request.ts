@@ -1,54 +1,34 @@
-import { NextRequest } from 'next/server';
-import { ZodSchema } from 'zod';
-import { ValidationError } from './api-error';
-import { hasXssPattern } from './sanitize';
+import { NextResponse } from 'next/server';
+import { z } from 'zod';
 
-function checkXssRecursive(data: any, path: string[] = []): void {
-  if (typeof data === 'string') {
-    if (hasXssPattern(data)) {
-      throw new ValidationError(
-        `Potential XSS attack detected in field: ${path.join('.') || 'body'}`,
+/**
+ * Valida el cuerpo de una petición entrante contra un schema de Zod.
+ *
+ * @param req - La petición Request de Next.js
+ * @param schema - Schema Zod para validar el cuerpo
+ * @returns Los datos validados O una respuesta NextResponse con error 400
+ *
+ * @example
+ * const result = await validateRequest(req, LoginSchema);
+ * if (result instanceof NextResponse) return result; // Retorna el error
+ * const { email, password } = result; // Datos seguros tipados
+ */
+export async function validateRequest<T>(
+  req: Request,
+  schema: z.ZodSchema<T>,
+): Promise<T | NextResponse> {
+  try {
+    const json = await req.json();
+    const result = schema.safeParse(json);
+
+    if (!result.success) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: result.error.flatten() },
+        { status: 400 },
       );
     }
-  } else if (Array.isArray(data)) {
-    for (let i = 0; i < data.length; i++) {
-      checkXssRecursive(data[i], [...path, i.toString()]);
-    }
-  } else if (data !== null && typeof data === 'object') {
-    for (const key of Object.keys(data)) {
-      checkXssRecursive(data[key], [...path, key]);
-    }
-  }
-}
-
-export async function validateRequest<T>(request: NextRequest, schema: ZodSchema<T>): Promise<T> {
-  try {
-    let body: any;
-    try {
-      body = await request.clone().json();
-    } catch {
-      throw new ValidationError('Invalid JSON body');
-    }
-
-    // Comprobar XSS antes de validar el esquema
-    checkXssRecursive(body);
-
-    const result = schema.safeParse(body);
-    if (!result.success) {
-      // Map Zod errors to a clean, user-friendly object
-      const formattedErrors = result.error.issues.map((err) => ({
-        field: err.path.join('.'),
-        message: err.message,
-      }));
-
-      throw new ValidationError('Validation failed', formattedErrors);
-    }
-
     return result.data;
-  } catch (error) {
-    if (error instanceof ValidationError) {
-      throw error;
-    }
-    throw new ValidationError(error instanceof Error ? error.message : 'Unknown validation error');
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 }

@@ -32,9 +32,10 @@ model Company {
   phone     String?
   email     String?
   logo      String?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isActive           Boolean  @default(true)
+  isOnboardingComplete Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   members        CompanyMember[]
   glAccounts     GlAccount[]

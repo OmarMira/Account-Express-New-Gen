@@ -1,0 +1,23 @@
+{
+  "version": "1.0",
+  "healthChecks": {
+    "cashFlowTrend": { "enabled": true, "minPeriods": 3 },
+    "budgetVarianceAlert": { "enabled": true, "thresholdPercent": 15 },
+    "unreconciledItems": { "enabled": true, "maxAllowed": 5 },
+    "duplicateDetection": { "enabled": true, "amountTolerance": 0.01, "dateWindowDays": 2 }
+  },
+  "templates": {
+    "executiveSummary": "Para {period}, el flujo neto fue de ${net}. Ingresos: ${income} | Gastos: ${expenses}. {budgetAlert}{reconAlert}",
+    "highExpense": "El gasto más alto en {month} fue ${amount} en {account}.",
+    "anomalyAlert": "⚠️ {issue} requiere revisión inmediata."
+  },
+  "queryLimits": {
+    "maxHistoryMonths": 12,
+    "cacheTtlMs": 300000,
+    "allowedQueryTypes": ["summary", "high_expense", "unreconciled_count", "budget_status", "cash_trend"]
+  },
+  "auditActions": {
+    "insightGenerated": "ASSISTANT_INSIGHT_GENERATED",
+    "queryExecuted": "ASSISTANT_QUERY_EXECUTED"
+  }
+}

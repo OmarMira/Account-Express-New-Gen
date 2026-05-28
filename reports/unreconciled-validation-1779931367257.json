@@ -1,0 +1,373 @@
+{
+  "timestamp": "2026-05-28T01:22:47.206Z",
+  "totalUnreconciled": 60,
+  "matched": [],
+  "unmatched": [
+    {
+      "txId": "cmpot0pqk004rc7uwdev9m9ni",
+      "description": "Zelle payment from JENNIFER E FABRO for \"Renta Enero 2025. Manuel Fabro.\"; Conf# 99au0miz8",
+      "amount": 600,
+      "date": "2025-01-02T05:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0pqk004sc7uw0k5mo7cd",
+      "description": "Zelle payment from RODRIGO OCHOA for \"MANUEL FABRO\"; Conf# T0YDHW29P",
+      "amount": 500,
+      "date": "2025-01-02T05:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0pqk004tc7uwunbjo9hi",
+      "description": "Zelle payment to Ignacio Plaza for \"Comisin Renta (Tullio, Quijano)\"; Conf# w9guzcpih",
+      "amount": -400,
+      "date": "2025-01-02T05:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0pqk004uc7uwi9k4dixj",
+      "description": "Zelle payment to omar mira Conf# uukwzjwuo",
+      "amount": -1200,
+      "date": "2025-01-06T05:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0pqk004vc7uwzi8traos",
+      "description": "Zelle payment to laura quijano Conf# wu5hiltbi",
+      "amount": -1000,
+      "date": "2025-01-06T05:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0pqk004wc7uwja4bs3b5",
+      "description": "Zelle payment to laura quijano Conf# utmwffsp4",
+      "amount": -3950,
+      "date": "2025-01-06T05:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0pqk004xc7uwe0r17trz",
+      "description": "Zelle payment to Noel Morales Conf# tzuoj7qav",
+      "amount": -85,
+      "date": "2025-01-06T05:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0pqk004yc7uwz2l55xc1",
+      "description": "Zelle payment from LLC CREATIVE CONCEPTS INTERNATIONAL for \"Omar Mira driver van\"; Conf#",
+      "amount": 330,
+      "date": "2025-01-13T05:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0pqk004zc7uw1g7uaywa",
+      "description": "Zelle payment to LQ&OM INVESTMENT LLC Conf# x4no296zo",
+      "amount": -1100,
+      "date": "2025-01-17T05:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0pqk0050c7uwg51i4xzk",
+      "description": "Zelle payment to Noel Morales Conf# xjhk8f51l",
+      "amount": -368.83,
+      "date": "2025-01-17T05:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0pqk0051c7uwoc9syqci",
+      "description": "Zelle payment to LQ&OM INVESTMENT LLC Conf# yk9ss0trf",
+      "amount": -500,
+      "date": "2025-01-23T05:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0pqk0052c7uw0mlnpxl1",
+      "description": "Zelle payment from LLC CREATIVE CONCEPTS INTERNATIONAL for \"Omar Mira driver Van and",
+      "amount": 764,
+      "date": "2025-01-24T05:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0pqk0053c7uwq4r8r6oa",
+      "description": "Zelle payment from A JN ENTERPRISE LLC for \"inv 001\"; Conf# jeamikzvn",
+      "amount": 599.25,
+      "date": "2025-01-24T05:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0pqk0054c7uwiq5jvi0h",
+      "description": "Counter Credit",
+      "amount": 15000,
+      "date": "2025-01-27T05:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0pqk0055c7uwrx9lxqr3",
+      "description": "Zelle payment to laura quijano Conf# uokkom5m2",
+      "amount": -1000,
+      "date": "2025-01-27T05:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0pqk0056c7uwj41ugwur",
+      "description": "Zelle payment to omar mira Conf# wjjaar4rg",
+      "amount": -2000,
+      "date": "2025-01-29T05:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0pqk0057c7uwrpksxdbs",
+      "description": "Zelle payment to laura quijano Conf# x3j4nr5zz",
+      "amount": -1000,
+      "date": "2025-01-29T05:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0pqk0058c7uwffoet8xn",
+      "description": "AMERICAN EXPRESS DES:ACH PMT ID:M4884 INDN:LAURA QUIJANO CO ID:1133133497",
+      "amount": -3417.57,
+      "date": "2025-01-29T05:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0pqk0059c7uw7xmycckv",
+      "description": "AMERICAN EXPRESS DES:ACH PMT ID:M5494 INDN:LAURA QUIJANO CO ID:1133133497",
+      "amount": -1025.79,
+      "date": "2025-01-30T05:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0pqk005ac7uw66b78ubk",
+      "description": "Zelle payment from RODRIGO OCHOA for \"RENTA MANUEL FABRO FEBRERO\"; Conf# T0YH4TZS7",
+      "amount": 1100,
+      "date": "2025-01-31T05:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0pw2005dc7uwgekwjrea",
+      "description": "Zelle payment to laura quijano Conf# qik3mucm3",
+      "amount": -500,
+      "date": "2025-02-11T05:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0pw2005ec7uwlg21405o",
+      "description": "Zelle payment to omar mira Conf# qn6qbo2nf",
+      "amount": -1000,
+      "date": "2025-02-11T05:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0pw2005fc7uwnbux3dog",
+      "description": "Zelle payment to LQ&OM INVESTMENT LLC Conf# jienbxl2c",
+      "amount": -1000,
+      "date": "2025-02-11T05:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0pw2005gc7uwvbcqqjq7",
+      "description": "AMERICAN EXPRESS DES:ACH PMT ID:M4604 INDN:LAURA QUIJANO CO ID:1133133497",
+      "amount": -1532.06,
+      "date": "2025-02-11T05:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0pw2005hc7uwzor6xth6",
+      "description": "Zelle payment to Grab and Go Autos Conf# vvcwt1jgu",
+      "amount": -500,
+      "date": "2025-02-20T05:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0pw2005ic7uwvcld5dbw",
+      "description": "Zelle payment to LQ&OM INVESTMENT LLC Conf# yzmf5zcc2",
+      "amount": -1500,
+      "date": "2025-02-27T05:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0pw2005jc7uw2df69kiz",
+      "description": "AMERICAN EXPRESS DES:ACH PMT ID:M4518 INDN:LAURA QUIJANO CO ID:1133133497",
+      "amount": -1245.15,
+      "date": "2025-02-27T05:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0pw2005kc7uw38n3oba8",
+      "description": "Zelle payment to omar mira Conf# tt4lmnsj9",
+      "amount": -500,
+      "date": "2025-02-28T05:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0pw2005lc7uw5og9txjt",
+      "description": "Zelle payment to LQ&OM INVESTMENT LLC Conf# uphnzn7xo",
+      "amount": -1500,
+      "date": "2025-02-28T05:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0pw2005mc7uwrs6lus6d",
+      "description": "Zelle payment to laura quijano Conf# sxhvaxw0g",
+      "amount": -500,
+      "date": "2025-02-28T05:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0q3b005pc7uwhyughfsb",
+      "description": "Zelle payment from RODRIGO OCHOA for \"MANUEL FABRO RENTA MARZO\"; Conf# T0YKY6RCL",
+      "amount": 1100,
+      "date": "2025-03-03T05:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0q3b005qc7uwpiso4yfd",
+      "description": "Zelle payment to LQ&OM INVESTMENT LLC Conf# vxp6ie00e",
+      "amount": -1000,
+      "date": "2025-03-10T04:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0q3b005rc7uwcw0pq84t",
+      "description": "SETOYOTA FIN/EZP DES:AUTO FINAN ID:2057245 INDN:LAURA QUIJANO CO",
+      "amount": -642.49,
+      "date": "2025-03-13T04:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0q3b005sc7uwt8lb9y9e",
+      "description": "AMERICAN EXPRESS DES:ACH PMT ID:M9864 INDN:LAURA QUIJANO CO ID:1133133497",
+      "amount": -401.18,
+      "date": "2025-03-19T04:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0q3b005tc7uwps9zqqmt",
+      "description": "Zelle payment from NELSON MIRA Conf# cxojn0jwb",
+      "amount": 800,
+      "date": "2025-03-24T04:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0q3b005uc7uwaqxsk267",
+      "description": "Zelle payment to LQ&OM INVESTMENT LLC Conf# zcc7ioqag",
+      "amount": -1500,
+      "date": "2025-03-24T04:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0q3b005vc7uw8cq1b3zz",
+      "description": "Zelle payment to LQ&OM INVESTMENT LLC Conf# sn2y6clsf",
+      "amount": -1000,
+      "date": "2025-03-25T04:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0q3b005wc7uwapyenscn",
+      "description": "Zelle payment from RODRIGO OCHOA for \"MANUEL FABRO\"; Conf# T0YNSMB9W",
+      "amount": 1100,
+      "date": "2025-03-31T04:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0q7p005zc7uw8370mzeh",
+      "description": "AMERICAN EXPRESS DES:ACH PMT ID:M1146 INDN:LAURA QUIJANO CO ID:1133133497",
+      "amount": -975.49,
+      "date": "2025-04-04T04:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0q7p0060c7uwg71pocy6",
+      "description": "SETOYOTA FIN/EZP DES:AUTO FINAN ID:0315136 INDN:LAURA QUIJANO CO",
+      "amount": -642.49,
+      "date": "2025-04-07T04:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0q7q0061c7uwi7amlalw",
+      "description": "Zelle payment to omar mira Conf# u29yb207o",
+      "amount": -1000,
+      "date": "2025-04-09T04:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0q7q0062c7uw79a7t9xs",
+      "description": "Zelle payment to laura quijano Conf# yind2g6kz",
+      "amount": -900,
+      "date": "2025-04-22T04:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0q7q0063c7uwr0u5p0ud",
+      "description": "Zelle payment to LQ&OM INVESTMENT LLC Conf# zodmei10d",
+      "amount": -2000,
+      "date": "2025-04-25T04:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0q7q0064c7uwa3h4c0k7",
+      "description": "Zelle payment to connectxion for \"Pago extras gg\"; Conf# wb1axsvvy",
+      "amount": -128.75,
+      "date": "2025-04-28T04:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0q7q0065c7uw89gmsvnk",
+      "description": "Zelle payment to lic Vallellanes Conf# txzz0nurs",
+      "amount": -150,
+      "date": "2025-04-30T04:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0qeg0068c7uw37ehyezn",
+      "description": "Zelle payment from GRAB GO AUTOS, LLC Conf# jj0ys5ljc",
+      "amount": 1000,
+      "date": "2025-05-01T04:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0qeg0069c7uw42vuepu8",
+      "description": "SETOYOTA FIN/EZP DES:AUTO FINAN ID:9491629 INDN:LAURA QUIJANO CO",
+      "amount": -642.49,
+      "date": "2025-05-01T04:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0qeg006ac7uwc54jzcjg",
+      "description": "SETOYOTA FIN/EZP DES:AUTO FINAN ID:9491613 INDN:NELSON MIRA CO",
+      "amount": -473.09,
+      "date": "2025-05-01T04:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0qeg006bc7uwyxhzrbsh",
+      "description": "SETOYOTA FIN/EZP DES:AUTO FINAN ID:9491625 INDN:LAURA QUIJANO CO",
+      "amount": -468.87,
+      "date": "2025-05-01T04:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0qeg006cc7uwywh8mmeu",
+      "description": "Zelle payment from GRAB GO AUTOS, LLC Conf# o63egk2v6",
+      "amount": 2000,
+      "date": "2025-05-02T04:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0qeg006dc7uwf3vxopd7",
+      "description": "Counter Credit",
+      "amount": 91.15,
+      "date": "2025-05-02T04:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0qeg006ec7uw9earqts6",
+      "description": "Zelle payment from RODRIGO OCHOA for \"MANUEL FABRO MES DE MAYO\"; Conf# T0YSBNW3C",
+      "amount": 1100,
+      "date": "2025-05-05T04:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0qeg006fc7uwcwscxc0o",
+      "description": "Zelle payment from GRAB GO AUTOS, LLC for \"Pago liq\"; Conf# pl81xz4cu",
+      "amount": 564.37,
+      "date": "2025-05-05T04:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0qeg006gc7uwyflzl08n",
+      "description": "Zelle payment to LQ&OM INVESTMENT LLC Conf# shxx65irp",
+      "amount": -2000,
+      "date": "2025-05-05T04:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0qeg006hc7uw5ig3pmiw",
+      "description": "AMERICAN EXPRESS DES:ACH PMT ID:M3466 INDN:LAURA QUIJANO CO ID:1133133497",
+      "amount": -870.84,
+      "date": "2025-05-05T04:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0qeg006ic7uw8u11zwkl",
+      "description": "AMERICAN EXPRESS DES:ACH PMT ID:M3768 INDN:LAURA QUIJANO CO ID:1133133497",
+      "amount": -1249.12,
+      "date": "2025-05-22T04:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0qeg006jc7uwvwk6refk",
+      "description": "Zelle payment from RODRIGO OCHOA for \"MANUEL FABRO JUNIO\"; Conf# T0YVLFQFJ",
+      "amount": 1100,
+      "date": "2025-05-27T04:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0qeg006kc7uwlktlyjhf",
+      "description": "Zelle payment to LQ&OM INVESTMENT LLC Conf# wdt5zxhfb",
+      "amount": -2000,
+      "date": "2025-05-27T04:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0qeg006lc7uw356wmtl1",
+      "description": "Zelle payment to omar mira Conf# s4imcnimx",
+      "amount": -200,
+      "date": "2025-05-28T04:00:00.000Z"
+    },
+    {
+      "txId": "cmpot0qeg006mc7uw43yb7cz7",
+      "description": "Zelle payment to LQ&OM INVESTMENT LLC Conf# vrar8hv8a",
+      "amount": -1900,
+      "date": "2025-05-29T04:00:00.000Z"
+    }
+  ],
+  "summary": {
+    "high": 0,
+    "medium": 0,
+    "low": 0,
+    "none": 60
+  }
+}

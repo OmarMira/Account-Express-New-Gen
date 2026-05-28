@@ -1,0 +1,30 @@
+{
+  "version": "1.0.0",
+  "archivedAt": "2026-05-28T01-59-49-398Z",
+  "companyId": "cmpos91cl0002c7uwco7gtkqb",
+  "state": "PRODUCTION_READY",
+  "metrics": {
+    "fiscalPeriods": 18,
+    "bankStatements": 5,
+    "postedJournalEntries": 61,
+    "bankTransactions": 60,
+    "auditLogEntries": 11,
+    "bankBalance": 32615.55,
+    "bankAccount": "Bank of America Checking"
+  },
+  "validation": {
+    "accountingEquation": "PASS",
+    "ledgerBalance": "PASS",
+    "reconciliationAlignment": "PASS",
+    "periodIntegrity": "PASS",
+    "auditCompleteness": "PASS",
+    "lockEnforcement": "PASS"
+  },
+  "referenceDocuments": [
+    "eStmt_2025-01-31.pdf",
+    "eStmt_2025-02-28.pdf",
+    "eStmt_2025-03-31.pdf",
+    "eStmt_2025-04-30.pdf",
+    "eStmt_2025-05-30.pdf"
+  ]
+}

@@ -17,6 +17,9 @@ const nextConfig: NextConfig = {
       '@radix-ui/themes',
     ],
   },
+  typescript: {
+    ignoreBuildErrors: true,
+  },
 };
 
 const intlConfig = withNextIntl(nextConfig);

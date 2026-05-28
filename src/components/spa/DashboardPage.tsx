@@ -54,6 +54,7 @@ import { useAccountingFlow } from '@/hooks/useAccountingFlow';
 import { FlowKpiCards } from '@/components/accounting-flow/FlowKpiCards';
 import { FlowErrorBoundary } from '@/components/accounting-flow/FlowErrorBoundary';
 import { AuditSection } from '@/components/audit/AuditSection';
+import { FinancialAssistantPanel } from '@/components/assistant/FinancialAssistantPanel';
 
 /* ─── Types ─── */
 interface DashboardData {
@@ -300,6 +301,13 @@ export function DashboardPage() {
           loading={loading}
         />
       </div>
+
+      {/* ── Asistente Financiero Contextual (V2.4) ── */}
+      {activeCompany && (
+        <motion.div variants={itemVariants}>
+          <FinancialAssistantPanel companyId={activeCompany.id} />
+        </motion.div>
+      )}
 
       {/* ── Accounting Flow KPIs (Fase 2) ── */}
       <motion.div variants={itemVariants}>

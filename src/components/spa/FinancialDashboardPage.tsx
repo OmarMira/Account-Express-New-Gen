@@ -102,6 +102,7 @@ export function FinancialDashboardPage() {
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [dbTransactions, setDbTransactions] = useState<Transaction[]>([]);
   const [initialBalanceInput, setInitialBalanceInput] = useState<number>(0);
+  const [initialBalanceDisplay, setInitialBalanceDisplay] = useState<string>('0.00');
   const apiInitialBalance = React.useRef<number>(0);
   const [bankAccountInfo, setBankAccountInfo] = useState<{
     accountName: string;
@@ -137,6 +138,53 @@ export function FinancialDashboardPage() {
   React.useEffect(() => {
     recurrentMapRef.current = recurrentMap;
   }, [recurrentMap]);
+
+  // --- Synchronize initialBalanceDisplay with initialBalanceInput ---
+  React.useEffect(() => {
+    const num = Number(initialBalanceInput);
+    if (!isNaN(num)) {
+      const fixed = num.toFixed(2);
+      const parts = fixed.split('.');
+      const formattedInteger = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+      setInitialBalanceDisplay(formattedInteger + '.' + parts[1]);
+    }
+  }, [initialBalanceInput]);
+
+  function formatNumberWithComas(val: string): string {
+    const cleaned = val.replace(/[^0-9.]/g, '');
+    const parts = cleaned.split('.');
+    if (parts.length > 2) return val;
+    const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    if (parts.length === 2) {
+      return `${integerPart}.${parts[1].slice(0, 2)}`;
+    }
+    return integerPart;
+  }
+
+  const handleChangeInitialBalance = (val: string) => {
+    const formatted = formatNumberWithComas(val);
+    setInitialBalanceDisplay(formatted);
+
+    const cleanNum = parseFloat(formatted.replace(/,/g, ''));
+    if (!isNaN(cleanNum)) {
+      setInitialBalanceInput(cleanNum);
+    } else {
+      setInitialBalanceInput(0);
+    }
+  };
+
+  const handleBlurInitialBalance = () => {
+    const num = Number(initialBalanceInput);
+    if (isNaN(num) || num <= 0.005) {
+      setInitialBalanceInput(0);
+      setInitialBalanceDisplay('0.00');
+    } else {
+      const fixed = num.toFixed(2);
+      const parts = fixed.split('.');
+      const formattedInteger = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+      setInitialBalanceDisplay(formattedInteger + '.' + parts[1]);
+    }
+  };
 
   // --- CLASSIFICATION ENGINE ---
   const classifyTransaction = useCallback(
@@ -1181,9 +1229,10 @@ export function FinancialDashboardPage() {
                   Saldo Inicial ($)
                 </label>
                 <input
-                  type="number"
-                  value={initialBalanceInput}
-                  onChange={(e) => setInitialBalanceInput(Number(e.target.value) || 0)}
+                  type="text"
+                  value={initialBalanceDisplay}
+                  onChange={(e) => handleChangeInitialBalance(e.target.value)}
+                  onBlur={handleBlurInitialBalance}
                   className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-sm font-mono font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:border-teal-500"
                 />
               </div>

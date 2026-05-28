@@ -1,37 +1,53 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 
-export const dynamic = 'force-dynamic'; // Evita caché estático
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET() {
-  const start = Date.now();
-  let dbStatus: { connected: boolean; latency: number; error?: string } = {
-    connected: false,
-    latency: 0,
-  };
-
   try {
+    // 1. Verificar conexión DB (ligero, sin carga de esquema)
     await db.$queryRaw`SELECT 1`;
-    dbStatus = { connected: true, latency: Date.now() - start };
-  } catch (e) {
-    dbStatus = { connected: false, latency: 0, error: String(e) };
-  }
 
-  const status = dbStatus.connected ? 'healthy' : 'degraded';
-  const httpCode = dbStatus.connected ? 200 : 503;
+    // 2. Cargar versión de configuración de seguridad
+    const configPath = join(process.cwd(), 'rules/security-config.json');
+    const config = JSON.parse(readFileSync(configPath, 'utf-8'));
 
-  return NextResponse.json(
-    {
-      status,
+    // 3. Métricas operativas (no sensibles)
+    const [lastBackup, audit24h, lockedPeriods] = await Promise.all([
+      db.auditLog.findFirst({
+        where: { action: 'BACKUP_CREATED' },
+        orderBy: { createdAt: 'desc' },
+        select: { createdAt: true },
+      }),
+      db.auditLog.count({
+        where: { createdAt: { gte: new Date(Date.now() - 86400000) } },
+      }),
+      db.fiscalPeriod.count({ where: { isLocked: true } }),
+    ]);
+
+    return NextResponse.json({
+      status: 'healthy',
       timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
-      version: process.env.npm_package_version || '1.0.0',
-      database: dbStatus,
-      memory: {
-        heapUsed: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB',
-        heapTotal: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + 'MB',
+      version: process.env.APP_VERSION || '3.0.0',
+      environment: process.env.NODE_ENV || 'development',
+      database: 'connected',
+      metrics: {
+        lastBackupAt: lastBackup?.createdAt || null,
+        auditEventsLast24h: audit24h,
+        lockedFiscalPeriods: lockedPeriods,
       },
-    },
-    { status: httpCode },
-  );
+      config: {
+        securityVersion: config.version,
+        rateLimitEnabled: true,
+      },
+    });
+  } catch (err) {
+    return NextResponse.json(
+      { status: 'degraded', error: (err as Error).message, timestamp: new Date().toISOString() },
+      { status: 503 },
+    );
+  }
 }

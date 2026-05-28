@@ -1,0 +1,73 @@
+{
+  "timestamp": "2026-05-28T01:55:13.216Z",
+  "companyId": "cmpos91cl0002c7uwco7gtkqb",
+  "summary": {
+    "total": 7,
+    "passed": 7,
+    "failed": 0,
+    "warnings": 0,
+    "status": "PRODUCTION_READY"
+  },
+  "checks": [
+    {
+      "gate": "FISCAL_PERIODS_INTEGRITY",
+      "status": "PASS",
+      "detail": "18 períodos válidos, sin solapamientos mensuales",
+      "metric": {
+        "count": 18
+      },
+      "timestamp": "2026-05-28T01:55:13.199Z"
+    },
+    {
+      "gate": "BANK_STATEMENT_CHAIN",
+      "status": "PASS",
+      "detail": "Cadena de saldos intacta",
+      "metric": {
+        "statements": 5
+      },
+      "timestamp": "2026-05-28T01:55:13.201Z"
+    },
+    {
+      "gate": "LEDGER_BALANCE_INTEGRITY",
+      "status": "PASS",
+      "detail": "Partida doble validada. Diferencia: $0.00",
+      "metric": {
+        "debit": 107333.53,
+        "credit": 107333.53
+      },
+      "timestamp": "2026-05-28T01:55:13.203Z"
+    },
+    {
+      "gate": "RECONCILIATION_ALIGNMENT",
+      "status": "PASS",
+      "detail": "Conciliación y posteo alineados perfectamente",
+      "timestamp": "2026-05-28T01:55:13.207Z"
+    },
+    {
+      "gate": "ACCOUNTING_EQUATION",
+      "status": "PASS",
+      "detail": "A = L + E (incluyendo utilidad neta) verificada. Diferencia: $0.00",
+      "metric": {
+        "assets": 13395.109999999993,
+        "liabilities": -13586.630000000001,
+        "equity": 26981.74
+      },
+      "timestamp": "2026-05-28T01:55:13.211Z"
+    },
+    {
+      "gate": "AUDIT_TRAIL_COMPLETENESS",
+      "status": "PASS",
+      "detail": "Trail completo. 10 tipos de acción registrados.",
+      "metric": {
+        "count": 10
+      },
+      "timestamp": "2026-05-28T01:55:13.213Z"
+    },
+    {
+      "gate": "PERIOD_LOCK_ENFORCEMENT",
+      "status": "PASS",
+      "detail": "Cero borradores en períodos cerrados",
+      "timestamp": "2026-05-28T01:55:13.215Z"
+    }
+  ]
+}

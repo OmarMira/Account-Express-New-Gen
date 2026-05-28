@@ -40,3 +40,14 @@ export class ConflictError extends AppError {
     super(409, message, 'CONFLICT');
   }
 }
+
+export class BankAccountRequiredError extends AppError {
+  constructor(metadata: {
+    bankName: string;
+    accountNo: string | null;
+    openingBalance: number;
+    currency: string;
+  }) {
+    super(400, 'Se requiere crear la cuenta bancaria.', 'BANK_CREATION_REQUIRED', metadata);
+  }
+}

@@ -2,7 +2,12 @@ import { db } from '@/lib/db';
 import { parseCSV } from '@/lib/csv-parser';
 import { parseOFX } from '@/lib/ofx-parser';
 import { parsePDFAsync } from '@/lib/pdf-processor';
-import { ValidationError, NotFoundError, ConflictError } from '@/lib/api-error';
+import {
+  ValidationError,
+  NotFoundError,
+  ConflictError,
+  BankAccountRequiredError,
+} from '@/lib/api-error';
 import { trackPDFParseDuration } from '@/lib/metrics';
 import { withTiming } from '@/lib/timing';
 import { generateImportHash } from '@/lib/accounting/import-hash';
@@ -68,6 +73,7 @@ export class ImportService {
         bankName,
         transactions,
         accountNo,
+        openingBalance || 0,
       );
 
       const balanceInfo: any = {};
@@ -148,6 +154,7 @@ export class ImportService {
         bankName,
         parsed.transactions,
         parsed.accountNumber,
+        parsed.openingBalance || 0,
       );
 
       const result = await this.importTransactions(
@@ -182,6 +189,8 @@ export class ImportService {
     bankName: string,
     transactions: { description: string; amount: number }[],
     accountNumber?: string,
+    openingBalance: number = 0,
+    currency: string = 'USD',
   ) {
     if (bankAccountId) {
       const account = await db.bankAccount.findFirst({
@@ -207,35 +216,12 @@ export class ImportService {
       if (existing) return existing;
     }
 
-    const cashAccount = await db.glAccount.findFirst({
-      where: { companyId, code: '1010', isActive: true },
-    });
-
-    const glAccount =
-      cashAccount ||
-      (await db.glAccount.findFirst({
-        where: { companyId, accountType: 'asset', isActive: true },
-      }));
-
-    if (!glAccount) {
-      throw new ValidationError(
-        'No se encontró ninguna cuenta GL de tipo Activo. Por favor cree una antes de importar.',
-      );
-    }
-
-    const displayName = bankName || 'Cuenta Bancaria Importada';
-
-    return db.bankAccount.create({
-      data: {
-        companyId,
-        accountName: displayName,
-        bankName: displayName,
-        accountNo: accountNumber || null,
-        glAccountId: glAccount.id,
-        balance: 0,
-        currency: 'USD',
-        isActive: true,
-      },
+    // Si no existe, lanzamos un error que pre-rellenará el modal de creación
+    throw new BankAccountRequiredError({
+      bankName: bankName || 'Cuenta Bancaria Importada',
+      accountNo: accountNumber || null,
+      openingBalance,
+      currency,
     });
   }
 

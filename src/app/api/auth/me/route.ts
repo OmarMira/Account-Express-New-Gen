@@ -22,7 +22,13 @@ export async function GET(request: NextRequest) {
         where: { company: { isActive: true } },
         include: {
           company: {
-            select: { id: true, legalName: true, taxId: true, isActive: true },
+            select: {
+              id: true,
+              legalName: true,
+              taxId: true,
+              isActive: true,
+              isOnboardingComplete: true,
+            },
           },
         },
       },
@@ -37,7 +43,13 @@ export async function GET(request: NextRequest) {
   if (user.role === 'super_admin') {
     companies = await db.company.findMany({
       where: { isActive: true },
-      select: { id: true, legalName: true, taxId: true, isActive: true },
+      select: {
+        id: true,
+        legalName: true,
+        taxId: true,
+        isActive: true,
+        isOnboardingComplete: true,
+      },
       orderBy: { legalName: 'asc' },
     });
   } else {

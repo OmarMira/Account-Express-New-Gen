@@ -60,4 +60,8 @@ scratch/
 prisma/dev.db
 AccountExpress.zip
 public/index.html
-backups/
+backups/
+test.db
+test.db-wal
+prisma/dev.db-wal
+prisma/dev.db-shm

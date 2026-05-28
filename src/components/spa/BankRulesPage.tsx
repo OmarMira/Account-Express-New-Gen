@@ -56,6 +56,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useLanguageStore } from '@/store/language-store';
 import { useAuthStore } from '@/store/auth-store';
 import { AccountSelector, type GlAccountOption } from '@/components/spa/journal/AccountSelector';
+import { AIRulesGeneratorTab } from './settings/AIRulesGeneratorTab';
 
 /* ─── Types ─── */
 interface GlAccount {
@@ -207,6 +208,9 @@ export function BankRulesPage() {
   const [applyDialogOpen, setApplyDialogOpen] = useState(false);
   const [applying, setApplying] = useState(false);
   const [applyResult, setApplyResult] = useState<{ matched: number; total: number } | null>(null);
+
+  // AI Rule Generator Modal state
+  const [aiModalOpen, setAiModalOpen] = useState(false);
 
   // Fetch accounts for dropdown
   const fetchAccounts = useCallback(async () => {
@@ -370,6 +374,15 @@ export function BankRulesPage() {
           <p className="text-sm text-muted-foreground mt-1">{t('bankRules.rulesDescription')}</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setAiModalOpen(true)}
+            className="gap-2 border-violet-500/30 hover:border-violet-500/60 bg-violet-500/5 hover:bg-violet-500/10 text-violet-600 dark:text-violet-400 dark:hover:bg-violet-500/20"
+          >
+            <Zap className="size-4 text-violet-500 fill-violet-500 animate-pulse" />
+            <span className="hidden sm:inline">{t('settings.aiRuleGenerator')}</span>
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -711,6 +724,19 @@ export function BankRulesPage() {
               </Button>
             </DialogFooter>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* AI Rule Generator Modal */}
+      <Dialog
+        open={aiModalOpen}
+        onOpenChange={(open) => {
+          setAiModalOpen(open);
+          if (!open) fetchRules();
+        }}
+      >
+        <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
+          <AIRulesGeneratorTab />
         </DialogContent>
       </Dialog>
     </div>

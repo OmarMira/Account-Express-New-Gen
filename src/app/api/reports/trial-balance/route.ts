@@ -59,8 +59,6 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    const realDescSet = new Set(journalLines.map((l) => l.entry?.description).filter(Boolean));
-
     // Fetch virtual entries from reconciled bank transactions
     const bankTxWhere: any = {
       statement: { bankAccount: { companyId } },
@@ -74,6 +72,7 @@ export async function GET(request: NextRequest) {
       select: {
         amount: true,
         description: true,
+        journalLineId: true,
         glAccount: {
           select: {
             code: true,
@@ -140,7 +139,7 @@ export async function GET(request: NextRequest) {
 
     for (const tx of reconciledTxs) {
       if (!tx.glAccount) continue;
-      if (realDescSet.has(`Reconciliation: ${tx.description}`)) continue;
+      if (tx.journalLineId) continue;
 
       const isDeposit = tx.amount > 0;
       const absAmount = Math.abs(tx.amount);

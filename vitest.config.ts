@@ -9,6 +9,7 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     setupFiles: ['./tests/setup.ts'],
+    globalTeardown: './tests/globalTeardown.ts',
     alias: {
       '@': path.resolve(__dirname, './src'),
     },

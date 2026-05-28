@@ -1,0 +1,14 @@
+{
+  "version": "1.0",
+  "feedbackLogPath": "rules/learning-events.jsonl",
+  "minConfidenceToAutoSuggest": 0.85,
+  "minOccurrencesToGenerateRule": 3,
+  "autoApplyRules": false,
+  "reviewQueueEnabled": true,
+  "patternGeneration": {
+    "safeRegexCharsOnly": true,
+    "ignoreStopWords": ["to", "from", "payment", "ach", "zelle", "conf", "id"],
+    "maxLength": 50
+  },
+  "auditAction": "LEARNING_FEEDBACK_RECEIVED"
+}
