@@ -92,8 +92,225 @@ const MONTHS_SPANISH = [
   { key: '12', name: 'Dic' },
 ];
 
+const LOCAL_TRANSLATIONS: Record<string, Record<string, string>> = {
+  es: {
+    loadingMetrics: 'Cargando métricas y conciliaciones...',
+    noTransactionsTitle: 'Sin transacciones importadas',
+    noTransactionsDesc:
+      'No hay transacciones importadas. Importa un estado de cuenta bancario para ver el dashboard financiero.',
+    goImport: 'Ir a Importar Transacciones',
+    demoMode: 'Modo Demostración Activo',
+    systemData: 'Datos del Sistema',
+    idealForTesting: 'Ideal para Pruebas',
+    financialDashboard: 'Dashboard financiero',
+    noBankAccount: 'Sin cuenta bancaria seleccionada',
+    supportedFormat: 'Formato Soportado',
+    hideFilters: 'Ocultar Filtros',
+    showFilters: 'Mostrar Filtros',
+    dynamicFilters: 'Filtros Dinámicos de Consulta',
+    clearFilters: 'Limpiar Filtros',
+    reconStatus: 'Estado Conciliación',
+    allTransactions: 'Todas las transacciones',
+    onlyReconciled: 'Solo conciliadas',
+    onlyUnreconciled: 'Solo no conciliadas',
+    startDate: 'Fecha Inicio',
+    endDate: 'Fecha Fin',
+    initialBalance: 'Saldo Inicial ($)',
+    selectedMonths: 'Meses Seleccionados',
+    all: 'Todos',
+    allF: 'Todas',
+    incomeCategories: 'Categorías de Ingresos',
+    expenseCategories: 'Categorías de Egresos',
+    totalTxSuffix: 'transacciones en total',
+    filteredTxSuffix: 'transacciones filtradas',
+    reconciledSuffix: 'conciliadas en el sistema',
+    pendingSuffix: 'pendientes',
+    totalIncome: 'Ingresos Totales',
+    totalExpenses: 'Egresos Totales',
+    netFlow: 'Flujo Neto',
+    startingBalance: 'Saldo Inicial',
+    endingBalance: 'Saldo Final',
+    commissions: 'Comisión Bancaria',
+    reconciledPct: 'Porcentaje Conciliado',
+    incomeVsExpensesMonth: 'Ingresos vs. egresos por mes',
+    monthlyFlowComparison: 'Comparativo mensual de flujos monetarios',
+    incomeLabel: 'Ingresos',
+    expensesLabel: 'Egresos',
+    balanceEvolution: 'Evolución del saldo al cierre mensual',
+    balanceDynamics: 'Dinámica del balance de tesorería consolidado con saldo mínimo',
+    cierreLabel: 'Saldo Cierre',
+    expensesDistribution: 'Distribución de egresos por categoría',
+    relativeCompositionExpenses: 'Composición relativa del egreso acumulado',
+    incomeDistribution: 'Distribución de ingresos por fuente',
+    relativeCompositionIncome: 'Origen y dispersión de créditos en cuenta',
+    netMonthlyFlow: 'Flujo neto mensual (ingresos − egresos)',
+    cashRetentionCapacity: 'Capacidad de retención de efectivo mes a mes',
+    evolutionOf: 'Evolución de',
+    monthlyOpExHistory: 'Histórico mensual de la categoría principal de egresos operacionales',
+    recurrentExpensesTitle: 'Gastos recurrentes principales por mes',
+    monthlyOpOutflowHistory:
+      'Histórico mensual de las principales salidas operacionales del usuario',
+    noExpensesToClassify: 'Sin gastos a clasificar',
+    mainIncomeSourcesTrend: 'Tendencia de principales fuentes de ingresos',
+    monthlyIncomePerformance: 'Desempeño mensual de los créditos mayores registrados',
+    noIncomeToClassify: 'Sin ingresos a clasificar',
+    monthlyAverageBalance: 'Saldo promedio mensual',
+    dailyAverageBalance: 'Promedio del saldo diario con umbral de seguridad',
+    minThresholdLabel: 'Umbral Mínimo $15,000',
+    compositionTitle: 'Composición',
+    vsRest: 'vs Resto',
+    relativeComparisonIncome:
+      'Comparativa del principal ingreso frente a otras fuentes secundarias',
+    otherIncome: 'Otros ingresos',
+    alertsTitle: 'Señales de Alerta',
+    noAlerts: 'Sin alertas críticas detectadas',
+    businessStructure: 'Estructura del Negocio',
+    opportunities: 'Oportunidades',
+    exportModuleTitle: 'Módulo de Exportación Legal & Tributaria',
+    exportClassifiedBtn: 'Exportar CSV de transacciones clasificadas',
+    exportSummaryBtn: 'Exportar resumen mensual CSV',
+    requiredStructure: 'Estructura del archivo requerida',
+    structureHelpDesc:
+      'El motor de conciliación y el dashboard financiero importan archivos de extractos bancarios en formatos CSV, OFX y QFX. Al importar un archivo CSV, asegúrate de mapear o estructurar las siguientes columnas básicas:',
+    colName: 'Columna',
+    colType: 'Tipo',
+    colDesc: 'Descripción',
+    colDateDesc: 'Fecha de la transacción (YYYY-MM-DD, MM/DD/YYYY o DD/MM/YYYY).',
+    colDescDesc: 'Concepto, beneficiario o descripción detallada de la transacción.',
+    colAmountDesc: 'Valor numérico de la transacción (debitos negativos, creditos positivos).',
+    colTypeDesc: 'Dirección del flujo ("credito" o "debito"). Opcional si el monto tiene signo.',
+    colAccountDesc: 'Código contable o cuenta del catálogo asociada (opcional).',
+    colReconDesc: '"si"/"no", "true"/"false" o "1"/"0" (opcional, por defecto "no").',
+    infoDisclaimer:
+      'El sistema cuenta con un motor de tolerancia inteligente para inferir campos incompletos, corregir formatos de fechas y deducir la clasificación contable en base a reglas dinámicas.',
+  },
+  en: {
+    loadingMetrics: 'Loading metrics and reconciliations...',
+    noTransactionsTitle: 'No Transactions Imported',
+    noTransactionsDesc:
+      'There are no transactions imported. Please import a bank statement to view the financial dashboard.',
+    goImport: 'Go to Import Transactions',
+    demoMode: 'Active Demo Mode',
+    systemData: 'System Data',
+    idealForTesting: 'Ideal for Testing',
+    financialDashboard: 'Financial Dashboard',
+    noBankAccount: 'No bank account selected',
+    supportedFormat: 'Supported Format',
+    hideFilters: 'Hide Filters',
+    showFilters: 'Show Filters',
+    dynamicFilters: 'Dynamic Query Filters',
+    clearFilters: 'Clear Filters',
+    reconStatus: 'Reconciliation Status',
+    allTransactions: 'All Transactions',
+    onlyReconciled: 'Only reconciled',
+    onlyUnreconciled: 'Only unreconciled',
+    startDate: 'Start Date',
+    endDate: 'End Date',
+    initialBalance: 'Starting Balance ($)',
+    selectedMonths: 'Selected Months',
+    all: 'All',
+    allF: 'All',
+    incomeCategories: 'Income Categories',
+    expenseCategories: 'Expense Categories',
+    totalTxSuffix: 'total transactions',
+    filteredTxSuffix: 'filtered transactions',
+    reconciledSuffix: 'reconciled in system',
+    pendingSuffix: 'pending',
+    totalIncome: 'Total Income',
+    totalExpenses: 'Total Expenses',
+    netFlow: 'Net Flow',
+    startingBalance: 'Starting Balance',
+    endingBalance: 'Ending Balance',
+    commissions: 'Bank Fees',
+    reconciledPct: 'Percentage Reconciled',
+    incomeVsExpensesMonth: 'Income vs. Expenses by Month',
+    monthlyFlowComparison: 'Monthly comparison of monetary flows',
+    incomeLabel: 'Income',
+    expensesLabel: 'Expenses',
+    balanceEvolution: 'Monthly Closing Balance Evolution',
+    balanceDynamics: 'Dynamics of the consolidated treasury balance with minimum threshold',
+    cierreLabel: 'Closing Balance',
+    expensesDistribution: 'Expenses Distribution by Category',
+    relativeCompositionExpenses: 'Relative composition of accumulated opex',
+    incomeDistribution: 'Income Distribution by Source',
+    relativeCompositionIncome: 'Origin and distribution of account credits',
+    netMonthlyFlow: 'Net Monthly Flow (Income − Expenses)',
+    cashRetentionCapacity: 'Cash retention capacity month by month',
+    evolutionOf: 'Evolution of',
+    monthlyOpExHistory: 'Monthly history of primary operational expenses category',
+    recurrentExpensesTitle: 'Primary Recurring Expenses by Month',
+    monthlyOpOutflowHistory: 'Monthly history of major operational outflows',
+    noExpensesToClassify: 'No expenses to classify',
+    mainIncomeSourcesTrend: 'Trend of Primary Income Sources',
+    monthlyIncomePerformance: 'Monthly performance of registered major credits',
+    noIncomeToClassify: 'No income to classify',
+    monthlyAverageBalance: 'Monthly Average Balance',
+    dailyAverageBalance: 'Average daily balance with safety threshold',
+    minThresholdLabel: 'Min Threshold $15,000',
+    compositionTitle: 'Composition',
+    vsRest: 'vs Rest',
+    relativeComparisonIncome: 'Comparison of primary income against secondary sources',
+    otherIncome: 'Other income',
+    alertsTitle: 'Alert Signals',
+    noAlerts: 'No critical alerts detected',
+    businessStructure: 'Business Structure',
+    opportunities: 'Opportunities',
+    exportModuleTitle: 'Legal & Tax Export Module',
+    exportClassifiedBtn: 'Export CSV of classified transactions',
+    exportSummaryBtn: 'Export monthly summary CSV',
+    requiredStructure: 'Required file structure',
+    structureHelpDesc:
+      'The reconciliation engine and the financial dashboard import bank statement files in CSV, OFX, and QFX formats. When importing a CSV file, make sure to map or structure the following basic columns:',
+    colName: 'Column',
+    colType: 'Type',
+    colDesc: 'Description',
+    colDateDesc: 'Transaction date (YYYY-MM-DD, MM/DD/YYYY, or DD/MM/YYYY).',
+    colDescDesc: 'Concept, beneficiary, or detailed description of the transaction.',
+    colAmountDesc: 'Numeric value of the transaction (negative debits, positive credits).',
+    colTypeDesc: 'Flow direction ("credito" or "debito"). Optional if amount has sign.',
+    colAccountDesc: 'Associated accounting code or GL account (optional).',
+    colReconDesc: '"si"/"no", "true"/"false", or "1"/"0" (optional, default "no").',
+    infoDisclaimer:
+      'The system has an intelligent tolerance engine to infer incomplete fields, correct date formats, and deduce accounting classification based on dynamic rules.',
+  },
+};
+
+const getMonthName = (key: string, lang: string) => {
+  const esNames: Record<string, string> = {
+    '01': 'Ene',
+    '02': 'Feb',
+    '03': 'Mar',
+    '04': 'Abr',
+    '05': 'May',
+    '06': 'Jun',
+    '07': 'Jul',
+    '08': 'Ago',
+    '09': 'Sep',
+    '10': 'Oct',
+    '11': 'Nov',
+    '12': 'Dic',
+  };
+  const enNames: Record<string, string> = {
+    '01': 'Jan',
+    '02': 'Feb',
+    '03': 'Mar',
+    '04': 'Apr',
+    '05': 'May',
+    '06': 'Jun',
+    '07': 'Jul',
+    '08': 'Aug',
+    '09': 'Sep',
+    '10': 'Oct',
+    '11': 'Nov',
+    '12': 'Dec',
+  };
+  return lang === 'en' ? enNames[key] : esNames[key];
+};
+
 export function FinancialDashboardPage() {
   const t = useLanguageStore((s) => s.t);
+  const language = useLanguageStore((s) => s.language) || 'es';
+  const dt = LOCAL_TRANSLATIONS[language] || LOCAL_TRANSLATIONS.es;
   const activeCompany = useAuthStore((s) => s.activeCompany);
   const setCurrentView = useAuthStore((s) => s.setCurrentView);
 
@@ -735,13 +952,19 @@ export function FinancialDashboardPage() {
     const finalBal = stats.finalBalance;
     const diffBal = finalBal - initialBalanceInput;
     const changePct = initialBalanceInput > 0 ? (diffBal / initialBalanceInput) * 105 : 100;
+    const isEn = language === 'en';
 
     // 1. Tendencia del saldo
     if (finalBal < initialBalanceInput) {
       alerts.push({
         icon: '⚠️',
-        title: 'Saldo Final a la Baja',
-        text: (
+        title: isEn ? 'Ending Balance Decreasing' : 'Saldo Final a la Baja',
+        text: isEn ? (
+          <span>
+            The closing treasury balance decreased by{' '}
+            <strong>{Math.abs(changePct).toFixed(1)}%</strong> compared to the starting balance.
+          </span>
+        ) : (
           <span>
             El saldo de cierre de tesorería disminuyó un{' '}
             <strong>{Math.abs(changePct).toFixed(1)}%</strong> con respecto al balance inicial.
@@ -751,8 +974,13 @@ export function FinancialDashboardPage() {
     } else {
       structure.push({
         icon: '✅',
-        title: 'Crecimiento de Tesorería',
-        text: (
+        title: isEn ? 'Treasury Growth' : 'Crecimiento de Tesorería',
+        text: isEn ? (
+          <span>
+            The ending balance increased by <strong>{changePct.toFixed(1)}%</strong> compared to the
+            starting balance of the period.
+          </span>
+        ) : (
           <span>
             El balance final se incrementó un <strong>{changePct.toFixed(1)}%</strong> en
             comparación con el saldo inicial del período.
@@ -772,8 +1000,13 @@ export function FinancialDashboardPage() {
     if (negMonths.length > 0) {
       alerts.push({
         icon: '📉',
-        title: 'Déficit Mensual Detectado',
-        text: (
+        title: isEn ? 'Monthly Deficit Detected' : 'Déficit Mensual Detectado',
+        text: isEn ? (
+          <span>
+            There were <strong>{negMonths.length} deficit months</strong> recorded (
+            {negMonths.join(', ')}), suggesting temporary cash flow pressures.
+          </span>
+        ) : (
           <span>
             Se registraron <strong>{negMonths.length} meses deficitarios</strong> (
             {negMonths.join(', ')}), lo que sugiere tensiones temporales de caja.
@@ -783,8 +1016,10 @@ export function FinancialDashboardPage() {
     } else {
       structure.push({
         icon: '📊',
-        title: 'Flujo Positivo Sostenido',
-        text: (
+        title: isEn ? 'Sustained Positive Cash Flow' : 'Flujo Positivo Sostenido',
+        text: isEn ? (
+          <span>100% positive cash flow: all months registered an accumulated net surplus.</span>
+        ) : (
           <span>
             Flujo de caja 100% positivo: todos los meses registraron superávit neto acumulado.
           </span>
@@ -796,12 +1031,20 @@ export function FinancialDashboardPage() {
     const validExpCats = expensesByCategoryData.filter((d) => d.name !== 'Otros egresos');
     const topExp = [...validExpCats].sort((a, b) => b.value - a.value)[0];
     if (topExp && topExp.value > 0) {
+      const displayCat =
+        topExp.name === 'Sin asignar' ? (isEn ? 'Unassigned' : 'Sin asignar') : topExp.name;
       structure.push({
         icon: '💰',
-        title: 'Concentración de Egresos',
-        text: (
+        title: isEn ? 'Expense Concentration' : 'Concentración de Egresos',
+        text: isEn ? (
           <span>
-            Las salidas hacia <strong>{topExp.name}</strong> representan el{' '}
+            Outflows to <strong>{displayCat}</strong> represent{' '}
+            <strong>{topExp.percentage.toFixed(1)}%</strong> of total expenses (
+            {formatCurrency(topExp.value)}).
+          </span>
+        ) : (
+          <span>
+            Las salidas hacia <strong>{displayCat}</strong> representan el{' '}
             <strong>{topExp.percentage.toFixed(1)}%</strong> del gasto total (
             {formatCurrency(topExp.value)}).
           </span>
@@ -811,10 +1054,15 @@ export function FinancialDashboardPage() {
       if (topExp.percentage > 15) {
         alerts.push({
           icon: '💳',
-          title: 'Alerta de Dependencia de Gasto',
-          text: (
+          title: isEn ? 'Expense Dependency Alert' : 'Alerta de Dependencia de Gasto',
+          text: isEn ? (
             <span>
-              La cuenta <strong>{topExp.name}</strong> concentra más del 15% de egresos
+              The account <strong>{displayCat}</strong> concentrates more than 15% of operational
+              outflows. A review of recurring invoices is suggested.
+            </span>
+          ) : (
+            <span>
+              La cuenta <strong>{displayCat}</strong> concentra más del 15% de egresos
               operacionales. Se sugiere una revisión de facturas recurrentes.
             </span>
           ),
@@ -829,13 +1077,20 @@ export function FinancialDashboardPage() {
     const sortedIncomes = [...validIncomeCats].sort((a, b) => b.value - a.value);
     const mainIncome = sortedIncomes[0];
     if (mainIncome) {
+      const displayCat =
+        mainIncome.name === 'Sin asignar' ? (isEn ? 'Unassigned' : 'Sin asignar') : mainIncome.name;
       structure.push({
         icon: '📈',
-        title: 'Principal Fuente de Recursos',
-        text: (
+        title: isEn ? 'Primary Source of Funds' : 'Principal Fuente de Recursos',
+        text: isEn ? (
           <span>
-            <strong>{mainIncome.name}</strong> constituye la mayor vía de captación, representando
-            el <strong>{mainIncome.percentage.toFixed(1)}%</strong> de créditos.
+            <strong>{displayCat}</strong> constitutes the primary source of funds, representing{' '}
+            <strong>{mainIncome.percentage.toFixed(1)}%</strong> of credits.
+          </span>
+        ) : (
+          <span>
+            <strong>{displayCat}</strong> constituye la mayor vía de captación, representando el{' '}
+            <strong>{mainIncome.percentage.toFixed(1)}%</strong> de créditos.
           </span>
         ),
       });
@@ -843,8 +1098,13 @@ export function FinancialDashboardPage() {
       if (mainIncome.percentage > 80) {
         alerts.push({
           icon: '⚠️',
-          title: 'Riesgo de Concentración de Ingresos',
-          text: (
+          title: isEn ? 'Income Concentration Risk' : 'Riesgo de Concentración de Ingresos',
+          text: isEn ? (
+            <span>
+              The company has a dependency of <strong>{mainIncome.percentage.toFixed(1)}%</strong>{' '}
+              on a single category of income. Diversifying the portfolio is recommended.
+            </span>
+          ) : (
             <span>
               La empresa tiene una dependencia del{' '}
               <strong>{mainIncome.percentage.toFixed(1)}%</strong> de una sola categoría de
@@ -871,8 +1131,13 @@ export function FinancialDashboardPage() {
       if (below) {
         alerts.push({
           icon: '🚨',
-          title: 'Reserva de Seguridad Vulnerada',
-          text: (
+          title: isEn ? 'Safety Reserve Violated' : 'Reserva de Seguridad Vulnerada',
+          text: isEn ? (
+            <span>
+              In <strong>{minBalMonth}</strong> the balance fell to{' '}
+              <strong>{formatCurrency(minBal)}</strong>, below the safety minimum of $15,000.
+            </span>
+          ) : (
             <span>
               En <strong>{minBalMonth}</strong> el saldo cayó a{' '}
               <strong>{formatCurrency(minBal)}</strong>, por debajo del mínimo prudencial de
@@ -883,8 +1148,13 @@ export function FinancialDashboardPage() {
       } else {
         structure.push({
           icon: '🛡️',
-          title: 'Colchón de Seguridad Sólido',
-          text: (
+          title: isEn ? 'Solid Safety Cushion' : 'Colchón de Seguridad Sólido',
+          text: isEn ? (
+            <span>
+              The minimum balance remained at <strong>{formatCurrency(minBal)}</strong>, preserving
+              the minimum safety cushion.
+            </span>
+          ) : (
             <span>
               El saldo mínimo se mantuvo en <strong>{formatCurrency(minBal)}</strong>, preservando
               el colchón mínimo de seguridad.
@@ -898,8 +1168,13 @@ export function FinancialDashboardPage() {
     if (stats.netFlow >= 0) {
       opportunities.push({
         icon: '🚀',
-        title: 'Optimización de Excedentes',
-        text: (
+        title: isEn ? 'Surplus Optimization' : 'Optimización de Excedentes',
+        text: isEn ? (
+          <span>
+            With a net positive flow of <strong>{formatCurrency(stats.netFlow)}</strong>, there is
+            an opportunity to reinvest in expansion or settle high-interest debt.
+          </span>
+        ) : (
           <span>
             Con un flujo positivo neto de <strong>{formatCurrency(stats.netFlow)}</strong>, existe
             oportunidad para reinvertir en expansión o liquidar deudas costosas.
@@ -908,8 +1183,13 @@ export function FinancialDashboardPage() {
       });
       opportunities.push({
         icon: '🏦',
-        title: 'Colocaciones Estratégicas',
-        text: (
+        title: isEn ? 'Strategic Placement' : 'Colocaciones Estratégicas',
+        text: isEn ? (
+          <span>
+            It is recommended to place temporary surplus in low-risk liquid funds to generate stable
+            passive returns.
+          </span>
+        ) : (
           <span>
             Se recomienda colocar excedentes temporales en fondos líquidos de bajo riesgo para
             generar rendimientos pasivos estables.
@@ -919,8 +1199,13 @@ export function FinancialDashboardPage() {
     } else {
       opportunities.push({
         icon: '✂️',
-        title: 'Control Estricto de Gastos',
-        text: (
+        title: isEn ? 'Strict Expense Control' : 'Control Estricto de Gastos',
+        text: isEn ? (
+          <span>
+            The net flow for the period is negative. Renegotiating fixed-expense contracts is urged
+            to restore treasury balance.
+          </span>
+        ) : (
           <span>
             El flujo neto del periodo es negativo. Urge renegociar contratos de egresos fijos para
             restablecer el equilibrio de tesorería.
@@ -929,8 +1214,13 @@ export function FinancialDashboardPage() {
       });
       opportunities.push({
         icon: '📈',
-        title: 'Estrategia de Captación Activa',
-        text: (
+        title: isEn ? 'Active Outflow Strategy' : 'Estrategia de Captación Activa',
+        text: isEn ? (
+          <span>
+            Prioritize short-term campaigns and accelerate billing of pending services to inject
+            immediate liquidity.
+          </span>
+        ) : (
           <span>
             Priorizar campañas de captación a corto plazo y acelerar la facturación de servicios
             pendientes para inyectar liquidez inmediata.
@@ -943,8 +1233,13 @@ export function FinancialDashboardPage() {
     if (pendingCount > 0) {
       opportunities.push({
         icon: '🎯',
-        title: 'Optimización Contable',
-        text: (
+        title: isEn ? 'Accounting Optimization' : 'Optimización Contable',
+        text: isEn ? (
+          <span>
+            There are <strong>{pendingCount} pending transactions</strong> to reconcile. Completing
+            reconciliation will improve fiscal balance precision.
+          </span>
+        ) : (
           <span>
             Hay <strong>{pendingCount} transacciones pendientes</strong> por conciliar. Completar la
             conciliación mejorará la precisión del balance fiscal.
@@ -960,8 +1255,9 @@ export function FinancialDashboardPage() {
     initialBalanceInput,
     expensesByCategoryData,
     incomeByCategoryData,
-    dbTransactions,
     stats.netFlow,
+    dbTransactions,
+    language,
   ]);
 
   // --- FILTERS TOGGLE HANDLERS ---
@@ -1060,7 +1356,7 @@ export function FinancialDashboardPage() {
       <div className="flex flex-col items-center justify-center min-h-[450px]">
         <RefreshCw className="w-10 h-10 animate-spin text-teal-600 dark:text-teal-400 mb-4" />
         <span className="text-sm font-bold text-slate-500 uppercase tracking-widest animate-pulse">
-          Cargando métricas y conciliaciones...
+          {dt.loadingMetrics}
         </span>
       </div>
     );
@@ -1074,18 +1370,17 @@ export function FinancialDashboardPage() {
         </div>
         <div className="space-y-2">
           <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-            Sin transacciones importadas
+            {dt.noTransactionsTitle}
           </h2>
           <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md">
-            No hay transacciones importadas. Importa un estado de cuenta bancario para ver el
-            dashboard financiero.
+            {dt.noTransactionsDesc}
           </p>
         </div>
         <Button
           onClick={() => setCurrentView && setCurrentView('banks')}
           className="bg-teal-600 hover:bg-teal-700 text-white rounded-xl px-6 py-2.5 font-bold"
         >
-          Ir a Importar Transacciones
+          {dt.goImport}
         </Button>
       </div>
     );
@@ -1098,22 +1393,22 @@ export function FinancialDashboardPage() {
         <div>
           <div className="flex items-center gap-2">
             <span className="bg-teal-500/10 text-teal-600 dark:text-teal-400 text-xs px-2.5 py-1 rounded-full font-bold uppercase tracking-wider">
-              {isDemoMode ? 'Modo Demostración Activo' : 'Datos del Sistema'}
+              {isDemoMode ? dt.demoMode : dt.systemData}
             </span>
             {isDemoMode && (
               <span className="bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs px-2.5 py-1 rounded-full font-bold uppercase tracking-wider flex items-center gap-1">
-                <AlertCircle className="w-3.5 h-3.5" /> Ideal para Pruebas
+                <AlertCircle className="w-3.5 h-3.5" /> {dt.idealForTesting}
               </span>
             )}
           </div>
           <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white mt-2 tracking-tight">
-            Dashboard financiero — {activeCompany?.legalName || 'LQ&OM LLC'}
+            {dt.financialDashboard} — {activeCompany?.legalName || 'LQ&OM LLC'}
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 font-medium flex items-center gap-1.5">
             <Activity className="w-4 h-4 text-teal-500" />
             {bankAccountInfo
               ? `${bankAccountInfo.bankName} — ${bankAccountInfo.accountName}${bankAccountInfo.accountNo ? ' #' + bankAccountInfo.accountNo : ''}`
-              : 'Sin cuenta bancaria seleccionada'}
+              : dt.noBankAccount}
           </p>
         </div>
 
@@ -1125,7 +1420,7 @@ export function FinancialDashboardPage() {
             className="rounded-xl border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 gap-1.5 hover:bg-slate-50 dark:hover:bg-slate-900"
           >
             <HelpCircle className="w-4 h-4 text-slate-400" />
-            Formato Soportado
+            {dt.supportedFormat}
           </Button>
 
           <Button
@@ -1135,7 +1430,7 @@ export function FinancialDashboardPage() {
             className={`rounded-xl border-slate-200 dark:border-slate-800 gap-1.5 ${filtersOpen ? 'bg-teal-50 dark:bg-teal-950/20 text-teal-600 dark:text-teal-400' : 'text-slate-700 dark:text-slate-300'}`}
           >
             <Filter className="w-4 h-4" />
-            {filtersOpen ? 'Ocultar Filtros' : 'Mostrar Filtros'}
+            {filtersOpen ? dt.hideFilters : dt.showFilters}
           </Button>
 
           <Button
@@ -1163,7 +1458,7 @@ export function FinancialDashboardPage() {
               <div className="flex items-center gap-2">
                 <Filter className="w-4.5 h-4.5 text-teal-500" />
                 <h3 className="font-bold text-slate-950 dark:text-slate-50 text-sm uppercase tracking-wider">
-                  Filtros Dinámicos de Consulta
+                  {dt.dynamicFilters}
                 </h3>
               </div>
               <div className="flex items-center gap-3">
@@ -1173,7 +1468,7 @@ export function FinancialDashboardPage() {
                   onClick={clearFilters}
                   className="text-xs text-slate-500 hover:text-slate-900 dark:hover:text-white flex items-center gap-1 rounded-xl"
                 >
-                  <RotateCcw className="w-3.5 h-3.5" /> Limpiar Filtros
+                  <RotateCcw className="w-3.5 h-3.5" /> {dt.clearFilters}
                 </Button>
               </div>
             </div>
@@ -1182,23 +1477,23 @@ export function FinancialDashboardPage() {
               {/* Reconciliation Filter */}
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
-                  Estado Conciliación
+                  {dt.reconStatus}
                 </label>
                 <select
                   value={filterReconciliation}
                   onChange={(e: any) => setFilterReconciliation(e.target.value)}
                   className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:border-teal-500 font-medium"
                 >
-                  <option value="all">Todas las transacciones</option>
-                  <option value="reconciled">Solo conciliadas</option>
-                  <option value="unreconciled">Solo no conciliadas</option>
+                  <option value="all">{dt.allTransactions}</option>
+                  <option value="reconciled">{dt.onlyReconciled}</option>
+                  <option value="unreconciled">{dt.onlyUnreconciled}</option>
                 </select>
               </div>
 
               {/* Start Date */}
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
-                  Fecha Inicio
+                  {dt.startDate}
                 </label>
                 <div className="relative">
                   <input
@@ -1213,7 +1508,7 @@ export function FinancialDashboardPage() {
               {/* End Date */}
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
-                  Fecha Fin
+                  {dt.endDate}
                 </label>
                 <input
                   type="date"
@@ -1226,7 +1521,7 @@ export function FinancialDashboardPage() {
               {/* Initial Balance */}
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
-                  Saldo Inicial ($)
+                  {dt.initialBalance}
                 </label>
                 <input
                   type="text"
@@ -1244,7 +1539,7 @@ export function FinancialDashboardPage() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
-                    Meses Seleccionados
+                    {dt.selectedMonths}
                   </span>
                   <label className="flex items-center gap-1 text-[10px] font-bold text-teal-600 dark:text-teal-400 uppercase cursor-pointer select-none">
                     <input
@@ -1253,7 +1548,7 @@ export function FinancialDashboardPage() {
                       onChange={(e) => toggleAllMonths(e.target.checked)}
                       className="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-3 h-3"
                     />
-                    Todos
+                    {dt.all}
                   </label>
                 </div>
                 <div className="grid grid-cols-4 gap-2 bg-white dark:bg-slate-950/60 p-3 rounded-2xl border border-slate-200 dark:border-slate-800/80">
@@ -1270,7 +1565,7 @@ export function FinancialDashboardPage() {
                           onChange={() => toggleMonth(m.key)}
                           className="hidden"
                         />
-                        {m.name}
+                        {getMonthName(m.key, language)}
                       </label>
                     );
                   })}
@@ -1281,7 +1576,7 @@ export function FinancialDashboardPage() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
-                    Categorías de Ingresos
+                    {dt.incomeCategories}
                   </span>
                   <label className="flex items-center gap-1 text-[10px] font-bold text-teal-600 dark:text-teal-400 uppercase cursor-pointer select-none">
                     <input
@@ -1290,7 +1585,7 @@ export function FinancialDashboardPage() {
                       onChange={(e) => toggleAllIncome(e.target.checked)}
                       className="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-3 h-3"
                     />
-                    Todas
+                    {dt.allF}
                   </label>
                 </div>
                 <div className="max-h-[120px] overflow-y-auto space-y-1 bg-white dark:bg-slate-950/60 p-3 rounded-2xl border border-slate-200 dark:border-slate-800/80">
@@ -1305,7 +1600,11 @@ export function FinancialDashboardPage() {
                         onChange={() => toggleIncome(cat)}
                         className="rounded border-slate-300 dark:border-slate-700 text-teal-600 focus:ring-teal-500 w-3.5 h-3.5 bg-transparent"
                       />
-                      {cat}
+                      {cat === 'Sin asignar'
+                        ? language === 'en'
+                          ? 'Unassigned'
+                          : 'Sin asignar'
+                        : cat}
                     </label>
                   ))}
                 </div>
@@ -1315,7 +1614,7 @@ export function FinancialDashboardPage() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
-                    Categorías de Egresos
+                    {dt.expenseCategories}
                   </span>
                   <label className="flex items-center gap-1 text-[10px] font-bold text-teal-600 dark:text-teal-400 uppercase cursor-pointer select-none">
                     <input
@@ -1324,7 +1623,7 @@ export function FinancialDashboardPage() {
                       onChange={(e) => toggleAllExpenses(e.target.checked)}
                       className="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-3 h-3"
                     />
-                    Todas
+                    {dt.allF}
                   </label>
                 </div>
                 <div className="max-h-[120px] overflow-y-auto space-y-1 bg-white dark:bg-slate-950/60 p-3 rounded-2xl border border-slate-200 dark:border-slate-800/80">
@@ -1339,7 +1638,11 @@ export function FinancialDashboardPage() {
                         onChange={() => toggleExpense(cat)}
                         className="rounded border-slate-300 dark:border-slate-700 text-teal-600 focus:ring-teal-500 w-3.5 h-3.5 bg-transparent"
                       />
-                      {cat}
+                      {cat === 'Sin asignar'
+                        ? language === 'en'
+                          ? 'Unassigned'
+                          : 'Sin asignar'
+                        : cat}
                     </label>
                   ))}
                 </div>
@@ -1349,16 +1652,16 @@ export function FinancialDashboardPage() {
             {/* Quick Metrics Info */}
             <div className="flex flex-wrap items-center gap-4 mt-6 pt-4 border-t border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-500">
               <span className="bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full">
-                {dbTransactions.length} transacciones en total
+                {dbTransactions.length} {dt.totalTxSuffix}
               </span>
               <span className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-3 py-1 rounded-full font-bold">
-                {filteredTransactions.length} transacciones filtradas
+                {filteredTransactions.length} {dt.filteredTxSuffix}
               </span>
               <span className="bg-teal-500/10 text-teal-600 dark:text-teal-400 px-3 py-1 rounded-full font-bold">
-                {dbTransactions.filter((t) => t.conciliado).length} conciliadas en el sistema
+                {dbTransactions.filter((t) => t.conciliado).length} {dt.reconciledSuffix}
               </span>
               <span className="bg-rose-500/10 text-rose-600 dark:text-rose-400 px-3 py-1 rounded-full font-bold">
-                {dbTransactions.filter((t) => !t.conciliado).length} pendientes
+                {dbTransactions.filter((t) => !t.conciliado).length} {dt.pendingSuffix}
               </span>
             </div>
           </motion.div>
@@ -1368,21 +1671,21 @@ export function FinancialDashboardPage() {
       {/* KPI METRIC CARDS GRID (6 Cards) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-5">
         <PremiumCard
-          title="Ingresos Totales"
+          title={dt.totalIncome}
           value={formatCurrency(stats.revenue)}
           trend="+10.4%"
           isUp={true}
           color="teal"
         />
         <PremiumCard
-          title="Egresos Totales"
+          title={dt.totalExpenses}
           value={formatCurrency(stats.expenses)}
           trend="+8.2%"
           isUp={false}
           color="rose"
         />
         <PremiumCard
-          title="Flujo Neto"
+          title={dt.netFlow}
           value={formatCurrency(stats.netFlow)}
           trend=""
           isUp={stats.netFlow >= 0}
@@ -1390,14 +1693,14 @@ export function FinancialDashboardPage() {
           isSpecialColor={true}
         />
         <PremiumCard
-          title="Saldo Inicial"
+          title={dt.startingBalance}
           value={formatCurrency(initialBalanceInput)}
           trend=""
           isUp={true}
           color="blue"
         />
         <PremiumCard
-          title="Saldo Final"
+          title={dt.endingBalance}
           value={formatCurrency(stats.finalBalance)}
           trend=""
           isUp={stats.finalBalance >= initialBalanceInput}
@@ -1406,7 +1709,7 @@ export function FinancialDashboardPage() {
           isDrop={stats.finalBalance < initialBalanceInput}
         />
         <PremiumCard
-          title="Comisión Bancaria"
+          title={dt.commissions}
           value={formatCurrency(stats.commissions)}
           trend=""
           isUp={false}
@@ -1417,10 +1720,7 @@ export function FinancialDashboardPage() {
       {/* --- GRAPHICS GRID (10 Charts) --- */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
         {/* Chart 1: Ingresos vs Egresos por Mes */}
-        <ChartBox
-          title="Ingresos vs. egresos por mes"
-          subtitle="Comparativo mensual de flujos monetarios"
-        >
+        <ChartBox title={dt.incomeVsExpensesMonth} subtitle={dt.monthlyFlowComparison}>
           <ResponsiveContainer width="100%" height={240}>
             <BarChart
               data={monthlyAggregatedData}
@@ -1458,14 +1758,14 @@ export function FinancialDashboardPage() {
               <Bar
                 dataKey="ingresos"
                 fill={PALETTE.verde}
-                name="Ingresos"
+                name={dt.incomeLabel}
                 radius={[4, 4, 0, 0]}
                 barSize={16}
               />
               <Bar
                 dataKey="gastos"
                 fill={PALETTE.rojo}
-                name="Egresos"
+                name={dt.expensesLabel}
                 radius={[4, 4, 0, 0]}
                 barSize={16}
               />
@@ -1474,10 +1774,7 @@ export function FinancialDashboardPage() {
         </ChartBox>
 
         {/* Chart 2: Evolución del saldo al cierre */}
-        <ChartBox
-          title="Evolución del saldo al cierre mensual"
-          subtitle="Dinámica del balance de tesorería consolidado con saldo mínimo"
-        >
+        <ChartBox title={dt.balanceEvolution} subtitle={dt.balanceDynamics}>
           <ResponsiveContainer width="100%" height={240}>
             <AreaChart
               data={monthlyAggregatedData}
@@ -1523,7 +1820,7 @@ export function FinancialDashboardPage() {
                 stroke={PALETTE.azul}
                 strokeWidth={2.5}
                 fill="url(#areaBal)"
-                name="Saldo Cierre"
+                name={dt.cierreLabel}
                 dot={(props: any) => {
                   const { cx, cy, payload } = props;
                   if (payload.monthKey === minCierreMonth) {
@@ -1547,10 +1844,7 @@ export function FinancialDashboardPage() {
         </ChartBox>
 
         {/* Chart 3: Distribución de egresos */}
-        <ChartBox
-          title="Distribución de egresos por categoría"
-          subtitle="Composición relativa del egreso acumulado"
-        >
+        <ChartBox title={dt.expensesDistribution} subtitle={dt.relativeCompositionExpenses}>
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <ResponsiveContainer width="100%" height={200} className="max-w-[200px]">
               <PieChart>
@@ -1580,7 +1874,11 @@ export function FinancialDashboardPage() {
                     style={{ backgroundColor: c.color }}
                   />
                   <span className="text-xs font-medium text-slate-600 dark:text-slate-300 truncate max-w-[140px]">
-                    {c.name}
+                    {c.name === 'Sin asignar'
+                      ? language === 'en'
+                        ? 'Unassigned'
+                        : 'Sin asignar'
+                      : c.name}
                   </span>
                   <span className="text-[10px] font-bold text-slate-400 ml-auto">
                     {c.percentage.toFixed(1)}%
@@ -1592,10 +1890,7 @@ export function FinancialDashboardPage() {
         </ChartBox>
 
         {/* Chart 4: Distribución de ingresos */}
-        <ChartBox
-          title="Distribución de ingresos por fuente"
-          subtitle="Origen y dispersión de créditos en cuenta"
-        >
+        <ChartBox title={dt.incomeDistribution} subtitle={dt.relativeCompositionIncome}>
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <ResponsiveContainer width="100%" height={200} className="max-w-[200px]">
               <PieChart>
@@ -1625,7 +1920,11 @@ export function FinancialDashboardPage() {
                     style={{ backgroundColor: c.color }}
                   />
                   <span className="text-xs font-medium text-slate-600 dark:text-slate-300 truncate max-w-[140px]">
-                    {c.name}
+                    {c.name === 'Sin asignar'
+                      ? language === 'en'
+                        ? 'Unassigned'
+                        : 'Sin asignar'
+                      : c.name}
                   </span>
                   <span className="text-[10px] font-bold text-slate-400 ml-auto">
                     {c.percentage.toFixed(1)}%
@@ -1637,10 +1936,7 @@ export function FinancialDashboardPage() {
         </ChartBox>
 
         {/* Chart 5: Flujo Neto Mensual */}
-        <ChartBox
-          title="Flujo neto mensual (ingresos − egresos)"
-          subtitle="Capacidad de retención de efectivo mes a mes"
-        >
+        <ChartBox title={dt.netMonthlyFlow} subtitle={dt.cashRetentionCapacity}>
           <ResponsiveContainer width="100%" height={240}>
             <BarChart
               data={monthlyAggregatedData}
@@ -1688,8 +1984,15 @@ export function FinancialDashboardPage() {
 
         {/* Chart 6: Principal categoría de egreso */}
         <ChartBox
-          title={`Evolución de: ${topExpenseCategory}`}
-          subtitle="Histórico mensual de la categoría principal de egresos operacionales"
+          title={
+            (language === 'en' ? 'Evolution of: ' : 'Evolución de: ') +
+            (topExpenseCategory === 'Sin asignar'
+              ? language === 'en'
+                ? 'Unassigned'
+                : 'Sin asignar'
+              : topExpenseCategory)
+          }
+          subtitle={dt.topExpenseHistory}
         >
           <ResponsiveContainer width="100%" height={240}>
             <BarChart
@@ -1719,7 +2022,13 @@ export function FinancialDashboardPage() {
               <Bar
                 dataKey="Monto"
                 fill={PALETTE.morado}
-                name={topExpenseCategory}
+                name={
+                  topExpenseCategory === 'Sin asignar'
+                    ? language === 'en'
+                      ? 'Unassigned'
+                      : 'Sin asignar'
+                    : topExpenseCategory
+                }
                 radius={[4, 4, 0, 0]}
                 barSize={18}
               />
@@ -1728,10 +2037,7 @@ export function FinancialDashboardPage() {
         </ChartBox>
 
         {/* Chart 7: Gastos recurrentes principales por mes */}
-        <ChartBox
-          title="Gastos recurrentes principales por mes"
-          subtitle="Histórico mensual de las principales salidas operacionales del usuario"
-        >
+        <ChartBox title={dt.topRecurrentExpenses} subtitle={dt.topRecurrentHistory}>
           <ResponsiveContainer width="100%" height={240}>
             <BarChart
               data={recurrentExpensesData}
@@ -1766,23 +2072,26 @@ export function FinancialDashboardPage() {
                     dataKey={cat}
                     stackId="a"
                     fill={colors[idx % colors.length]}
-                    name={cat}
+                    name={
+                      cat === 'Sin asignar'
+                        ? language === 'en'
+                          ? 'Unassigned'
+                          : 'Sin asignar'
+                        : cat
+                    }
                     radius={idx === top3ExpenseCategories.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
                   />
                 );
               })}
               {top3ExpenseCategories.length === 0 && (
-                <Bar dataKey="Sin asignar" fill={PALETTE.gris} name="Sin gastos a clasificar" />
+                <Bar dataKey="Sin asignar" fill={PALETTE.gris} name={dt.noExpensesToClassify} />
               )}
             </BarChart>
           </ResponsiveContainer>
         </ChartBox>
 
         {/* Chart 8: Tendencia de principales fuentes de ingresos */}
-        <ChartBox
-          title="Tendencia de principales fuentes de ingresos"
-          subtitle="Desempeño mensual de los créditos mayores registrados"
-        >
+        <ChartBox title={dt.topIncomeTrends} subtitle={dt.topIncomeTrendsHistory}>
           <ResponsiveContainer width="100%" height={240}>
             <LineChart
               data={platformIncomeData}
@@ -1820,7 +2129,13 @@ export function FinancialDashboardPage() {
                     strokeWidth={2}
                     dot={{ r: 3 }}
                     activeDot={{ r: 5 }}
-                    name={cat}
+                    name={
+                      cat === 'Sin asignar'
+                        ? language === 'en'
+                          ? 'Unassigned'
+                          : 'Sin asignar'
+                        : cat
+                    }
                   />
                 );
               })}
@@ -1829,7 +2144,7 @@ export function FinancialDashboardPage() {
                   type="monotone"
                   dataKey="Sin asignar"
                   stroke={PALETTE.gris}
-                  name="Sin ingresos a clasificar"
+                  name={dt.noIncomeToClassify}
                 />
               )}
             </LineChart>
@@ -1837,10 +2152,7 @@ export function FinancialDashboardPage() {
         </ChartBox>
 
         {/* Chart 9: Saldo Promedio Mensual */}
-        <ChartBox
-          title="Saldo promedio mensual"
-          subtitle="Promedio del saldo diario con umbral de seguridad"
-        >
+        <ChartBox title={dt.avgMonthlyBalance} subtitle={dt.avgDailyBalanceDesc}>
           <ResponsiveContainer width="100%" height={240}>
             <BarChart
               data={monthlyAggregatedData}
@@ -1872,7 +2184,7 @@ export function FinancialDashboardPage() {
                 strokeWidth={1.5}
                 strokeDasharray="6 4"
                 label={{
-                  value: 'Umbral Mínimo $15,000',
+                  value: language === 'en' ? 'Minimum Threshold $15,000' : 'Umbral Mínimo $15,000',
                   position: 'top',
                   fill: PALETTE.rojo,
                   fontSize: 10,
@@ -1894,8 +2206,16 @@ export function FinancialDashboardPage() {
 
         {/* Chart 10: Composición de ingresos: Principal fuente vs Resto */}
         <ChartBox
-          title={`Composición: ${topIncomeCategory} vs Resto`}
-          subtitle="Comparativa del principal ingreso frente a otras fuentes secundarias"
+          title={
+            (language === 'en' ? 'Composition: ' : 'Composición: ') +
+            (topIncomeCategory === 'Sin asignar'
+              ? language === 'en'
+                ? 'Unassigned'
+                : 'Sin asignar'
+              : topIncomeCategory) +
+            (language === 'en' ? ' vs Rest' : ' vs Resto')
+          }
+          subtitle={dt.mainIncomeVsOthers}
         >
           <ResponsiveContainer width="100%" height={240}>
             <BarChart
@@ -1923,12 +2243,23 @@ export function FinancialDashboardPage() {
               />
               <Tooltip formatter={(value: any) => formatCurrency(value)} />
               <Legend verticalAlign="top" height={36} iconType="circle" />
-              <Bar dataKey="Rentas" stackId="a" fill={PALETTE.verde} name={topIncomeCategory} />
+              <Bar
+                dataKey="Rentas"
+                stackId="a"
+                fill={PALETTE.verde}
+                name={
+                  topIncomeCategory === 'Sin asignar'
+                    ? language === 'en'
+                      ? 'Unassigned'
+                      : 'Sin asignar'
+                    : topIncomeCategory
+                }
+              />
               <Bar
                 dataKey="Operaciones"
                 stackId="a"
                 fill={PALETTE.morado}
-                name="Otros ingresos"
+                name={dt.otherIncome}
                 radius={[4, 4, 0, 0]}
               />
             </BarChart>
@@ -1945,13 +2276,13 @@ export function FinancialDashboardPage() {
               <AlertCircle className="w-5 h-5" />
             </span>
             <h2 className="text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-wider">
-              Señales de Alerta
+              {dt.alertSignals}
             </h2>
           </div>
           <div className="flex-1 space-y-4">
             {categorizedConclusions.alerts.length === 0 ? (
               <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 italic uppercase">
-                Sin alertas críticas detectadas
+                {dt.noCriticalAlerts}
               </p>
             ) : (
               categorizedConclusions.alerts.map((conc, idx) => (
@@ -1981,7 +2312,7 @@ export function FinancialDashboardPage() {
               <Layers className="w-5 h-5" />
             </span>
             <h2 className="text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-wider">
-              Estructura del Negocio
+              {dt.businessStructure}
             </h2>
           </div>
           <div className="flex-1 space-y-4">
@@ -2011,7 +2342,7 @@ export function FinancialDashboardPage() {
               <Zap className="w-5 h-5" />
             </span>
             <h2 className="text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-wider">
-              Oportunidades
+              {dt.opportunities}
             </h2>
           </div>
           <div className="flex-1 space-y-4">
@@ -2040,7 +2371,7 @@ export function FinancialDashboardPage() {
         <div className="flex items-center gap-2">
           <FileSpreadsheet className="w-5 h-5 text-teal-600" />
           <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-            Módulo de Exportación Legal & Tributaria
+            {dt.legalTaxExportModule}
           </span>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -2052,7 +2383,7 @@ export function FinancialDashboardPage() {
             disabled={filteredTransactions.length === 0}
           >
             <Download className="w-4 h-4" />
-            Exportar CSV de transacciones clasificadas
+            {dt.exportClassifiedCSV}
           </Button>
 
           <Button
@@ -2063,7 +2394,7 @@ export function FinancialDashboardPage() {
             disabled={monthlyAggregatedData.length === 0}
           >
             <Download className="w-4 h-4" />
-            Exportar resumen mensual CSV
+            {dt.exportMonthlySummaryCSV}
           </Button>
         </div>
       </footer>
@@ -2084,71 +2415,80 @@ export function FinancialDashboardPage() {
             </button>
 
             <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-4">
-              Estructura del archivo requerida
+              {dt.requiredFileStructure}
             </h3>
             <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
-              El motor de conciliación y el dashboard financiero importan archivos de extractos
-              bancarios en formatos <strong>CSV</strong>, <strong>OFX</strong> y{' '}
-              <strong>QFX</strong>. Al importar un archivo CSV, asegúrate de mapear o estructurar
-              las siguientes columnas básicas:
+              {dt.supportedFormatHelpDesc}
             </p>
 
             <div className="overflow-hidden border border-slate-200 dark:border-slate-800 rounded-2xl mb-6">
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50 dark:bg-slate-950 font-bold text-slate-400 border-b border-slate-200 dark:border-slate-800">
                   <tr>
-                    <th className="px-4 py-3">Columna</th>
-                    <th className="px-4 py-3">Tipo</th>
-                    <th className="px-4 py-3">Descripción</th>
+                    <th className="px-4 py-3">{dt.columnHeader}</th>
+                    <th className="px-4 py-3">{dt.typeHeader}</th>
+                    <th className="px-4 py-3">{dt.descriptionHeader}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-150 dark:divide-slate-850 font-medium text-slate-700 dark:text-slate-300">
                   <tr>
                     <td className="px-4 py-3 font-bold text-slate-900 dark:text-white">fecha</td>
-                    <td className="px-4 py-3">Texto</td>
+                    <td className="px-4 py-3">{language === 'en' ? 'Text' : 'Texto'}</td>
                     <td className="px-4 py-3">
-                      Fecha de la transacción (YYYY-MM-DD, MM/DD/YYYY o DD/MM/YYYY).
+                      {language === 'en'
+                        ? 'Transaction date (YYYY-MM-DD, MM/DD/YYYY or DD/MM/YYYY).'
+                        : 'Fecha de la transacción (YYYY-MM-DD, MM/DD/YYYY o DD/MM/YYYY).'}
                     </td>
                   </tr>
                   <tr>
                     <td className="px-4 py-3 font-bold text-slate-900 dark:text-white">
                       descripcion
                     </td>
-                    <td className="px-4 py-3">Texto</td>
+                    <td className="px-4 py-3">{language === 'en' ? 'Text' : 'Texto'}</td>
                     <td className="px-4 py-3">
-                      Concepto, beneficiario o descripción detallada de la transacción.
+                      {language === 'en'
+                        ? 'Concept, beneficiary or detailed description of the transaction.'
+                        : 'Concepto, beneficiario o descripción detallada de la transacción.'}
                     </td>
                   </tr>
                   <tr>
                     <td className="px-4 py-3 font-bold text-slate-900 dark:text-white">monto</td>
-                    <td className="px-4 py-3">Número</td>
+                    <td className="px-4 py-3">{language === 'en' ? 'Number' : 'Número'}</td>
                     <td className="px-4 py-3">
-                      Valor numérico de la transacción (debitos negativos, creditos positivos).
+                      {language === 'en'
+                        ? 'Numeric value of the transaction (negative debits, positive credits).'
+                        : 'Valor numérico de la transacción (debitos negativos, creditos positivos).'}
                     </td>
                   </tr>
                   <tr>
                     <td className="px-4 py-3 font-bold text-slate-900 dark:text-white">tipo</td>
-                    <td className="px-4 py-3">Texto</td>
+                    <td className="px-4 py-3">{language === 'en' ? 'Text' : 'Texto'}</td>
                     <td className="px-4 py-3">
-                      Dirección del flujo ("credito" o "debito"). Opcional si el monto tiene signo.
+                      {language === 'en'
+                        ? 'Flow direction ("credit" or "debit"). Optional if amount has sign.'
+                        : 'Dirección del flujo ("credito" o "debito"). Opcional si el monto tiene signo.'}
                     </td>
                   </tr>
                   <tr>
                     <td className="px-4 py-3 font-bold text-slate-900 dark:text-white">
                       cuenta_contable
                     </td>
-                    <td className="px-4 py-3">Texto</td>
+                    <td className="px-4 py-3">{language === 'en' ? 'Text' : 'Texto'}</td>
                     <td className="px-4 py-3">
-                      Código contable o cuenta del catálogo asociada (opcional).
+                      {language === 'en'
+                        ? 'Accounting code or associated catalog account (optional).'
+                        : 'Código contable o cuenta del catálogo asociada (opcional).'}
                     </td>
                   </tr>
                   <tr>
                     <td className="px-4 py-3 font-bold text-slate-900 dark:text-white">
                       conciliado
                     </td>
-                    <td className="px-4 py-3">Booleano</td>
+                    <td className="px-4 py-3">{language === 'en' ? 'Boolean' : 'Booleano'}</td>
                     <td className="px-4 py-3">
-                      "si"/"no", "true"/"false" o "1"/"0" (opcional, por defecto "no").
+                      {language === 'en'
+                        ? '"yes"/"no", "true"/"false" or "1"/"0" (optional, default "no").'
+                        : '"si"/"no", "true"/"false" o "1"/"0" (opcional, por defecto "no").'}
                     </td>
                   </tr>
                 </tbody>
@@ -2157,9 +2497,7 @@ export function FinancialDashboardPage() {
 
             <p className="text-xs text-slate-400 font-medium flex items-start gap-1.5">
               <Info className="w-4 h-4 shrink-0 text-teal-500" />
-              El sistema cuenta con un motor de tolerancia inteligente para inferir campos
-              incompletos, corregir formatos de fechas y deducir la clasificación contable en base a
-              reglas dinámicas.
+              {dt.supportedFormatHelpFootnote}
             </p>
           </motion.div>
         </div>
