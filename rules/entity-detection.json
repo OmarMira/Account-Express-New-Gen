@@ -49,8 +49,8 @@
       },
       {
         "priority": 3,
-        "pattern": "^(RAISER|LYFT\\.COM|TURO|AMERICAN EXPRESS|SETOYOTA FIN|HOME DEPOT|KMF)\\b",
-        "description": "Captura nombres de empresas al inicio de la descripción."
+        "pattern": "^(RAISER\\s*\\d*|LYFT[\\*\\.]?COM|TURO\\s*\\d*|AMERICAN\\s*EXPRESS|SETOYOTA\\s*FIN[\\/\\w]*|HOME\\s*DEPOT|KMF[\\w\\.]*|UBER\\s*USA\\s*\\d*|RIDELYFT)\\b",
+        "description": "Captura nombres de empresas con variantes numéricas y de formato al inicio de la descripción."
       },
       {
         "priority": 4,

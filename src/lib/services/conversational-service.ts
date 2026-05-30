@@ -1,6 +1,7 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { db } from '@/lib/db';
+import { safeAuditLog } from './audit-service';
 
 export interface ConversationalParseResult {
   role: string;
@@ -77,6 +78,7 @@ export async function parseConversationalContext(
   companyId: string,
   pattern: string,
   userInput: string,
+  userId?: string,
 ): Promise<ConversationalParseResult> {
   const apiKey = process.env.AI_API_KEY;
   const baseUrl = process.env.AI_BASE_URL;
@@ -115,6 +117,22 @@ export async function parseConversationalContext(
         const content = resData.choices?.[0]?.message?.content;
         if (content) {
           parsed = JSON.parse(content);
+
+          // 🔍 AUDITORÍA: Registrar respuesta cruda de IA externa
+          if (userId) {
+            safeAuditLog({
+              companyId,
+              userId,
+              action: 'AI_EXTERNAL_RESPONSE_RECEIVED',
+              entity: 'EntityContext',
+              details: {
+                pattern,
+                userInput,
+                aiResponse: parsed,
+                timestamp: new Date().toISOString(),
+              },
+            }).catch((e) => console.warn('[AI AUDIT LOG FAIL]', e));
+          }
         }
       }
     } catch (err) {

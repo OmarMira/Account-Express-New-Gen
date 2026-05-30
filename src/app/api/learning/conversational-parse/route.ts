@@ -47,8 +47,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // Ejecutar el parser
-    const result = await parseConversationalContext(companyId, pattern, userInput);
+    // Ejecutar el parser (con userId para auditoría de respuesta IA externa)
+    const result = await parseConversationalContext(companyId, pattern, userInput, userId);
 
     // ─── VALIDACIÓN CRÍTICA DE DIRECCIONALIDAD ───
     const creditPct = directionProfile.creditPct;
