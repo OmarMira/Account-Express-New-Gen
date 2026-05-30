@@ -321,11 +321,11 @@ export class ImportService {
 
     // ─── Validar statement duplicado ANTES de insertar ───────────────
     const existingStatement = await db.bankStatement.findFirst({
-      where: { bankAccountId, startDate, endDate },
+      where: { bankAccountId, startDate },
     });
     if (existingStatement) {
       throw new ConflictError(
-        `Statement for period ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]} was already imported on ${existingStatement.createdAt.toISOString().split('T')[0]}`,
+        `Ya existe un extracto para el período que inicia el ${startDate.toISOString().split('T')[0]}. Elimine el anterior o use un período diferente.`,
       );
     }
 
