@@ -24,6 +24,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // ─── VALIDACIÓN: directionProfile obligatorio ───────────────────
+    const directionProfile = body.directionProfile;
+    if (
+      !directionProfile ||
+      typeof directionProfile.creditPct !== 'number' ||
+      typeof directionProfile.debitPct !== 'number'
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            'directionProfile con creditPct/debitPct numérico es obligatorio para validación contable.',
+        },
+        { status: 400 },
+      );
+    }
+
     const membership = await db.companyMember.findUnique({
       where: { userId_companyId: { userId, companyId } },
     });
@@ -35,9 +51,8 @@ export async function POST(request: NextRequest) {
     const result = await parseConversationalContext(companyId, pattern, userInput);
 
     // ─── VALIDACIÓN CRÍTICA DE DIRECCIONALIDAD ───
-    const directionProfile = body.directionProfile || { creditPct: 0, debitPct: 0 };
-    const creditPct = directionProfile.creditPct ?? 0;
-    const debitPct = directionProfile.debitPct ?? 0;
+    const creditPct = directionProfile.creditPct;
+    const debitPct = directionProfile.debitPct;
     const suggestedAccountType = result.glAccountCode?.charAt(0);
 
     if (suggestedAccountType) {

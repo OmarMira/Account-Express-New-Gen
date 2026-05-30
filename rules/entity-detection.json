@@ -39,8 +39,8 @@
     "strategies": [
       {
         "priority": 1,
-        "pattern": "\\bINDN:\\s*([A-ZÀ-ÿ\\s\\.&]{2,40})\\b",
-        "description": "Busca nombre tras marcador 'INDN:' (común en ACH/Wires/Plataformas)."
+        "pattern": "\\bINDN:\\s*([A-ZÀ-ÿ\\s\\.&]+?)(?=\\s+(?:CO ID:|ID:|CCD|WEB|$))",
+        "description": "Busca nombre tras 'INDN:' hasta marcador técnico (CO ID:, ID:, CCD, WEB). Corrige truncado por \\b."
       },
       {
         "priority": 2,
