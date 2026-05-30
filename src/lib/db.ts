@@ -19,6 +19,23 @@ export const db = isEdge
       ],
     }));
 
+// Optimización para SQLite (WAL Mode)
+if (!isEdge && db) {
+  db.$connect()
+    .then(async () => {
+      try {
+        await db.$executeRawUnsafe(`PRAGMA journal_mode=WAL;`);
+        await db.$executeRawUnsafe(`PRAGMA synchronous=NORMAL;`);
+        console.log('✅ Base de datos configurada en modo WAL para alta concurrencia.');
+      } catch (err) {
+        console.warn('⚠️ Fallo al activar WAL mode:', err);
+      }
+    })
+    .catch((err) => {
+      console.error('⚠️ DB connect failed:', err);
+    });
+}
+
 // ─── Query Profiling ─────────────────────────────────────────────────────────
 // Track all queries; log slow ones (>100ms); alert on critical ones (>500ms).
 if (!isEdge && db) {
@@ -33,9 +50,11 @@ if (!isEdge && db) {
     }
 
     if (duration > 500) {
-      import('./alerts').then(({ alertIfSlowQuery }) => {
-        alertIfSlowQuery(duration, query);
-      }).catch(() => {});
+      import('./alerts')
+        .then(({ alertIfSlowQuery }) => {
+          alertIfSlowQuery(duration, query);
+        })
+        .catch(() => {});
     }
   });
 }

@@ -32,6 +32,13 @@ export function checkRateLimit(
     const key = `${userId}:${companyId}`;
     const now = Date.now();
 
+    // Limpieza pasiva activa (in-line garbage collection para evitar memory leaks)
+    for (const [winKey, winVal] of requestWindows.entries()) {
+      if (now >= winVal.resetAt) {
+        requestWindows.delete(winKey);
+      }
+    }
+
     // Determinar límite según ruta
     let limit = config.default.requestsPerMinute;
     let burst = config.default.burstMultiplier;

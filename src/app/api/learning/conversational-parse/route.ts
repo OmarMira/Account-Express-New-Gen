@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
 import { parseConversationalContext } from '@/lib/services/conversational-service';
+import { safeAuditLog } from '@/lib/services/audit-service';
 
 // ── POST /api/learning/conversational-parse ──────────────────────
 export async function POST(request: NextRequest) {
@@ -33,25 +34,22 @@ export async function POST(request: NextRequest) {
     // Ejecutar el parser
     const result = await parseConversationalContext(companyId, pattern, userInput);
 
-    // ─── FIX: Proteger el AuditLog para evitar fallos fatales ───
+    // ─── FIX: Proteger el AuditLog usando el servicio seguro ───
     try {
-      await db.auditLog.create({
-        data: {
-          companyId,
-          userId,
-          action: 'CONVERSATIONAL_CONTEXT_PARSED',
-          entity: 'EntityContext',
-          details: JSON.stringify({
-            pattern,
-            userInput,
-            parsedRole: result.role,
-            parsedGlAccountCode: result.glAccountCode,
-            suggestSubAccount: result.suggestSubAccount,
-          }),
+      await safeAuditLog({
+        companyId,
+        userId,
+        action: 'CONVERSATIONAL_CONTEXT_PARSED',
+        entity: 'EntityContext',
+        details: {
+          pattern,
+          userInput,
+          parsedRole: result.role,
+          parsedGlAccountCode: result.glAccountCode,
+          suggestSubAccount: result.suggestSubAccount,
         },
       });
     } catch (auditErr) {
-      // Si falla el log, no detenemos la respuesta al usuario
       console.warn('[AUDIT LOG FAILED]', auditErr);
     }
     // ──────────────────────────────────────────────────────────────
