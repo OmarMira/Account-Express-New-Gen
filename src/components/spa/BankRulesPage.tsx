@@ -427,40 +427,31 @@ export function BankRulesPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[100px]">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="gap-1 h-auto p-0 font-medium text-xs"
-                        onClick={toggleSort}
-                      >
-                        {t('bankRules.priority')}
-                        {sortDir === 'asc' ? (
-                          <ArrowUp className="size-3" />
-                        ) : (
-                          <ArrowDown className="size-3" />
-                        )}
-                      </Button>
+                    <TableHead className="w-[25%]">{t('bankRules.ruleName')}</TableHead>
+                    <TableHead className="w-[35%]">{t('bankRules.condition')}</TableHead>
+                    <TableHead className="w-[25%]">{t('bankRules.assignToAccount')}</TableHead>
+                    <TableHead className="w-[10%] text-center">
+                      {t('bankRules.autoMatches')}
                     </TableHead>
-                    <TableHead>{t('bankRules.ruleName')}</TableHead>
-                    <TableHead>{t('bankRules.condition')}</TableHead>
-                    <TableHead>{t('bankRules.assignToAccount')}</TableHead>
-                    <TableHead className="text-center">{t('bankRules.autoMatches')}</TableHead>
-                    <TableHead className="text-center">{t('common.status')}</TableHead>
-                    <TableHead className="text-right">{t('common.actions')}</TableHead>
+                    <TableHead className="w-[5%] text-right">{t('common.actions')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {sortedRules.map((rule) => (
                     <TableRow key={rule.id} className={!rule.isActive ? 'opacity-60' : ''}>
-                      <TableCell>{getPriorityBadge(rule.priority, t)}</TableCell>
-                      <TableCell className="font-medium">{rule.name}</TableCell>
-                      <TableCell>
-                        <span className="text-sm text-muted-foreground">
-                          {getConditionDisplay(rule, t)}
-                        </span>
+                      <TableCell className="font-medium max-w-[200px] truncate" title={rule.name}>
+                        {rule.name}
                       </TableCell>
-                      <TableCell>
+                      <TableCell
+                        className="max-w-[250px] truncate text-sm text-muted-foreground"
+                        title={getConditionDisplay(rule, t)}
+                      >
+                        {getConditionDisplay(rule, t)}
+                      </TableCell>
+                      <TableCell
+                        className="max-w-[200px] truncate"
+                        title={`${rule.glAccount.code} ${rule.glAccount.name}`}
+                      >
                         <span className="flex items-center gap-2">
                           <span className="font-mono text-xs text-teal-600 dark:text-teal-400">
                             {rule.glAccount.code}
@@ -472,12 +463,6 @@ export function BankRulesPage() {
                         <Badge variant="secondary" className="font-mono">
                           {rule._matchCount}
                         </Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Switch
-                          checked={rule.isActive}
-                          onCheckedChange={() => handleToggleActive(rule)}
-                        />
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
@@ -736,6 +721,10 @@ export function BankRulesPage() {
         }}
       >
         <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Generador de Reglas IA</DialogTitle>
+            <DialogDescription>Generador de reglas automáticas usando IA local</DialogDescription>
+          </DialogHeader>
           <AIRulesGeneratorTab />
         </DialogContent>
       </Dialog>

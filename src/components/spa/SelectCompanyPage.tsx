@@ -191,8 +191,12 @@ export function SelectCompanyPage() {
                       onClick={() => handleSelectCompany(company)}
                       className="flex w-full items-center gap-3 rounded-lg border p-4 text-left transition-colors hover:bg-accent hover:border-primary/50 group"
                     >
-                      <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                        <Building2 className="size-5 text-primary" />
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border bg-muted/20 overflow-hidden">
+                        {company.logo ? (
+                          <img src={company.logo} alt="Logo" className="size-full object-cover" />
+                        ) : (
+                          <Building2 className="size-5 text-primary" />
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-medium truncate">{company.legalName}</p>

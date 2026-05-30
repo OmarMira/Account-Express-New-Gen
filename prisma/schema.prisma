@@ -15,6 +15,13 @@ model User {
   lastName     String
   role         String   @default("company_admin") // super_admin | company_admin
   isActive     Boolean  @default(true)
+  phone        String   @default("")
+  streetLine1  String   @default("")
+  streetLine2  String   @default("")
+  city         String   @default("")
+  state        String   @default("")
+  zipCode      String   @default("")
+  avatar       String   @default("")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -32,6 +39,11 @@ model Company {
   phone     String?
   email     String?
   logo      String?
+  streetLine1          String   @default("")
+  streetLine2          String   @default("")
+  city                 String   @default("")
+  state                String   @default("")
+  zipCode              String   @default("")
   isActive           Boolean  @default(true)
   isOnboardingComplete Boolean  @default(false)
   createdAt          DateTime @default(now())
@@ -46,6 +58,7 @@ model Company {
   statements           BankStatement[]
   reconciliationPeriods ReconciliationPeriod[]
   auditLogs            AuditLog[]
+  entityContexts       EntityContext[]
 }
 
 model CompanyMember {
@@ -81,6 +94,7 @@ model GlAccount {
   bankAccounts BankAccount[]
   bankRules    BankRule[]
   transactions BankTransaction[]
+  entityContexts EntityContext[]
 
   @@unique([companyId, code])
   @@index([companyId, parentId])
@@ -283,5 +297,22 @@ model Session {
   @@index([userId])
   @@index([token])
   @@index([userId, expiresAt])
+}
+
+model EntityContext {
+  id          String   @id @default(cuid())
+  companyId   String
+  pattern     String
+  role        String
+  glAccountId String?
+  source      String   @default("user") // user | ai
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company    Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  glAccount  GlAccount? @relation(fields: [glAccountId], references: [id], onDelete: SetNull)
+
+  @@unique([companyId, pattern])
+  @@index([companyId])
 }
 

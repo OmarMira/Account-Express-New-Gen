@@ -18,6 +18,7 @@ import { useAuthStore } from '@/store/auth-store';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
+import { UserProfileTab } from './settings/UserProfileTab';
 import { CompanyDataTab } from './settings/CompanyDataTab';
 import { UsersTab } from './settings/UsersTab';
 import { RolesTab } from './settings/RolesTab';
@@ -35,6 +36,7 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
+  { id: 'user-profile', labelKey: 'settings.userProfile', icon: Users },
   { id: 'company', labelKey: 'settings.companyData', icon: Building2 },
   { id: 'users', labelKey: 'settings.userManagement', icon: Users },
   { id: 'roles', labelKey: 'settings.rolesPermissions', icon: Shield },
@@ -65,8 +67,8 @@ const contentVariants = {
 export function SettingsPage() {
   const t = useLanguageStore((s) => s.t);
   const activeCompany = useAuthStore((s) => s.activeCompany);
-
-  const [activeTab, setActiveTab] = useState('company');
+  const activeTab = useAuthStore((s) => s.settingsActiveTab);
+  const setActiveTab = useAuthStore((s) => s.setSettingsActiveTab);
 
   const subtitle = activeCompany?.legalName
     ? t('settings.systemSubtitle').replace('{company}', activeCompany.legalName)
@@ -74,6 +76,8 @@ export function SettingsPage() {
 
   function renderContent() {
     switch (activeTab) {
+      case 'user-profile':
+        return <UserProfileTab />;
       case 'company':
         return <CompanyDataTab />;
       case 'users':
@@ -89,7 +93,7 @@ export function SettingsPage() {
       case 'ai-config':
         return <AiConfigTab />;
       default:
-        return <CompanyDataTab />;
+        return <UserProfileTab />;
     }
   }
 

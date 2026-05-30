@@ -95,7 +95,7 @@ describe('Security Layer - Unit & Integration Tests', () => {
         body: JSON.stringify({ description: 'Pago de Renta "Marzo 2026" - O\'Brien' }),
       });
 
-      const data = await validateRequest(req, schema);
+      const data = (await validateRequest(req, schema)) as { description: string };
       expect(data.description).toBe('Pago de Renta "Marzo 2026" - O\'Brien');
     });
   });

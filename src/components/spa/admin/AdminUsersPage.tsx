@@ -15,6 +15,10 @@ import {
   Calendar,
   Lock,
   CheckCircle,
+  Upload,
+  Save,
+  Phone,
+  MapPin,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,6 +31,60 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { AddressAutocomplete } from '@/components/ui/address-autocomplete';
+
+const US_STATES = [
+  'AL',
+  'AK',
+  'AZ',
+  'AR',
+  'CA',
+  'CO',
+  'CT',
+  'DE',
+  'FL',
+  'GA',
+  'HI',
+  'ID',
+  'IL',
+  'IN',
+  'IA',
+  'KS',
+  'KY',
+  'LA',
+  'ME',
+  'MD',
+  'MA',
+  'MI',
+  'MN',
+  'MS',
+  'MO',
+  'MT',
+  'NE',
+  'NV',
+  'NH',
+  'NJ',
+  'NM',
+  'NY',
+  'NC',
+  'ND',
+  'OH',
+  'OK',
+  'OR',
+  'PA',
+  'RI',
+  'SC',
+  'SD',
+  'TN',
+  'TX',
+  'UT',
+  'VT',
+  'VA',
+  'WA',
+  'WV',
+  'WI',
+  'WY',
+];
 
 interface User {
   id: string;
@@ -35,6 +93,13 @@ interface User {
   lastName: string;
   role: string;
   isActive: boolean;
+  phone?: string;
+  streetLine1?: string;
+  streetLine2?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  avatar?: string;
   createdAt: string;
 }
 
@@ -143,8 +208,17 @@ export default function AdminUsersPage() {
     lastName: '',
     password: '',
     role: 'company_admin',
+    phone: '',
+    streetLine1: '',
+    streetLine2: '',
+    city: '',
+    state: '',
+    zipCode: '',
     isActive: true,
   });
+
+  const [avatarPreview, setAvatarPreview] = useState('');
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -173,8 +247,16 @@ export default function AdminUsersPage() {
       lastName: '',
       password: '',
       role: 'company_admin',
+      phone: '',
+      streetLine1: '',
+      streetLine2: '',
+      city: '',
+      state: '',
+      zipCode: '',
       isActive: true,
     });
+    setAvatarPreview('');
+    setAvatarFile(null);
     setModalOpen(true);
   };
 
@@ -186,8 +268,16 @@ export default function AdminUsersPage() {
       lastName: user.lastName,
       password: '', // Leave empty to keep unchanged
       role: user.role,
+      phone: user.phone || '',
+      streetLine1: user.streetLine1 || '',
+      streetLine2: user.streetLine2 || '',
+      city: user.city || '',
+      state: user.state || '',
+      zipCode: user.zipCode || '',
       isActive: user.isActive,
     });
+    setAvatarPreview(user.avatar || '');
+    setAvatarFile(null);
     setModalOpen(true);
   };
 
@@ -200,23 +290,40 @@ export default function AdminUsersPage() {
       const url = editingUser ? `/api/admin/users/${editingUser.id}` : '/api/admin/users';
       const method = editingUser ? 'PATCH' : 'POST';
 
-      const payload: any = { ...formData };
-      if (editingUser && !payload.password) {
-        delete payload.password; // Do not send empty password on update
+      const data = new FormData();
+      data.append('email', formData.email);
+      data.append('firstName', formData.firstName);
+      data.append('lastName', formData.lastName);
+      data.append('role', formData.role);
+      data.append('isActive', String(formData.isActive));
+
+      if (formData.password) {
+        data.append('password', formData.password);
+      }
+      data.append('phone', formData.phone);
+      data.append('streetLine1', formData.streetLine1);
+      data.append('streetLine2', formData.streetLine2);
+      data.append('city', formData.city);
+      data.append('state', formData.state);
+      data.append('zipCode', formData.zipCode);
+
+      if (avatarFile) {
+        data.append('avatar', avatarFile);
+      } else if (!avatarPreview && editingUser) {
+        data.append('avatarCleared', 'true');
       }
 
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: data,
       });
 
       if (res.ok) {
         setModalOpen(false);
         loadUsers();
       } else {
-        const data = await res.json();
-        alert(data.error || 'Ocurrió un error al guardar.');
+        const err = await res.json();
+        alert(err.error || 'Ocurrió un error al guardar.');
       }
     } catch (err) {
       console.error(err);
@@ -308,8 +415,12 @@ export default function AdminUsersPage() {
                 <div className="p-6 space-y-4">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="size-11 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-extrabold text-sm border border-indigo-500/10">
-                        {`${u.firstName?.[0] ?? ''}${u.lastName?.[0] ?? ''}`.toUpperCase()}
+                      <div className="size-11 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-extrabold text-sm border border-indigo-500/10 overflow-hidden shrink-0">
+                        {u.avatar ? (
+                          <img src={u.avatar} alt="Avatar" className="size-full object-cover" />
+                        ) : (
+                          `${u.firstName?.[0] ?? ''}${u.lastName?.[0] ?? ''}`.toUpperCase()
+                        )}
                       </div>
                       <div>
                         <h3 className="font-bold text-lg text-foreground group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors leading-snug">
@@ -342,6 +453,20 @@ export default function AdminUsersPage() {
                       <Mail className="size-4 text-muted-foreground" />
                       <span className="truncate">{u.email}</span>
                     </div>
+                    {u.phone && (
+                      <div className="flex items-center gap-2 text-foreground/80">
+                        <Phone className="size-4 text-muted-foreground animate-pulse" />
+                        <span>{u.phone}</span>
+                      </div>
+                    )}
+                    {u.streetLine1 && (
+                      <div className="flex items-center gap-2 text-foreground/80">
+                        <MapPin className="size-4 text-muted-foreground shrink-0" />
+                        <span className="truncate">
+                          {[u.streetLine1, u.city, u.state].filter(Boolean).join(', ')}
+                        </span>
+                      </div>
+                    )}
                     <div className="flex items-center gap-2 text-foreground/80">
                       <Calendar className="size-4 text-muted-foreground" />
                       <span>
@@ -389,7 +514,7 @@ export default function AdminUsersPage() {
 
       {/* Creation/Editing Modal */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="bg-slate-900 text-white border border-white/10 rounded-2xl max-w-lg shadow-2xl">
+        <DialogContent className="bg-slate-900 text-white border border-white/10 rounded-2xl max-w-xl shadow-2xl overflow-y-auto max-h-[90vh]">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold flex items-center gap-2 text-indigo-400">
               <UserPlus className="size-6" />
@@ -397,7 +522,55 @@ export default function AdminUsersPage() {
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4 py-2">
-            <div className="grid grid-cols-2 gap-4">
+            {/* Avatar upload */}
+            <div className="flex flex-col items-center justify-center gap-2 py-3 border border-dashed border-white/10 rounded-xl bg-slate-950/20">
+              <Label className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                Foto de Perfil
+              </Label>
+              <div className="relative group size-20 rounded-full overflow-hidden border border-white/10 bg-slate-950 flex items-center justify-center shadow-sm">
+                {avatarPreview ? (
+                  <img src={avatarPreview} alt="Avatar" className="size-full object-cover" />
+                ) : (
+                  <Users className="size-10 text-slate-600" />
+                )}
+                <label className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-white text-xs font-semibold">
+                  Cambiar
+                  <input
+                    type="file"
+                    accept="image/png, image/jpeg, image/svg+xml"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        if (file.size > 10 * 1024 * 1024) {
+                          alert('El archivo excede el límite de 10MB');
+                          return;
+                        }
+                        setAvatarFile(file);
+                        setAvatarPreview(URL.createObjectURL(file));
+                      }
+                    }}
+                  />
+                </label>
+              </div>
+              {avatarPreview && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-rose-400 hover:text-rose-50 hover:bg-rose-950/20 text-xs"
+                  onClick={() => {
+                    setAvatarFile(null);
+                    setAvatarPreview('');
+                  }}
+                >
+                  Eliminar foto
+                </Button>
+              )}
+              <p className="text-[10px] text-slate-500">Formatos: PNG, JPG, SVG. Máximo 1MB.</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
                   {dt.labelFirstName}
@@ -422,50 +595,149 @@ export default function AdminUsersPage() {
                   className="bg-slate-950 border-white/10 text-white rounded-xl focus:ring-indigo-500"
                 />
               </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
-                {dt.labelEmail}
-              </Label>
-              <Input
-                type="email"
-                required
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder={dt.placeholderEmail}
-                className="bg-slate-950 border-white/10 text-white rounded-xl focus:ring-indigo-500"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
-                {dt.labelPassword} {editingUser && dt.passwordHint}
-              </Label>
-              <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-500" />
+              <div className="space-y-1.5 md:col-span-2">
+                <Label className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                  {dt.labelEmail}
+                </Label>
                 <Input
-                  type="password"
-                  required={!editingUser}
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  placeholder={editingUser ? '••••••••' : dt.placeholderPassword}
-                  className="pl-11 bg-slate-950 border-white/10 text-white rounded-xl focus:ring-indigo-500"
+                  type="email"
+                  required
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder={dt.placeholderEmail}
+                  className="bg-slate-950 border-white/10 text-white rounded-xl focus:ring-indigo-500"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                  {dt.labelPassword} {editingUser && dt.passwordHint}
+                </Label>
+                <div className="relative">
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-500" />
+                  <Input
+                    type="password"
+                    required={!editingUser}
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    placeholder={editingUser ? '••••••••' : dt.placeholderPassword}
+                    className="pl-11 bg-slate-950 border-white/10 text-white rounded-xl focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                  {dt.labelRole}
+                </Label>
+                <select
+                  required
+                  value={formData.role}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                  className="block w-full rounded-xl border border-white/10 bg-slate-950 text-white px-4 py-2 text-sm focus:ring-indigo-500 outline-none h-[38px]"
+                >
+                  <option value="company_admin">{dt.roleCompanyAdmin}</option>
+                  <option value="super_admin">{dt.roleSuperAdmin}</option>
+                </select>
+              </div>
+
+              {/* Teléfono */}
+              <div className="space-y-1.5 md:col-span-2">
+                <Label className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                  Teléfono
+                </Label>
+                <Input
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  placeholder="+1 555-0199"
+                  className="bg-slate-950 border-white/10 text-white rounded-xl focus:ring-indigo-500"
+                />
+              </div>
+
+              {/* Autocomplete de dirección en EE.UU. */}
+              <div className="space-y-1.5 md:col-span-2">
+                <Label className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                  Dirección (Calle y Número)
+                </Label>
+                <AddressAutocomplete
+                  defaultValue={formData.streetLine1}
+                  onSelect={(addr) => {
+                    setFormData((prev) => {
+                      if (addr.streetLine1 === '') {
+                        return {
+                          ...prev,
+                          streetLine1: '',
+                          streetLine2: '',
+                          city: '',
+                          state: '',
+                          zipCode: '',
+                        };
+                      }
+                      return {
+                        ...prev,
+                        streetLine1: addr.streetLine1,
+                        streetLine2: addr.isManual
+                          ? prev.streetLine2
+                          : addr.streetLine2 || prev.streetLine2,
+                        city: addr.isManual ? prev.city : addr.city || prev.city,
+                        state: addr.isManual ? prev.state : addr.state || prev.state,
+                        zipCode: addr.isManual ? prev.zipCode : addr.zipCode || prev.zipCode,
+                      };
+                    });
+                  }}
+                  placeholder="Buscar dirección en EE.UU..."
+                />
+              </div>
+              <div className="space-y-1.5 md:col-span-2">
+                <Label className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                  Suite / Oficina / Unidad (Opcional)
+                </Label>
+                <Input
+                  value={formData.streetLine2}
+                  onChange={(e) => setFormData({ ...formData, streetLine2: e.target.value })}
+                  placeholder="Apt 2B"
+                  className="bg-slate-950 border-white/10 text-white rounded-xl focus:ring-indigo-500"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                  Ciudad / Localidad
+                </Label>
+                <Input
+                  value={formData.city}
+                  onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                  placeholder="Miami"
+                  className="bg-slate-950 border-white/10 text-white rounded-xl focus:ring-indigo-500"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                  Estado
+                </Label>
+                <select
+                  value={formData.state}
+                  onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                  className="flex h-9 w-full rounded-xl border border-white/10 bg-slate-950 text-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <option value="">Seleccione Estado</option>
+                  {US_STATES.map((st) => (
+                    <option key={st} value={st}>
+                      {st}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5 md:col-span-2">
+                <Label className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                  Código Postal (ZIP Code)
+                </Label>
+                <Input
+                  value={formData.zipCode}
+                  onChange={(e) => setFormData({ ...formData, zipCode: e.target.value })}
+                  placeholder="33101"
+                  className="bg-slate-950 border-white/10 text-white rounded-xl focus:ring-indigo-500"
                 />
               </div>
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
-                {dt.labelRole}
-              </Label>
-              <select
-                required
-                value={formData.role}
-                onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                className="block w-full rounded-xl border border-white/10 bg-slate-950 text-white px-4 py-2.5 text-sm focus:ring-indigo-500 outline-none"
-              >
-                <option value="company_admin">{dt.roleCompanyAdmin}</option>
-                <option value="super_admin">{dt.roleSuperAdmin}</option>
-              </select>
-            </div>
+
             {editingUser && (
               <div className="flex items-center gap-3 pt-2">
                 <input

@@ -116,10 +116,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
   if (limit) {
     transactions = await db.bankTransaction.findMany({
       where: txWhere,
-      orderBy: [
-        { date: 'asc' },
-        { id: 'asc' }
-      ],
+      orderBy: [{ date: 'asc' }, { id: 'asc' }],
       take: limit + 1,
       cursor: cursorParam ? { id: cursorParam } : undefined,
       skip: cursorParam ? 1 : undefined,
@@ -273,6 +270,7 @@ export const POST = apiHandler(async (request: NextRequest) => {
   }
 
   const body = await validateRequest(request, createReconciliationSchema);
+  if (body instanceof NextResponse) return body;
   const { companyId, bankAccountId, periodId } = body;
 
   // Verify access

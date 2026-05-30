@@ -3,6 +3,10 @@ import { parseCSV } from '@/lib/csv-parser';
 import { parseOFX } from '@/lib/ofx-parser';
 import { parsePDFAsync } from '@/lib/pdf-processor';
 import {
+  validateAccountHolder,
+  isStrictModeEnabled,
+} from '@/lib/validation/account-holder-validator';
+import {
   ValidationError,
   NotFoundError,
   ConflictError,
@@ -30,6 +34,8 @@ export class ImportService {
     extension,
     buffer,
     content,
+    userId,
+    bypassHolderValidation = false,
   }: {
     companyId: string;
     bankAccountId: string | null;
@@ -37,6 +43,8 @@ export class ImportService {
     extension: string;
     buffer: Buffer;
     content: string;
+    userId?: string;
+    bypassHolderValidation?: boolean;
   }): Promise<ImportResult> {
     const newAccountCreated = !bankAccountId;
 
@@ -49,6 +57,7 @@ export class ImportService {
       let closingBalance: number | undefined;
       let startDate: Date | undefined;
       let endDate: Date | undefined;
+      let accountHolder: string | undefined;
 
       try {
         const pdfStart = performance.now();
@@ -61,10 +70,39 @@ export class ImportService {
         closingBalance = parsed.closingBalance;
         startDate = parsed.startDate;
         endDate = parsed.endDate;
+        accountHolder = parsed.accountHolder;
       } catch (parseError) {
         throw new ValidationError(
           parseError instanceof Error ? parseError.message : 'Error al parsear el archivo PDF',
         );
+      }
+
+      // Pre-validation of account holder name
+      const company = await db.company.findUnique({
+        where: { id: companyId },
+        select: { legalName: true },
+      });
+
+      let holderDecision: 'auto_approved' | 'user_approved' | 'rejected' = 'auto_approved';
+      let similarityScore = 1.0;
+
+      if (company && accountHolder) {
+        const validation = validateAccountHolder(accountHolder, company.legalName);
+        similarityScore = validation.score;
+
+        if (validation.requiresApproval) {
+          if (isStrictModeEnabled()) {
+            throw new ValidationError(
+              `EL_TITULAR_NO_COINCIDE_STRICT:${accountHolder}:${company.legalName}:${Math.round(validation.score * 100)}`,
+            );
+          }
+          if (!bypassHolderValidation) {
+            throw new ValidationError(
+              `EL_TITULAR_NO_COINCIDE:${accountHolder}:${company.legalName}:${Math.round(validation.score * 100)}`,
+            );
+          }
+          holderDecision = 'user_approved';
+        }
       }
 
       const bankAccount = await this.findOrCreateBankAccount(
@@ -90,6 +128,31 @@ export class ImportService {
         fileName,
         balanceInfo,
       );
+
+      // Create Audit Log for holder validation
+      if (userId && accountHolder && company) {
+        await db.auditLog
+          .create({
+            data: {
+              companyId,
+              userId,
+              action:
+                holderDecision === 'auto_approved'
+                  ? 'HOLDER_VALIDATION_AUTO_APPROVED'
+                  : 'HOLDER_VALIDATION_USER_APPROVED',
+              entity: 'BankStatement',
+              entityId: result.statementId,
+              details: JSON.stringify({
+                fileName,
+                companyLegalName: company.legalName,
+                extractedHolderName: accountHolder,
+                similarityScore: Math.round(similarityScore * 100) / 100,
+                decision: holderDecision,
+              }),
+            },
+          })
+          .catch(() => {});
+      }
 
       return {
         ...result,

@@ -1,4 +1,7 @@
 import { db } from '@/lib/db';
+import { getPeriodStrategy } from '@/lib/fiscal-period/strategies';
+import * as fs from 'fs';
+import * as path from 'path';
 
 const CHART_OF_ACCOUNTS = [
   // Assets
@@ -113,10 +116,42 @@ const CHART_OF_ACCOUNTS = [
   },
 ];
 
+// Helper seguro para guardar configs en JSON sin modificar el schema de Prisma
+function saveCompanyConfig(companyId: string, currency: string, periodType: string) {
+  const rulesDir = path.join(process.cwd(), 'rules');
+  if (!fs.existsSync(rulesDir)) {
+    fs.mkdirSync(rulesDir, { recursive: true });
+  }
+  const configPath = path.join(rulesDir, 'company-config.json');
+  let configData: any = { companies: {} };
+  try {
+    if (fs.existsSync(configPath)) {
+      configData = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    }
+  } catch (err) {
+    console.error('[ONBOARDING] Error reading company-config.json, creating new', err);
+  }
+  if (!configData.companies) {
+    configData.companies = {};
+  }
+  configData.companies[companyId] = {
+    currency,
+    periodType,
+    taxModuleEnabled: false,
+    updatedAt: new Date().toISOString(),
+  };
+  fs.writeFileSync(configPath, JSON.stringify(configData, null, 2), 'utf8');
+}
+
 export async function completeOnboarding(
   companyId: string,
-  fiscalYearStartMonth: number, // 1 to 12
-  fiscalYearStartYear: number = 2025, // Nuevo parámetro dinámico para cargar periodos anteriores
+  legalName: string,
+  currency: string,
+  fiscalYearStartMonth: number,
+  fiscalYearStartYear: number,
+  periodType: 'CALENDAR' | 'CUSTOM_MONTHS' | 'WEEK_52_53',
+  initialCashBalance?: number,
+  userId?: string,
 ) {
   return await db.$transaction(async (tx) => {
     // 1. Validar que la compañía exista
@@ -127,39 +162,58 @@ export async function completeOnboarding(
       throw new Error(`La compañía con ID ${companyId} no existe.`);
     }
 
-    console.log(`[ONBOARDING] Initializing onboarding for company: ${company.legalName}`);
+    console.log(`[ONBOARDING] Initializing onboarding for: ${legalName}`);
 
-    // 2. Crear los FiscalPeriods para el año dinámico
-    // Calculamos el inicio del año fiscal basándonos en el mes especificado
-    const startYear = fiscalYearStartYear;
-    const startDate = new Date(Date.UTC(startYear, fiscalYearStartMonth - 1, 1, 0, 0, 0, 0));
-    const endDate = new Date(Date.UTC(startYear + 1, fiscalYearStartMonth - 1, 0, 23, 59, 59, 999));
+    // Actualizar nombre legal
+    await tx.company.update({
+      where: { id: companyId },
+      data: { legalName },
+    });
 
-    // Validar si ya existe el periodo fiscal para evitar duplicados
-    const periodName = `FY ${startYear}`;
-    const existingPeriod = await tx.fiscalPeriod.findUnique({
-      where: {
-        companyId_name: {
-          companyId,
-          name: periodName,
-        },
+    // Guardar moneda y tipo de periodo en config JSON inmutable
+    saveCompanyConfig(companyId, currency, periodType);
+
+    // 2. Generar Períodos Fiscales con el Patrón Strategy
+    const strategy = getPeriodStrategy(periodType);
+    const calculatedPeriods = strategy.calculate({
+      year: fiscalYearStartYear,
+      config: {
+        type: periodType,
+        startMonth: fiscalYearStartMonth,
+        closingAccountCode: '3020',
+        periodsPerYear: 12,
+        allowShortPeriods: false,
       },
     });
 
-    if (!existingPeriod) {
-      await tx.fiscalPeriod.create({
-        data: {
-          companyId,
-          name: periodName,
-          startDate,
-          endDate,
-          isLocked: false,
+    // Guardar los períodos calculados de manera transaccional
+    for (const period of calculatedPeriods) {
+      const existingPeriod = await tx.fiscalPeriod.findUnique({
+        where: {
+          companyId_name: {
+            companyId,
+            name: period.name,
+          },
         },
       });
-      console.log(`[ONBOARDING] Created FiscalPeriod: ${periodName}`);
-    }
 
-    // 3. Crear Plan de Cuentas (Chart of Accounts)
+      if (!existingPeriod) {
+        await tx.fiscalPeriod.create({
+          data: {
+            companyId,
+            name: period.name,
+            startDate: period.startDate,
+            endDate: period.endDate,
+            isLocked: false,
+          },
+        });
+      }
+    }
+    console.log(
+      `[ONBOARDING] Generated ${calculatedPeriods.length} periods via ${periodType} strategy`,
+    );
+
+    // 3. Crear Plan de Cuentas GAAP (COA) - Obligatorio antes del asiento de apertura (FK Constraint Guardrail 1)
     const existingAccountsCount = await tx.glAccount.count({
       where: { companyId },
     });
@@ -167,7 +221,7 @@ export async function completeOnboarding(
     const accountIdMap = new Map<string, string>();
 
     if (existingAccountsCount === 0) {
-      console.log(`[ONBOARDING] Seeding standard chart of accounts...`);
+      console.log(`[ONBOARDING] Seeding GAAP chart of accounts...`);
       for (const account of CHART_OF_ACCOUNTS) {
         const created = await tx.glAccount.create({
           data: {
@@ -185,7 +239,6 @@ export async function completeOnboarding(
       }
       console.log(`[ONBOARDING] Created ${CHART_OF_ACCOUNTS.length} standard accounts`);
     } else {
-      // Si ya existen, mapeamos los códigos existentes
       const accounts = await tx.glAccount.findMany({
         where: { companyId },
       });
@@ -194,13 +247,98 @@ export async function completeOnboarding(
       }
     }
 
-    // 4. Marcar la compañía como configurada
+    // 4. Asiento de Apertura de Saldos Iniciales (Solo si initialCashBalance > 0)
+    let journalEntryId: string | undefined;
+    if (initialCashBalance && initialCashBalance > 0) {
+      const cashAccountId = accountIdMap.get('1010');
+      const equityAccountId = accountIdMap.get('3010');
+
+      if (!cashAccountId || !equityAccountId) {
+        throw new Error(
+          'Cuentas GL Cash (1010) o Equity (3010) no encontradas en el seeder contable.',
+        );
+      }
+
+      // Crear asiento balanceado (Débito a Cash, Crédito a Equity)
+      const openingEntry = await tx.journalEntry.create({
+        data: {
+          companyId,
+          date: calculatedPeriods[0].startDate,
+          description: 'Asiento de apertura - Saldo de efectivo inicial configurado en Onboarding',
+          reference: 'OPENING-BALANCE',
+          status: 'posted',
+          lines: {
+            create: [
+              {
+                glAccountId: cashAccountId,
+                description: 'Efectivo y equivalentes de efectivo iniciales',
+                debit: initialCashBalance,
+                credit: 0,
+              },
+              {
+                glAccountId: equityAccountId,
+                description: 'Aportación de capital - Saldos iniciales',
+                debit: 0,
+                credit: initialCashBalance,
+              },
+            ],
+          },
+        },
+      });
+      journalEntryId = openingEntry.id;
+      console.log(`[ONBOARDING] Opening Journal Entry posted successfully: $${initialCashBalance}`);
+
+      // Crear BankAccount por defecto vinculada al efectivo
+      await tx.bankAccount.create({
+        data: {
+          companyId,
+          accountName: 'Efectivo Operativo (Caja General)',
+          bankName: 'Caja General Onboarding',
+          accountNo: 'CASH-OPERATIVE',
+          glAccountId: cashAccountId,
+          balance: initialCashBalance,
+          initialBalance: initialCashBalance,
+          currency,
+          isActive: true,
+        },
+      });
+    }
+
+    // 5. Marcar onboarding como completado
     const updatedCompany = await tx.company.update({
       where: { id: companyId },
       data: { isOnboardingComplete: true },
     });
 
-    console.log(`[ONBOARDING] Onboarding completed for company: ${updatedCompany.legalName}`);
+    // 6. Traza Forense en AuditLog (Guardrail 3)
+    await tx.auditLog.create({
+      data: {
+        companyId,
+        userId: userId || null,
+        action: 'ONBOARDING_COMPLETED',
+        entity: 'Company',
+        entityId: companyId,
+        details: JSON.stringify({
+          payload: {
+            companyId,
+            legalName,
+            currency,
+            fiscalYearStartMonth,
+            fiscalYearStartYear,
+            periodType,
+            initialCashBalance: initialCashBalance || 0,
+          },
+          strategyUsed: periodType,
+          periodsGenerated: calculatedPeriods.length,
+          openingBalanceApplied: initialCashBalance && initialCashBalance > 0 ? true : false,
+          journalEntryId: journalEntryId || null,
+        }),
+      },
+    });
+
+    console.log(
+      `[ONBOARDING] Complete system activation succeeded for: ${updatedCompany.legalName}`,
+    );
 
     return {
       success: true,

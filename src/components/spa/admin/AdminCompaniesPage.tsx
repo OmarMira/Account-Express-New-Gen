@@ -17,6 +17,8 @@ import {
   MapPin,
   Calendar,
   DollarSign,
+  Upload,
+  Save,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
 import { useLanguageStore } from '@/store/language-store';
@@ -32,6 +34,60 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { AddressAutocomplete } from '@/components/ui/address-autocomplete';
+
+const US_STATES = [
+  'AL',
+  'AK',
+  'AZ',
+  'AR',
+  'CA',
+  'CO',
+  'CT',
+  'DE',
+  'FL',
+  'GA',
+  'HI',
+  'ID',
+  'IL',
+  'IN',
+  'IA',
+  'KS',
+  'KY',
+  'LA',
+  'ME',
+  'MD',
+  'MA',
+  'MI',
+  'MN',
+  'MS',
+  'MO',
+  'MT',
+  'NE',
+  'NV',
+  'NH',
+  'NJ',
+  'NM',
+  'NY',
+  'NC',
+  'ND',
+  'OH',
+  'OK',
+  'OR',
+  'PA',
+  'RI',
+  'SC',
+  'SD',
+  'TN',
+  'TX',
+  'UT',
+  'VT',
+  'VA',
+  'WA',
+  'WV',
+  'WI',
+  'WY',
+];
 
 interface Company {
   id: string;
@@ -40,6 +96,12 @@ interface Company {
   address: string | null;
   phone: string | null;
   email: string | null;
+  streetLine1?: string;
+  streetLine2?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  logo?: string | null;
   isActive: boolean;
   createdAt: string;
 }
@@ -142,11 +204,18 @@ export default function AdminCompaniesPage() {
   const [formData, setFormData] = useState({
     legalName: '',
     taxId: '',
-    address: '',
     phone: '',
     email: '',
+    streetLine1: '',
+    streetLine2: '',
+    city: '',
+    state: '',
+    zipCode: '',
     isActive: true,
   });
+
+  const [logoPreview, setLogoPreview] = useState('');
+  const [logoFile, setLogoFile] = useState<File | null>(null);
 
   const loadCompanies = useCallback(async () => {
     setLoading(true);
@@ -172,11 +241,17 @@ export default function AdminCompaniesPage() {
     setFormData({
       legalName: '',
       taxId: '',
-      address: '',
       phone: '',
       email: '',
+      streetLine1: '',
+      streetLine2: '',
+      city: '',
+      state: '',
+      zipCode: '',
       isActive: true,
     });
+    setLogoPreview('');
+    setLogoFile(null);
     setModalOpen(true);
   };
 
@@ -185,11 +260,17 @@ export default function AdminCompaniesPage() {
     setFormData({
       legalName: company.legalName,
       taxId: company.taxId || '',
-      address: company.address || '',
       phone: company.phone || '',
       email: company.email || '',
+      streetLine1: company.streetLine1 || '',
+      streetLine2: company.streetLine2 || '',
+      city: company.city || '',
+      state: company.state || '',
+      zipCode: company.zipCode || '',
       isActive: company.isActive,
     });
+    setLogoPreview(company.logo || '');
+    setLogoFile(null);
     setModalOpen(true);
   };
 
@@ -204,15 +285,35 @@ export default function AdminCompaniesPage() {
         : '/api/admin/companies';
       const method = editingCompany ? 'PUT' : 'POST';
 
+      const data = new FormData();
+      data.append('legalName', formData.legalName);
+      data.append('taxId', formData.taxId);
+      data.append('phone', formData.phone);
+      data.append('email', formData.email);
+      data.append('streetLine1', formData.streetLine1);
+      data.append('streetLine2', formData.streetLine2);
+      data.append('city', formData.city);
+      data.append('state', formData.state);
+      data.append('zipCode', formData.zipCode);
+      data.append('isActive', String(formData.isActive));
+
+      if (logoFile) {
+        data.append('logo', logoFile);
+      } else if (!logoPreview && editingCompany) {
+        data.append('logoCleared', 'true');
+      }
+
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: data,
       });
 
       if (res.ok) {
         setModalOpen(false);
         loadCompanies();
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Error al guardar la empresa');
       }
     } catch (err) {
       console.error(err);
@@ -301,8 +402,12 @@ export default function AdminCompaniesPage() {
                 <div className="p-6 space-y-4">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="p-2.5 bg-indigo-500/10 rounded-xl group-hover:bg-indigo-500/20 transition-all">
-                        <Building2 className="size-6 text-indigo-600 dark:text-indigo-400" />
+                      <div className="p-1 bg-indigo-500/10 rounded-xl group-hover:bg-indigo-500/20 transition-all size-12 flex items-center justify-center overflow-hidden shrink-0">
+                        {company.logo ? (
+                          <img src={company.logo} alt="Logo" className="size-full object-contain" />
+                        ) : (
+                          <Building2 className="size-6 text-indigo-600 dark:text-indigo-400" />
+                        )}
                       </div>
                       <div>
                         <h3 className="font-bold text-lg text-foreground group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors leading-snug">
@@ -409,7 +514,7 @@ export default function AdminCompaniesPage() {
 
       {/* Creation/Editing Modal */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="bg-card text-card-foreground border border-border rounded-2xl max-w-lg shadow-2xl">
+        <DialogContent className="bg-card text-card-foreground border border-border rounded-2xl max-w-xl shadow-2xl overflow-y-auto max-h-[90vh]">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold flex items-center gap-2 text-indigo-600 dark:text-indigo-400">
               <Building2 className="size-6" />
@@ -417,63 +522,190 @@ export default function AdminCompaniesPage() {
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4 py-2">
-            <div className="space-y-1.5">
-              <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
-                {dt.labelLegalName}
+            {/* Logo upload */}
+            <div className="flex flex-col items-center justify-center gap-2 py-3 border border-dashed rounded-xl bg-muted/20">
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Logotipo de la Empresa
               </Label>
-              <Input
-                required
-                value={formData.legalName}
-                onChange={(e) => setFormData({ ...formData, legalName: e.target.value })}
-                placeholder={dt.placeholderLegalName}
-                className="bg-card border-input text-foreground placeholder-muted-foreground rounded-xl focus:ring-indigo-500"
-              />
+              <div className="relative group size-20 rounded-xl overflow-hidden border bg-background flex items-center justify-center shadow-sm">
+                {logoPreview ? (
+                  <img src={logoPreview} alt="Logo" className="size-full object-contain p-1" />
+                ) : (
+                  <Building2 className="size-10 text-muted-foreground/50" />
+                )}
+                <label className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-white text-xs font-semibold">
+                  Cambiar
+                  <input
+                    type="file"
+                    accept="image/png, image/jpeg, image/svg+xml"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        if (file.size > 10 * 1024 * 1024) {
+                          alert('El archivo excede el límite de 10MB');
+                          return;
+                        }
+                        setLogoFile(file);
+                        setLogoPreview(URL.createObjectURL(file));
+                      }
+                    }}
+                  />
+                </label>
+              </div>
+              {logoPreview && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-xs"
+                  onClick={() => {
+                    setLogoFile(null);
+                    setLogoPreview('');
+                  }}
+                >
+                  Eliminar logo
+                </Button>
+              )}
+              <p className="text-[10px] text-muted-foreground">
+                Formatos: PNG, JPG, SVG. Máximo 1MB.
+              </p>
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
-                {dt.labelTaxId}
-              </Label>
-              <Input
-                value={formData.taxId}
-                onChange={(e) => setFormData({ ...formData, taxId: e.target.value })}
-                placeholder={dt.placeholderTaxId}
-                className="bg-card border-input text-foreground placeholder-muted-foreground rounded-xl focus:ring-indigo-500"
-              />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
+                  {dt.labelLegalName}
+                </Label>
+                <Input
+                  required
+                  value={formData.legalName}
+                  onChange={(e) => setFormData({ ...formData, legalName: e.target.value })}
+                  placeholder={dt.placeholderLegalName}
+                  className="bg-card border-input text-foreground placeholder-muted-foreground rounded-xl focus:ring-indigo-500"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
+                  {dt.labelTaxId}
+                </Label>
+                <Input
+                  value={formData.taxId}
+                  onChange={(e) => setFormData({ ...formData, taxId: e.target.value })}
+                  placeholder={dt.placeholderTaxId}
+                  className="bg-card border-input text-foreground placeholder-muted-foreground rounded-xl focus:ring-indigo-500"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
+                  {dt.labelEmail}
+                </Label>
+                <Input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder={dt.placeholderEmail}
+                  className="bg-card border-input text-foreground placeholder-muted-foreground rounded-xl focus:ring-indigo-500"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
+                  {dt.labelPhone}
+                </Label>
+                <Input
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  placeholder={dt.placeholderPhone}
+                  className="bg-card border-input text-foreground placeholder-muted-foreground rounded-xl focus:ring-indigo-500"
+                />
+              </div>
+
+              {/* Localized US Address fields */}
+              <div className="space-y-1.5 md:col-span-2">
+                <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
+                  Dirección (Calle y Número)
+                </Label>
+                <AddressAutocomplete
+                  defaultValue={formData.streetLine1}
+                  onSelect={(addr) => {
+                    setFormData((prev) => {
+                      if (addr.streetLine1 === '') {
+                        return {
+                          ...prev,
+                          streetLine1: '',
+                          streetLine2: '',
+                          city: '',
+                          state: '',
+                          zipCode: '',
+                        };
+                      }
+                      return {
+                        ...prev,
+                        streetLine1: addr.streetLine1,
+                        streetLine2: addr.isManual
+                          ? prev.streetLine2
+                          : addr.streetLine2 || prev.streetLine2,
+                        city: addr.isManual ? prev.city : addr.city || prev.city,
+                        state: addr.isManual ? prev.state : addr.state || prev.state,
+                        zipCode: addr.isManual ? prev.zipCode : addr.zipCode || prev.zipCode,
+                      };
+                    });
+                  }}
+                  placeholder="Buscar dirección en EE.UU..."
+                />
+              </div>
+              <div className="space-y-1.5 md:col-span-2">
+                <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
+                  Suite / Oficina / Unidad (Opcional)
+                </Label>
+                <Input
+                  value={formData.streetLine2}
+                  onChange={(e) => setFormData({ ...formData, streetLine2: e.target.value })}
+                  placeholder="Apt 2B"
+                  className="bg-card border-input text-foreground placeholder-muted-foreground rounded-xl focus:ring-indigo-500"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
+                  Ciudad / Localidad
+                </Label>
+                <Input
+                  value={formData.city}
+                  onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                  placeholder="Miami"
+                  className="bg-card border-input text-foreground placeholder-muted-foreground rounded-xl focus:ring-indigo-500"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
+                  Estado
+                </Label>
+                <select
+                  value={formData.state}
+                  onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                  className="flex h-9 w-full rounded-xl border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-950"
+                >
+                  <option value="">Seleccione Estado</option>
+                  {US_STATES.map((st) => (
+                    <option key={st} value={st}>
+                      {st}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5 md:col-span-2">
+                <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
+                  Código Postal (ZIP Code)
+                </Label>
+                <Input
+                  value={formData.zipCode}
+                  onChange={(e) => setFormData({ ...formData, zipCode: e.target.value })}
+                  placeholder="33101"
+                  className="bg-card border-input text-foreground placeholder-muted-foreground rounded-xl focus:ring-indigo-500"
+                />
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
-                {dt.labelEmail}
-              </Label>
-              <Input
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder={dt.placeholderEmail}
-                className="bg-card border-input text-foreground placeholder-muted-foreground rounded-xl focus:ring-indigo-500"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
-                {dt.labelPhone}
-              </Label>
-              <Input
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                placeholder={dt.placeholderPhone}
-                className="bg-card border-input text-foreground placeholder-muted-foreground rounded-xl focus:ring-indigo-500"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
-                {dt.labelAddress}
-              </Label>
-              <Input
-                value={formData.address}
-                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                placeholder={dt.placeholderAddress}
-                className="bg-card border-input text-foreground placeholder-muted-foreground rounded-xl focus:ring-indigo-500"
-              />
-            </div>
+
             {editingCompany && (
               <div className="flex items-center gap-3 pt-2">
                 <input

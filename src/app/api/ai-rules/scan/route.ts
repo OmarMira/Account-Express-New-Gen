@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
 import { hasCompanyAccess } from '@/lib/auth';
+import { findContext } from '@/lib/services/entity-context-service';
 
 /**
  * POST /api/ai-rules/scan
@@ -190,7 +191,24 @@ export async function POST(request: NextRequest) {
       if (alreadyHasRule) continue;
 
       const isDebit = entry.debitCount >= entry.creditCount;
-      const suggested = suggestAccount(entry.sample, isDebit);
+
+      // Look up entity context
+      const context = await findContext(companyId, entry.sample);
+      let suggested: { name: string; code: string; id: string } | null = null;
+      let hasContext = false;
+      let contextRole = '';
+
+      if (context && context.glAccount) {
+        suggested = {
+          name: context.glAccount.name,
+          code: context.glAccount.code,
+          id: context.glAccount.id,
+        };
+        hasContext = true;
+        contextRole = context.role;
+      } else {
+        suggested = suggestAccount(entry.sample, isDebit);
+      }
 
       // Pretty-print the normalized key
       const prettyKey = key.replace(/\b\w/g, (c) => c.toUpperCase());
@@ -198,12 +216,15 @@ export async function POST(request: NextRequest) {
       patterns.push({
         id: Buffer.from(key).toString('base64').replace(/=/g, ''),
         description: prettyKey || entry.sample.substring(0, 60),
+        rawDescription: entry.sample,
         occurrences: entry.count,
         direction: isDebit ? 'debit' : 'credit',
         averageAmount: entry.totalAmount / entry.count,
         suggestedAccount: suggested ? suggested.name : '',
         suggestedAccountCode: suggested ? suggested.code : '',
         suggestedAccountId: suggested ? suggested.id : '',
+        hasContext,
+        contextRole,
       });
     }
 

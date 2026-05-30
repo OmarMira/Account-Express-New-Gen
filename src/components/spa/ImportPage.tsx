@@ -195,6 +195,7 @@ export function ImportPage() {
   const [formBankName, setFormBankName] = useState('');
   const [formAccountNo, setFormAccountNo] = useState('');
   const [formRoutingNo, setFormRoutingNo] = useState('');
+  const [formGlOption, setFormGlOption] = useState<'create' | 'link'>('create');
   const [formGlAccountId, setFormGlAccountId] = useState<string | null>(null);
   const [formBalance, setFormBalance] = useState('');
   const [formCurrency, setFormCurrency] = useState('USD');
@@ -212,6 +213,13 @@ export function ImportPage() {
   // Result dialog
   const [resultOpen, setResultOpen] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
+
+  // Mismatch warning dialog states
+  const [mismatchFiles, setMismatchFiles] = useState<
+    { fileName: string; extractedHolder: string; score: number }[]
+  >([]);
+  const [mismatchModalOpen, setMismatchModalOpen] = useState(false);
+  const [isStrict, setIsStrict] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -364,8 +372,55 @@ export function ImportPage() {
 
   // ─── Upload ───────────────────────────────────────────────────────
 
-  async function handleUpload() {
+  const handleRejectMismatches = () => {
+    setMismatchModalOpen(false);
+    setSelectedFiles([]);
+  };
+
+  async function handleUpload(forceBypass: boolean = false) {
     if (selectedFiles.length === 0 || !activeCompany) return;
+
+    // 1. Pre-validate account holder name for PDF statement files
+    const pdfFiles = selectedFiles.filter((f) => f.name.toLowerCase().endsWith('.pdf'));
+    if (pdfFiles.length > 0 && !forceBypass) {
+      setUploading(true);
+      startProcessing('Validando titular de cuenta...');
+      try {
+        const valData = new FormData();
+        valData.append('companyId', activeCompany.id);
+        selectedFiles.forEach((f) => valData.append('files', f));
+
+        const valRes = await fetch('/api/import/validate', {
+          method: 'POST',
+          body: valData,
+        });
+
+        if (valRes.ok) {
+          const valResult = await valRes.json();
+          const mismatches = valResult.results.filter((r: any) => r.requiresApproval);
+
+          if (mismatches.length > 0) {
+            setIsStrict(valResult.strictMode || false);
+            setMismatchFiles(
+              mismatches.map((m: any) => ({
+                fileName: m.fileName,
+                extractedHolder: m.extractedHolder,
+                score: Math.round(m.score * 100),
+              })),
+            );
+            setMismatchModalOpen(true);
+            setUploading(false);
+            stopProcessing();
+            return;
+          }
+        }
+      } catch (err) {
+        console.error('Validation failed:', err);
+      } finally {
+        setUploading(false);
+        stopProcessing();
+      }
+    }
 
     setUploading(true);
     setUploadProgress(5);
@@ -391,6 +446,9 @@ export function ImportPage() {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('companyId', activeCompany.id);
+        if (forceBypass) {
+          formData.append('bypassHolderValidation', 'true');
+        }
         if (selectedBankAccountId) {
           formData.append('bankAccountId', selectedBankAccountId);
         }
@@ -413,6 +471,7 @@ export function ImportPage() {
               setFormAccountNo(meta.accountNo || '');
               setFormRoutingNo('');
               setFormGlAccountId(null);
+              setFormGlOption('create');
               setFormBalance(
                 meta.openingBalance !== undefined
                   ? formatNumberWithComas(Number(meta.openingBalance.toFixed(2)).toString())
@@ -475,7 +534,7 @@ export function ImportPage() {
       setFormError('El nombre del banco es requerido');
       return;
     }
-    if (!formGlAccountId) {
+    if (formGlOption === 'link' && !formGlAccountId) {
       setFormError('La cuenta contable vinculada es requerida');
       return;
     }
@@ -483,13 +542,61 @@ export function ImportPage() {
     setSavingBank(true);
     setFormError('');
     try {
+      let targetGlAccountId = formGlAccountId;
+
+      if (formGlOption === 'create') {
+        // Fetch all accounts to find parent "1010" and next code
+        const accountsRes = await fetch(`/api/accounts?companyId=${activeCompany!.id}`);
+        if (!accountsRes.ok) throw new Error('No se pudo obtener el plan de cuentas');
+        const data = await accountsRes.json();
+        const accounts = data.accounts ?? [];
+
+        const parentAcc = accounts.find((a: any) => a.code === '1010');
+        if (!parentAcc)
+          throw new Error('No se encontró la cuenta base "1010 - Cash & Cash Equivalents"');
+
+        const subAccounts = accounts.filter(
+          (a: any) =>
+            a.parentId === parentAcc.id || (a.code.startsWith('101') && a.code !== '1010'),
+        );
+        let nextCode = 1011;
+        const codes = subAccounts
+          .map((a: any) => parseInt(a.code, 10))
+          .filter((c: any) => !isNaN(c));
+        if (codes.length > 0) {
+          nextCode = Math.max(...codes) + 1;
+        }
+
+        // Create the GL Account automatically
+        const newAccRes = await fetch('/api/accounts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            companyId: activeCompany!.id,
+            code: String(nextCode),
+            name: `${formBankName} - ${formAccountName}`,
+            accountType: 'asset',
+            normalBalance: 'debit',
+            parentId: parentAcc.id,
+          }),
+        });
+
+        if (!newAccRes.ok) {
+          const errData = await newAccRes.json();
+          throw new Error(errData.error || 'No se pudo crear la cuenta en el plan de cuentas');
+        }
+
+        const newAccData = await newAccRes.json();
+        targetGlAccountId = newAccData.account.id;
+      }
+
       const body = {
         companyId: activeCompany!.id,
         accountName: formAccountName,
         bankName: formBankName,
         accountNo: formAccountNo || null,
         routingNo: formRoutingNo || null,
-        glAccountId: formGlAccountId,
+        glAccountId: targetGlAccountId!,
         balance: parseFloat(formBalance.replace(/,/g, '')) || 0,
         currency: formCurrency,
       };
@@ -512,13 +619,22 @@ export function ImportPage() {
         const err = await res.json();
         setFormError(err.error || 'No se pudo guardar la cuenta bancaria');
       }
-    } catch (err) {
-      console.error('Failed to save bank account:', err);
-      setFormError('Ocurrió un error inesperado');
+    } catch (err: any) {
+      setFormError(err.message || 'Error al guardar la cuenta bancaria');
     } finally {
       setSavingBank(false);
     }
   }
+
+  const getSuggestedCode = () => {
+    const subAccounts = assetAccounts.filter((a) => a.code.startsWith('101') && a.code !== '1010');
+    let nextCode = 1011;
+    const codes = subAccounts.map((a) => parseInt(a.code, 10)).filter((c) => !isNaN(c));
+    if (codes.length > 0) {
+      nextCode = Math.max(...codes) + 1;
+    }
+    return String(nextCode);
+  };
 
   // ─── Render ──────────────────────────────────────────────────────
 
@@ -680,7 +796,7 @@ export function ImportPage() {
             {/* Import button */}
             <div className="flex items-center gap-3">
               <Button
-                onClick={handleUpload}
+                onClick={() => handleUpload()}
                 disabled={selectedFiles.length === 0 || uploading}
                 className="w-full sm:w-auto h-10 px-6 text-sm font-semibold"
                 size="lg"
@@ -974,19 +1090,74 @@ export function ImportPage() {
               </div>
             </div>
 
-            {/* GL Account */}
+            {/* GL Account Option Selection */}
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">
-                {t('banks.linkedAccount')} <span className="text-red-500">*</span>
-              </label>
-              <AccountSelector
-                accounts={assetAccounts}
-                value={formGlAccountId}
-                onChange={setFormGlAccountId}
-                placeholder="Select asset account"
-              />
-              <p className="text-xs text-muted-foreground">{t('banks.linkedAccountHelp')}</p>
+              <label className="text-sm font-medium">Cuenta Contable (Plan de Cuentas)</label>
+              <div className="grid grid-cols-2 gap-2 bg-slate-900/50 dark:bg-slate-900/80 p-1 rounded-lg border">
+                <button
+                  type="button"
+                  onClick={() => setFormGlOption('create')}
+                  className={cn(
+                    'py-1.5 text-xs font-semibold rounded-md transition-all',
+                    formGlOption === 'create'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200',
+                  )}
+                >
+                  Crear Nueva (Automático)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormGlOption('link')}
+                  className={cn(
+                    'py-1.5 text-xs font-semibold rounded-md transition-all',
+                    formGlOption === 'link'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200',
+                  )}
+                >
+                  Vincular Existente
+                </button>
+              </div>
             </div>
+
+            {formGlOption === 'create' ? (
+              <div className="rounded-lg bg-blue-500/10 border border-blue-500/20 p-3 text-xs leading-relaxed text-blue-300 space-y-2">
+                <p className="font-semibold text-blue-400">✨ Autoconfiguración Contable:</p>
+                <p>El sistema creará automáticamente la subcuenta de activos:</p>
+                <div className="mt-1 bg-slate-950/80 p-2.5 rounded border border-white/5 font-mono text-[11px] text-white space-y-1">
+                  <div>
+                    <span className="text-slate-400">Código GL:</span>{' '}
+                    <span className="text-blue-400 font-bold">{getSuggestedCode()}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">Nombre GL:</span>{' '}
+                    <span className="text-emerald-400 font-bold">
+                      {formBankName
+                        ? `${formBankName} - ${formAccountName || 'Cuenta'}`
+                        : 'Banco - Cuenta'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">Cuenta Padre:</span> 1010 - Cash & Cash
+                    Equivalents
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">
+                  {t('banks.linkedAccount')} <span className="text-red-500">*</span>
+                </label>
+                <AccountSelector
+                  accounts={assetAccounts}
+                  value={formGlAccountId}
+                  onChange={setFormGlAccountId}
+                  placeholder="Select asset account"
+                />
+                <p className="text-xs text-muted-foreground">{t('banks.linkedAccountHelp')}</p>
+              </div>
+            )}
 
             {/* Starting Balance + Currency */}
             <div className="grid grid-cols-2 gap-3">
@@ -1029,6 +1200,126 @@ export function ImportPage() {
               {savingBank && <Loader2 className="size-4 mr-1 animate-spin" />}
               {t('common.save')}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Account Holder Mismatch Warning Dialog ───────────────── */}
+      <Dialog open={mismatchModalOpen} onOpenChange={setMismatchModalOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle
+              className={`flex items-center gap-2 ${isStrict ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}`}
+            >
+              <AlertCircle className="size-5 shrink-0" />
+              <span>
+                {isStrict
+                  ? 'Validación Bloqueada (Modo Estricto)'
+                  : 'Titular de Cuenta no Coincide'}
+              </span>
+            </DialogTitle>
+            <DialogDescription>
+              {isStrict
+                ? 'Se han bloqueado los siguientes archivos debido a discrepancia estricta en el titular:'
+                : 'Se detectaron diferencias en el titular de la cuenta de los siguientes archivos:'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="rounded-lg border overflow-hidden max-h-[160px] overflow-y-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Archivo</TableHead>
+                    <TableHead>Titular PDF</TableHead>
+                    <TableHead className="text-right">Similitud</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {mismatchFiles.map((f, idx) => (
+                    <TableRow key={idx}>
+                      <TableCell className="font-medium text-xs truncate max-w-[150px]">
+                        {f.fileName}
+                      </TableCell>
+                      <TableCell
+                        className={`text-xs font-semibold ${isStrict ? 'text-red-700 dark:text-red-400' : 'text-amber-700 dark:text-amber-400'}`}
+                      >
+                        {f.extractedHolder}
+                      </TableCell>
+                      <TableCell className="text-right text-xs font-mono">{f.score}%</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            {isStrict ? (
+              <div className="rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 p-3 text-xs text-red-800 dark:text-red-300 leading-relaxed space-y-2">
+                <p className="font-semibold">🚫 Error de Cumplimiento Estricto:</p>
+                <p>
+                  El sistema está configurado en <strong>Modo Estricto</strong>. No se permite
+                  importar extractos bancarios que pertenezcan a un titular diferente de{' '}
+                  <strong>{activeCompany?.legalName}</strong> (Se detectó{' '}
+                  <strong>
+                    "
+                    {mismatchFiles
+                      .map((f) => f.extractedHolder)
+                      .filter((v, i, a) => a.indexOf(v) === i)
+                      .join(', ')}
+                    "
+                  </strong>{' '}
+                  en el documento).
+                </p>
+                <p className="font-medium">
+                  Para continuar, cargue los archivos correctos o cambie la configuración en
+                  rules/import-config.json.
+                </p>
+              </div>
+            ) : (
+              <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 p-3 text-xs text-amber-800 dark:text-amber-300 leading-relaxed space-y-2">
+                <p className="font-semibold">⚠️ Advertencia de integridad contable:</p>
+                <p>
+                  Los documentos no corresponden plenamente a{' '}
+                  <strong>{activeCompany?.legalName}</strong> (Se detectó{' '}
+                  <strong>
+                    "
+                    {mismatchFiles
+                      .map((f) => f.extractedHolder)
+                      .filter((v, i, a) => a.indexOf(v) === i)
+                      .join(', ')}
+                    "
+                  </strong>{' '}
+                  en el documento). Esto puede deberse a abreviaciones o cambios de nombre en el
+                  banco, pero si corresponden a la empresa puedes aceptarlos.
+                </p>
+                <p className="font-medium">
+                  ¿Deseas aceptar los archivos e iniciar la importación?
+                </p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="flex gap-2">
+            {isStrict ? (
+              <Button className="w-full" variant="outline" onClick={handleRejectMismatches}>
+                Cerrar
+              </Button>
+            ) : (
+              <>
+                <Button variant="outline" onClick={handleRejectMismatches}>
+                  Rechazar y Cancelar
+                </Button>
+                <Button
+                  onClick={() => {
+                    setMismatchModalOpen(false);
+                    handleUpload(true);
+                  }}
+                  className="bg-amber-600 hover:bg-amber-700 text-white"
+                >
+                  Aceptar e Importar
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

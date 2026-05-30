@@ -10,6 +10,9 @@ export abstract class PeriodStrategy {
   }
 
   protected toMonthName(month: number, lang: 'es' | 'en' = 'es'): string {
-    return new Date(Date.UTC(2000, month - 1)).toLocaleString(lang, { month: 'long' });
+    return new Date(Date.UTC(2000, month - 1)).toLocaleString(lang, {
+      month: 'long',
+      timeZone: 'UTC',
+    });
   }
 }

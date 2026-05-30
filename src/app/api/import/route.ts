@@ -19,6 +19,7 @@ export const POST = apiHandler(async (request: NextRequest) => {
   const file = formData.get('file') as File | null;
   const companyId = formData.get('companyId') as string | null;
   const bankAccountId = formData.get('bankAccountId') as string | null;
+  const bypassHolderValidation = formData.get('bypassHolderValidation') === 'true';
 
   if (!file) {
     throw new ValidationError('No se subió ningún archivo. Proporcione un campo "file".');
@@ -55,6 +56,8 @@ export const POST = apiHandler(async (request: NextRequest) => {
     extension,
     buffer,
     content,
+    userId,
+    bypassHolderValidation,
   });
   trackAPIResponseTime('ImportService.importFile', 'POST', performance.now() - importStart);
 

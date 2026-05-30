@@ -53,14 +53,8 @@ export function LoginPage() {
 
       login(user);
 
-      if (companies.length === 1) {
-        useAuthStore.getState().setActiveCompany(companies[0]);
-        setCurrentView('dashboard');
-      } else if (companies.length > 1) {
-        setCurrentView('select-company');
-      } else {
-        setCurrentView('dashboard');
-      }
+      useAuthStore.getState().setActiveCompany(null);
+      setCurrentView('select-company');
     } catch {
       setError(t('common.error'));
     } finally {

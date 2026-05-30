@@ -21,7 +21,13 @@ export class AuthService {
           where: { company: { isActive: true } },
           include: {
             company: {
-              select: { id: true, legalName: true, taxId: true, isActive: true },
+              select: {
+                id: true,
+                legalName: true,
+                taxId: true,
+                isActive: true,
+                isOnboardingComplete: true,
+              },
             },
           },
         },

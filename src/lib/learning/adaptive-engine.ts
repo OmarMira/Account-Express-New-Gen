@@ -9,6 +9,7 @@ export type FeedbackEvent = {
   confidence: number; // 0-1
   userId: string;
   companyId: string;
+  amount?: number; // Optional transaction amount
 };
 
 export async function recordFeedback(event: FeedbackEvent) {
@@ -18,6 +19,24 @@ export async function recordFeedback(event: FeedbackEvent) {
 
   mkdirSync(join(process.cwd(), 'rules'), { recursive: true });
   appendFileSync(logPath, JSON.stringify(event) + '\n', 'utf-8');
+}
+
+export function sanitizeDescription(desc: string, config: any): string {
+  let cleaned = desc.toLowerCase().trim();
+
+  // Apply configured noise sanitizers
+  if (config.sanitizeNoise) {
+    for (const pattern of Object.values(config.sanitizeNoise)) {
+      const rx = new RegExp(pattern as string, 'gi');
+      cleaned = cleaned.replace(rx, ' ');
+    }
+  }
+
+  // Remove ignoreStopWords and clean spacing
+  const words = cleaned.split(/\s+/).filter(Boolean);
+  const filtered = words.filter((w) => !config.patternGeneration.ignoreStopWords.includes(w));
+
+  return filtered.join(' ').trim();
 }
 
 export function generateCandidateRules(companyId: string) {
@@ -31,39 +50,79 @@ export function generateCandidateRules(companyId: string) {
   const events: FeedbackEvent[] = lines.map((l) => JSON.parse(l));
   const companyEvents = events.filter((e) => e.companyId === companyId);
 
-  // Agrupar por cuenta GL -> descripción
-  const grouped: Record<string, { descriptions: string[]; count: number }> = {};
+  // Group by sanitized pattern
+  const patternGroups: Record<string, { events: FeedbackEvent[]; count: number }> = {};
+
   for (const e of companyEvents) {
-    if (!grouped[e.selectedGlAccountCode])
-      grouped[e.selectedGlAccountCode] = { descriptions: [], count: 0 };
-    grouped[e.selectedGlAccountCode].descriptions.push(e.bankDescription);
-    grouped[e.selectedGlAccountCode].count++;
+    const patternKey = sanitizeDescription(e.bankDescription, config);
+    if (patternKey.length < 3) continue;
+
+    if (!patternGroups[patternKey]) {
+      patternGroups[patternKey] = { events: [], count: 0 };
+    }
+    patternGroups[patternKey].events.push(e);
+    patternGroups[patternKey].count++;
   }
 
-  const candidates = [];
-  for (const [code, data] of Object.entries(grouped)) {
+  const candidates: any[] = [];
+
+  for (const [pattern, data] of Object.entries(patternGroups)) {
     if (data.count < config.minOccurrencesToGenerateRule) continue;
 
-    // Extraer patrón común (intersección segura de palabras clave)
-    const words = data.descriptions.map((d) =>
-      d
-        .toLowerCase()
-        .split(/\s+/)
-        .filter((w) => !config.patternGeneration.ignoreStopWords.includes(w)),
-    );
-    const common = words[0].filter((w) => words.slice(1).every((arr) => arr.includes(w)));
-    const pattern = common.slice(0, 3).join('.*'); // Ej: "zelle.*fabro"
+    // Check Account Consistency Score
+    const accountCounts: Record<string, number> = {};
+    let debitCount = 0;
+    let creditCount = 0;
 
-    if (pattern.length > 0) {
-      candidates.push({
-        id: createHash('sha256').update(`${code}-${pattern}`).digest('hex').slice(0, 12),
-        pattern: `(?i)${pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, // Regex seguro
-        glAccountCode: code,
-        confidence: Math.min(1, data.count / (config.minOccurrencesToGenerateRule * 2)),
-        occurrences: data.count,
-        status: 'pending_review',
-      });
+    data.events.forEach((ev) => {
+      accountCounts[ev.selectedGlAccountCode] = (accountCounts[ev.selectedGlAccountCode] || 0) + 1;
+      if (ev.amount !== undefined) {
+        if (ev.amount < 0) debitCount++;
+        else creditCount++;
+      }
+    });
+
+    // Find most common account
+    let bestAccount = '';
+    let maxCount = 0;
+    for (const [code, cnt] of Object.entries(accountCounts)) {
+      if (cnt > maxCount) {
+        maxCount = cnt;
+        bestAccount = code;
+      }
     }
+
+    const consistencyScore = maxCount / data.count;
+    const threshold = config.consistencyScoreThreshold || 0.85;
+
+    // Discard if inconsistent
+    if (consistencyScore < threshold) continue;
+
+    // Determine direction lock
+    let direction: 'debit' | 'credit' | 'any' = 'any';
+    if (debitCount > 0 && creditCount === 0) {
+      direction = 'debit';
+    } else if (creditCount > 0 && debitCount === 0) {
+      direction = 'credit';
+    } else if (debitCount > 0 && creditCount > 0) {
+      // Mixed signs -> discard or manual review
+      continue;
+    }
+
+    // Dynamic priority: longer/more specific patterns get lower priority numbers (higher execution order)
+    const priority = Math.max(1, Math.min(19, 20 - Math.floor(pattern.length / 3)));
+
+    candidates.push({
+      id: createHash('sha256').update(`${bestAccount}-${pattern}`).digest('hex').slice(0, 12),
+      pattern: `(?i)${pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, // Safe regex
+      glAccountCode: bestAccount,
+      confidence: consistencyScore,
+      occurrences: data.count,
+      direction,
+      priority,
+      status: 'pending_review',
+    });
   }
+
   return candidates;
 }

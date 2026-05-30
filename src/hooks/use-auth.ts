@@ -20,12 +20,8 @@ export function useAuth() {
         throw new Error(data.error || 'Failed to login');
       }
       store.login(data.user);
-      if (data.companies && data.companies.length > 0) {
-        store.setActiveCompany(data.companies[0]);
-        store.setCurrentView('dashboard');
-      } else {
-        store.setCurrentView('select-company');
-      }
+      store.setActiveCompany(null);
+      store.setCurrentView('select-company');
       return data;
     } catch (err: any) {
       setError(err.message);

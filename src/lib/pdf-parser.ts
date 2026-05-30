@@ -17,6 +17,7 @@ export interface ParsedPDFResult {
   closingBalance?: number;
   startDate?: Date;
   endDate?: Date;
+  accountHolder?: string;
 }
 
 // Force pdfjs-dist to use standard in-thread fake worker mode in Node/Bun to prevent worker thread loader crashes
@@ -211,6 +212,81 @@ export async function parsePDF(buffer: Buffer): Promise<ParsedPDFResult> {
     }
   }
 
+  let accountHolder: string | undefined;
+
+  const isAddressLine = (l: string): boolean => {
+    if (!l) return false;
+    // 1. P.O. Box pattern
+    if (/p\.?o\.?\s*box/i.test(l)) return true;
+    // 2. Contains a ZIP code (5 digits or 5-4 digits)
+    if (/\b\d{5}(?:-\d{4})?\b/.test(l)) return true;
+    // 3. Contains street suffixes or address indicators
+    if (
+      /\b(?:street|st|avenue|ave|road|rd|drive|dr|lane|ln|court|ct|boulevard|blvd|highway|hwy|suite|ste|apt|apartment|unit|zip|fl)\b/i.test(
+        l,
+      )
+    )
+      return true;
+    return false;
+  };
+
+  const isHeaderOrServiceLine = (l: string): boolean => {
+    if (!l) return false;
+    // If it has a clear business entity suffix, it is likely the business name, so do NOT skip it
+    if (/\b(?:LLC|INC|CORP|L\.L\.C\.|I\.N\.C\.|CO|CO\.)\b/i.test(l)) return false;
+
+    // Common banking and service headers
+    if (
+      /(?:service|information|info\b|phone|hours|contact|support|online|website|mobile|app\b|email|call\b|help\b|customer|client|member)/i.test(
+        l,
+      )
+    )
+      return true;
+    if (
+      /(?:statement|summary|activity|period|date|balance|page\b|checks\b|deposits|withdrawals|fees|interest|ref\b|id\b|transaction)/i.test(
+        l,
+      )
+    )
+      return true;
+    if (
+      /(?:checking|savings|card\b|loan\b|mortgage|payment|deposit|transfer|wire|routing)/i.test(l)
+    )
+      return true;
+    // Phone numbers
+    if (/\b(?:\+?1[-. ]?)?\(?[0-9]{3}\)?[-. ]?[0-9]{3}[-. ]?[0-9]{4}\b/.test(l)) return true;
+    // Web URLs or domains or emails
+    if (/\b(?:https?:\/\/)?(?:www\.)?[a-zA-Z0-9-]+\.[a-zA-Z]{2,}\b/.test(l)) return true;
+    if (/@/.test(l)) return true;
+    return false;
+  };
+
+  const holderMatch = fullText.match(
+    /(?:Account Holder|Account statement for|Name|Client|Titular|Customer Name|Customer\b(?! Service| Support| Info| Phone)|Para|Titular de la cuenta):\s*([^\n\r]+)/i,
+  );
+  if (holderMatch) {
+    const val = holderMatch[1].trim();
+    if (!isAddressLine(val) && !isHeaderOrServiceLine(val)) {
+      accountHolder = val;
+    }
+  }
+
+  if (!accountHolder) {
+    // If not found, look for the first non-empty lines that aren't page numbers, dates, transaction headers, address lines or service/header lines
+    const potentialLines = lines
+      .map((l) => l.trim())
+      .filter((l) => {
+        if (l.length <= 3) return false;
+        if (/Bank of America|Page|Statement|Chase|Wells|Date|Balance|Amount|Description/i.test(l))
+          return false;
+        if (isAddressLine(l)) return false;
+        if (isHeaderOrServiceLine(l)) return false;
+        return true;
+      });
+    if (potentialLines.length > 0) {
+      accountHolder = potentialLines[0];
+    }
+  }
+
   return {
     transactions,
     bankName,
@@ -219,6 +295,7 @@ export async function parsePDF(buffer: Buffer): Promise<ParsedPDFResult> {
     closingBalance,
     startDate,
     endDate,
+    accountHolder,
   };
 }
 

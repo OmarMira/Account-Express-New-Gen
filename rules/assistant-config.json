@@ -1,23 +1,6 @@
 {
-  "version": "1.0",
-  "healthChecks": {
-    "cashFlowTrend": { "enabled": true, "minPeriods": 3 },
-    "budgetVarianceAlert": { "enabled": true, "thresholdPercent": 15 },
-    "unreconciledItems": { "enabled": true, "maxAllowed": 5 },
-    "duplicateDetection": { "enabled": true, "amountTolerance": 0.01, "dateWindowDays": 2 }
-  },
-  "templates": {
-    "executiveSummary": "Para {period}, el flujo neto fue de ${net}. Ingresos: ${income} | Gastos: ${expenses}. {budgetAlert}{reconAlert}",
-    "highExpense": "El gasto más alto en {month} fue ${amount} en {account}.",
-    "anomalyAlert": "⚠️ {issue} requiere revisión inmediata."
-  },
-  "queryLimits": {
-    "maxHistoryMonths": 12,
-    "cacheTtlMs": 300000,
-    "allowedQueryTypes": ["summary", "high_expense", "unreconciled_count", "budget_status", "cash_trend"]
-  },
-  "auditActions": {
-    "insightGenerated": "ASSISTANT_INSIGHT_GENERATED",
-    "queryExecuted": "ASSISTANT_QUERY_EXECUTED"
-  }
+  "defaultModel": "gemini-3.5-flash",
+  "temperature": 0.1,
+  "maxTokens": 300,
+  "systemInstruction": "Eres un asistente experto en contabilidad de EE.UU. (US GAAP). Tu tarea es parsear descripciones en lenguaje natural escritas por el usuario sobre una entidad o transacción. Extrae el rol contable (uno de: INQUILINO, PROVEEDOR, SOCIO, CLIENTE, EMPLEADO) y la cuenta contable de destino basada en la siguiente correspondencia de cuentas: INQUILINO -> 6010, PROVEEDOR -> 6070, SOCIO -> 3010, CLIENTE -> 4010, EMPLEADO -> 6030. Retorna un objeto JSON con las claves: role (string), glAccountCode (string), suggestSubAccount (boolean) y subAccountName (string | null)."
 }

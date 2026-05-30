@@ -16,6 +16,7 @@ export function withCompanyScope(db: PrismaClient, companyId: string) {
           ];
 
           if (args && !(args as any).skipCompanyScope) {
+            const anyArgs = args as any;
             // Scope queries on where conditions
             if (
               operation.startsWith('find') ||
@@ -23,24 +24,40 @@ export function withCompanyScope(db: PrismaClient, companyId: string) {
               operation.startsWith('aggregate') ||
               operation.startsWith('groupBy')
             ) {
-              if (!args.where) args.where = {};
-              if (!args.where.companyId) {
-                args.where.companyId = companyId;
+              if (!anyArgs.where) anyArgs.where = {};
+              // Only inject companyId if it is present or expected in the schema model query
+              if (
+                typeof anyArgs.where === 'object' &&
+                'companyId' in anyArgs.where &&
+                anyArgs.where.companyId === undefined
+              ) {
+                anyArgs.where.companyId = companyId;
               }
             }
 
             // Scope writes
             if (operation === 'create') {
-              if (!args.data) args.data = {};
-              if (!args.data.companyId) {
-                args.data.companyId = companyId;
+              if (!anyArgs.data) anyArgs.data = {};
+              if (
+                typeof anyArgs.data === 'object' &&
+                'companyId' in anyArgs.data &&
+                anyArgs.data.companyId === undefined
+              ) {
+                anyArgs.data.companyId = companyId;
               }
             }
 
             if (operation === 'createMany') {
-              if (Array.isArray(args.data)) {
-                for (const item of args.data) {
-                  if (!item.companyId) item.companyId = companyId;
+              if (Array.isArray(anyArgs.data)) {
+                for (const item of anyArgs.data) {
+                  if (
+                    item &&
+                    typeof item === 'object' &&
+                    'companyId' in item &&
+                    item.companyId === undefined
+                  ) {
+                    item.companyId = companyId;
+                  }
                 }
               }
             }

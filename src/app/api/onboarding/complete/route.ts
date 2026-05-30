@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
 import { completeOnboarding } from '@/services/onboarding.service';
+import { onboardingPayloadSchema } from '@/lib/validations/onboarding';
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,24 +14,62 @@ export async function POST(request: NextRequest) {
 
     // 2. Parsear el body de la petición
     const body = await request.json();
-    const { companyId, fiscalYearStartMonth, fiscalYearStartYear } = body;
 
-    if (!companyId) {
-      return NextResponse.json({ error: 'El parámetro companyId es requerido' }, { status: 400 });
+    // 3. Mapeo inteligente y tolerante (Retrocompatibilidad total con Wizard viejo y nuevo)
+    const rawCompanyId = body.companyId;
+    const rawLegalName = body.legalName || 'LQ & OM LLC';
+    const rawCurrency = body.currency || 'USD';
+
+    // Normalizar mes
+    let rawMonth = 1;
+    if (body.fiscalYearStartMonth !== undefined) {
+      rawMonth = parseInt(body.fiscalYearStartMonth, 10);
+    } else if (body.fiscalYearStartMonth === undefined && body.fiscalMonth !== undefined) {
+      rawMonth = parseInt(body.fiscalMonth, 10);
     }
 
-    const startMonth = parseInt(fiscalYearStartMonth, 10);
-    const startYear = fiscalYearStartYear ? parseInt(fiscalYearStartYear, 10) : 2025;
-
-    if (isNaN(startMonth) || startMonth < 1 || startMonth > 12) {
-      return NextResponse.json({ error: 'Mes de inicio fiscal inválido' }, { status: 400 });
+    // Normalizar año
+    let rawYear = 2025;
+    if (body.fiscalYearStartYear !== undefined) {
+      rawYear = parseInt(body.fiscalYearStartYear, 10);
+    } else if (body.fiscalYearStartYear === undefined && body.fiscalYear !== undefined) {
+      rawYear = parseInt(body.fiscalYear, 10);
     }
 
-    if (isNaN(startYear) || startYear < 2000 || startYear > 2100) {
-      return NextResponse.json({ error: 'Año de inicio fiscal inválido' }, { status: 400 });
+    const rawPeriodType = body.periodType || 'CALENDAR';
+    const rawInitialBalance =
+      body.initialCashBalance !== undefined ? parseFloat(body.initialCashBalance) : 0;
+
+    const payload = {
+      companyId: rawCompanyId,
+      legalName: rawLegalName,
+      currency: rawCurrency,
+      fiscalYearStartMonth: rawMonth,
+      fiscalYearStartYear: rawYear,
+      periodType: rawPeriodType,
+      initialCashBalance: rawInitialBalance,
+    };
+
+    // 4. Validar con Zod
+    const validation = onboardingPayloadSchema.safeParse(payload);
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: 'Datos de validación inválidos', details: validation.error.format() },
+        { status: 400 },
+      );
     }
 
-    // 3. Verificar membresía y rol administrativo en la compañía
+    const {
+      companyId,
+      legalName,
+      currency,
+      fiscalYearStartMonth,
+      fiscalYearStartYear,
+      periodType,
+      initialCashBalance,
+    } = validation.data;
+
+    // 5. Verificar membresía y rol administrativo en la compañía
     const membership = await db.companyMember.findFirst({
       where: {
         userId,
@@ -46,8 +85,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 4. Ejecutar el servicio de onboarding
-    const result = await completeOnboarding(companyId, startMonth, startYear);
+    // 6. Ejecutar el servicio de onboarding robusto
+    const result = await completeOnboarding(
+      companyId,
+      legalName,
+      currency,
+      fiscalYearStartMonth,
+      fiscalYearStartYear,
+      periodType,
+      initialCashBalance,
+      userId,
+    );
 
     return NextResponse.json(result);
   } catch (error: any) {

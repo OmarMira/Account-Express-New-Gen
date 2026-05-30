@@ -8,6 +8,7 @@ import { AuthService } from '@/services/auth.service';
 // ─── POST /api/auth/login ─────────────────────────────────────────────
 export const POST = apiHandler(async (request: NextRequest) => {
   const body = await validateRequest(request, loginSchema);
+  if (body instanceof NextResponse) return body;
   const result = await AuthService.login(body);
 
   // Create session token using shared module

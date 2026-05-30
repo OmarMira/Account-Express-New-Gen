@@ -45,9 +45,11 @@ export async function getVarianceReport(
   const results: BudgetComparison[] = [];
 
   // Iterar sobre cuentas con presupuesto O movimiento real
-  const allCodes = new Set([
+  const allCodes = new Set<string>([
     ...Object.keys(monthBudgets),
-    ...actualsAgg.map((a) => accountMap.get(a.glAccountId)?.code).filter(Boolean),
+    ...actualsAgg
+      .map((a) => accountMap.get(a.glAccountId)?.code)
+      .filter((c): c is string => typeof c === 'string'),
   ]);
 
   for (const code of allCodes) {

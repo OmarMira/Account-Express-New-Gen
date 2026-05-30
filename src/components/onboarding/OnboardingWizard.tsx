@@ -3,20 +3,16 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Calendar,
-  DollarSign,
-  ArrowRight,
-  ArrowLeft,
-  Sparkles,
-  Building,
-  CheckCircle,
-  Loader2,
-  HelpCircle,
-} from 'lucide-react';
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  CardFooter,
+} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Select,
   SelectContent,
@@ -24,379 +20,347 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  CheckCircle2,
+  AlertCircle,
+  ArrowRight,
+  Loader2,
+  ShieldCheck,
+  BarChart3,
+  BookOpen,
+} from 'lucide-react';
 import { useLanguageStore } from '@/store/language-store';
 import { useAuthStore } from '@/store/auth-store';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
-const MONTHS = [
-  { value: '1', name: 'Enero' },
-  { value: '2', name: 'Febrero' },
-  { value: '3', name: 'Marzo' },
-  { value: '4', name: 'Abril' },
-  { value: '5', name: 'Mayo' },
-  { value: '6', name: 'Junio' },
-  { value: '7', name: 'Julio' },
-  { value: '8', name: 'Agosto' },
-  { value: '9', name: 'Septiembre' },
-  { value: '10', name: 'Octubre' },
-  { value: '11', name: 'Noviembre' },
-  { value: '12', name: 'Diciembre' },
+// Pasos del Wizard
+const STEPS = [
+  { id: 1, title: 'Entidad', icon: ShieldCheck },
+  { id: 2, title: 'Periodo Fiscal', icon: BookOpen },
+  { id: 3, title: 'Plan de Cuentas', icon: BarChart3 },
+  { id: 4, title: 'Impuestos', icon: AlertCircle },
+  { id: 5, title: 'Saldos Iniciales', icon: BarChart3 },
+  { id: 6, title: 'Finalizar', icon: CheckCircle2 },
 ];
-
-const LOCAL_TRANSLATIONS: Record<string, Record<string, string>> = {
-  en: {
-    welcome: 'Welcome to Account Express!',
-    ready: 'All ready to take off!',
-    step1Label: 'Fiscal Year',
-    step2Label: 'Confirmation',
-    questionMonth: 'In what month does your business year begin?',
-    descMonth:
-      'For most self-employed and small businesses, the accounting year matches the calendar year (starts in January).',
-    selectMonthPlaceholder: 'Select a month',
-    questionYear: 'In what year do you want to start registering data?',
-    descYear:
-      'If you have bank statements from prior years that you want to reconcile, select the corresponding year.',
-    selectYearPlaceholder: 'Select a year',
-    year2024: 'Year 2024',
-    year2025: 'Year 2025 (Recommended)',
-    year2026: 'Year 2026',
-    step2Title: 'Everything ready to configure!',
-    step2Desc:
-      'By continuing, we will automatically configure your chart of accounts and fiscal periods from {month} to December {year}.',
-    loadingTitle: 'Setting up your educational accounting...',
-    backBtn: 'Back',
-    nextBtn: 'Next',
-    startBtn: 'Start!',
-    errorOnboarding: 'An error occurred during onboarding.',
-    errorConnection: 'Connection error when completing onboarding.',
-    loadingChartOfAccounts: 'Creating your standard Chart of Accounts...',
-    loadingFiscalPeriods: 'Configuring your fiscal periods...',
-    loadingFinalizing: 'Finalizing the accounting setup...',
-    month1: 'January',
-    month2: 'February',
-    month3: 'March',
-    month4: 'April',
-    month5: 'May',
-    month6: 'June',
-    month7: 'July',
-    month8: 'August',
-    month9: 'September',
-    month10: 'October',
-    month11: 'November',
-    month12: 'December',
-  },
-  es: {
-    welcome: '¡Bienvenido a Account Express!',
-    ready: '¡Todo listo para despegar!',
-    step1Label: 'Año Contable',
-    step2Label: 'Confirmación',
-    questionMonth: '¿En qué mes comienza tu año de negocios?',
-    descMonth:
-      'Para la mayoría de los autónomos y pequeñas empresas, el año contable coincide con el año natural (empieza en Enero).',
-    selectMonthPlaceholder: 'Selecciona un mes',
-    questionYear: '¿En qué año deseas comenzar a registrar datos?',
-    descYear:
-      'Si tienes extractos bancarios de años anteriores que deseas conciliar, selecciona el año correspondiente.',
-    selectYearPlaceholder: 'Selecciona un año',
-    year2024: 'Año 2024',
-    year2025: 'Año 2025 (Recomendado)',
-    year2026: 'Año 2026',
-    step2Title: '¡Todo listo para configurar!',
-    step2Desc:
-      'Al continuar, configuraremos automáticamente tu plan contable y tus periodos fiscales de {month} a Diciembre del {year}.',
-    loadingTitle: 'Configurando tu contabilidad didáctica...',
-    backBtn: 'Volver',
-    nextBtn: 'Siguiente',
-    startBtn: '¡Comenzar!',
-    errorOnboarding: 'Ocurrió un error en el onboarding.',
-    errorConnection: 'Error de conexión al completar el onboarding.',
-    loadingChartOfAccounts: 'Creando tu Plan de Cuentas estándar...',
-    loadingFiscalPeriods: 'Configurando tus periodos fiscales...',
-    loadingFinalizing: 'Finalizando la puesta a punto contable...',
-    month1: 'Enero',
-    month2: 'Febrero',
-    month3: 'Marzo',
-    month4: 'Abril',
-    month5: 'Mayo',
-    month6: 'Junio',
-    month7: 'Julio',
-    month8: 'Agosto',
-    month9: 'Septiembre',
-    month10: 'Octubre',
-    month11: 'Noviembre',
-    month12: 'Diciembre',
-  },
-};
-
-import { useEffect } from 'react';
 
 export function OnboardingWizard() {
   const t = useLanguageStore((s) => s.t);
-  const language = useLanguageStore((s) => s.language) || 'es';
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const activeLang = mounted ? language : 'es';
-  const dt = LOCAL_TRANSLATIONS[activeLang] || LOCAL_TRANSLATIONS.es;
   const { activeCompany, hydrate } = useAuthStore();
 
   const [step, setStep] = useState(1);
-  const [fiscalMonth, setFiscalMonth] = useState('1');
-  const [fiscalYear, setFiscalYear] = useState('2025');
-  const [loading, setLoading] = useState(false);
-  const [progressStatus, setProgressStatus] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const nextStep = () => setStep((s) => s + 1);
-  const prevStep = () => setStep((s) => s - 1);
+  // Estado del formulario alineado con el Schema Zod del Backend
+  const [formData, setFormData] = useState({
+    legalName: activeCompany?.legalName || '',
+    currency: 'USD',
+    fiscalStartYear: '',
+    fiscalStartMonth: '',
+    periodType: 'CALENDAR',
+    initialCashBalance: '0',
+  });
 
-  async function handleComplete() {
+  const handleNext = () => {
+    setErrorMessage(null);
+    if (step === 1 && !formData.legalName.trim()) {
+      setErrorMessage('El nombre legal de la empresa es obligatorio.');
+      return;
+    }
+    if (step === 2 && (!formData.fiscalStartYear || !formData.fiscalStartMonth)) {
+      setErrorMessage('El año y el mes de inicio fiscal son obligatorios.');
+      return;
+    }
+    setStep((s) => Math.min(s + 1, STEPS.length));
+  };
+
+  const handleBack = () => {
+    setErrorMessage(null);
+    setStep((s) => Math.max(s - 1, 1));
+  };
+
+  const handleComplete = async () => {
     if (!activeCompany?.id) return;
-    setLoading(true);
-
-    // Simular progreso didáctico visual para reducir la fricción técnica
-    setProgressStatus(dt.loadingChartOfAccounts);
-    await new Promise((resolve) => setTimeout(resolve, 1200));
-
-    setProgressStatus(dt.loadingFiscalPeriods);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    setProgressStatus(dt.loadingFinalizing);
-    await new Promise((resolve) => setTimeout(resolve, 800));
-
+    setIsLoading(true);
+    setErrorMessage(null);
     try {
       const response = await fetch('/api/onboarding/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           companyId: activeCompany.id,
-          fiscalYearStartMonth: fiscalMonth,
-          fiscalYearStartYear: fiscalYear,
+          legalName: formData.legalName,
+          currency: formData.currency,
+          fiscalYearStartMonth: parseInt(formData.fiscalStartMonth, 10),
+          fiscalYearStartYear: parseInt(formData.fiscalStartYear, 10),
+          periodType: formData.periodType,
+          initialCashBalance: parseFloat(formData.initialCashBalance) || 0,
         }),
       });
 
-      if (response.ok) {
-        // Recargar el authStore para actualizar activeCompany y su isOnboardingComplete
-        await hydrate();
-        window.location.reload();
-      } else {
-        const err = await response.json();
-        alert(err.error || dt.errorOnboarding);
-        setLoading(false);
-      }
-    } catch {
-      alert(dt.errorConnection);
-      setLoading(false);
-    }
-  }
+      const data = await response.json();
 
-  // Animation variants
-  const slideVariants = {
-    enter: (direction: number) => ({
-      x: direction > 0 ? 100 : -100,
-      opacity: 0,
-    }),
-    center: {
-      x: 0,
-      opacity: 1,
-      transition: { duration: 0.3 },
-    },
-    exit: (direction: number) => ({
-      x: direction < 0 ? 100 : -100,
-      opacity: 0,
-      transition: { duration: 0.2 },
-    }),
+      if (!response.ok) {
+        throw new Error(data.error || 'Error completando el onboarding');
+      }
+
+      setIsSuccess(true);
+      // Recargar la sesión y la aplicación para aplicar cambios
+      await hydrate();
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } catch (error: any) {
+      console.error(error);
+      setErrorMessage(error.message || 'Error en onboarding de configuración');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Renderizado condicional por paso
+  const renderStep = () => {
+    switch (step) {
+      case 1:
+        return (
+          <div className="space-y-4">
+            <div>
+              <Label>{t('onboarding.step1.legalName')}</Label>
+              <Input
+                value={formData.legalName}
+                onChange={(e) => setFormData({ ...formData, legalName: e.target.value })}
+                placeholder="Ej: LQ & OM LLC"
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label>{t('onboarding.step1.currency')}</Label>
+              <Select
+                value={formData.currency}
+                onValueChange={(v) => setFormData({ ...formData, currency: v })}
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Seleccionar Divisa" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="USD">USD - Dólar Estadounidense</SelectItem>
+                  <SelectItem value="EUR">EUR - Euro</SelectItem>
+                  <SelectItem value="MXN">MXN - Peso Mexicano</SelectItem>
+                  <SelectItem value="ARS">ARS - Peso Argentino</SelectItem>
+                  <SelectItem value="GBP">GBP - Libra Esterlina</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        );
+      case 2:
+        return (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>{t('onboarding.step2.startYear')}</Label>
+                <Input
+                  type="number"
+                  value={formData.fiscalStartYear}
+                  onChange={(e) => setFormData({ ...formData, fiscalStartYear: e.target.value })}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label>{t('onboarding.step2.startMonth')}</Label>
+                <Select
+                  value={formData.fiscalStartMonth}
+                  onValueChange={(v) => setFormData({ ...formData, fiscalStartMonth: v })}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Mes" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 12 }, (_, i) => (
+                      <SelectItem key={i + 1} value={String(i + 1)}>
+                        {new Date(2000, i).toLocaleString('es', { month: 'long' }).toUpperCase()}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <Label>{t('onboarding.step2.periodType')}</Label>
+              <Select
+                value={formData.periodType}
+                onValueChange={(v) => setFormData({ ...formData, periodType: v })}
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Tipo de Periodo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="CALENDAR">Calendario Natural</SelectItem>
+                  <SelectItem value="CUSTOM_MONTHS">Meses Personalizados</SelectItem>
+                  <SelectItem value="WEEK_52_53">Semanas 52/53</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        );
+      case 3:
+        return (
+          <div className="text-center space-y-4 py-8">
+            <BookOpen className="mx-auto h-12 w-12 text-primary/50" />
+            <p className="text-sm text-muted-foreground">{t('onboarding.step3.description')}</p>
+            <p className="text-xs text-primary font-semibold">{t('onboarding.step3.note')}</p>
+          </div>
+        );
+      case 4:
+        return (
+          <div className="text-center space-y-4 py-8">
+            <AlertCircle className="mx-auto h-12 w-12 text-yellow-500" />
+            <p className="text-sm text-muted-foreground">{t('onboarding.step4.description')}</p>
+            <p className="text-xs text-yellow-600 font-semibold">{t('onboarding.step4.note')}</p>
+          </div>
+        );
+      case 5:
+        return (
+          <div className="space-y-4">
+            <Label>{t('onboarding.step5.initialBalance')}</Label>
+            <Input
+              type="number"
+              value={formData.initialCashBalance}
+              onChange={(e) => setFormData({ ...formData, initialCashBalance: e.target.value })}
+              placeholder="0.00"
+              className="mt-1"
+            />
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              {t('onboarding.step5.help')}
+            </p>
+          </div>
+        );
+      case 6:
+        return (
+          <div className="text-center space-y-4 py-6">
+            <CheckCircle2 className="mx-auto h-16 w-16 text-emerald-500 animate-pulse" />
+            <p className="font-semibold text-lg">{t('onboarding.step6.ready')}</p>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              {t('onboarding.step6.confirm')}
+            </p>
+          </div>
+        );
+      default:
+        return null;
+    }
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-teal-50/50 via-background to-indigo-50/30 p-4 dark:from-teal-950/10 dark:to-indigo-950/5">
-      <Card className="w-full max-w-lg border-teal-100/50 shadow-2xl backdrop-blur-sm dark:border-teal-950/20">
-        <CardHeader className="text-center pb-2">
-          <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-teal-500/10 text-teal-600 dark:bg-teal-500/20 dark:text-teal-400 mb-3">
-            <Sparkles className="size-6 animate-pulse" />
-          </div>
-          <CardTitle className="text-2xl font-bold tracking-tight">
-            {step < 2 ? dt.welcome : dt.ready}
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-teal-50/40 via-background to-indigo-50/20 p-4">
+      <Card className="w-full max-w-lg shadow-2xl border-t-4 border-t-teal-600">
+        <CardHeader>
+          <CardTitle className="text-2xl font-bold tracking-tight text-foreground">
+            {t('onboarding.title')}
           </CardTitle>
-          <CardDescription>
-            {activeCompany && (
-              <span className="flex items-center justify-center gap-1 text-xs text-muted-foreground font-medium uppercase tracking-wider mt-1">
-                <Building className="size-3.5" />
-                {activeCompany.legalName}
-              </span>
-            )}
+          <CardDescription className="text-muted-foreground">
+            {t('onboarding.subtitle')}
           </CardDescription>
         </CardHeader>
-        <CardContent className="pt-4">
-          {/* Progress Indicators */}
-          {step <= 2 && (
-            <div className="flex items-center justify-between mb-8 px-4">
-              <div className="flex items-center gap-2">
-                <div
-                  className={`flex size-6 items-center justify-center rounded-full text-xs font-bold transition-colors ${step >= 1 ? 'bg-teal-500 text-white' : 'bg-muted text-muted-foreground'}`}
-                >
-                  1
-                </div>
-                <span
-                  className={`text-xs font-medium ${step === 1 ? 'text-teal-600 dark:text-teal-400 font-bold' : 'text-muted-foreground'}`}
-                >
-                  {dt.step1Label}
-                </span>
+
+        <CardContent className="min-h-[280px] flex flex-col justify-between">
+          {isSuccess ? (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-center py-8 space-y-4 my-auto"
+            >
+              <CheckCircle2 className="mx-auto h-16 w-16 text-emerald-500 animate-bounce" />
+              <h3 className="text-2xl font-bold text-foreground">
+                {t('onboarding.success.title')}
+              </h3>
+              <p className="text-muted-foreground text-sm">{t('onboarding.success.description')}</p>
+              <div className="animate-pulse text-sm text-teal-600 font-mono mt-4">
+                Redirigiendo al sistema...
               </div>
-              <div className="h-[1px] flex-1 bg-muted mx-3" />
-              <div className="flex items-center gap-2">
-                <div
-                  className={`flex size-6 items-center justify-center rounded-full text-xs font-bold transition-colors ${step >= 2 ? 'bg-teal-500 text-white' : 'bg-muted text-muted-foreground'}`}
-                >
-                  2
+            </motion.div>
+          ) : (
+            <div className="flex-1 flex flex-col justify-between">
+              <div>
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold uppercase tracking-widest text-teal-600">
+                      {t('onboarding.step')} {step} / {STEPS.length}
+                    </span>
+                    <span className="text-xs font-semibold text-muted-foreground">
+                      {STEPS[step - 1].title}
+                    </span>
+                  </div>
+                  <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                    <motion.div
+                      className="h-full bg-teal-600"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${(step / STEPS.length) * 100}%` }}
+                      transition={{ duration: 0.3 }}
+                    />
+                  </div>
                 </div>
-                <span
-                  className={`text-xs font-medium ${step === 2 ? 'text-teal-600 dark:text-teal-400 font-bold' : 'text-muted-foreground'}`}
-                >
-                  {dt.step2Label}
-                </span>
+
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={step}
+                    initial={{ opacity: 0, x: 15 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -15 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    {renderStep()}
+                  </motion.div>
+                </AnimatePresence>
               </div>
-            </div>
-          )}
 
-          <AnimatePresence mode="wait" custom={step}>
-            {!loading ? (
-              <motion.div
-                key={step}
-                custom={step}
-                variants={slideVariants}
-                initial="enter"
-                animate="center"
-                exit="exit"
-                className="space-y-6 min-h-[160px] flex flex-col justify-center"
-              >
-                {/* STEP 1: Fiscal Year Start Month and Year */}
-                {step === 1 && (
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label
-                        htmlFor="fiscalMonth"
-                        className="text-sm font-semibold flex items-center gap-1.5"
-                      >
-                        <Calendar className="size-4 text-teal-500" />
-                        {dt.questionMonth}
-                      </Label>
-                      <p className="text-xs text-muted-foreground leading-relaxed">
-                        {dt.descMonth}
-                      </p>
-                      <Select value={fiscalMonth} onValueChange={setFiscalMonth}>
-                        <SelectTrigger className="w-full mt-2 border-teal-100 dark:border-teal-950 focus:ring-teal-500">
-                          <SelectValue placeholder={dt.selectMonthPlaceholder} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {MONTHS.map((m) => (
-                            <SelectItem key={m.value} value={m.value}>
-                              {dt['month' + m.value] || m.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2 mt-4">
-                      <Label
-                        htmlFor="fiscalYear"
-                        className="text-sm font-semibold flex items-center gap-1.5"
-                      >
-                        <Calendar className="size-4 text-teal-500" />
-                        {dt.questionYear}
-                      </Label>
-                      <p className="text-xs text-muted-foreground leading-relaxed">{dt.descYear}</p>
-                      <Select value={fiscalYear} onValueChange={setFiscalYear}>
-                        <SelectTrigger className="w-full mt-2 border-teal-100 dark:border-teal-950 focus:ring-teal-500">
-                          <SelectValue placeholder={dt.selectYearPlaceholder} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="2024">{dt.year2024}</SelectItem>
-                          <SelectItem value="2025">{dt.year2025}</SelectItem>
-                          <SelectItem value="2026">{dt.year2026}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                )}
-
-                {/* STEP 2: Setup Confirmation */}
-                {step === 2 && (
-                  <div className="space-y-4 text-center">
-                    <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-500 mb-2">
-                      <CheckCircle className="size-8" />
-                    </div>
-                    <h3 className="text-lg font-bold text-foreground">{dt.step2Title}</h3>
-                    <p className="text-xs text-muted-foreground max-w-sm mx-auto leading-relaxed">
-                      {dt.step2Desc
-                        .replace('{month}', dt['month' + fiscalMonth] || '')
-                        .replace('{year}', fiscalYear)}
-                    </p>
-                  </div>
-                )}
-              </motion.div>
-            ) : (
-              // Loading Progress Panel (Highly Didactic Visual Feedback)
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="flex flex-col items-center justify-center py-10 space-y-4"
-              >
-                <div className="relative flex items-center justify-center size-20">
-                  <div className="absolute inset-0 rounded-full border-t-2 border-r-2 border-teal-500 animate-spin" />
-                  <div className="absolute inset-2 rounded-full border-b-2 border-l-2 border-indigo-500 animate-spin [animation-direction:reverse]" />
-                  <Loader2 className="size-6 animate-spin text-teal-500" />
+              {errorMessage && (
+                <div className="mt-4 p-3 bg-destructive/10 text-destructive rounded-lg flex items-center gap-2 text-xs font-medium border border-destructive/20">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span>{errorMessage}</span>
                 </div>
-                <div className="text-center space-y-1">
-                  <h4 className="font-semibold text-sm text-foreground">{dt.loadingTitle}</h4>
-                  <p className="text-xs text-muted-foreground animate-pulse">{progressStatus}</p>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Action Buttons */}
-          {!loading && (
-            <div className="flex items-center justify-between mt-8 pt-4 border-t border-muted/50">
-              {step > 1 ? (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={prevStep}
-                  className="gap-1 text-muted-foreground"
-                >
-                  <ArrowLeft className="size-4" />
-                  {dt.backBtn}
-                </Button>
-              ) : (
-                <div />
-              )}
-
-              {step < 2 ? (
-                <Button
-                  size="sm"
-                  onClick={nextStep}
-                  className="gap-1 bg-teal-600 hover:bg-teal-500 text-white"
-                >
-                  {dt.nextBtn}
-                  <ArrowRight className="size-4" />
-                </Button>
-              ) : (
-                <Button
-                  size="sm"
-                  onClick={handleComplete}
-                  className="gap-1 bg-teal-600 hover:bg-teal-500 text-white"
-                >
-                  {dt.startBtn}
-                  <Sparkles className="size-4" />
-                </Button>
               )}
             </div>
           )}
         </CardContent>
+
+        {!isSuccess && (
+          <CardFooter className="flex justify-between pt-4 border-t bg-muted/20">
+            <Button
+              variant="ghost"
+              onClick={handleBack}
+              disabled={step === 1 || isLoading}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              {t('common.back')}
+            </Button>
+
+            {step < STEPS.length ? (
+              <Button
+                onClick={handleNext}
+                disabled={isLoading}
+                className="bg-teal-600 hover:bg-teal-700 text-white"
+              >
+                {t('common.next')} <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            ) : (
+              <Button
+                onClick={handleComplete}
+                disabled={isLoading}
+                className="bg-teal-600 hover:bg-teal-700 text-white"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t('onboarding.processing')}
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="mr-2 h-4 w-4" /> {t('onboarding.complete')}
+                  </>
+                )}
+              </Button>
+            )}
+          </CardFooter>
+        )}
       </Card>
     </div>
   );

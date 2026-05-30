@@ -84,6 +84,12 @@ export function AIAssistantModal() {
   const [ruleReply, setRuleReply] = useState('');
   const [error, setError] = useState('');
 
+  // Interactive Account Creation Wizard state
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [wizardCode, setWizardCode] = useState('');
+  const [wizardName, setWizardName] = useState('');
+  const [wizardParentId, setWizardParentId] = useState('');
+
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
   const ruleInputRef = useRef<HTMLTextAreaElement>(null);
@@ -93,7 +99,7 @@ export function AIAssistantModal() {
     if (chatScrollRef.current) {
       chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
     }
-  }, [chatMessages]);
+  }, [chatMessages, wizardOpen]);
 
   // Reset to chat mode and clear history when opening
   useEffect(() => {
@@ -105,11 +111,90 @@ export function AIAssistantModal() {
       setRuleInput('');
       setRuleReply('');
       setParsedRule(null);
+      setWizardOpen(false);
+      setWizardCode('');
+      setWizardName('');
+      setWizardParentId('');
       setTimeout(() => {
         chatInputRef.current?.focus();
       }, 300);
     }
   }, [aiAssistantOpen]);
+
+  const handleStartWizard = async () => {
+    if (!activeCompany) return;
+    setIsLoading(true);
+    setError('');
+    try {
+      const res = await fetch(`/api/accounts?companyId=${activeCompany.id}`);
+      if (!res.ok) throw new Error('Error al obtener el plan de cuentas');
+      const data = await res.json();
+      const accounts = data.accounts ?? [];
+
+      // Find cash & cash equivalents (parent account "1010")
+      const parentAcc = accounts.find((a: any) => a.code === '1010');
+      if (!parentAcc) {
+        throw new Error('No se encontró la cuenta base "1010 - Cash & Cash Equivalents"');
+      }
+      setWizardParentId(parentAcc.id);
+
+      // Find sub-accounts of 1010 or starting with 101
+      const subAccounts = accounts.filter(
+        (a: any) => a.parentId === parentAcc.id || (a.code.startsWith('101') && a.code !== '1010'),
+      );
+      let nextCode = 1011;
+      const codes = subAccounts.map((a: any) => parseInt(a.code, 10)).filter((c: any) => !isNaN(c));
+      if (codes.length > 0) {
+        nextCode = Math.max(...codes) + 1;
+      }
+      setWizardCode(String(nextCode));
+      setWizardName('Banco Chase - Corriente 1234');
+      setWizardOpen(true);
+    } catch (err: any) {
+      setError(err.message || 'Error al iniciar el asistente');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSaveWizardAccount = async () => {
+    if (!wizardCode || !wizardName || !activeCompany) return;
+    setIsLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId: activeCompany.id,
+          code: wizardCode.trim(),
+          name: wizardName.trim(),
+          accountType: 'asset',
+          normalBalance: 'debit',
+          parentId: wizardParentId || null,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || 'No se pudo crear la cuenta contable');
+      }
+
+      setWizardOpen(false);
+
+      const successMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: `✅ ¡Listo! He creado la cuenta contable **"${wizardCode} - ${wizardName}"** de tipo Activo (Deudor) bajo **"1010 - Cash & Cash Equivalents"** en tu Plan de Cuentas.`,
+        timestamp: new Date(),
+      };
+      setChatMessages((prev) => [...prev, successMsg]);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Close on Escape
   useEffect(() => {
@@ -398,6 +483,14 @@ export function AIAssistantModal() {
                   chatScrollRef={chatScrollRef}
                   chatInputRef={chatInputRef}
                   t={t}
+                  handleStartWizard={handleStartWizard}
+                  wizardOpen={wizardOpen}
+                  setWizardOpen={setWizardOpen}
+                  wizardCode={wizardCode}
+                  setWizardCode={setWizardCode}
+                  wizardName={wizardName}
+                  setWizardName={setWizardName}
+                  handleSaveWizardAccount={handleSaveWizardAccount}
                 />
               ) : (
                 <RuleView
@@ -434,6 +527,14 @@ function ChatView({
   chatScrollRef,
   chatInputRef,
   t,
+  handleStartWizard,
+  wizardOpen,
+  setWizardOpen,
+  wizardCode,
+  setWizardCode,
+  wizardName,
+  setWizardName,
+  handleSaveWizardAccount,
 }: {
   messages: ChatMessage[];
   isLoading: boolean;
@@ -445,6 +546,14 @@ function ChatView({
   chatScrollRef: React.RefObject<HTMLDivElement | null>;
   chatInputRef: React.RefObject<HTMLTextAreaElement | null>;
   t: (key: string) => string;
+  handleStartWizard: () => Promise<void>;
+  wizardOpen: boolean;
+  setWizardOpen: (v: boolean) => void;
+  wizardCode: string;
+  setWizardCode: (v: string) => void;
+  wizardName: string;
+  setWizardName: (v: string) => void;
+  handleSaveWizardAccount: () => Promise<void>;
 }) {
   const hasMessages = messages.length > 0;
 
@@ -471,15 +580,29 @@ function ChatView({
                       <Bot className="size-4 text-blue-400" />
                     </div>
                   )}
-                  <div
-                    className={cn(
-                      'max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap',
-                      msg.role === 'user'
-                        ? 'bg-blue-600 text-white rounded-br-md'
-                        : 'bg-white/10 text-slate-200 rounded-bl-md',
+                  <div className="flex flex-col gap-2 max-w-[80%]">
+                    <div
+                      className={cn(
+                        'rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap',
+                        msg.role === 'user'
+                          ? 'bg-blue-600 text-white rounded-br-md'
+                          : 'bg-white/10 text-slate-200 rounded-bl-md',
+                      )}
+                    >
+                      {msg.content
+                        .replace('[Te ayudo a crearla](action:create-account)', '')
+                        .trim()}
+                    </div>
+                    {msg.role === 'assistant' && msg.content.includes('action:create-account') && (
+                      <Button
+                        size="sm"
+                        onClick={handleStartWizard}
+                        className="self-start mt-1 bg-blue-600 hover:bg-blue-500 text-white gap-1 text-xs px-3 py-1.5 rounded-lg shadow-md font-semibold border border-blue-500/30"
+                      >
+                        <Sparkles className="size-3.5" />
+                        Te ayudo a crearla
+                      </Button>
                     )}
-                  >
-                    {msg.content}
                   </div>
                   {msg.role === 'user' && (
                     <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-purple-600/20 mt-0.5">
@@ -490,7 +613,77 @@ function ChatView({
               ))}
             </AnimatePresence>
 
-            {isLoading && (
+            {/* Inline Bank Account Creation Wizard */}
+            {wizardOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: 12, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                className="p-4 rounded-xl bg-slate-800/90 border border-blue-500/40 shadow-xl space-y-4 max-w-sm ml-11 backdrop-blur-sm"
+              >
+                <div className="flex items-center gap-2 text-blue-400 font-semibold text-xs">
+                  <Sparkles className="size-4 animate-pulse text-blue-300" />
+                  <span>Asistente de Cuenta Contable</span>
+                </div>
+
+                <div className="space-y-3 text-xs">
+                  <div className="space-y-1">
+                    <label className="text-slate-400 font-medium">Código de Cuenta:</label>
+                    <Input
+                      value={wizardCode}
+                      onChange={(e) => setWizardCode(e.target.value)}
+                      placeholder="Ej. 1011"
+                      className="bg-slate-900 border-white/10 text-white text-xs h-8 focus:ring-blue-500/50"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-slate-400 font-medium">Nombre de Cuenta:</label>
+                    <Input
+                      value={wizardName}
+                      onChange={(e) => setWizardName(e.target.value)}
+                      placeholder="Ej. Banco Chase - Corriente 1234"
+                      className="bg-slate-900 border-white/10 text-white text-xs h-8 focus:ring-blue-500/50"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-400 bg-white/5 p-2 rounded-lg border border-white/5">
+                    <div>
+                      <span className="font-semibold block text-slate-500">TIPO:</span> Activo
+                      (Asset)
+                    </div>
+                    <div>
+                      <span className="font-semibold block text-slate-500">SALDO NORMAL:</span>{' '}
+                      Débito
+                    </div>
+                    <div className="col-span-2">
+                      <span className="font-semibold block text-slate-500">CUENTA PADRE:</span> 1010
+                      - Cash & Cash Equivalents
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setWizardOpen(false)}
+                    className="flex-1 text-xs border-white/10 hover:bg-white/5 text-slate-300 h-8"
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleSaveWizardAccount}
+                    disabled={!wizardCode.trim() || !wizardName.trim()}
+                    className="flex-1 bg-blue-600 hover:bg-blue-500 text-white text-xs h-8"
+                  >
+                    Crear Cuenta
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+
+            {isLoading && !wizardOpen && (
               <motion.div
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}

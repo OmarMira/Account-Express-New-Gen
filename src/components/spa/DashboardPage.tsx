@@ -17,6 +17,7 @@ import {
   XCircle,
   Loader2,
   Activity,
+  Info,
 } from 'lucide-react';
 import {
   Bar,
@@ -55,6 +56,7 @@ import { FlowKpiCards } from '@/components/accounting-flow/FlowKpiCards';
 import { FlowErrorBoundary } from '@/components/accounting-flow/FlowErrorBoundary';
 import { AuditSection } from '@/components/audit/AuditSection';
 import { FinancialAssistantPanel } from '@/components/assistant/FinancialAssistantPanel';
+import { UtcEducationalModal } from '@/components/spa/UtcEducationalModal';
 
 /* ─── Types ─── */
 interface DashboardData {
@@ -529,16 +531,27 @@ export function DashboardPage() {
       {/* ── Period Alerts ── */}
       {d.upcomingPeriodEnds.length > 0 && (
         <motion.div variants={itemVariants}>
-          <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/40">
-            <AlertTriangle className="size-5 shrink-0 text-amber-600" />
-            <div className="flex-1 text-sm">
-              <span className="font-medium text-amber-800 dark:text-amber-300">
-                {d.upcomingPeriodEnds
-                  .map((p) => `${p.name} — ends ${formatDate(p.endDate)}`)
-                  .join(', ')}
-              </span>
+          <UtcEducationalModal>
+            <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/40 cursor-pointer hover:bg-amber-100/50 dark:hover:bg-amber-950/60 transition-all select-none hover:shadow-sm">
+              <AlertTriangle className="size-5 shrink-0 text-amber-600" />
+              <div className="flex-1 text-sm flex items-center justify-between gap-4">
+                <span className="font-medium text-amber-800 dark:text-amber-300">
+                  {d.upcomingPeriodEnds
+                    .map((p) => {
+                      const template = t('dashboard.periodEnds') || '{name} — ends {date}';
+                      return template
+                        .replace('{name}', p.name)
+                        .replace('{date}', formatDate(p.endDate));
+                    })
+                    .join(', ')}
+                </span>
+                <span className="text-xs font-semibold text-amber-700 dark:text-amber-400 flex items-center gap-1 border border-amber-200 dark:border-amber-800/60 rounded-md px-2.5 py-1 bg-white/50 dark:bg-black/20 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors shrink-0">
+                  <Info className="size-3.5" />
+                  <span>Soporte Didáctico</span>
+                </span>
+              </div>
             </div>
-          </div>
+          </UtcEducationalModal>
         </motion.div>
       )}
 

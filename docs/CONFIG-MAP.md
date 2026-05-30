@@ -15,6 +15,7 @@
 | `assistant-config.json` | Asistente Contextual | `healthChecks.*`, `templates.executiveSummary`, `queryLimits.maxHistoryMonths` | Controla alertas proactivas, plantillas de resumen y límites de consulta. | Editar plantillas/umbrales → Insights se regeneran en 5 min. |
 | `security-config.json` | Hardening V3.0 | `rateLimit.criticalEndpoints`, `ipAllowlist.enabled`, `securityHeaders` | Define límites de petición, headers de seguridad y políticas de IP. | Ajustar RPM → Rate-limiter aplica en caliente. |
 | `learning-engine.json` | Motor Adaptativo | `minOccurrencesToGenerateRule`, `autoApplyRules`, `patternGeneration.safeRegexCharsOnly` | Controla cuándo el sistema genera reglas candidatas desde feedback humano. | Cambiar umbral → `regenerate-rules.ts` ajusta salida. |
+| `import-config.json` | Importaciones Bancarias | `accountHolderValidation.{enabled,threshold,strictMode}` | Controla validación difusa de titular de cuenta, umbral y modo de bloqueo estricto en importación. | Incrementar `version` → La validación y UI se adaptan instantáneamente. |
 
 ## 🔒 Reglas de Gobierno de Configuración
 1. **Versionado Obligatorio:** Cada archivo debe incrementar `"version"` al modificar parámetros críticos.

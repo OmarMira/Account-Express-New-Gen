@@ -8,6 +8,7 @@ import { AuthService } from '@/services/auth.service';
 // ─── POST /api/auth/register ──────────────────────────────────────────
 export const POST = apiHandler(async (request: NextRequest) => {
   const body = await validateRequest(request, registerSchema);
+  if (body instanceof NextResponse) return body;
   const result = await AuthService.register(body);
 
   // Create session token
@@ -26,6 +27,7 @@ export const POST = apiHandler(async (request: NextRequest) => {
         id: result.company.id,
         legalName: result.company.legalName,
         taxId: result.company.taxId,
+        isOnboardingComplete: result.company.isOnboardingComplete,
       },
     ],
   });

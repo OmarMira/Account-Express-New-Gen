@@ -1,0 +1,83 @@
+{
+  "version": "1.0",
+  "active": true,
+  "sanitization": {
+    "description": "Reglas para eliminar ruido (IDs, fechas, montos, descriptores) antes de extraer nombres.",
+    "stripPatterns": [
+      {
+        "name": "remove_zelle_memos",
+        "regex": "\\bfor\\b.*",
+        "replacement": "",
+        "flags": "gi"
+      },
+      {
+        "name": "remove_conf_ref_ids",
+        "regex": "(Conf#|Ref#|ID:|ID: Indn:|TRX|\\d{10,}|\\$[\\d,]+\\.\\d{2})",
+        "replacement": ""
+      },
+      {
+        "name": "remove_dates",
+        "regex": "\\b\\d{1,2}[\\/\\-\\.]\\d{1,2}[\\/\\-\\.]\\d{2,4}\\b",
+        "replacement": ""
+      },
+      {
+        "name": "remove_banks_prefixes",
+        "regex": "\\b(BKOFAMERICA|DEPOSIT|MOBILE|PAYMENT|TRANSFER|Zelle payment)\\b",
+        "replacement": "",
+        "flags": "gi"
+      },
+      {
+        "name": "remove_descriptors",
+        "regex": "(DES:|WEB|CCD|PMT INFO:[^\\s]+)",
+        "replacement": "",
+        "flags": "gi"
+      }
+    ]
+  },
+  "extraction": {
+    "description": "Patrones heurísticos para encontrar nombres cerca de palabras clave.",
+    "strategies": [
+      {
+        "priority": 1,
+        "pattern": "\\bINDN:\\s*([A-ZÀ-ÿ\\s\\.&]{2,40})\\b",
+        "description": "Busca nombre tras marcador 'INDN:' (común en ACH/Wires/Plataformas)."
+      },
+      {
+        "priority": 2,
+        "pattern": "\\b(?:from|to|payee)\\s+([A-ZÀ-ÿ\\s\\.&]{2,40})\\b",
+        "description": "Busca nombre tras 'from', 'to' o 'payee'. Captura mayúsculas."
+      },
+      {
+        "priority": 3,
+        "pattern": "^(RAISER|LYFT\\.COM|TURO|AMERICAN EXPRESS|SETOYOTA FIN|HOME DEPOT|KMF)\\b",
+        "description": "Captura nombres de empresas al inicio de la descripción."
+      },
+      {
+        "priority": 4,
+        "pattern": "^([A-ZÀ-ÿ\\s\\.\\,&]{2,40})(?=\\s+(DES:|ID:|\\d{2}\\/))",
+        "description": "Fallback: Primera secuencia de texto largo antes de un descriptor técnico."
+      }
+    ]
+  },
+  "clustering": {
+    "description": "Configuración para agrupar variantes del mismo nombre (Fuzzy Matching).",
+    "algorithm": "jaro-winkler",
+    "threshold": 0.85,
+    "canonicalSelection": "most_frequent",
+    "minLength": 3,
+    "stopWords": ["LLC", "INC", "CORP", "CO", "PA", "THE", "AND", "DES", "PMNT"]
+  },
+  "validation": {
+    "description": "Umbrales para decidir si una entidad merece ser preguntada al usuario.",
+    "minOccurrences": 2,
+    "directionLockThreshold": 0.90,
+    "ignorePatterns": [
+      "CASH",
+      "CHECK",
+      "FEE",
+      "INTEREST",
+      "BALANCE",
+      "MOBILE"
+    ]
+  }
+}

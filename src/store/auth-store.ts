@@ -7,6 +7,7 @@ export interface User {
   firstName: string;
   lastName: string;
   role: 'super_admin' | 'company_admin';
+  avatar?: string | null;
 }
 
 export interface Company {
@@ -14,6 +15,7 @@ export interface Company {
   legalName: string;
   taxId: string | null;
   isOnboardingComplete: boolean;
+  logo?: string | null;
 }
 
 export type ViewName =
@@ -52,13 +54,16 @@ interface AuthState {
   adminSelectedCompanyId: string | null;
   isProcessing: boolean;
   processingMessage: string;
+  settingsActiveTab: string;
   login: (user: User) => void;
+  setUser: (user: User | null) => void;
   logout: () => void;
-  setActiveCompany: (company: Company) => void;
+  setActiveCompany: (company: Company | null) => void;
   setCurrentView: (view: ViewName) => void;
   setSidebarOpen: (open: boolean) => void;
   setAiAssistantOpen: (open: boolean) => void;
   setAdminSelectedCompanyId: (id: string | null) => void;
+  setSettingsActiveTab: (tab: string) => void;
   startProcessing: (message?: string) => void;
   stopProcessing: () => void;
   hydrate: () => Promise<void>;
@@ -76,6 +81,7 @@ export const useAuthStore = create<AuthState>()(
       adminSelectedCompanyId: null,
       isProcessing: false,
       processingMessage: 'Procesando...',
+      settingsActiveTab: 'user-profile',
 
       login: (user: User) =>
         set({
@@ -83,6 +89,8 @@ export const useAuthStore = create<AuthState>()(
           isAuthenticated: true,
           currentView: 'dashboard',
         }),
+
+      setUser: (user: User | null) => set({ user }),
 
       logout: () =>
         set({
@@ -94,9 +102,10 @@ export const useAuthStore = create<AuthState>()(
           aiAssistantOpen: false,
           adminSelectedCompanyId: null,
           isProcessing: false,
+          settingsActiveTab: 'user-profile',
         }),
 
-      setActiveCompany: (company: Company) => set({ activeCompany: company }),
+      setActiveCompany: (company: Company | null) => set({ activeCompany: company }),
 
       setCurrentView: (view: ViewName) => set({ currentView: view }),
 
@@ -105,6 +114,8 @@ export const useAuthStore = create<AuthState>()(
       setAiAssistantOpen: (open: boolean) => set({ aiAssistantOpen: open }),
 
       setAdminSelectedCompanyId: (id: string | null) => set({ adminSelectedCompanyId: id }),
+
+      setSettingsActiveTab: (tab: string) => set({ settingsActiveTab: tab }),
 
       startProcessing: (message) =>
         set({ isProcessing: true, processingMessage: message || 'Procesando...' }),
@@ -126,21 +137,11 @@ export const useAuthStore = create<AuthState>()(
                 isAuthenticated: true,
               });
 
-              if (currentStore.currentView === 'select-company') {
-                // If explicitly on select-company, keep it open and keep activeCompany null
+              if (!currentStore.activeCompany || currentStore.currentView === 'select-company') {
+                // If no company is active or explicitly on select-company, go to select-company with activeCompany as null
                 set({
                   activeCompany: null,
                   currentView: 'select-company',
-                });
-              } else if (
-                !currentStore.activeCompany &&
-                data.companies &&
-                data.companies.length > 0
-              ) {
-                // If no company is selected and not explicitly on select-company, auto-select first
-                set({
-                  activeCompany: data.companies[0],
-                  currentView: 'dashboard',
                 });
               } else if (currentStore.activeCompany) {
                 // Verify the active company is still valid and refresh its data

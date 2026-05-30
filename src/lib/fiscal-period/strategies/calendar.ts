@@ -13,8 +13,9 @@ export class CalendarYearStrategy extends PeriodStrategy {
         startDate: this.utcDate(year, startM + 1, 1),
         endDate: this.utcDate(year, startM + monthsPerPeriod + 1, 0, 23, 59, 59),
         name:
-          new Date(Date.UTC(year, startM)).toLocaleString('es', { month: 'long' }).toUpperCase() +
-          ` ${year}`,
+          new Date(Date.UTC(year, startM))
+            .toLocaleString('es', { month: 'long', timeZone: 'UTC' })
+            .toUpperCase() + ` ${year}`,
         isShort: false,
       };
     });

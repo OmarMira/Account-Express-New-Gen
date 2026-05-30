@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
+import { saveLogo } from '@/lib/uploads/logo-service';
 
 export async function GET(request: NextRequest) {
   try {
@@ -355,12 +356,54 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const body = await request.json();
-    const { legalName, taxId, address, phone, email } = body;
+    const contentType = request.headers.get('content-type') || '';
+    let legalName = '';
+    let taxId = '';
+    let phone = '';
+    let email = '';
+    let streetLine1 = '';
+    let streetLine2 = '';
+    let city = '';
+    let state = '';
+    let zipCode = '';
+    let logoFile: File | null = null;
+
+    if (contentType.includes('multipart/form-data')) {
+      const formData = await request.formData();
+      legalName = (formData.get('legalName') as string) || '';
+      taxId = (formData.get('taxId') as string) || '';
+      phone = (formData.get('phone') as string) || '';
+      email = (formData.get('email') as string) || '';
+      streetLine1 = (formData.get('streetLine1') as string) || '';
+      streetLine2 = (formData.get('streetLine2') as string) || '';
+      city = (formData.get('city') as string) || '';
+      state = (formData.get('state') as string) || '';
+      zipCode = (formData.get('zipCode') as string) || '';
+      logoFile = formData.get('logo') as File | null;
+    } else {
+      const body = await request.json();
+      legalName = body.legalName || '';
+      taxId = body.taxId || '';
+      phone = body.phone || '';
+      email = body.email || '';
+      streetLine1 = body.streetLine1 || '';
+      streetLine2 = body.streetLine2 || '';
+      city = body.city || '';
+      state = body.state || '';
+      zipCode = body.zipCode || '';
+    }
 
     if (!legalName) {
       return NextResponse.json({ error: 'legalName is required' }, { status: 400 });
     }
+
+    let logoPath: string | null = null;
+    if (logoFile && logoFile.size > 0) {
+      logoPath = await saveLogo(logoFile);
+    }
+
+    const companyAddress =
+      [streetLine1, streetLine2, city, state, zipCode].filter(Boolean).join(', ') || null;
 
     const company = await db.$transaction(async (tx) => {
       // 1. Create company
@@ -368,9 +411,15 @@ export async function POST(request: NextRequest) {
         data: {
           legalName,
           taxId: taxId || null,
-          address: address || null,
+          address: companyAddress,
           phone: phone || null,
           email: email || null,
+          streetLine1,
+          streetLine2,
+          city,
+          state,
+          zipCode,
+          logo: logoPath,
           isActive: true,
         },
       });
@@ -405,6 +454,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ company }, { status: 201 });
   } catch (error) {
     console.error('[ADMIN COMPANY POST]', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    const errMsg = error instanceof Error ? error.message : 'Internal server error';
+    return NextResponse.json({ error: errMsg }, { status: 500 });
   }
 }

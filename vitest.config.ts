@@ -15,5 +15,5 @@ export default defineConfig({
     },
     fileParallelism: false,
     maxWorkers: 1,
-  },
+  } as any,
 });

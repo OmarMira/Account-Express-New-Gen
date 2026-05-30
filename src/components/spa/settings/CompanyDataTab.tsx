@@ -10,6 +10,8 @@ import {
   MoreVertical,
   Pencil,
   Trash2,
+  Upload,
+  X,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useLanguageStore } from '@/store/language-store';
@@ -20,6 +22,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { AddressAutocomplete } from '@/components/ui/address-autocomplete';
+import { usAddressClientSchema } from '@/lib/validations/us-address-client';
 import {
   Table,
   TableBody,
@@ -67,6 +71,59 @@ interface CompanyRow {
   isActive: boolean;
 }
 
+const US_STATES = [
+  'AL',
+  'AK',
+  'AZ',
+  'AR',
+  'CA',
+  'CO',
+  'CT',
+  'DE',
+  'FL',
+  'GA',
+  'HI',
+  'ID',
+  'IL',
+  'IN',
+  'IA',
+  'KS',
+  'KY',
+  'LA',
+  'ME',
+  'MD',
+  'MA',
+  'MI',
+  'MN',
+  'MS',
+  'MO',
+  'MT',
+  'NE',
+  'NV',
+  'NH',
+  'NJ',
+  'NM',
+  'NY',
+  'NC',
+  'ND',
+  'OH',
+  'OK',
+  'OR',
+  'PA',
+  'RI',
+  'SC',
+  'SD',
+  'TN',
+  'TX',
+  'UT',
+  'VT',
+  'VA',
+  'WA',
+  'WV',
+  'WI',
+  'WY',
+];
+
 /* ─── CompanyDataTab ─────────────────────────────────────────── */
 
 export function CompanyDataTab() {
@@ -79,9 +136,17 @@ export function CompanyDataTab() {
     legalName: '',
     taxId: '',
     address: '',
+    streetLine1: '',
+    streetLine2: '',
+    city: '',
+    state: '',
+    zipCode: '',
     phone: '',
     email: '',
+    logo: '',
   });
+  const [logoPreview, setLogoPreview] = useState('');
+  const [logoFile, setLogoFile] = useState<File | null>(null);
   const [editingCompany, setEditingCompany] = useState(false);
   const [savingCompany, setSavingCompany] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -114,9 +179,16 @@ export function CompanyDataTab() {
               legalName: data.company.legalName || '',
               taxId: data.company.taxId || '',
               address: data.company.address || '',
+              streetLine1: data.company.streetLine1 || '',
+              streetLine2: data.company.streetLine2 || '',
+              city: data.company.city || '',
+              state: data.company.state || '',
+              zipCode: data.company.zipCode || '',
               phone: data.company.phone || '',
               email: data.company.email || '',
+              logo: data.company.logo || '',
             });
+            setLogoPreview(data.company.logo || '');
           }
         }
       } catch {
@@ -152,26 +224,72 @@ export function CompanyDataTab() {
 
   async function handleSaveCompany() {
     if (!companyId) return;
+
+    // Zod validation on submit
+    const addressParse = usAddressClientSchema.safeParse({
+      streetLine1: companyData.streetLine1,
+      streetLine2: companyData.streetLine2 || '',
+      city: companyData.city,
+      state: companyData.state,
+      zipCode: companyData.zipCode,
+      phone: companyData.phone || '',
+    });
+
+    if (!addressParse.success) {
+      console.error('[COMPANY PROFILE VALIDATION ERROR]', addressParse.error);
+      const errorMsg = addressParse.error.issues[0]?.message || 'Datos de dirección inválidos';
+      toast.error(errorMsg);
+      return;
+    }
+
     setSavingCompany(true);
     try {
-      const res = await fetch('/api/settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companyId, ...companyData }),
+      const formData = new FormData();
+      formData.append('companyId', companyId);
+      formData.append('email', companyData.email);
+      formData.append('phone', companyData.phone);
+
+      formData.append('address', JSON.stringify(addressParse.data));
+
+      if (logoFile) {
+        formData.append('logo', logoFile);
+      } else if (!logoPreview) {
+        // If logo was cleared
+        formData.append('logoCleared', 'true');
+      }
+
+      const res = await fetch('/api/company/profile', {
+        method: 'PATCH',
+        body: formData,
       });
+
       if (res.ok) {
         const data = await res.json();
-        if (data.company?.legalName) {
-          useAuthStore.getState().setActiveCompany({
-            ...activeCompany!,
-            legalName: data.company.legalName,
-          });
-        }
+
+        // Update auth-store active company logo & info
+        useAuthStore.getState().setActiveCompany({
+          ...activeCompany!,
+          legalName: companyData.legalName,
+          logo: data.logo || null,
+        });
+
+        // Update state
+        setCompanyData((prev) => ({
+          ...prev,
+          logo: data.logo || '',
+        }));
+        setLogoPreview(data.logo || '');
+        setLogoFile(null);
+
         setEditingCompany(false);
-        toast.success(t('settings.companyUpdated'));
+        toast.success('Información de la empresa actualizada.');
+      } else {
+        const err = await res.json();
+        toast.error(err.error || 'Ocurrió un error al guardar.');
       }
-    } catch {
-      /* ignore */
+    } catch (err) {
+      console.error(err);
+      toast.error('Ocurrió un error al guardar.');
     }
     setSavingCompany(false);
   }
@@ -234,6 +352,54 @@ export function CompanyDataTab() {
               </div>
             ) : editingCompany ? (
               <div className="grid gap-4 sm:grid-cols-2">
+                {/* Logo upload */}
+                <div className="flex flex-col items-center justify-center gap-2 sm:col-span-2 py-4 border border-dashed rounded-lg bg-muted/20">
+                  <Label className="text-sm font-semibold">Logo Corporativo</Label>
+                  <div className="relative group size-20 rounded-full overflow-hidden border bg-background flex items-center justify-center">
+                    {logoPreview ? (
+                      <img
+                        src={logoPreview}
+                        alt="Logo Preview"
+                        className="size-full object-cover"
+                      />
+                    ) : (
+                      <Building2 className="size-8 text-muted-foreground" />
+                    )}
+                    <label className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-white text-xs font-semibold">
+                      Cambiar
+                      <input
+                        type="file"
+                        accept="image/png, image/jpeg, image/svg+xml"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setLogoFile(file);
+                            setLogoPreview(URL.createObjectURL(file));
+                          }
+                        }}
+                      />
+                    </label>
+                  </div>
+                  {logoPreview && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-destructive text-xs"
+                      onClick={() => {
+                        setLogoFile(null);
+                        setLogoPreview('');
+                      }}
+                    >
+                      Eliminar logo
+                    </Button>
+                  )}
+                  <p className="text-[10px] text-muted-foreground">
+                    Formatos: PNG, JPG, SVG. Máximo 1MB.
+                  </p>
+                </div>
+
                 <div className="space-y-1.5 sm:col-span-2">
                   <Label htmlFor="legalName">{t('settings.legalName')}</Label>
                   <Input
@@ -269,17 +435,90 @@ export function CompanyDataTab() {
                     onChange={(e) => setCompanyData((prev) => ({ ...prev, phone: e.target.value }))}
                   />
                 </div>
+
+                {/* Localized US Address fields */}
                 <div className="space-y-1.5 sm:col-span-2">
-                  <Label htmlFor="address">{t('settings.address')}</Label>
-                  <Input
-                    id="address"
-                    value={companyData.address}
-                    onChange={(e) =>
-                      setCompanyData((prev) => ({ ...prev, address: e.target.value }))
-                    }
+                  <Label htmlFor="streetLine1">Dirección (Calle y Número)</Label>
+                  <AddressAutocomplete
+                    defaultValue={companyData.streetLine1}
+                    onSelect={(addr) => {
+                      setCompanyData((prev) => {
+                        // If address was cleared, clear all fields
+                        if (addr.streetLine1 === '') {
+                          return {
+                            ...prev,
+                            streetLine1: '',
+                            streetLine2: '',
+                            city: '',
+                            state: '',
+                            zipCode: '',
+                          };
+                        }
+                        // If typing manually, preserve other fields, otherwise overwrite with suggestion values
+                        return {
+                          ...prev,
+                          streetLine1: addr.streetLine1,
+                          streetLine2: addr.isManual
+                            ? prev.streetLine2
+                            : addr.streetLine2 || prev.streetLine2,
+                          city: addr.isManual ? prev.city : addr.city || prev.city,
+                          state: addr.isManual ? prev.state : addr.state || prev.state,
+                          zipCode: addr.isManual ? prev.zipCode : addr.zipCode || prev.zipCode,
+                        };
+                      });
+                    }}
+                    placeholder="Buscar dirección en EE.UU..."
                   />
                 </div>
-                <div className="flex gap-2 sm:col-span-2">
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="streetLine2">Suite / Oficina / Unidad (Opcional)</Label>
+                  <Input
+                    id="streetLine2"
+                    value={companyData.streetLine2}
+                    onChange={(e) =>
+                      setCompanyData((prev) => ({ ...prev, streetLine2: e.target.value }))
+                    }
+                    placeholder="Apt 2B"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="city">Ciudad / Localidad</Label>
+                  <Input
+                    id="city"
+                    value={companyData.city}
+                    onChange={(e) => setCompanyData((prev) => ({ ...prev, city: e.target.value }))}
+                    placeholder="Miami"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="state">Estado</Label>
+                  <select
+                    id="state"
+                    value={companyData.state}
+                    onChange={(e) => setCompanyData((prev) => ({ ...prev, state: e.target.value }))}
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-950"
+                  >
+                    <option value="">Seleccione Estado</option>
+                    {US_STATES.map((st) => (
+                      <option key={st} value={st}>
+                        {st}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="zipCode">Código Postal (ZIP Code)</Label>
+                  <Input
+                    id="zipCode"
+                    value={companyData.zipCode}
+                    onChange={(e) =>
+                      setCompanyData((prev) => ({ ...prev, zipCode: e.target.value }))
+                    }
+                    placeholder="33101"
+                  />
+                </div>
+
+                <div className="flex gap-2 sm:col-span-2 pt-2">
                   <Button onClick={handleSaveCompany} disabled={savingCompany}>
                     {savingCompany ? (
                       <>
@@ -297,16 +536,45 @@ export function CompanyDataTab() {
                 </div>
               </div>
             ) : (
-              <div className="grid gap-3 sm:grid-cols-2">
-                <InfoRow label={t('settings.legalName')} value={companyData.legalName} />
-                <InfoRow label={t('settings.taxId')} value={companyData.taxId || '—'} />
-                <InfoRow label={t('settings.email')} value={companyData.email || '—'} />
-                <InfoRow label={t('settings.phone')} value={companyData.phone || '—'} />
-                <InfoRow
-                  label={t('settings.address')}
-                  value={companyData.address || '—'}
-                  fullWidth
-                />
+              <div className="flex flex-col md:flex-row gap-6 items-start">
+                {/* Logo Display */}
+                <div className="shrink-0 size-24 rounded-full border bg-muted/30 flex items-center justify-center overflow-hidden">
+                  {companyData.logo ? (
+                    <img src={companyData.logo} alt="Logo" className="size-full object-cover" />
+                  ) : (
+                    <Building2 className="size-10 text-muted-foreground" />
+                  )}
+                </div>
+
+                {/* Company Info */}
+                <div className="grid gap-3 sm:grid-cols-2 flex-1 w-full">
+                  <InfoRow label={t('settings.legalName')} value={companyData.legalName} />
+                  <InfoRow label={t('settings.taxId')} value={companyData.taxId || '—'} />
+                  <InfoRow label={t('settings.email')} value={companyData.email || '—'} />
+                  <InfoRow label={t('settings.phone')} value={companyData.phone || '—'} />
+
+                  {/* Detailed US Address Display */}
+                  <div className="sm:col-span-2 pt-2 border-t mt-1">
+                    <p className="text-xs font-semibold text-primary mb-1">
+                      Dirección Fiscal Registrada (EE.UU.)
+                    </p>
+                    {companyData.streetLine1 ? (
+                      <div className="space-y-0.5 text-sm font-medium">
+                        <p>
+                          {companyData.streetLine1}{' '}
+                          {companyData.streetLine2 && `, ${companyData.streetLine2}`}
+                        </p>
+                        <p>
+                          {companyData.city}, {companyData.state} {companyData.zipCode}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground italic">
+                        Ninguna dirección registrada
+                      </p>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
           </CardContent>

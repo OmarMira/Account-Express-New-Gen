@@ -100,6 +100,7 @@ const es = {
     monthlyTrend: 'Tendencia Mensual',
     income: 'Ingresos',
     expenses: 'Gastos',
+    periodEnds: '{name} — finaliza el {date}',
   },
   accounts: {
     title: 'Plan de Cuentas',
@@ -532,6 +533,9 @@ const es = {
       patternFound: 'Patrón encontrado',
       occurrences: 'ocurrencias',
       suggestedAccount: 'Cuenta sugerida',
+      selectCompanyFirst: 'Selecciona una empresa para comenzar.',
+      conversationalDescription:
+        'El asistente detectará entidades recurrentes y te preguntará en lenguaje natural cómo clasificarlas.',
     },
     diag: {
       title: 'Diagnóstico del Sistema',
@@ -752,19 +756,50 @@ const es = {
   },
   onboarding: {
     title: 'Bienvenido a AccountExpress',
-    subtitle: 'Configuremos tu cuenta en unos pocos pasos.',
-    step1: 'Información de la Empresa',
-    step2: 'Plan de Cuentas',
-    step3: 'Cuentas Bancarias',
-    step4: 'Períodos Fiscales',
-    step5: 'Completar',
+    subtitle: 'Configuremos tu contabilidad en unos pocos pasos.',
+    step: 'Paso',
+    step1: {
+      legalName: 'Nombre Legal de la Empresa',
+      currency: 'Divisa de Reporte (Divisa Base)',
+    },
+    step2: {
+      startYear: 'Año de Inicio Fiscal',
+      startMonth: 'Mes de Inicio Fiscal',
+      periodType: 'Tipo de Período Contable',
+    },
+    step3: {
+      description:
+        'Se sembrará automáticamente un Plan de Cuentas (Chart of Accounts) bajo el estándar jerárquico US GAAP (Activos, Pasivos, Patrimonio, Ingresos, Gastos).',
+      note: 'Presione siguiente para confirmar e inyectar el catálogo didáctico.',
+    },
+    step4: {
+      description:
+        'Configuración de Impuestos Desactivada. Por control interno y mitigación de contingencia legal, la imputación de impuestos se realizará de manera pura vía cuentas del Libro Diario.',
+      note: 'El módulo fiscal estándar permanecerá desactivado de acuerdo a las reglas del sistema.',
+    },
+    step5: {
+      initialBalance: 'Saldo Inicial de Caja/Banco (Opcional)',
+      help: 'Si ingresa un monto mayor a cero, se generará de forma automática un asiento contable balanceado de apertura en el Libro Diario asimilando el capital inicial en el patrimonio.',
+    },
+    step6: {
+      ready: '¡Todo listo para activar el sistema!',
+      confirm:
+        'Al presionar "Finalizar", se ejecutarán de forma atómica la creación de períodos, la inyección del plan de cuentas y la inicialización de tus balances contables.',
+    },
+    success: {
+      title: '¡Configuración Exitosa!',
+      description:
+        'El motor contable ha sido activado y tus períodos y cuentas han sido creados correctamente en la base de datos.',
+    },
+    processing: 'Procesando Configuración Contable...',
+    complete: 'Finalizar Onboarding',
     skip: 'Omitir por ahora',
     finish: 'Finalizar Configuración',
     addCompanyInfo: 'Cuéntanos sobre tu empresa.',
     chooseAccounts: 'Elige tu plantilla de plan de cuentas.',
     addBanks: 'Conecta tus cuentas bancarias.',
     setPeriods: 'Configura los períodos de tu año fiscal.',
-    ready: '¡Todo listo!',
+    readyLabel: '¡Todo listo!',
   },
   selectCompany: {
     subtitle: 'Por favor, selecciona una empresa para continuar.',
@@ -814,6 +849,75 @@ const es = {
       nov: 'Nov',
       dic: 'Dic',
     },
+  },
+  address: {
+    searchPlaceholder: 'Buscar dirección en EE.UU...',
+    searching: 'Buscando dirección...',
+    noResults: 'No se encontraron resultados. Puede escribir manualmente.',
+  },
+  utc: {
+    modal: {
+      title: '¿Por qué usamos UTC?',
+      description:
+        'Para garantizar que tus reportes sean exactos sin importar tu zona horaria o la del servidor, el sistema estandariza todos los períodos fiscales a Tiempo Universal Coordinado (UTC). Esto evita que un mes se "corte" o cambie de nombre automáticamente.',
+      benefit: '✅ Tus datos siempre cuadran. Los reportes son idénticos en Miami, Madrid o Tokio.',
+      action: 'Ver configuración de períodos',
+      close: 'Entendido',
+    },
+  },
+  learning: {
+    modalTitle: 'Contexto de Entidad',
+    modalDesc:
+      'Para clasificar correctamente las transacciones, indícanos quién o qué es "{pattern}".',
+    tabManual: 'Selección Manual',
+    tabConversational: 'Asistente IA',
+    promptLabel: 'Describe la relación en lenguaje natural',
+    promptPlaceholder:
+      'ej: Ignacio Plaza es nuestro inquilino que paga la renta del local comercial...',
+    analyzeBtn: 'Analizar con IA',
+    analyzing: 'Analizando...',
+    roleLabel: '¿Cuál es su relación con el negocio?',
+    roleTenant: 'Inquilino / Pago de Renta',
+    roleVendor: 'Proveedor / Servicios',
+    rolePartner: 'Socio / Extracción',
+    roleCustomer: 'Cliente / Ventas',
+    roleEmployee: 'Empleado / Salarios',
+    roleOther: 'Otro...',
+    customRoleLabel: 'Especificar Relación / Rol',
+    customRolePlaceholder: 'ej: SEGUROS, TAXI, PUBLICIDAD',
+    accountLabel: 'Cuenta Contable Vinculada',
+    accountDesc: 'Las transacciones de esta entidad se imputarán automáticamente a esta cuenta.',
+    loadingAccounts: 'Cargando cuentas...',
+    confirmBtn: 'Confirmar y Aplicar',
+    cancelBtn: 'Cancelar',
+    aiSuccess: 'IA ha sugerido el rol "{role}" y la cuenta "{account}".',
+    aiError: 'No se pudo analizar la descripción. Usando fallbacks por defecto.',
+  },
+  ruleBuilder: {
+    title: 'Asistente de Clasificación Inteligente',
+    description:
+      'Analiza entidades recurrentes y genera reglas contables precisas con contexto conversacional.',
+    loadingCandidates: 'Escaneando transacciones...',
+    noCandidates: 'No se detectaron patrones pendientes de clasificación.',
+    allProcessed: '✅ Todas las entidades han sido procesadas correctamente.',
+    fetchError: 'Error al cargar candidatos pendientes.',
+    interpretError: 'No se pudo interpretar la respuesta. Intenta de nuevo.',
+    createError: 'Error al guardar la regla. Verifica la conexión.',
+    unknownError: 'Error inesperado.',
+    occurrences: 'ocurrencias',
+    directionCredit: 'Solo Ingresos (Crédito)',
+    directionDebit: 'Solo Gastos (Débito)',
+    directionMixed: 'Mixto (Requiere revisión)',
+    question: '¿Quién o qué es "{entity}" para tu negocio?',
+    answerPlaceholder: 'Ej: es un inquilino, mi socio, plataforma de ingresos...',
+    answerHint: 'La IA interpretará tu respuesta y sugerirá la cuenta GL correcta.',
+    interpretBtn: 'Interpretar',
+    aiUnderstood: 'Entendido. Clasificación inferida:',
+    suggestedAccount: 'Cuenta GL sugerida:',
+    subAccountHint: 'Se recomienda crear una sub-cuenta para "{name}" bajo esta cuenta padre.',
+    confirmBtn: 'Confirmar y Generar Regla',
+    editBtn: 'Editar respuesta',
+    skipBtn: 'Omitir por ahora',
   },
 };
 

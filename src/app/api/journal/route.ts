@@ -57,10 +57,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
     // Cursor-based pagination (Infinito Scroll)
     const entries = await db.journalEntry.findMany({
       where,
-      orderBy: [
-        { date: 'desc' },
-        { id: 'desc' }
-      ],
+      orderBy: [{ date: 'desc' }, { id: 'desc' }],
       take: limit + 1,
       cursor: { id: cursor },
       skip: 1, // Skip the cursor element itself
@@ -98,10 +95,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
     // Initial fetch for cursor-based pagination (no cursor value but parameter exists)
     const entries = await db.journalEntry.findMany({
       where,
-      orderBy: [
-        { date: 'desc' },
-        { id: 'desc' }
-      ],
+      orderBy: [{ date: 'desc' }, { id: 'desc' }],
       take: limit + 1,
       include: {
         lines: {
@@ -184,6 +178,7 @@ export const POST = apiHandler(async (request: NextRequest) => {
   }
 
   const body = await validateRequest(request, createJournalEntrySchema);
+  if (body instanceof NextResponse) return body;
   const { companyId } = body;
 
   // Verify user has access

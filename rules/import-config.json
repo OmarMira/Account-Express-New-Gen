@@ -1,0 +1,8 @@
+{
+  "version": "1.1",
+  "accountHolderValidation": {
+    "enabled": true,
+    "threshold": 0.85,
+    "strictMode": false
+  }
+}

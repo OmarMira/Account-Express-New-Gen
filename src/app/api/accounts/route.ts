@@ -46,17 +46,50 @@ export async function GET(request: NextRequest) {
       orderBy: [{ code: 'asc' }],
     });
 
-    const accounts = rawAccounts.map((account) => {
+    // 1. Calculate direct balances for all accounts and build a map
+    const accountMap = new Map<string, any>();
+    rawAccounts.forEach((acc) => {
       let balance = 0;
-      for (const line of account.journalLines) {
-        if (account.normalBalance === 'debit') {
+      for (const line of acc.journalLines) {
+        if (acc.normalBalance === 'debit') {
           balance += line.debit - line.credit;
         } else {
           balance += line.credit - line.debit;
         }
       }
-      const { journalLines, ...rest } = account;
-      return { ...rest, balance };
+      accountMap.set(acc.id, {
+        ...acc,
+        directBalance: balance,
+        balance: balance, // Will hold the accumulated balance
+      });
+    });
+
+    // 2. Recursive function to aggregate child balances
+    function getAccumulatedBalance(accId: string): number {
+      const acc = accountMap.get(accId);
+      if (!acc) return 0;
+
+      let total = acc.directBalance;
+      // Get all child accounts of this parent
+      const children = rawAccounts.filter((a) => a.parentId === accId);
+      for (const child of children) {
+        total += getAccumulatedBalance(child.id);
+      }
+
+      acc.balance = total;
+      return total;
+    }
+
+    // 3. Populate accumulated balances for all accounts
+    rawAccounts.forEach((acc) => {
+      getAccumulatedBalance(acc.id);
+    });
+
+    // 4. Map back and clean up
+    const accounts = rawAccounts.map((acc) => {
+      const enriched = accountMap.get(acc.id);
+      const { journalLines, ...rest } = enriched;
+      return rest;
     });
 
     return NextResponse.json({ accounts });
