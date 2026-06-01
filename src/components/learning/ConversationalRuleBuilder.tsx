@@ -73,7 +73,10 @@ export function ConversationalRuleBuilder({
           directionProfile: current.directionProfile,
         }),
       });
-      if (!res.ok) throw new Error(t('ruleBuilder.interpretError'));
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || t('ruleBuilder.interpretError'));
+      }
       const resData = await res.json();
       if (resData.success && resData.data) {
         setSuggestion(resData.data);

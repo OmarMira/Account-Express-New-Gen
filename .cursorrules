@@ -1,0 +1,12 @@
+# AI Agent Rules - Account Express New Gen
+
+## 1. Lectura Forzada
+BEFORE modifying, auditing, or generating code, you MUST explicitly read target files using `read`/`cat`. Declaring compatibility without file-level verification is a HARD FAILURE.
+
+## 2. Separación Productor / Crítico
+NEVER use the same context to generate and approve semantic business rules. Flow: Draft → Save → Independent context validates → Approve/Reject. Self-evaluation of accounting logic is prohibited.
+
+## 3. Límites Contables
+- This system records, reconciles, and generates base reports under US GAAP.
+- Tax forms, semantic intent validation, and final journal approval are EXCLUSIVE to a licensed CPA.
+- NEVER hardcode account numbers, thresholds, or business rules. All must be configurable via `rules/*.json`.

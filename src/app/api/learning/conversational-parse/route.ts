@@ -3,6 +3,8 @@ import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
 import { parseConversationalContext } from '@/lib/services/conversational-service';
 import { safeAuditLog } from '@/lib/services/audit-service';
+import { join } from 'path';
+import { readFileSync, existsSync } from 'fs';
 
 // ── POST /api/learning/conversational-parse ──────────────────────
 export async function POST(request: NextRequest) {
@@ -50,29 +52,43 @@ export async function POST(request: NextRequest) {
     // Ejecutar el parser (con userId para auditoría de respuesta IA externa)
     const result = await parseConversationalContext(companyId, pattern, userInput, userId);
 
-    // ─── VALIDACIÓN CRÍTICA DE DIRECCIONALIDAD ───
+    // ─── VALIDACIÓN CRÍTICA DE DIRECCIONALIDAD (EXTERNALIZADA) ───
     const creditPct = directionProfile.creditPct;
     const debitPct = directionProfile.debitPct;
     const suggestedAccountType = result.glAccountCode?.charAt(0);
 
     if (suggestedAccountType) {
-      // Si es >90% Crédito, debe ser Ingreso (4), Pasivo (2) o Patrimonio (3)
-      if (creditPct >= 0.9 && !['4', '2', '3'].includes(suggestedAccountType)) {
+      const profilePath = join(process.cwd(), 'rules/direction-profiles.json');
+      let directionProfiles: Record<
+        string,
+        { normalBalance: 'credit' | 'debit'; deviationThreshold: number }
+      > = {};
+      try {
+        if (existsSync(profilePath)) {
+          directionProfiles = JSON.parse(readFileSync(profilePath, 'utf-8'));
+        }
+      } catch (fsErr) {
+        console.error('[FS ERROR reading direction-profiles.json]', fsErr);
+      }
+
+      const profile = directionProfiles[suggestedAccountType];
+      const threshold = profile?.deviationThreshold ?? 0.9;
+
+      if (creditPct >= threshold && profile?.normalBalance === 'debit') {
         return NextResponse.json(
           {
             error:
-              'La cuenta sugerida no es válida para transacciones de INGRESO. Intente con una cuenta de tipo Ingreso o Pasivo.',
+              'La cuenta sugerida no es válida para transacciones de INGRESO. Ajuste el rol o seleccione una cuenta de tipo Ingreso/Pasivo.',
           },
           { status: 400 },
         );
       }
 
-      // Si es >90% Débito, debe ser Gasto (5/6), Activo (1) o Patrimonio (3)
-      if (debitPct >= 0.9 && !['5', '6', '1', '3'].includes(suggestedAccountType)) {
+      if (debitPct >= threshold && profile?.normalBalance === 'credit') {
         return NextResponse.json(
           {
             error:
-              'La cuenta sugerida no es válida para transacciones de GASTO. Intente con una cuenta de tipo Gasto o Activo.',
+              'La cuenta sugerida no es válida para transacciones de GASTO. Ajuste el rol o seleccione una cuenta de tipo Gasto/Activo.',
           },
           { status: 400 },
         );
