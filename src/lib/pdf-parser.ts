@@ -1,6 +1,19 @@
 import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
 import path from 'path';
 import { pathToFileURL } from 'url';
+// Helper to detect '- continued' headers and section keywords
+function isContinuedHeader(line: string): boolean {
+  const lower = line.toLowerCase();
+  return lower.includes('- continued') || lower.includes('– continued');
+}
+
+function detectSection(line: string): 'deposits' | 'withdrawals' | null {
+  const lower = line.toLowerCase();
+  if (lower.includes('deposit') || lower.includes('credit')) return 'deposits';
+  if (lower.includes('withdrawal') || lower.includes('debit') || lower.includes('payment'))
+    return 'withdrawals';
+  return null;
+}
 
 export interface ParsedTransaction {
   date: Date;
@@ -73,9 +86,9 @@ export async function parsePDF(buffer: Buffer): Promise<ParsedPDFResult> {
 
     fullText += pageText + '\n';
   }
-
   const lines = fullText.split('\n');
   const transactions: ParsedTransaction[] = [];
+  let currentSection: 'deposits' | 'withdrawals' | null = null;
 
   // Regex to match a date
   const dateRegex =
@@ -87,6 +100,19 @@ export async function parsePDF(buffer: Buffer): Promise<ParsedPDFResult> {
   for (const rawLine of lines) {
     const line = rawLine.trim();
     if (!line) continue;
+
+    // Detect section headers (they typically don't have dates)
+    if (!dateRegex.test(line)) {
+      const detected = detectSection(line);
+      if (detected) {
+        currentSection = detected;
+        continue;
+      }
+      // If this line is a continued header, keep currentSection unchanged
+      if (isContinuedHeader(line)) {
+        continue;
+      }
+    }
 
     // Skip balance summary lines so they aren't parsed as transactions
     if (
@@ -116,9 +142,16 @@ export async function parsePDF(buffer: Buffer): Promise<ParsedPDFResult> {
 
         if (description.length > 1) {
           const date = parseDate(matchedDateStr);
-          const amount = parseAmount(matchedAmountStr);
+          let amount = parseAmount(matchedAmountStr);
 
           if (date && !isNaN(date.getTime()) && !isNaN(amount)) {
+            // Apply sign based on current section if it's not explicitly signed
+            if (currentSection === 'withdrawals' && amount > 0) {
+              amount = -amount;
+            } else if (currentSection === 'deposits' && amount < 0) {
+              amount = Math.abs(amount);
+            }
+
             let reference: string | undefined;
             const zelleMatch = description.match(/Conf#\s*([a-zA-Z0-9]+)/i);
             const achMatch = description.match(/ID:\s*([a-zA-Z0-9]+)/i);

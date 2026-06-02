@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { createAuditLogWithRetry } from '@/lib/audit';
 import { getPeriodStrategy } from '@/lib/fiscal-period/strategies';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -311,8 +312,8 @@ export async function completeOnboarding(
     });
 
     // 6. Traza Forense en AuditLog (Guardrail 3)
-    await tx.auditLog.create({
-      data: {
+    await createAuditLogWithRetry(
+      {
         companyId,
         userId: userId || null,
         action: 'ONBOARDING_COMPLETED',
@@ -334,7 +335,8 @@ export async function completeOnboarding(
           journalEntryId: journalEntryId || null,
         }),
       },
-    });
+      tx,
+    );
 
     console.log(
       `[ONBOARDING] Complete system activation succeeded for: ${updatedCompany.legalName}`,

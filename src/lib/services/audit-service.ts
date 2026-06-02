@@ -1,4 +1,4 @@
-import { db } from '../db';
+import { createAuditLogWithRetry } from '../audit';
 
 export async function safeAuditLog(data: {
   companyId: string;
@@ -14,14 +14,12 @@ export async function safeAuditLog(data: {
     entity = 'System';
   }
 
-  return db.auditLog.create({
-    data: {
-      companyId: data.companyId,
-      userId: data.userId,
-      action: data.action,
-      entity: entity,
-      entityId: data.entityId || null,
-      details: data.details ? JSON.stringify(data.details) : null,
-    },
+  return createAuditLogWithRetry({
+    companyId: data.companyId,
+    userId: data.userId,
+    action: data.action,
+    entity: entity,
+    entityId: data.entityId || null,
+    details: data.details ? JSON.stringify(data.details) : null,
   });
 }

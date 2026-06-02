@@ -96,6 +96,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       glAccountId,
       priority,
       isActive,
+      conditions,
+      debitGlAccountId,
+      creditGlAccountId,
     } = body;
 
     // Find existing rule
@@ -117,23 +120,74 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'name cannot be empty' }, { status: 400 });
     }
 
-    const validConditionTypes = [
-      'contains',
-      'starts_with',
-      'ends_with',
-      'equals',
-      'amount_greater',
-      'amount_less',
-    ];
-    if (conditionType !== undefined && !validConditionTypes.includes(conditionType)) {
-      return NextResponse.json(
-        { error: `conditionType must be one of: ${validConditionTypes.join(', ')}` },
-        { status: 400 },
-      );
-    }
+    if (conditions !== undefined) {
+      if (!Array.isArray(conditions) || conditions.length === 0) {
+        return NextResponse.json(
+          { error: 'conditions must be a non-empty array' },
+          { status: 400 },
+        );
+      }
+      for (const cond of conditions) {
+        if (!cond.field || !['description', 'amount'].includes(cond.field.toLowerCase())) {
+          return NextResponse.json(
+            { error: "condition field must be 'description' or 'amount'" },
+            { status: 400 },
+          );
+        }
+        const validConditionTypes = [
+          'contains',
+          'starts_with',
+          'ends_with',
+          'equals',
+          'amount_greater',
+          'amount_less',
+        ];
+        if (!cond.operator || !validConditionTypes.includes(cond.operator)) {
+          return NextResponse.json(
+            { error: `condition operator must be one of: ${validConditionTypes.join(', ')}` },
+            { status: 400 },
+          );
+        }
+        if (!cond.value || !cond.value.trim()) {
+          return NextResponse.json({ error: 'condition value cannot be empty' }, { status: 400 });
+        }
+        if (
+          (cond.operator === 'amount_greater' || cond.operator === 'amount_less') &&
+          isNaN(Number(cond.value))
+        ) {
+          return NextResponse.json(
+            { error: 'condition value must be a number for amount conditions' },
+            { status: 400 },
+          );
+        }
+      }
+    } else if (conditionType !== undefined || conditionValue !== undefined) {
+      const type = conditionType !== undefined ? conditionType : existing.conditionType;
+      const val = conditionValue !== undefined ? conditionValue : existing.conditionValue;
 
-    if (conditionValue !== undefined && !conditionValue.trim()) {
-      return NextResponse.json({ error: 'conditionValue cannot be empty' }, { status: 400 });
+      const validConditionTypes = [
+        'contains',
+        'starts_with',
+        'ends_with',
+        'equals',
+        'amount_greater',
+        'amount_less',
+      ];
+      if (!validConditionTypes.includes(type)) {
+        return NextResponse.json(
+          { error: `conditionType must be one of: ${validConditionTypes.join(', ')}` },
+          { status: 400 },
+        );
+      }
+      if (!val || !val.trim()) {
+        return NextResponse.json({ error: 'conditionValue cannot be empty' }, { status: 400 });
+      }
+      if ((type === 'amount_greater' || type === 'amount_less') && isNaN(Number(val))) {
+        return NextResponse.json(
+          { error: 'conditionValue must be a number for amount conditions' },
+          { status: 400 },
+        );
+      }
     }
 
     if (glAccountId !== undefined) {
@@ -143,6 +197,30 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       if (!glAccount) {
         return NextResponse.json(
           { error: 'GL account not found or does not belong to this company' },
+          { status: 400 },
+        );
+      }
+    }
+
+    if (debitGlAccountId !== undefined && debitGlAccountId !== null) {
+      const glAccount = await db.glAccount.findFirst({
+        where: { id: debitGlAccountId, companyId: existing.companyId },
+      });
+      if (!glAccount) {
+        return NextResponse.json(
+          { error: 'Debit GL account not found or does not belong to this company' },
+          { status: 400 },
+        );
+      }
+    }
+
+    if (creditGlAccountId !== undefined && creditGlAccountId !== null) {
+      const glAccount = await db.glAccount.findFirst({
+        where: { id: creditGlAccountId, companyId: existing.companyId },
+      });
+      if (!glAccount) {
+        return NextResponse.json(
+          { error: 'Credit GL account not found or does not belong to this company' },
           { status: 400 },
         );
       }
@@ -159,8 +237,45 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (name !== undefined) updateData.name = name.trim();
     if (conditionType !== undefined) updateData.conditionType = conditionType;
     if (conditionValue !== undefined) updateData.conditionValue = conditionValue.trim();
+
+    if (conditions !== undefined) {
+      updateData.conditions = conditions;
+      updateData.conditionType = conditions[0].operator;
+      updateData.conditionValue = conditions[0].value;
+    } else if (conditionType !== undefined || conditionValue !== undefined) {
+      const activeType = conditionType !== undefined ? conditionType : existing.conditionType;
+      const activeValue =
+        conditionValue !== undefined ? conditionValue.trim() : existing.conditionValue;
+      updateData.conditions = [
+        {
+          field: 'description',
+          operator: activeType,
+          value: activeValue,
+        },
+      ];
+    }
+
     if (transactionDirection !== undefined) updateData.transactionDirection = transactionDirection;
     if (glAccountId !== undefined) updateData.glAccountId = glAccountId;
+    if (debitGlAccountId !== undefined) updateData.debitGlAccountId = debitGlAccountId;
+    if (creditGlAccountId !== undefined) updateData.creditGlAccountId = creditGlAccountId;
+
+    const finalDebit =
+      debitGlAccountId !== undefined ? debitGlAccountId : existing.debitGlAccountId;
+    const finalCredit =
+      creditGlAccountId !== undefined ? creditGlAccountId : existing.creditGlAccountId;
+    const finalDirection =
+      transactionDirection !== undefined ? transactionDirection : existing.transactionDirection;
+    if (glAccountId === undefined) {
+      if (finalDirection === 'debit') {
+        updateData.glAccountId = finalDebit;
+      } else if (finalDirection === 'credit') {
+        updateData.glAccountId = finalCredit;
+      } else {
+        updateData.glAccountId = finalDebit || finalCredit || null;
+      }
+    }
+
     if (priority !== undefined) updateData.priority = Math.round(priority);
     if (isActive !== undefined) updateData.isActive = Boolean(isActive);
 
@@ -169,6 +284,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       data: updateData,
       include: {
         glAccount: {
+          select: { id: true, code: true, name: true, accountType: true },
+        },
+        debitGlAccount: {
+          select: { id: true, code: true, name: true, accountType: true },
+        },
+        creditGlAccount: {
           select: { id: true, code: true, name: true, accountType: true },
         },
         _count: {

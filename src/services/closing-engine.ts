@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { createAuditLogWithRetry } from '@/lib/audit';
 import { getPeriodStrategy } from '@/lib/fiscal-period/strategies';
 import { FiscalYearConfig } from '@/lib/fiscal-period/types';
 
@@ -81,15 +82,16 @@ export async function executeYearClose(companyId: string, year: number, config: 
         lines: { create: lines },
       },
     });
-    await tx.auditLog.create({
-      data: {
+    await createAuditLogWithRetry(
+      {
         companyId,
         action: 'YEAR_CLOSED',
         entity: 'JournalEntry',
         entityId: entry.id,
         details: JSON.stringify({ year }),
       },
-    });
+      tx,
+    );
     await tx.fiscalPeriod.updateMany({
       where: { companyId, endDate: { gte: fiscalEnd } },
       data: { isLocked: true },
