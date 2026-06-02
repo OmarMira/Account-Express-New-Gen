@@ -2,23 +2,26 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { authRateLimiter } from '@/lib/rate-limiter';
 
-const SECURITY_HEADERS = {
-  'Content-Security-Policy': [
-    "default-src 'self'",
-    "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
-    "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob:",
-    "font-src 'self' data:",
-    "connect-src 'self'",
-    "frame-ancestors 'none'",
-    "base-uri 'self'",
-    "form-action 'self'",
-  ].join('; '),
-  'X-Frame-Options': 'DENY',
-  'X-Content-Type-Options': 'nosniff',
-  'Referrer-Policy': 'strict-origin-when-cross-origin',
-  'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
-};
+function getSecurityHeaders(): Record<string, string> {
+  const extraSources = process.env.CSP_SOURCES ? ` ${process.env.CSP_SOURCES}` : '';
+  return {
+    'Content-Security-Policy': [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: blob:",
+      "font-src 'self' data:",
+      `connect-src 'self'${extraSources}`,
+      "frame-ancestors 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+    ].join('; '),
+    'X-Frame-Options': 'DENY',
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'strict-origin-when-cross-origin',
+    'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
+  };
+}
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -110,7 +113,7 @@ export async function middleware(request: NextRequest) {
 
   // 3. Apply Security Headers
   const response = NextResponse.next();
-  Object.entries(SECURITY_HEADERS).forEach(([key, value]) => {
+  Object.entries(getSecurityHeaders()).forEach(([key, value]) => {
     response.headers.set(key, value);
   });
 

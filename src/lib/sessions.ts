@@ -10,17 +10,6 @@ export async function createSession(userId: string): Promise<string> {
   // Sessions expire after 7 days
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-  // Run cleanup of expired sessions to keep the DB small
-  await db.session
-    .deleteMany({
-      where: {
-        expiresAt: {
-          lt: new Date(),
-        },
-      },
-    })
-    .catch((err) => console.error('[SESSION CLEANUP ERROR]', err));
-
   await db.session.create({
     data: {
       token,

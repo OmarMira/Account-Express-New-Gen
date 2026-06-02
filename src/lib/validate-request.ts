@@ -18,10 +18,22 @@ export async function validateRequest<T>(
   req: Request,
   schema: z.ZodSchema<T>,
 ): Promise<T | NextResponse> {
+  // Endpoints that do NOT require body validation (e.g., logout, backup upload)
+  const skipValidationPaths = ['/api/auth/logout', '/api/backup/upload'];
+
+  const url = new URL(req.url);
+  if (skipValidationPaths.includes(url.pathname)) {
+    // Return raw JSON body without schema validation
+    try {
+      return (await req.json()) as unknown as T;
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+  }
+
   try {
     const json = await req.json();
-
-    // Detección recursiva de XSS
+    // Recursive XSS detection
     const checkXss = (obj: any) => {
       if (typeof obj === 'string' && hasXssPattern(obj)) {
         throw new Error('Potential XSS attack detected');
@@ -33,9 +45,7 @@ export async function validateRequest<T>(
       }
     };
     checkXss(json);
-
     const result = schema.safeParse(json);
-
     if (!result.success) {
       return NextResponse.json(
         { error: 'Validation failed', details: result.error.flatten() },

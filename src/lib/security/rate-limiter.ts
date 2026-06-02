@@ -20,14 +20,37 @@ setInterval(() => {
   }
 }, CLEANUP_INTERVAL);
 
+type SecurityConfig = {
+  version: string;
+  rateLimit: RateLimitConfig;
+};
+
+let cachedConfig: RateLimitConfig | null = null;
+let lastLoadedTime = 0;
+const CACHE_TTL = 300 * 1000; // 300s TTL in development
+
+function getRateLimitConfig(): RateLimitConfig {
+  const isProd = process.env.NODE_ENV === 'production';
+  const now = Date.now();
+
+  if (cachedConfig && (isProd || now - lastLoadedTime < CACHE_TTL)) {
+    return cachedConfig;
+  }
+
+  const configPath = join(process.cwd(), 'rules/security-config.json');
+  const fullConfig = JSON.parse(readFileSync(configPath, 'utf-8')) as SecurityConfig;
+  cachedConfig = fullConfig.rateLimit;
+  lastLoadedTime = now;
+  return cachedConfig;
+}
+
 export function checkRateLimit(
   userId: string,
   companyId: string,
   path: string,
 ): { allowed: boolean; limit: number; remaining: number; resetAt: number } {
   try {
-    const configPath = join(process.cwd(), 'rules/security-config.json');
-    const config: RateLimitConfig = JSON.parse(readFileSync(configPath, 'utf-8'));
+    const config = getRateLimitConfig();
 
     const key = `${userId}:${companyId}`;
     const now = Date.now();

@@ -32,7 +32,9 @@ export async function register() {
     await initPdfWorker();
     const { optimizeSQLite } = await import('./lib/db-optimizer');
     const { resetMetrics } = await import('./lib/metrics');
+    const { startSessionCleanupInterval } = await import('./lib/maintenance/cleanupSessions');
     await optimizeSQLite();
     resetMetrics();
+    startSessionCleanupInterval();
   }
 }

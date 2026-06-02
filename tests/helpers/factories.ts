@@ -136,7 +136,12 @@ export async function createTestJournalEntry(
 }
 
 export async function clearDatabase() {
-  await db.session.deleteMany().catch(() => {});
+  // Defensive guard: only attempt to clear sessions if the model exists
+  if ('session' in db) {
+    await db.session.deleteMany().catch(() => {});
+  } else {
+    console.warn('⚠️ Session model not available in Prisma client; skipping session cleanup.');
+  }
   await db.auditLog.deleteMany().catch(() => {});
   await db.journalLine.deleteMany().catch(() => {});
   await db.journalEntry.deleteMany().catch(() => {});
