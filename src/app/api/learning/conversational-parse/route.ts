@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
 import { parseConversationalContext } from '@/lib/services/conversational-service';
 import { safeAuditLog } from '@/lib/services/audit-service';
+import { logger } from '@/lib/logger';
 import { join } from 'path';
 import { readFileSync, existsSync } from 'fs';
 
@@ -61,42 +62,48 @@ export async function POST(request: NextRequest) {
       const profilePath = join(process.cwd(), 'rules/direction-profiles.json');
       let directionProfiles: Record<
         string,
-        { normalBalance: 'credit' | 'debit'; deviationThreshold: number }
+        { normalBalance: 'credit' | 'debit'; deviationThreshold: number; allowOpposite?: boolean }
       > = {};
       try {
         if (existsSync(profilePath)) {
           directionProfiles = JSON.parse(readFileSync(profilePath, 'utf-8'));
         }
       } catch (fsErr) {
-        console.error('[FS ERROR reading direction-profiles.json]', fsErr);
+        logger.error('FS_ERROR_DIRECTION_PROFILES', { error: String(fsErr) });
       }
 
       const profile = directionProfiles[suggestedAccountType];
       const threshold = profile?.deviationThreshold ?? 0.9;
+      const allowOpposite = profile?.allowOpposite ?? false;
+      const isMixed = creditPct > 0.15 && debitPct > 0.15;
 
-      if (creditPct >= threshold && profile?.normalBalance === 'debit') {
-        return NextResponse.json(
-          {
-            error:
-              'La cuenta sugerida no es válida para transacciones de INGRESO. Ajuste el rol o seleccione una cuenta de tipo Ingreso/Pasivo.',
-          },
-          { status: 400 },
-        );
+      // Only block if: entity is NOT mixed, opposite is not allowed,
+      // AND the account's normal balance clearly contradicts the observed flow.
+      if (!allowOpposite && !isMixed) {
+        if (creditPct >= threshold && profile?.normalBalance === 'debit') {
+          return NextResponse.json(
+            {
+              error:
+                'La cuenta sugerida no es válida para transacciones de INGRESO. Ajuste el rol o seleccione una cuenta de tipo Ingreso/Pasivo.',
+            },
+            { status: 400 },
+          );
+        }
+
+        if (debitPct >= threshold && profile?.normalBalance === 'credit') {
+          return NextResponse.json(
+            {
+              error:
+                'La cuenta sugerida no es válida para transacciones de GASTO. Ajuste el rol o seleccione una cuenta de tipo Gasto/Activo.',
+            },
+            { status: 400 },
+          );
+        }
       }
 
-      if (debitPct >= threshold && profile?.normalBalance === 'credit') {
-        return NextResponse.json(
-          {
-            error:
-              'La cuenta sugerida no es válida para transacciones de GASTO. Ajuste el rol o seleccione una cuenta de tipo Gasto/Activo.',
-          },
-          { status: 400 },
-        );
-      }
-
-      // Si es Mixto y sugiere Equity (3), advertir pero permitir
-      if (creditPct > 0.2 && debitPct > 0.2 && suggestedAccountType === '3') {
-        console.warn(`⚠️ Entidad MIXTA clasificada como Equity: ${pattern}`);
+      // Warn (structured) when a mixed entity maps to Equity (class 3)
+      if (isMixed && suggestedAccountType === '3') {
+        logger.warn('MIXED_ENTITY_CLASSIFIED_AS_EQUITY', { pattern, creditPct, debitPct });
       }
     }
 
@@ -116,13 +123,14 @@ export async function POST(request: NextRequest) {
         },
       });
     } catch (auditErr) {
-      console.warn('[AUDIT LOG FAILED]', auditErr);
+      logger.warn('AUDIT_LOG_FAILED', { error: String(auditErr) });
     }
     // ──────────────────────────────────────────────────────────────
 
     return NextResponse.json({ success: true, data: result });
-  } catch (error: any) {
-    console.error('[CONVERSATIONAL PARSE ROUTE ERROR]', error);
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'Internal server error';
+    logger.error('CONVERSATIONAL_PARSE_ROUTE_ERROR', { error: msg });
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

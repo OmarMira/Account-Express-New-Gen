@@ -262,9 +262,7 @@ export function BanksPage() {
     setFormRoutingNo(account.routingNo || '');
     setFormGlAccountId(account.glAccountId);
     const rawBalance = (
-      account.initialBalance !== undefined
-        ? account.initialBalance
-        : account.balance
+      account.initialBalance !== undefined ? account.initialBalance : account.balance
     ) as number;
     setFormBalance(
       typeof rawBalance === 'number'

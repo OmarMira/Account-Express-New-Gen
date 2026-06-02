@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { apiHandler } from '@/lib/api-handler';
 import { recordFeedback } from '@/lib/learning/adaptive-engine';
 import { getSessionUserId } from '@/lib/sessions';
+import { db } from '@/lib/db';
 
 export const PATCH = apiHandler(async (req: NextRequest) => {
   const userId = await getSessionUserId(req);
@@ -12,6 +13,14 @@ export const PATCH = apiHandler(async (req: NextRequest) => {
   const { companyId, bankDescription, glAccountCode, confidence } = await req.json();
   if (!companyId || !bankDescription || !glAccountCode) {
     throw new Error('Faltan parámetros requeridos para feedback');
+  }
+
+  // Verify company membership
+  const membership = await db.companyMember.findFirst({
+    where: { userId, companyId },
+  });
+  if (!membership) {
+    return NextResponse.json({ error: 'Forbidden: No membership found' }, { status: 403 });
   }
 
   await recordFeedback({

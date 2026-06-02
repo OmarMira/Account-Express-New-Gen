@@ -1724,6 +1724,102 @@ export function FinancialDashboardPage() {
         />
       </div>
 
+      {/* SECCIÓN DE CONCILIACIÓN OPERATIVA (KPIs & Progreso) */}
+      {dbTransactions.length > 0 && (
+        <div className="bg-gradient-to-br from-teal-500/5 to-indigo-500/5 dark:from-teal-500/10 dark:to-indigo-500/10 border border-teal-500/10 dark:border-teal-500/20 rounded-3xl p-6 shadow-sm">
+          <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
+            <div className="space-y-2">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-teal-500" />
+                {language === 'en'
+                  ? 'Operational Reconciliation Status'
+                  : 'Estado de Conciliación Operativa'}
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                {language === 'en'
+                  ? 'Audit control of bank statement entries matched against GL Ledger.'
+                  : 'Control de auditoría de partidas bancarias confrontadas contra el Libro Mayor.'}
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-6 lg:gap-12 w-full lg:w-auto">
+              {/* Progreso Visual */}
+              <div className="flex items-center gap-4 flex-1 lg:flex-initial min-w-[200px]">
+                <div className="relative w-16 h-16 shrink-0 flex items-center justify-center">
+                  <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                    <path
+                      className="text-slate-200 dark:text-slate-800"
+                      strokeWidth="3.5"
+                      stroke="currentColor"
+                      fill="none"
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    />
+                    <path
+                      className="text-teal-500 transition-all duration-500"
+                      strokeWidth="3.5"
+                      strokeDasharray={`${((dbTransactions.filter((t) => t.conciliado).length / dbTransactions.length) * 100).toFixed(1)}, 100`}
+                      strokeLinecap="round"
+                      stroke="currentColor"
+                      fill="none"
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    />
+                  </svg>
+                  <span className="absolute text-xs font-bold text-slate-900 dark:text-white">
+                    {(
+                      (dbTransactions.filter((t) => t.conciliado).length / dbTransactions.length) *
+                      100
+                    ).toFixed(0)}
+                    %
+                  </span>
+                </div>
+                <div>
+                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                    {language === 'en' ? 'Reconciliation Rate' : 'Tasa de Conciliación'}
+                  </p>
+                  <p className="text-xl font-extrabold text-teal-600 dark:text-teal-400">
+                    {(
+                      (dbTransactions.filter((t) => t.conciliado).length / dbTransactions.length) *
+                      100
+                    ).toFixed(1)}
+                    %
+                  </p>
+                </div>
+              </div>
+
+              {/* Contadores */}
+              <div className="grid grid-cols-3 gap-6 lg:gap-8 flex-1">
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    {language === 'en' ? 'Total Entries' : 'Total Movimientos'}
+                  </p>
+                  <p className="text-lg font-black text-slate-950 dark:text-slate-50">
+                    {dbTransactions.length}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-teal-500" />
+                    {language === 'en' ? 'Reconciled' : 'Conciliados'}
+                  </p>
+                  <p className="text-lg font-black text-teal-600 dark:text-teal-400">
+                    {dbTransactions.filter((t) => t.conciliado).length}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-rose-500" />
+                    {language === 'en' ? 'Pending' : 'Sin Conciliar'}
+                  </p>
+                  <p className="text-lg font-black text-rose-600 dark:text-rose-400">
+                    {dbTransactions.filter((t) => !t.conciliado).length}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* --- GRAPHICS GRID (10 Charts) --- */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
         {/* Chart 1: Ingresos vs Egresos por Mes */}

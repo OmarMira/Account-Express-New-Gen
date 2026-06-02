@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
           matchMap.set(tx.id, {
             ruleId: rule.id,
             ruleName: rule.name,
-            glAccountId: rule.glAccountId,
+            glAccountId: rule.glAccountId || '',
           });
         }
       }

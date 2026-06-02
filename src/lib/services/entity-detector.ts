@@ -1,6 +1,7 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import crypto from 'crypto';
+import { logger } from '../logger';
 
 // ========== INTERFACES TIPIFICADAS (V3.0 Zero-Any) ==========
 export interface EntityDetectionConfig {
@@ -125,7 +126,7 @@ export function sanitizeDescription(desc: string, config: EntityDetectionConfig)
       const rx = new RegExp(pattern.regex, flags);
       cleaned = cleaned.replace(rx, pattern.replacement ?? '');
     } catch (err) {
-      console.warn(`⚠️ Regex inválido en config (${pattern.name}):`, err);
+      logger.warn('ENTITY_DETECTOR_INVALID_REGEX', { pattern: pattern.name, error: String(err) });
     }
   }
   return cleaned.replace(/\s+/g, ' ').trim();
@@ -139,14 +140,14 @@ export function extractName(desc: string, config: EntityDetectionConfig): string
     try {
       const rx = new RegExp(strategy.pattern, 'i');
       const match = desc.match(rx);
-      if (match && match[1]) {
-        const extracted = match[1].trim();
+      if (match) {
+        const extracted = (match[1] || match[0]).trim();
         if (extracted.length >= config.clustering.minLength) {
           return extracted;
         }
       }
     } catch (err) {
-      console.warn(`⚠️ Regex inválido en estrategia de extracción:`, err);
+      logger.warn('ENTITY_DETECTOR_INVALID_STRATEGY', { error: String(err) });
     }
   }
   return null;

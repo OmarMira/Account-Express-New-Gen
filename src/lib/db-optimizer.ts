@@ -15,7 +15,7 @@ export async function optimizeSQLite() {
     await db.$queryRawUnsafe('PRAGMA foreign_keys = ON');
 
     // Verify WAL mode
-    const result = await db.$queryRawUnsafe('PRAGMA journal_mode') as any[];
+    const result = (await db.$queryRawUnsafe('PRAGMA journal_mode')) as any[];
     const journalMode = result?.[0]?.journal_mode;
     logger.info('SQLITE_OPTIMIZED', { journalMode, cacheSize: '20MB', busyTimeout: '5000ms' });
   } catch (error) {

@@ -906,6 +906,8 @@ const en = {
     confirmBtn: 'Confirm & Generate Rule',
     editBtn: 'Edit response',
     skipBtn: 'Skip for now',
+    cpaDisclaimer:
+      'Suggested accounts are operational drafts. Final semantic validation, closing adjustments, and tax forms are the exclusive responsibility of a licensed CPA.',
   },
 };
 

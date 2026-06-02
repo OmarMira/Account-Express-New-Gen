@@ -15,8 +15,9 @@ function transactionMatchesRule(
   if (rule.transactionDirection === 'debit' && tx.amount >= 0) return false;
   if (rule.transactionDirection === 'credit' && tx.amount < 0) return false;
 
-  const desc = tx.description.toLowerCase();
-  const val = rule.conditionValue.toLowerCase();
+  const rawDesc = tx.description || '';
+  const desc = rawDesc.toLowerCase().trim().replace(/\s+/g, ' '); // 🔹 Sanitización completa
+  const val = rule.conditionValue.toLowerCase().trim();
 
   switch (rule.conditionType) {
     case 'contains':

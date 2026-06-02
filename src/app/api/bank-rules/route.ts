@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
+import { logger } from '@/lib/logger';
 
 // ─── GET /api/bank-rules ───────────────────────────────────────────
 // List bank rules for a company, sorted by priority. Includes GL account info.
@@ -64,12 +65,25 @@ export async function POST(request: NextRequest) {
       name,
       conditionType,
       conditionValue,
-      transactionDirection = 'any',
+      transactionDirection,
       glAccountId,
       glAccountCode,
       priority = 10,
       isActive = true,
+      directionProfile, // { creditPct, debitPct } — optional, sent by AI wizard
     } = body;
+
+    // Auto-resolve direction for AI-generated rules:
+    // mixed entity (both sides > 15%) → 'any'; otherwise honour what was sent
+    if (!transactionDirection && directionProfile) {
+      const isMixed = directionProfile.creditPct > 0.15 && directionProfile.debitPct > 0.15;
+      transactionDirection = isMixed
+        ? 'any'
+        : directionProfile.creditPct > directionProfile.debitPct
+          ? 'credit'
+          : 'debit';
+    }
+    transactionDirection = transactionDirection ?? 'any';
 
     // Validate required fields
     if (!companyId || !name?.trim()) {
@@ -179,8 +193,9 @@ export async function POST(request: NextRequest) {
       },
       { status: 201 },
     );
-  } catch (error) {
-    console.error('[BANK RULE CREATE ERROR]', error);
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'Internal server error';
+    logger.error('BANK_RULE_CREATE_ERROR', { error: msg });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

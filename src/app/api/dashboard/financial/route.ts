@@ -30,14 +30,22 @@ export const GET = apiHandler(async (req: NextRequest) => {
   );
   const now = new Date();
 
-  // Descubrir el año fiscal activo de los libros de la compañía
+  // Descubrir el año fiscal activo prioritariamente en base a las transacciones bancarias importadas
   let fiscalYear = now.getUTCFullYear();
-  const lastEntry = await db.journalEntry.findFirst({
-    where: { companyId, status: 'posted' },
+  const lastTx = await db.bankTransaction.findFirst({
+    where: { statement: { bankAccount: { companyId } } },
     orderBy: { date: 'desc' },
   });
-  if (lastEntry) {
-    fiscalYear = new Date(lastEntry.date).getUTCFullYear();
+  if (lastTx) {
+    fiscalYear = new Date(lastTx.date).getUTCFullYear();
+  } else {
+    const lastEntry = await db.journalEntry.findFirst({
+      where: { companyId, status: 'posted' },
+      orderBy: { date: 'desc' },
+    });
+    if (lastEntry) {
+      fiscalYear = new Date(lastEntry.date).getUTCFullYear();
+    }
   }
 
   const fiscalStart = new Date(Date.UTC(fiscalYear, 0, 1));

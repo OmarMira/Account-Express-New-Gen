@@ -20,15 +20,22 @@ export const db = isEdge
     }));
 
 // Optimización para SQLite (WAL Mode)
+// PRAGMA journal_mode returns a result row, so we must use $queryRawUnsafe.
+// $executeRawUnsafe rejects any query that returns rows in SQLite.
 if (!isEdge && db) {
   db.$connect()
     .then(async () => {
       try {
-        await db.$executeRawUnsafe(`PRAGMA journal_mode=WAL;`);
-        await db.$executeRawUnsafe(`PRAGMA synchronous=NORMAL;`);
-        console.log('✅ Base de datos configurada en modo WAL para alta concurrencia.');
+        const [{ journal_mode }] =
+          await db.$queryRawUnsafe<{ journal_mode: string }[]>(`PRAGMA journal_mode=WAL;`);
+        await db.$queryRawUnsafe(`PRAGMA synchronous=NORMAL;`);
+        logger.info('SQLITE_OPTIMIZED', {
+          journalMode: journal_mode,
+          cacheSize: '20MB',
+          busyTimeout: '5000ms',
+        });
       } catch (err) {
-        console.warn('⚠️ Fallo al activar WAL mode:', err);
+        logger.warn('SQLITE_WAL_SKIPPED', { reason: String(err) });
       }
     })
     .catch((err) => {

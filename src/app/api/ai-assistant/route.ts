@@ -336,17 +336,26 @@ export async function POST(request: NextRequest) {
     }
     const { message, mode, companyId: bodyCompanyId } = parsed.data;
 
+    const userId = await getSessionUserId(request);
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     let companyId = bodyCompanyId;
     if (!companyId) {
-      const userId = await getSessionUserId(request);
-      if (userId) {
-        const membership = await db.companyMember.findFirst({
-          where: { userId },
-          select: { companyId: true },
-        });
-        if (membership) {
-          companyId = membership.companyId;
-        }
+      const membership = await db.companyMember.findFirst({
+        where: { userId },
+        select: { companyId: true },
+      });
+      if (membership) {
+        companyId = membership.companyId;
+      }
+    } else {
+      const membership = await db.companyMember.findFirst({
+        where: { userId, companyId },
+      });
+      if (!membership) {
+        return NextResponse.json({ error: 'Forbidden: No membership found' }, { status: 403 });
       }
     }
 

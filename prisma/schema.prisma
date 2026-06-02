@@ -92,7 +92,9 @@ model GlAccount {
   children     GlAccount[]     @relation("AccountHierarchy")
   journalLines JournalLine[]
   bankAccounts BankAccount[]
-  bankRules    BankRule[]
+  bankRules          BankRule[]        @relation("LegacyRuleGlAccount")
+  debitBankRules     BankRule[]        @relation("DebitRuleGlAccount")
+  creditBankRules    BankRule[]        @relation("CreditRuleGlAccount")
   transactions BankTransaction[]
   entityContexts EntityContext[]
 
@@ -204,21 +206,33 @@ model ReconciliationPeriod {
 }
 
 model BankRule {
-  id                 String   @id @default(cuid())
-  companyId          String
-  name               String
-  conditionType      String   // contains | starts_with | ends_with | equals | amount_greater | amount_less
-  conditionValue     String
-  transactionDirection String @default("any") // debit | credit | any
-  glAccountId        String
-  priority           Int      @default(10)
-  isActive           Boolean  @default(true)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  id                   String      @id @default(cuid())
+  companyId            String
+  company              Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name                 String
+  
+  // v1 legacy fields (kept for migration safety)
+  conditionType        String
+  conditionValue       String
+  transactionDirection String      @default("any") // "any", "debit", "credit"
+  glAccountId          String?
+  glAccount            GlAccount?  @relation("LegacyRuleGlAccount", fields: [glAccountId], references: [id], onDelete: SetNull)
+  
+  // v2 composite fields
+  conditions           Json?       // Array of Condition objects
+  debitGlAccountId     String?
+  debitGlAccount       GlAccount?  @relation("DebitRuleGlAccount", fields: [debitGlAccountId], references: [id], onDelete: SetNull)
+  creditGlAccountId    String?
+  creditGlAccount      GlAccount?  @relation("CreditRuleGlAccount", fields: [creditGlAccountId], references: [id], onDelete: SetNull)
+  
+  priority             Int         @default(10)
+  isActive             Boolean     @default(true)
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
 
-  company     Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  glAccount   GlAccount         @relation(fields: [glAccountId], references: [id])
-  transactions BankTransaction[]
+  transactions         BankTransaction[]
+
+  @@index([companyId])
 }
 
 model JournalEntry {

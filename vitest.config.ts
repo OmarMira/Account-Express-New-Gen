@@ -13,6 +13,7 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
+    exclude: ['**/node_modules/**', '**/.next/**', '**/dist/**'],
     fileParallelism: false,
     maxWorkers: 1,
   } as any,

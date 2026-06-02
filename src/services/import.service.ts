@@ -374,6 +374,8 @@ export class ImportService {
       orderBy: { priority: 'asc' },
       include: {
         glAccount: { select: { id: true } },
+        debitGlAccount: { select: { id: true } },
+        creditGlAccount: { select: { id: true } },
       },
     });
 
@@ -434,53 +436,99 @@ export class ImportService {
     };
   }
 
+  private static matchCondition(description: string, amount: number, cond: any): boolean {
+    const field = (cond.field || 'description').toLowerCase();
+    const operator = cond.operator;
+    const value = cond.value;
+
+    if (!value) return false;
+
+    if (operator === 'amount_greater') {
+      return Math.abs(amount) > parseFloat(value);
+    }
+    if (operator === 'amount_less') {
+      return Math.abs(amount) < parseFloat(value);
+    }
+
+    if (field === 'amount') {
+      const absAmount = Math.abs(amount);
+      const valNum = parseFloat(value);
+      if (isNaN(valNum)) return false;
+      if (operator === 'equals') return absAmount === valNum;
+      return false;
+    } else {
+      const desc = description.toUpperCase();
+      const val = value.toUpperCase();
+      switch (operator) {
+        case 'contains':
+          return desc.includes(val);
+        case 'starts_with':
+          return desc.startsWith(val);
+        case 'ends_with':
+          return desc.endsWith(val);
+        case 'equals':
+          return desc === val;
+        default:
+          return false;
+      }
+    }
+  }
+
   private static applyBankRule(
     description: string,
     amount: number,
     rules: any[],
   ): { matchedRuleId: string | null; glAccountId: string | null } {
-    const desc = description.toUpperCase();
-    const isCredit = amount > 0;
     const isDebit = amount < 0;
 
     for (const rule of rules) {
-      if (rule.transactionDirection === 'credit' && !isCredit) continue;
-      if (rule.transactionDirection === 'debit' && !isDebit) continue;
+      // Legacy direction checks if they still exist (kept for absolute safety)
+      if (rule.transactionDirection === 'credit' && amount <= 0) continue;
+      if (rule.transactionDirection === 'debit' && amount >= 0) continue;
 
-      const condValue = rule.conditionValue.toUpperCase();
-
-      switch (rule.conditionType) {
-        case 'contains':
-          if (desc.includes(condValue)) {
-            return { matchedRuleId: rule.id, glAccountId: rule.glAccountId };
+      // 1. Evaluate conditions (V2 AND matching with legacy fallback)
+      const conditions = rule.conditions;
+      if (!conditions || !Array.isArray(conditions) || conditions.length === 0) {
+        // Legacy fallback
+        const legacyCond = {
+          field: 'description',
+          operator: rule.conditionType,
+          value: rule.conditionValue,
+        };
+        if (!this.matchCondition(description, amount, legacyCond)) {
+          continue;
+        }
+      } else {
+        // AND evaluation of multiple conditions
+        let allMatch = true;
+        for (const cond of conditions) {
+          if (!this.matchCondition(description, amount, cond)) {
+            allMatch = false;
+            break;
           }
-          break;
-        case 'starts_with':
-          if (desc.startsWith(condValue)) {
-            return { matchedRuleId: rule.id, glAccountId: rule.glAccountId };
-          }
-          break;
-        case 'ends_with':
-          if (desc.endsWith(condValue)) {
-            return { matchedRuleId: rule.id, glAccountId: rule.glAccountId };
-          }
-          break;
-        case 'equals':
-          if (desc === condValue) {
-            return { matchedRuleId: rule.id, glAccountId: rule.glAccountId };
-          }
-          break;
-        case 'amount_greater':
-          if (Math.abs(amount) > parseFloat(rule.conditionValue)) {
-            return { matchedRuleId: rule.id, glAccountId: rule.glAccountId };
-          }
-          break;
-        case 'amount_less':
-          if (Math.abs(amount) < parseFloat(rule.conditionValue)) {
-            return { matchedRuleId: rule.id, glAccountId: rule.glAccountId };
-          }
-          break;
+        }
+        if (!allMatch) continue;
       }
+
+      // 2. Resolve GL Account ID with bifurcation and strict safety guard
+      let resolvedGlAccountId: string | null = null;
+      const hasBifurcated =
+        (rule.debitGlAccountId !== null && rule.debitGlAccountId !== undefined) ||
+        (rule.creditGlAccountId !== null && rule.creditGlAccountId !== undefined);
+
+      if (hasBifurcated) {
+        if (isDebit) {
+          if (!rule.debitGlAccountId) continue;
+          resolvedGlAccountId = rule.debitGlAccountId;
+        } else {
+          if (!rule.creditGlAccountId) continue;
+          resolvedGlAccountId = rule.creditGlAccountId;
+        }
+      } else {
+        resolvedGlAccountId = rule.glAccountId;
+      }
+
+      return { matchedRuleId: rule.id, glAccountId: resolvedGlAccountId };
     }
 
     return { matchedRuleId: null, glAccountId: null };

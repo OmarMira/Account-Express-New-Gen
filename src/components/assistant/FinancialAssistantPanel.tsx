@@ -6,8 +6,24 @@ import { AlertCircle, CheckCircle, Info, TrendingUp } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { useRBAC } from '@/hooks/useRBAC';
 
+import { useLanguageStore } from '@/store/language-store';
+
 export function FinancialAssistantPanel({ companyId }: { companyId: string }) {
   const { user } = useAuth();
+  const language = useLanguageStore((s) => s.language) || 'es';
+
+  const translations = {
+    es: {
+      loading: 'Cargando asistente...',
+      noAlerts: 'Sin alertas activas. Sistema estable.',
+      title: 'Asistente Financiero',
+    },
+    en: {
+      loading: 'Loading assistant...',
+      noAlerts: 'No active alerts. Stable system.',
+      title: 'Financial Assistant',
+    },
+  }[language];
 
   // Mapear el rol global 'company_admin' al rol 'admin' de la compañía para la validación RBAC
   const authCtx = user
@@ -29,11 +45,11 @@ export function FinancialAssistantPanel({ companyId }: { companyId: string }) {
 
   if (!canView) return null;
   if (isLoading)
-    return <div className="p-6 text-muted-foreground animate-pulse">Cargando asistente...</div>;
+    return <div className="p-6 text-muted-foreground animate-pulse">{translations.loading}</div>;
   if (!data?.insights?.length)
     return (
       <div className="p-6 text-muted-foreground flex items-center gap-2">
-        <CheckCircle className="text-green-500 size-5" /> Sin alertas activas. Sistema estable.
+        <CheckCircle className="text-green-500 size-5" /> {translations.noAlerts}
       </div>
     );
 
@@ -53,7 +69,7 @@ export function FinancialAssistantPanel({ companyId }: { companyId: string }) {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg font-bold">
-          <TrendingUp className="size-5 text-primary" /> Asistente Financiero
+          <TrendingUp className="size-5 text-primary" /> {translations.title}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">

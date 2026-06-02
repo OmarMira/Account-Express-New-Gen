@@ -139,10 +139,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       if (hasStatements > 0) {
         const statements = await db.bankStatement.findMany({
           where: { bankAccountId: id },
-          orderBy: [
-            { startDate: 'asc' },
-            { endDate: 'asc' },
-          ],
+          orderBy: [{ startDate: 'asc' }, { endDate: 'asc' }],
         });
         updateData.initialBalance = statements[0].openingBalance;
         updateData.balance = statements[statements.length - 1].closingBalance;

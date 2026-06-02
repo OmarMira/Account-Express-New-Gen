@@ -2,6 +2,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { db } from '@/lib/db';
 import { safeAuditLog } from './audit-service';
+import { logger } from '@/lib/logger';
 
 export interface ConversationalParseResult {
   role: string;
@@ -15,63 +16,71 @@ export interface ConversationalParseResult {
   };
 }
 
-// Helper: Lógica mejorada para priorizar TIPO DE TRANSACCIÓN sobre ROL
+// Helper: Lógica dinámica para parsear descriptores basada en rules/assistant-config.json
 export function localHeuristicParse(userInput: string): { role: string; glAccountCode: string } {
   const text = userInput.toLowerCase().trim();
 
-  // PRIORIDAD 1: Detectar TIPO DE TRANSACCIÓN (Gasto vs Ingreso) ANTES que el rol
-  if (
-    text.includes('gasto') ||
-    text.includes('pago') ||
-    text.includes('compra') ||
-    text.includes('vehículo') ||
-    text.includes('auto') ||
-    text.includes('transporte')
-  ) {
-    return { role: 'GASTO_OPERATIVO', glAccountCode: '5000' }; // Expense
+  let priorities: string[] = [
+    'SOCIO',
+    'EMPLEADO',
+    'INQUILINO',
+    'CLIENTE',
+    'GASTO_OPERATIVO',
+    'INGRESO',
+  ];
+  let fallback = { role: 'PROVEEDOR', glAccountCode: '6070' };
+  let rules: Array<{
+    role: string;
+    glAccountCode: string;
+    keywords: { es: string[]; en: string[] };
+  }> = [];
+
+  try {
+    const configPath = join(process.cwd(), 'rules/assistant-config.json');
+    const config = JSON.parse(readFileSync(configPath, 'utf-8'));
+    if (config.heuristics) {
+      if (Array.isArray(config.heuristics.priorities)) {
+        priorities = config.heuristics.priorities;
+      }
+      if (config.heuristics.fallback) {
+        fallback = config.heuristics.fallback;
+      }
+      if (Array.isArray(config.heuristics.rules)) {
+        rules = config.heuristics.rules;
+      }
+    }
+  } catch (err) {
+    console.warn('[CONVERSATIONAL PARSE LOAD CONFIG FAIL, FALLING BACK TO DEFAULTS]', err);
   }
 
-  if (
-    text.includes('ingreso') ||
-    text.includes('venta') ||
-    text.includes('cobro') ||
-    text.includes('alquiler') ||
-    text.includes('renta')
-  ) {
-    return { role: 'INGRESO', glAccountCode: '4010' }; // Revenue
+  // Detectar idioma usando las palabras clave configuradas dinámicamente
+  const enKeywordsList: string[] = [];
+  rules.forEach((rule) => {
+    if (rule.keywords && Array.isArray(rule.keywords.en)) {
+      enKeywordsList.push(...rule.keywords.en);
+    }
+  });
+
+  const isEnglish =
+    enKeywordsList.length > 0
+      ? new RegExp(
+          `\\b(${enKeywordsList.map((k) => k.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')).join('|')})\\b`,
+          'i',
+        ).test(text)
+      : false;
+
+  // Evaluar por orden estricto de prioridad configurado
+  for (const roleName of priorities) {
+    const rule = rules.find((r) => r.role === roleName);
+    if (!rule) continue;
+
+    const keywords = isEnglish ? rule.keywords.en : rule.keywords.es;
+    if (Array.isArray(keywords) && keywords.some((k) => text.includes(k.toLowerCase()))) {
+      return { role: rule.role, glAccountCode: rule.glAccountCode };
+    }
   }
 
-  // PRIORIDAD 2: Si no especificó tipo, buscar el ROL
-  if (text.includes('inquilino') || text.includes('propiedad')) {
-    return { role: 'INQUILINO', glAccountCode: '6010' }; // Rent Expense
-  }
-
-  if (
-    text.includes('socio') ||
-    text.includes('dueño') ||
-    text.includes('capital') ||
-    text.includes('extracción') ||
-    text.includes('retiro')
-  ) {
-    return { role: 'SOCIO', glAccountCode: '3010' }; // Owner's Equity
-  }
-
-  if (text.includes('cliente')) {
-    return { role: 'CLIENTE', glAccountCode: '4010' }; // Sales Revenue
-  }
-
-  if (
-    text.includes('empleado') ||
-    text.includes('salario') ||
-    text.includes('sueldo') ||
-    text.includes('nómina') ||
-    text.includes('nomina')
-  ) {
-    return { role: 'EMPLEADO', glAccountCode: '6030' }; // Salaries
-  }
-
-  // Default fallback
-  return { role: 'PROVEEDOR', glAccountCode: '6070' };
+  return fallback;
 }
 
 export async function parseConversationalContext(
@@ -160,8 +169,11 @@ export async function parseConversationalContext(
   // Buscar el nombre default por el código
   if (glAccountCode === '5000') glAccountName = 'Gastos Operativos / Generales';
   else if (glAccountCode === '4000') glAccountName = 'Ingresos Operativos / Ventas';
-  else if (glAccountCode === '3010') glAccountName = 'Capital Social / Aportes de Socios';
   else if (glAccountCode === '4010') glAccountName = 'Ingresos por Servicios / Ventas';
+  else if (glAccountCode === '4020') glAccountName = 'Ingresos por Renta / Alquiler';
+  else if (glAccountCode === '2020') glAccountName = 'Tarjetas de Crédito por Pagar';
+  else if (glAccountCode === '2040') glAccountName = 'Préstamos por Pagar';
+  else if (glAccountCode === '3010') glAccountName = 'Capital Social / Aportes de Socios';
   else if (glAccountCode === '6030') glAccountName = 'Sueldos, Salarios y Beneficios';
   else if (glAccountCode === '6070') glAccountName = 'Gasto Proveedores y Servicios';
 
@@ -175,7 +187,7 @@ export async function parseConversationalContext(
         glAccountName = acc.name;
       }
     } catch (dbErr) {
-      console.warn('[DB GL ACCOUNT QUERY FAIL]', dbErr);
+      logger.warn('GL_ACCOUNT_QUERY_FAIL', { companyId, glAccountCode, error: String(dbErr) });
     }
   }
 

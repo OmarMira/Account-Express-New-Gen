@@ -9,10 +9,12 @@ interface LanguageState {
   t: (key: string) => string;
 }
 
-const createTranslator = (lang: Locale) => (key: string): string => {
-  const localeTranslations = translations[lang] as Record<string, unknown>;
-  return getTranslation(localeTranslations, key, key);
-};
+const createTranslator =
+  (lang: Locale) =>
+  (key: string): string => {
+    const localeTranslations = translations[lang] as Record<string, unknown>;
+    return getTranslation(localeTranslations, key, key);
+  };
 
 export const useLanguageStore = create<LanguageState>()(
   persist(

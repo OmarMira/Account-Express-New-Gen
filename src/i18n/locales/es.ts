@@ -918,6 +918,8 @@ const es = {
     confirmBtn: 'Confirmar y Generar Regla',
     editBtn: 'Editar respuesta',
     skipBtn: 'Omitir por ahora',
+    cpaDisclaimer:
+      'Las sugerencias contables son borradores operacionales. La validación semántica final, ajustes de cierre y formularios fiscales son responsabilidad exclusiva de un CPA licenciado.',
   },
 };
 

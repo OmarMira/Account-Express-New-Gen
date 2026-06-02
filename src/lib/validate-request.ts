@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { hasXssPattern } from './sanitize';
 
 /**
  * Valida el cuerpo de una petición entrante contra un schema de Zod.
@@ -19,6 +20,20 @@ export async function validateRequest<T>(
 ): Promise<T | NextResponse> {
   try {
     const json = await req.json();
+
+    // Detección recursiva de XSS
+    const checkXss = (obj: any) => {
+      if (typeof obj === 'string' && hasXssPattern(obj)) {
+        throw new Error('Potential XSS attack detected');
+      }
+      if (obj && typeof obj === 'object') {
+        for (const key of Object.keys(obj)) {
+          checkXss(obj[key]);
+        }
+      }
+    };
+    checkXss(json);
+
     const result = schema.safeParse(json);
 
     if (!result.success) {
@@ -28,7 +43,10 @@ export async function validateRequest<T>(
       );
     }
     return result.data;
-  } catch {
+  } catch (err: any) {
+    if (err.message === 'Potential XSS attack detected') {
+      throw err;
+    }
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 }

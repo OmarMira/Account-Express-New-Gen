@@ -45,7 +45,7 @@ describe('PDF Parser - Bank of America PDF Parser', () => {
     });
 
     it('debe importar el PDF de Marzo de BOA exitosamente en la base de datos', async () => {
-      const company = await createTestCompany();
+      const company = await createTestCompany('LQ&OM LLC');
       const glAccount = await createTestGlAccount({
         companyId: company.id,
         code: '1010',
@@ -98,7 +98,7 @@ describe('PDF Parser - Bank of America PDF Parser', () => {
     });
 
     it('rechaza importación de statement duplicado con ConflictError', async () => {
-      const company = await createTestCompany();
+      const company = await createTestCompany('LQ&OM LLC');
       const glAccount = await createTestGlAccount({
         companyId: company.id,
         code: '1010',

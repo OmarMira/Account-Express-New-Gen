@@ -94,6 +94,3 @@ export function alertIfSlowQuery(durationMs: number, query: string) {
     alertAggregator.push({ query, durationMs });
   }
 }
-
-
-
