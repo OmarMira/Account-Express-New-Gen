@@ -232,7 +232,7 @@ model BankRule {
 
   transactions         BankTransaction[]
 
-  @@index([companyId])
+  @@index([companyId, isActive, priority])
 }
 
 model JournalEntry {

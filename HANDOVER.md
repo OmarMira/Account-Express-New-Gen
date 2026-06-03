@@ -39,6 +39,8 @@
 | `400 Validation failed` en API | Payload malformado o schema desactualizado | Revisar `src/lib/validations/` vs payload real |
 | Sesión expira prematuramente | `maxAge` bajo o `secure: true` en HTTP local | Ajustar `login/route.ts` → `maxAge: 604800` |
 | Build falla por `module not found` | `serverExternalPackages` incompleto | Añadir `pdf-parse`, `pdfjs-dist`, `bcryptjs` en `next.config.ts` |
+| Sentry no captura errores de API | Falta exportar `onRequestError` | Confirmar `export const onRequestError = Sentry.captureRequestError` en `instrumentation.ts` |
+| Build falla en Windows (`copyfile EINVAL`) | Bug de Turbopack con rutas `node:inspector` | Ejecutar build con Webpack (`next build --webpack`), configurado por defecto en `package.json` |
 
 ---
 

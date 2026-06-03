@@ -28,3 +28,23 @@
 - Workflow valida que todos los JSON sean parseables y contengan `"version"`.
 - Merge bloqueado si algún archivo tiene sintaxis inválida o versión duplicada.
 - Despliegue seguro: Configuración se carga en runtime, nunca se compila en bundle.
+
+---
+
+## 📊 Sentry APM Configuration
+
+### Architecture
+- `sentry.client.config.ts`: Frontend error capture
+- `sentry.server.config.ts`: Node.js runtime error capture
+- `sentry.edge.config.ts`: Edge runtime error capture
+- `src/instrumentation.ts`: Dynamic import + `onRequestError` hook
+
+### Critical: onRequestError Hook
+The `onRequestError` export in `instrumentation.ts` is **mandatory** for capturing API route errors. Without it, errors in `/api/*` routes will not be reported to Sentry.
+
+### Environment Variables
+```env
+NEXT_PUBLIC_SENTRY_DSN=https://your-key@sentry.io/your-project-id
+SENTRY_DSN=https://your-key@sentry.io/your-project-id
+SENTRY_AUTH_TOKEN=sntrys_your_auth_token_here
+```

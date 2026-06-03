@@ -7,12 +7,36 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Send, CheckCircle2, ArrowRight, AlertCircle } from 'lucide-react';
+import {
+  Loader2,
+  Send,
+  CheckCircle2,
+  ArrowRight,
+  AlertCircle,
+  Plus,
+  Trash2,
+  Eye,
+} from 'lucide-react';
 import { type EntityCandidate } from '@/lib/services/entity-detector';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 
 interface RuleCondition {
-  field: 'description' | 'amount';
-  operator: 'contains' | 'starts_with' | 'ends_with' | 'equals' | 'amount_greater' | 'amount_less';
+  field: 'description' | 'amount' | 'reference';
+  operator:
+    | 'contains'
+    | 'starts_with'
+    | 'ends_with'
+    | 'equals'
+    | 'greater_than'
+    | 'less_than'
+    | 'amount_greater'
+    | 'amount_less';
   value: string;
 }
 
@@ -45,6 +69,62 @@ export function ConversationalRuleBuilder({
   const [suggestion, setSuggestion] = useState<AISuggestion | null>(null);
   const [creatingRule, setCreatingRule] = useState(false);
   const [clickCount, setClickCount] = useState(0);
+
+  // Live simulation & condition editor states
+  const [editableConditions, setEditableConditions] = useState<RuleCondition[]>([]);
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [simulationResult, setSimulationResult] = useState<{
+    matchCount: number;
+    samples: any[];
+  } | null>(null);
+  const [showSamplesModal, setShowSamplesModal] = useState(false);
+
+  // Sync suggestion conditions to editable state
+  useEffect(() => {
+    if (suggestion) {
+      setEditableConditions(suggestion.conditions || []);
+    } else {
+      setEditableConditions([]);
+    }
+  }, [suggestion]);
+
+  // Debounced Simulation Effect
+  useEffect(() => {
+    if (editableConditions.length === 0) {
+      setSimulationResult(null);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSimulating(true);
+      try {
+        const res = await fetch('/api/learning/rules/simulate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            companyId,
+            conditions: editableConditions,
+          }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success) {
+            setSimulationResult({
+              matchCount: data.matchCount,
+              samples: data.samples,
+            });
+          }
+        }
+      } catch (err) {
+        console.error('[SIMULATION ERROR]', err);
+      } finally {
+        setIsSimulating(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [editableConditions, companyId]);
 
   useEffect(() => {
     if (clickCount > 0) {
@@ -158,7 +238,7 @@ export function ConversationalRuleBuilder({
           role: suggestion.role,
           createSubAccount: suggestion.suggestSubAccount,
           subAccountName: suggestion.subAccountName,
-          conditions: suggestion.conditions,
+          conditions: editableConditions,
         }),
       });
       if (!res.ok) throw new Error(t('ruleBuilder.createError'));
@@ -168,6 +248,8 @@ export function ConversationalRuleBuilder({
       // Reset para siguiente entidad
       setAnswer('');
       setSuggestion(null);
+      setEditableConditions([]);
+      setSimulationResult(null);
       setCurrentIndex((prev) => prev + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : t('ruleBuilder.unknownError'));
@@ -363,24 +445,227 @@ export function ConversationalRuleBuilder({
                     )}
                   </p>
                 )}
-                {suggestion.conditions && suggestion.conditions.length > 0 && (
-                  <div className="text-xs text-muted-foreground mt-2 border-t pt-2 space-y-1">
-                    <p className="font-semibold text-foreground">
+                {/* Condition Editor */}
+                <div className="text-xs text-muted-foreground mt-2 border-t pt-2 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="font-semibold text-foreground text-sm">
                       {t('ruleBuilder.conditionsTitle') || 'Match Conditions (AND):'}
                     </p>
-                    <ul className="list-disc pl-4 space-y-0.5">
-                      {suggestion.conditions.map((cond, idx) => (
-                        <li key={idx}>
-                          <span className="capitalize">
-                            {cond.field === 'description' ? 'description' : cond.field}
-                          </span>{' '}
-                          <span className="italic">{cond.operator.replace('_', ' ')}</span> "
-                          {cond.value}"
-                        </li>
-                      ))}
-                    </ul>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setEditableConditions((prev) => [
+                          ...prev,
+                          { field: 'description', operator: 'contains', value: '' },
+                        ]);
+                      }}
+                      className="h-7 px-2 text-[10px]"
+                    >
+                      <Plus className="h-3 w-3 mr-1" />{' '}
+                      {t('ruleBuilder.addCondition') || 'Add Condition'}
+                    </Button>
                   </div>
-                )}
+
+                  {editableConditions.length === 0 ? (
+                    <p className="text-xs italic text-muted-foreground">
+                      {t('ruleBuilder.noConditions') ||
+                        'No conditions defined. This rule will match all transactions.'}
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {editableConditions.map((cond, idx) => (
+                        <div key={idx} className="flex gap-1.5 items-center">
+                          {/* Field Select */}
+                          <select
+                            value={cond.field}
+                            onChange={(e) => {
+                              const newField = e.target.value as
+                                | 'description'
+                                | 'amount'
+                                | 'reference';
+                              setEditableConditions((prev) => {
+                                const copy = [...prev];
+                                copy[idx] = {
+                                  ...copy[idx],
+                                  field: newField,
+                                  operator: newField === 'amount' ? 'greater_than' : 'contains',
+                                };
+                                return copy;
+                              });
+                            }}
+                            className="h-8 rounded-md border border-input bg-transparent px-2 text-[11px] shadow-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                          >
+                            <option value="description" className="bg-background text-foreground">
+                              Description
+                            </option>
+                            <option value="amount" className="bg-background text-foreground">
+                              Amount
+                            </option>
+                            <option value="reference" className="bg-background text-foreground">
+                              Reference
+                            </option>
+                          </select>
+
+                          {/* Operator Select */}
+                          <select
+                            value={cond.operator}
+                            onChange={(e) => {
+                              const op = e.target.value as any;
+                              setEditableConditions((prev) => {
+                                const copy = [...prev];
+                                copy[idx] = { ...copy[idx], operator: op };
+                                return copy;
+                              });
+                            }}
+                            className="h-8 rounded-md border border-input bg-transparent px-2 text-[11px] shadow-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                          >
+                            {cond.field === 'amount' ? (
+                              <>
+                                <option value="equals" className="bg-background text-foreground">
+                                  Equals
+                                </option>
+                                <option
+                                  value="greater_than"
+                                  className="bg-background text-foreground"
+                                >
+                                  Greater Than
+                                </option>
+                                <option value="less_than" className="bg-background text-foreground">
+                                  Less Than
+                                </option>
+                              </>
+                            ) : (
+                              <>
+                                <option value="contains" className="bg-background text-foreground">
+                                  Contains
+                                </option>
+                                <option value="equals" className="bg-background text-foreground">
+                                  Equals
+                                </option>
+                                <option
+                                  value="starts_with"
+                                  className="bg-background text-foreground"
+                                >
+                                  Starts With
+                                </option>
+                                <option value="ends_with" className="bg-background text-foreground">
+                                  Ends With
+                                </option>
+                              </>
+                            )}
+                          </select>
+
+                          {/* Value Input */}
+                          <Input
+                            value={cond.value}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setEditableConditions((prev) => {
+                                const copy = [...prev];
+                                copy[idx] = { ...copy[idx], value: val };
+                                return copy;
+                              });
+                            }}
+                            placeholder="Value..."
+                            className="h-8 text-[11px] flex-1 min-w-[80px]"
+                          />
+
+                          {/* Remove Button */}
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setEditableConditions((prev) => prev.filter((_, i) => i !== idx));
+                            }}
+                            className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive shrink-0"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Live Simulation Preview Badge and Details */}
+                  {editableConditions.length > 0 && (
+                    <div className="flex flex-col gap-2 pt-2 border-t mt-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-medium text-foreground">Simulation:</span>
+                        {isSimulating ? (
+                          <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                            <Loader2 className="h-3 w-3 animate-spin text-primary" />
+                            <span>Evaluating...</span>
+                          </div>
+                        ) : simulationResult ? (
+                          <Dialog open={showSamplesModal} onOpenChange={setShowSamplesModal}>
+                            <DialogTrigger asChild>
+                              <Badge
+                                variant={simulationResult.matchCount > 0 ? 'secondary' : 'outline'}
+                                className="cursor-pointer text-[10px] h-5 hover:bg-primary/10 hover:text-primary transition-all flex items-center gap-1 select-none"
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                                {simulationResult.matchCount === 1
+                                  ? 'Matches 1 transaction'
+                                  : `Matches ${simulationResult.matchCount} transactions`}
+                              </Badge>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-[500px]">
+                              <DialogHeader>
+                                <DialogTitle>Simulation Preview</DialogTitle>
+                              </DialogHeader>
+                              <div className="space-y-4 pt-2">
+                                <p className="text-xs text-muted-foreground">
+                                  Showing up to 5 sample unreconciled transactions that match your
+                                  conditions:
+                                </p>
+                                {simulationResult.samples.length === 0 ? (
+                                  <div className="text-center p-6 bg-muted/30 rounded-md text-xs italic text-muted-foreground">
+                                    No matching unreconciled transactions found.
+                                  </div>
+                                ) : (
+                                  <div className="divide-y border rounded-md overflow-hidden bg-background">
+                                    {simulationResult.samples.map((sample, sIdx) => (
+                                      <div
+                                        key={sIdx}
+                                        className="p-3 text-xs flex justify-between gap-4 hover:bg-muted/30 transition-colors"
+                                      >
+                                        <div className="space-y-1">
+                                          <p className="font-semibold text-foreground line-clamp-1">
+                                            {sample.description}
+                                          </p>
+                                          <div className="flex items-center gap-2 text-muted-foreground text-[10px]">
+                                            <span>
+                                              {new Date(sample.date).toLocaleDateString()}
+                                            </span>
+                                            {sample.reference && (
+                                              <>
+                                                <span>•</span>
+                                                <span>Ref: {sample.reference}</span>
+                                              </>
+                                            )}
+                                          </div>
+                                        </div>
+                                        <span
+                                          className={`font-mono font-semibold ${sample.amount < 0 ? 'text-red-500' : 'text-green-500'}`}
+                                        >
+                                          {sample.amount < 0 ? '-' : ''}$
+                                          {Math.abs(sample.amount).toFixed(2)}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+                        ) : null}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="flex gap-2">
