@@ -3,7 +3,7 @@ import { NextRequest } from 'next/server';
 import { RateLimiter, authRateLimiter } from '@/lib/rate-limiter';
 import { hasXssPattern } from '@/lib/sanitize';
 import { validateRequest } from '@/lib/validate-request';
-import { middleware } from '@/middleware';
+import { proxy } from '@/proxy';
 import { z } from 'zod';
 
 describe('Security Layer - Unit & Integration Tests', () => {
@@ -100,10 +100,10 @@ describe('Security Layer - Unit & Integration Tests', () => {
     });
   });
 
-  describe('3. Middleware (Security Headers, CSRF & Rate Limit Integration)', () => {
+  describe('3. Proxy (Security Headers, CSRF & Rate Limit Integration)', () => {
     it('debe agregar headers de seguridad a las respuestas', async () => {
       const req = new NextRequest('http://localhost:3000/');
-      const res = await middleware(req);
+      const res = await proxy(req);
 
       expect(res.headers.get('Content-Security-Policy')).toContain("default-src 'self'");
       expect(res.headers.get('X-Frame-Options')).toBe('DENY');
@@ -115,7 +115,7 @@ describe('Security Layer - Unit & Integration Tests', () => {
       const req = new NextRequest('http://localhost:3000/api/companies', {
         method: 'POST',
       });
-      const res = await middleware(req);
+      const res = await proxy(req);
       expect(res.status).toBe(403);
       const body = await res.json();
       expect(body.error).toContain('CSRF');
@@ -129,7 +129,7 @@ describe('Security Layer - Unit & Integration Tests', () => {
           'Host': 'localhost:3000',
         },
       });
-      const res = await middleware(req);
+      const res = await proxy(req);
       expect(res.status).toBe(403);
     });
 
@@ -141,7 +141,7 @@ describe('Security Layer - Unit & Integration Tests', () => {
           'Host': 'localhost:3000',
         },
       });
-      const res = await middleware(req);
+      const res = await proxy(req);
       // NextResponse.next() no tiene el status bloqueado (es decir, pasa al siguiente handler)
       expect(res.status).toBe(200); // 200 indica Next
     });
@@ -158,7 +158,7 @@ describe('Security Layer - Unit & Integration Tests', () => {
           },
           body: JSON.stringify({ email: 'user@example.com', password: 'password' }),
         });
-        const res = await middleware(req);
+        const res = await proxy(req);
         expect(res.status).toBe(200); // NextResponse.next()
       }
 
@@ -172,7 +172,7 @@ describe('Security Layer - Unit & Integration Tests', () => {
         },
         body: JSON.stringify({ email: 'user@example.com', password: 'password' }),
       });
-      const resBlocked = await middleware(reqBlocked);
+      const resBlocked = await proxy(reqBlocked);
       expect(resBlocked.status).toBe(429);
       const json = await resBlocked.json();
       expect(json.code).toBe('RATE_LIMIT_EXCEEDED');

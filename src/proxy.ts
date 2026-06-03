@@ -23,7 +23,7 @@ function getSecurityHeaders(): Record<string, string> {
   };
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const method = request.method;
 
@@ -125,7 +125,7 @@ export async function middleware(request: NextRequest) {
   return response;
 }
 
-// Configuración del matcher del middleware
+// Configuración del matcher del proxy
 export const config = {
   matcher: ['/((?!_next/image|favicon.ico).*)'],
 };

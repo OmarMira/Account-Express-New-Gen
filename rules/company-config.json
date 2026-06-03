@@ -1031,6 +1031,18 @@
       "periodType": "WEEK_52_53",
       "taxModuleEnabled": false,
       "updatedAt": "2026-06-03T21:11:44.705Z"
+    },
+    "cmpyktkp90000c784pijvgpkp": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-03T21:26:30.685Z"
+    },
+    "cmpyktkv80028c784u0q9zfzt": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-03T21:26:30.893Z"
     }
   }
 }

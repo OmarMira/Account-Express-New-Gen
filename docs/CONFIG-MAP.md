@@ -34,10 +34,8 @@
 ## 📊 Sentry APM Configuration
 
 ### Architecture
-- `sentry.client.config.ts`: Frontend error capture
-- `sentry.server.config.ts`: Node.js runtime error capture
-- `sentry.edge.config.ts`: Edge runtime error capture
-- `src/instrumentation.ts`: Dynamic import + `onRequestError` hook
+- `src/instrumentation-client.ts`: Client-side Sentry initialization (native client entry point)
+- `src/instrumentation.ts`: Inlined Node.js & Edge Sentry initialization (runtime conditional check) + `onRequestError` hook
 
 ### Critical: onRequestError Hook
 The `onRequestError` export in `instrumentation.ts` is **mandatory** for capturing API route errors. Without it, errors in `/api/*` routes will not be reported to Sentry.

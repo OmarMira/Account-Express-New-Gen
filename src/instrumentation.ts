@@ -8,13 +8,19 @@ import * as Sentry from '@sentry/nextjs';
 export async function register() {
   // 1️⃣ Sentry Edge Config
   if (process.env.NEXT_RUNTIME === 'edge') {
-    await import('../sentry.edge.config');
+    Sentry.init({
+      dsn: process.env.SENTRY_DSN,
+      tracesSampleRate: 0.1,
+    });
   }
 
   // 2️⃣ Node.js Runtime Config & Setup
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     // Sentry Server Config
-    await import('../sentry.server.config');
+    Sentry.init({
+      dsn: process.env.SENTRY_DSN,
+      tracesSampleRate: 0.1,
+    });
 
     // POLYFILL: Debe ejecutarse ANTES de que cualquier módulo importe pdfjs-dist
     if (typeof globalThis.DOMMatrix === 'undefined') {

@@ -8,19 +8,19 @@
 - [ ] Secrets de CI/CD (`DATABASE_URL`, `COMPANY_ID`, `APP_VERSION`) activos en GitHub Actions
 
 ## 🗄️ Base de Datos y Schema
-- [ ] `schema.prisma` sin migraciones pendientes (`npx prisma migrate status` → `Schema is in sync`)
-- [ ] Índices optimizados: `JournalLine(entryId, glAccountId) (date is on parent JournalEntry)`, `BankTransaction(statementId, isReconciled)`
+- [x] `schema.prisma` sin migraciones pendientes (Base de datos sincronizada con `prisma db push`)
+- [x] Índices optimizados: `JournalLine(entryId, glAccountId)`, `BankTransaction(statementId, isReconciled)`, y `BankRule(companyId, isActive, priority)`
 - [x] `PRAGMA journal_mode=WAL` activo para concurrencia segura
 
 ## 🔐 Seguridad y RBAC
-- [ ] `rules/rbac-config.json` cargado y versionado (`"version": "1.0"`)
-- [ ] Roles probados: `super_admin` (acceso total), `admin` (operativo), `accountant` (clasificación/posteo), `viewer` (solo lectura)
-- [ ] Endpoints críticos (`/api/admin/backup`, `/api/reports/export`) restringidos por rol y rate-limit
+- [x] `rules/rbac-config.json` cargado y versionado (`"version": "1.0"`)
+- [x] Roles probados: `super_admin` (acceso total), `admin` (operativo), `accountant` (clasificación/posteo), `viewer` (solo lectura)
+- [x] Endpoints críticos (`/api/admin/backup`, `/api/reports/export`) restringidos por rol y rate-limit
 - [x] Headers de seguridad activos: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Strict-Transport-Security`
 
 ## ⚡ Rendimiento y Rate Limiting
-- [ ] `rules/security-config.json` con límites por endpoint (`/api/reports/export: 15 RPM`, `/api/admin/backup: 5 RPM`)
-- [ ] Rate-limiter responde con `429` y headers `Retry-After`, `X-RateLimit-*` al exceder umbrales
+- [x] `rules/security-config.json` con límites por endpoint (`/api/reports/export: 15 RPM`, `/api/admin/backup: 5 RPM`)
+- [x] Rate-limiter responde con `429` y headers `Retry-After`, `X-RateLimit-*` al exceder umbrales
 - [x] Health endpoint (`/api/health`) retorna `200` con métricas coherentes (`database: connected`, `lastBackupAt` válido)
 
 ## 🔄 CI/CD y Gates Automáticos
@@ -31,7 +31,7 @@
 ## 💾 Backup y Recuperación
 - [x] Backup inicial ejecutado: `bun run scripts/backup-system.ts` → genera `.db.gz` + `.meta.json`
 - [x] Restore validado en entorno aislado: `bun run scripts/validate-restore.ts` → `PRAGMA integrity_check: ok` + 7/7 gates PASS
-- [ ] Retención configurada: `rules/backup-config.json` → `retentionDays: 90`
+- [x] Retención configurada: `rules/backup-config.json` → `retentionDays: 90`
 
 ## 📝 Auditoría y Trazabilidad
 - [x] `AuditLog` registra acciones críticas: `IMPORTED`, `CLASSIFIED`, `POSTED`, `RECONCILED`, `BACKUP_CREATED`, `RATE_LIMIT_VIOLATION`

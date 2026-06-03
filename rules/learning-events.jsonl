@@ -78,3 +78,4 @@
 {"timestamp":"2026-06-03T20:56:25.384Z","bankDescription":"Zelle payment","selectedGlAccountCode":"4010","confidence":0.95,"userId":"cmpyjqvpi0000c788kdnzytb6","companyId":"cmpyjqvpm0001c788lf68dtlm"}
 {"timestamp":"2026-06-03T21:09:02.237Z","bankDescription":"Zelle payment","selectedGlAccountCode":"4010","confidence":0.95,"userId":"cmpyk73p30000c7l0hza1dvli","companyId":"cmpyk73p80001c7l0372zmo0p"}
 {"timestamp":"2026-06-03T21:11:53.909Z","bankDescription":"Zelle payment","selectedGlAccountCode":"4010","confidence":0.95,"userId":"cmpykas5x0000c76srruvzhvj","companyId":"cmpykas610001c76ssi4aary7"}
+{"timestamp":"2026-06-03T21:27:00.219Z","bankDescription":"Zelle payment","selectedGlAccountCode":"4010","confidence":0.95,"userId":"cmpyku7h50000c75oz3xkd9f8","companyId":"cmpyku7hb0001c75od389rari"}
