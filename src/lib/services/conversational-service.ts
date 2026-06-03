@@ -14,6 +14,7 @@ export interface ConversationalParseResult {
     code: string;
     name: string;
   };
+  conditions?: any[] | null;
 }
 
 // Helper: Lógica dinámica para parsear descriptores basada en rules/assistant-config.json
@@ -201,5 +202,6 @@ export async function parseConversationalContext(
       code: glAccountCode,
       name: glAccountName,
     },
+    conditions: parsed.conditions || null,
   };
 }

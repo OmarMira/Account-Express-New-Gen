@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
@@ -21,6 +21,7 @@ import {
   Sparkles,
   ShieldCheck,
   Loader2,
+  Workflow,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -55,6 +56,7 @@ import { AIAssistantModal } from '@/components/spa/AIAssistantModal';
 import { FinancialDashboardPage } from '@/components/spa/FinancialDashboardPage';
 import { useLanguageStore } from '@/store/language-store';
 import { useAuthStore, type ViewName } from '@/store/auth-store';
+import { WorkflowPanel } from '@/components/workflow/WorkflowPanel';
 
 /* ─── Navigation Items ─── */
 interface NavItem {
@@ -79,7 +81,13 @@ const navItems: NavItem[] = [
 const settingsItem: NavItem = { view: 'settings', icon: Settings, labelKey: 'settings.title' };
 
 /* ─── Sidebar Content (shared between desktop + mobile) ─── */
-function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
+function SidebarNav({
+  onNavigate,
+  onOpenWorkflow,
+}: {
+  onNavigate?: () => void;
+  onOpenWorkflow?: () => void;
+}) {
   const t = useLanguageStore((s) => s.t);
   const router = useRouter();
   const pathname = usePathname();
@@ -101,12 +109,15 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <div className="flex h-full flex-col">
       {/* Logo */}
-      <div className="flex h-14 items-center gap-2 px-4">
+      <button
+        onClick={onOpenWorkflow}
+        className="flex h-14 w-full items-center gap-2 px-4 hover:bg-accent/50 transition-colors text-left focus:outline-hidden cursor-pointer"
+      >
         <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm">
           AE
         </div>
         <span className="text-lg font-semibold tracking-tight">{t('common.appName')}</span>
-      </div>
+      </button>
 
       <Separator />
 
@@ -176,7 +187,15 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
 }
 
 /* ─── Desktop Sidebar ─── */
-function DesktopSidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
+function DesktopSidebar({
+  collapsed,
+  onToggle,
+  onOpenWorkflow,
+}: {
+  collapsed: boolean;
+  onToggle: () => void;
+  onOpenWorkflow?: () => void;
+}) {
   return (
     <aside
       className={cn(
@@ -184,8 +203,12 @@ function DesktopSidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
         collapsed ? 'w-16' : 'w-64',
       )}
     >
-      <div
-        className={cn('flex h-14 items-center', collapsed ? 'justify-center px-2' : 'gap-2 px-4')}
+      <button
+        onClick={onOpenWorkflow}
+        className={cn(
+          'flex h-14 items-center hover:bg-accent/50 transition-colors text-left focus:outline-hidden cursor-pointer',
+          collapsed ? 'justify-center px-2' : 'gap-2 px-4 w-full',
+        )}
       >
         <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm">
           AE
@@ -193,7 +216,7 @@ function DesktopSidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
         {!collapsed && (
           <span className="text-lg font-semibold tracking-tight truncate">AccountExpress</span>
         )}
-      </div>
+      </button>
 
       <Separator />
 
@@ -283,8 +306,11 @@ function DesktopNavItems({ collapsed }: { collapsed: boolean }) {
 /* ─── Main AppShell ─── */
 export function AppShell({ children }: { children?: React.ReactNode }) {
   const router = useRouter();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const t = useLanguageStore((s) => s.t);
-  const { user, activeCompany, logout, sidebarOpen, setSidebarOpen } = useAuthStore();
+  const pathname = usePathname();
+  const { user, activeCompany, logout, sidebarOpen, setSidebarOpen, setCurrentView } =
+    useAuthStore();
   const currentView = useAuthStore((s) => s.currentView);
 
   const initials = user
@@ -346,14 +372,23 @@ export function AppShell({ children }: { children?: React.ReactNode }) {
       <AIAssistantModal />
 
       {/* Desktop sidebar */}
-      <DesktopSidebar collapsed={!sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
+      <DesktopSidebar
+        collapsed={!sidebarOpen}
+        onToggle={() => setSidebarOpen(!sidebarOpen)}
+        onOpenWorkflow={() => {
+          if (pathname !== '/') {
+            router.push('/');
+          }
+          setCurrentView('workflow');
+        }}
+      />
 
       {/* Main area */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* ── Top Header ── */}
         <header className="flex h-14 shrink-0 items-center gap-3 border-b bg-background px-4 lg:px-6">
           {/* Mobile hamburger */}
-          <Sheet>
+          <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" className="lg:hidden">
                 <Menu className="size-5" />
@@ -364,7 +399,16 @@ export function AppShell({ children }: { children?: React.ReactNode }) {
               <SheetHeader className="sr-only">
                 <SheetTitle>Navigation</SheetTitle>
               </SheetHeader>
-              <SidebarNav />
+              <SidebarNav
+                onNavigate={() => setMobileNavOpen(false)}
+                onOpenWorkflow={() => {
+                  if (pathname !== '/') {
+                    router.push('/');
+                  }
+                  setCurrentView('workflow');
+                  setMobileNavOpen(false);
+                }}
+              />
             </SheetContent>
           </Sheet>
 
@@ -495,6 +539,9 @@ function PlaceholderView({ view }: { view: ViewName }) {
   }
   if (view === 'financial-dashboard') {
     return <FinancialDashboardPage />;
+  }
+  if (view === 'workflow') {
+    return <WorkflowPanel />;
   }
 
   // Map views to their title keys

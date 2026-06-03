@@ -35,7 +35,7 @@
 | Síntoma | Causa Probable | Solución |
 |---------|----------------|----------|
 | `Worker not found` al importar PDF | `initPdfWorker()` no se ejecutó | Verificar `instrumentation.ts` + `NEXT_RUNTIME === 'nodejs'` |
-| `database is locked` en conciliación | WAL no activo o múltiples writers sin retry | Confirmar `DATABASE_URL` contiene `?journal_mode=WAL` |
+| `database is locked` en conciliación | WAL no activo o múltiples writers sin retry | Confirmar `DATABASE_URL` contiene `?journal_mode=WAL` y que las escrituras usen `createAuditLogWithRetry` |
 | `400 Validation failed` en API | Payload malformado o schema desactualizado | Revisar `src/lib/validations/` vs payload real |
 | Sesión expira prematuramente | `maxAge` bajo o `secure: true` en HTTP local | Ajustar `login/route.ts` → `maxAge: 604800` |
 | Build falla por `module not found` | `serverExternalPackages` incompleto | Añadir `pdf-parse`, `pdfjs-dist`, `bcryptjs` en `next.config.ts` |
@@ -54,10 +54,12 @@
 
 ## 🔐 Seguridad & Cumplimiento
 - ✅ Cookies hardening (XSS/CSRF mitigado)
-- ✅ Validación Zod en todas las rutas `POST/PATCH`
+- ✅ Validación Zod en todas las rutas `POST/PATCH` críticas
 - ✅ Hash SHA-256 para idempotencia de importaciones (`importHash`)
 - ✅ Backups automáticos con retención de 30 días
 - ✅ Logs estructurados (JSON) compatibles con CloudWatch/Datadog
+- ✅ Resiliencia contra bloqueos de SQLite: reintentos con backoff exponencial (`createAuditLogWithRetry`) en escrituras críticas de auditoría
+- ✅ Listener de queries de Prisma optimizado como Singleton global en `db.ts` para evitar duplicaciones en HMR
 - ⚠️ **No subir `prisma/dev.db` ni `.env` al repositorio**
 
 ---

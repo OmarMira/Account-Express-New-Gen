@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
+import { createAuditLogWithRetry } from '@/lib/audit';
 
 interface AccountSeed {
   code: string;
@@ -357,8 +358,8 @@ export async function POST(request: NextRequest) {
       await seedChartOfAccounts(tx, newCompany.id);
 
       // 5. Create audit log
-      await tx.auditLog.create({
-        data: {
+      await createAuditLogWithRetry(
+        {
           companyId: newCompany.id,
           userId,
           action: 'create_company',
@@ -366,7 +367,8 @@ export async function POST(request: NextRequest) {
           entityId: newCompany.id,
           details: `Created company ${newCompany.legalName} and auto-seeded chart of accounts`,
         },
-      });
+        tx,
+      );
 
       return newCompany;
     });

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
+import { createAuditLogWithRetry } from '@/lib/audit';
 
 export async function POST(request: NextRequest) {
   const userId = await getSessionUserId(request);
@@ -165,24 +166,22 @@ export async function POST(request: NextRequest) {
     }
 
     // Write Audit Log
-    await db.auditLog.create({
-      data: {
-        companyId,
-        userId,
-        action: 'RULE_CREATED_WITH_CONTEXT',
-        entity: 'BankRule',
-        details: JSON.stringify({
-          ruleId: rule.id,
-          pattern,
-          lockedDirection,
-          glAccountId: legacyGlAccountId,
-          debitGlAccountId: resolvedDebitGlAccountId,
-          creditGlAccountId: resolvedCreditGlAccountId,
-          role,
-          createSubAccount,
-          subAccountName,
-        }),
-      },
+    await createAuditLogWithRetry({
+      companyId,
+      userId,
+      action: 'RULE_CREATED_WITH_CONTEXT',
+      entity: 'BankRule',
+      details: JSON.stringify({
+        ruleId: rule.id,
+        pattern,
+        lockedDirection,
+        glAccountId: legacyGlAccountId,
+        debitGlAccountId: resolvedDebitGlAccountId,
+        creditGlAccountId: resolvedCreditGlAccountId,
+        role,
+        createSubAccount,
+        subAccountName,
+      }),
     });
 
     return NextResponse.json({ success: true, data: rule });

@@ -4,37 +4,37 @@
 ## 🌍 Entorno y Secrets
 - [ ] `DATABASE_URL` apunta a archivo SQLite válido (`file:./prisma/prod.db`)
 - [ ] `COMPANY_ID` configurado y coincide con scope de datos reales
-- [ ] `APP_VERSION` = `3.0.0` o superior
+- [x] `APP_VERSION` = `3.0.0` o superior
 - [ ] Secrets de CI/CD (`DATABASE_URL`, `COMPANY_ID`, `APP_VERSION`) activos en GitHub Actions
 
 ## 🗄️ Base de Datos y Schema
 - [ ] `schema.prisma` sin migraciones pendientes (`npx prisma migrate status` → `Schema is in sync`)
-- [ ] Índices optimizados: `JournalLine(entryId, glAccountId, date)`, `BankTransaction(statementId, isReconciled)`
-- [ ] `PRAGMA journal_mode=WAL` activo para concurrencia segura
+- [ ] Índices optimizados: `JournalLine(entryId, glAccountId) (date is on parent JournalEntry)`, `BankTransaction(statementId, isReconciled)`
+- [x] `PRAGMA journal_mode=WAL` activo para concurrencia segura
 
 ## 🔐 Seguridad y RBAC
 - [ ] `rules/rbac-config.json` cargado y versionado (`"version": "1.0"`)
 - [ ] Roles probados: `super_admin` (acceso total), `admin` (operativo), `accountant` (clasificación/posteo), `viewer` (solo lectura)
 - [ ] Endpoints críticos (`/api/admin/backup`, `/api/reports/export`) restringidos por rol y rate-limit
-- [ ] Headers de seguridad activos: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Strict-Transport-Security`
+- [x] Headers de seguridad activos: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Strict-Transport-Security`
 
 ## ⚡ Rendimiento y Rate Limiting
 - [ ] `rules/security-config.json` con límites por endpoint (`/api/reports/export: 15 RPM`, `/api/admin/backup: 5 RPM`)
 - [ ] Rate-limiter responde con `429` y headers `Retry-After`, `X-RateLimit-*` al exceder umbrales
-- [ ] Health endpoint (`/api/health`) retorna `200` con métricas coherentes (`database: connected`, `lastBackupAt` válido)
+- [x] Health endpoint (`/api/health`) retorna `200` con métricas coherentes (`database: connected`, `lastBackupAt` válido)
 
 ## 🔄 CI/CD y Gates Automáticos
 - [ ] Workflow `.github/workflows/ci-cd.yml` activo y pasando en `main`
-- [ ] Gates validados: `TYPE_SAFETY`, `CYCLE_INTEGRITY`, `TENANT_ISOLATION`, `PREDICTIVE_ENGINE`, `ASSISTANT_LOGIC`, `LEARNING_LOOP`, `BUDGET_VARIANCE`
+- [x] Gates validados: `TYPE_SAFETY`, `CYCLE_INTEGRITY`, `TENANT_ISOLATION`, `PREDICTIVE_ENGINE`, `ASSISTANT_LOGIC`, `LEARNING_LOOP`, `BUDGET_VARIANCE`
 - [ ] Merge bloqueado si algún gate falla (`continue-on-error: false`)
 
 ## 💾 Backup y Recuperación
-- [ ] Backup inicial ejecutado: `bun run scripts/backup-system.ts` → genera `.db.gz` + `.meta.json`
-- [ ] Restore validado en entorno aislado: `bun run scripts/validate-restore.ts` → `PRAGMA integrity_check: ok` + 7/7 gates PASS
+- [x] Backup inicial ejecutado: `bun run scripts/backup-system.ts` → genera `.db.gz` + `.meta.json`
+- [x] Restore validado en entorno aislado: `bun run scripts/validate-restore.ts` → `PRAGMA integrity_check: ok` + 7/7 gates PASS
 - [ ] Retención configurada: `rules/backup-config.json` → `retentionDays: 90`
 
 ## 📝 Auditoría y Trazabilidad
-- [ ] `AuditLog` registra acciones críticas: `IMPORTED`, `CLASSIFIED`, `POSTED`, `RECONCILED`, `BACKUP_CREATED`, `RATE_LIMIT_VIOLATION`
+- [x] `AuditLog` registra acciones críticas: `IMPORTED`, `CLASSIFIED`, `POSTED`, `RECONCILED`, `BACKUP_CREATED`, `RATE_LIMIT_VIOLATION`
 - [ ] Cero registros huérfanos o sin `companyId`
 - [ ] Hash de integridad en reportes exportados coincide con header `X-Integrity-Hash`
 

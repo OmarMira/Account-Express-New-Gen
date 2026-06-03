@@ -86,8 +86,12 @@ function ok(res, label) {
     [`${label} → status 200`]: (r) => r.status === 200,
     [`${label} → response < 5s`]: (r) => r.timings.duration < 5000,
   });
-  if (!passed) errorRate.add(1);
-  else errorRate.add(0);
+  if (!passed) {
+    errorRate.add(1);
+    console.error(`FAIL: ${label} (status ${res.status}): ${res.body ? res.body.substring(0, 200) : 'no body'}`);
+  } else {
+    errorRate.add(0);
+  }
   return res;
 }
 
@@ -130,7 +134,8 @@ export function setup() {
   let companyId = '';
   try {
     const body = JSON.parse(loginRes.body);
-    companyId = body?.user?.companyMemberships?.[0]?.companyId
+    companyId = body?.companies?.[0]?.id
+      || body?.user?.companyMemberships?.[0]?.companyId
       || body?.companyMemberships?.[0]?.companyId
       || '';
     console.log(`Body keys: ${Object.keys(body || {}).join(', ')}`);
@@ -150,19 +155,19 @@ export function setup() {
       .join('; ');
   }
 
-  // If still no companyId, try /api/companies with cookie
+  // If still no companyId, try /api/auth/me with cookie
   if (!companyId && cookieStr) {
-    const cr = http.get(`${BASE_URL}/api/companies`, {
+    const cr = http.get(`${BASE_URL}/api/auth/me`, {
       headers: {
         'Cookie':  cookieStr,
         'Origin':  BASE_URL,
         'Referer': `${BASE_URL}/`,
       },
     });
-    console.log(`Companies status: ${cr.status}, body: ${cr.body.substring(0, 200)}`);
+    console.log(`Auth me status: ${cr.status}, body: ${cr.body.substring(0, 200)}`);
     try {
       const b = JSON.parse(cr.body);
-      companyId = b?.companies?.[0]?.id || '';
+      companyId = b?.companies?.[0]?.id || b?.user?.companyMemberships?.[0]?.companyId || '';
     } catch (_) {}
   }
 
@@ -195,7 +200,7 @@ export default function (data) {
 
   // ── 3. Companies ───────────────────────────────────────────
   group('03 Companies', () => {
-    ok(get('/api/companies', authHeaders), 'companies');
+    ok(get('/api/admin/companies', authHeaders), 'admin/companies');
   });
 
   if (!companyId) {
@@ -240,7 +245,7 @@ export default function (data) {
 
   // ── 10. Fiscal Periods ─────────────────────────────────────
   group('10 Fiscal Periods', () => {
-    ok(get(`/api/fiscal-periods?companyId=${companyId}`, authHeaders), 'fiscal-periods');
+    ok(get(`/api/settings?companyId=${companyId}`, authHeaders), 'settings/fiscal-periods');
   });
 
   // ── 11. Movement Summary ───────────────────────────────────

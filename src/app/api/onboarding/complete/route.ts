@@ -69,16 +69,30 @@ export async function POST(request: NextRequest) {
       initialCashBalance,
     } = validation.data;
 
-    // 5. Verificar membresía y rol administrativo en la compañía
-    const membership = await db.companyMember.findFirst({
-      where: {
-        userId,
-        companyId,
-        role: 'company_admin', // solo admins pueden realizar onboarding
-      },
+    // 5. Verificar rol del usuario y membresía administrativa en la compañía
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
     });
 
-    if (!membership) {
+    let isAuthorized = false;
+
+    if (user?.role === 'super_admin') {
+      isAuthorized = true;
+    } else {
+      const membership = await db.companyMember.findFirst({
+        where: {
+          userId,
+          companyId,
+          role: 'company_admin', // solo admins pueden realizar onboarding
+        },
+      });
+      if (membership) {
+        isAuthorized = true;
+      }
+    }
+
+    if (!isAuthorized) {
       return NextResponse.json(
         { error: 'Acceso denegado: Se requieren privilegios de administrador' },
         { status: 403 },

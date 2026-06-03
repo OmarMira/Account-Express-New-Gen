@@ -207,7 +207,7 @@ export function CompanyDataTab() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch('/api/companies');
+        const res = await fetch('/api/admin/companies');
         if (res.ok && !cancelled) {
           const data = await res.json();
           setCompanies(data.companies || []);

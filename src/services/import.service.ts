@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { createAuditLogWithRetry } from '@/lib/audit';
 import { parseCSV } from '@/lib/csv-parser';
 import { parseOFX } from '@/lib/ofx-parser';
 import { parsePDFAsync } from '@/lib/pdf-processor';
@@ -131,27 +132,23 @@ export class ImportService {
 
       // Create Audit Log for holder validation
       if (userId && accountHolder && company) {
-        await db.auditLog
-          .create({
-            data: {
-              companyId,
-              userId,
-              action:
-                holderDecision === 'auto_approved'
-                  ? 'HOLDER_VALIDATION_AUTO_APPROVED'
-                  : 'HOLDER_VALIDATION_USER_APPROVED',
-              entity: 'BankStatement',
-              entityId: result.statementId,
-              details: JSON.stringify({
-                fileName,
-                companyLegalName: company.legalName,
-                extractedHolderName: accountHolder,
-                similarityScore: Math.round(similarityScore * 100) / 100,
-                decision: holderDecision,
-              }),
-            },
-          })
-          .catch(() => {});
+        await createAuditLogWithRetry({
+          companyId,
+          userId,
+          action:
+            holderDecision === 'auto_approved'
+              ? 'HOLDER_VALIDATION_AUTO_APPROVED'
+              : 'HOLDER_VALIDATION_USER_APPROVED',
+          entity: 'BankStatement',
+          entityId: result.statementId,
+          details: JSON.stringify({
+            fileName,
+            companyLegalName: company.legalName,
+            extractedHolderName: accountHolder,
+            similarityScore: Math.round(similarityScore * 100) / 100,
+            decision: holderDecision,
+          }),
+        }).catch(() => {});
       }
 
       return {

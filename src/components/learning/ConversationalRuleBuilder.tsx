@@ -10,11 +10,18 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Send, CheckCircle2, ArrowRight, AlertCircle } from 'lucide-react';
 import { type EntityCandidate } from '@/lib/services/entity-detector';
 
+interface RuleCondition {
+  field: 'description' | 'amount';
+  operator: 'contains' | 'starts_with' | 'ends_with' | 'equals' | 'amount_greater' | 'amount_less';
+  value: string;
+}
+
 interface AISuggestion {
   role: string;
   account: { code: string; name: string };
   suggestSubAccount: boolean;
   subAccountName?: string;
+  conditions?: RuleCondition[];
 }
 
 interface ConversationalRuleBuilderProps {
@@ -37,6 +44,14 @@ export function ConversationalRuleBuilder({
   const [processingAnswer, setProcessingAnswer] = useState(false);
   const [suggestion, setSuggestion] = useState<AISuggestion | null>(null);
   const [creatingRule, setCreatingRule] = useState(false);
+  const [clickCount, setClickCount] = useState(0);
+
+  useEffect(() => {
+    if (clickCount > 0) {
+      const timer = setTimeout(() => setClickCount(0), 1200);
+      return () => clearTimeout(timer);
+    }
+  }, [clickCount]);
 
   // Perfiles de dirección cargados dinámicamente
   const [directionProfiles, setDirectionProfiles] = useState<
@@ -143,6 +158,7 @@ export function ConversationalRuleBuilder({
           role: suggestion.role,
           createSubAccount: suggestion.suggestSubAccount,
           subAccountName: suggestion.subAccountName,
+          conditions: suggestion.conditions,
         }),
       });
       if (!res.ok) throw new Error(t('ruleBuilder.createError'));
@@ -347,16 +363,41 @@ export function ConversationalRuleBuilder({
                     )}
                   </p>
                 )}
+                {suggestion.conditions && suggestion.conditions.length > 0 && (
+                  <div className="text-xs text-muted-foreground mt-2 border-t pt-2 space-y-1">
+                    <p className="font-semibold text-foreground">
+                      {t('ruleBuilder.conditionsTitle') || 'Match Conditions (AND):'}
+                    </p>
+                    <ul className="list-disc pl-4 space-y-0.5">
+                      {suggestion.conditions.map((cond, idx) => (
+                        <li key={idx}>
+                          <span className="capitalize">
+                            {cond.field === 'description' ? 'description' : cond.field}
+                          </span>{' '}
+                          <span className="italic">{cond.operator.replace('_', ' ')}</span> "
+                          {cond.value}"
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-2">
-                <Button onClick={handleConfirm} disabled={creatingRule} className="flex-1">
+                <Button
+                  onDoubleClick={handleConfirm}
+                  onClick={() => setClickCount((c) => c + 1)}
+                  disabled={creatingRule}
+                  className="flex-1 select-none transition-all duration-200"
+                >
                   {creatingRule ? (
                     <Loader2 className="animate-spin mr-2" />
                   ) : (
                     <CheckCircle2 className="mr-2" />
                   )}
-                  {t('ruleBuilder.confirmBtn')}
+                  {clickCount === 1
+                    ? t('ruleBuilder.doubleClickConfirm')
+                    : t('ruleBuilder.confirmBtn')}
                 </Button>
                 <Button
                   variant="outline"

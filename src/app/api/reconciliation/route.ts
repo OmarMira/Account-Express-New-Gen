@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
 import { apiHandler } from '@/lib/api-handler';
 import { validateRequest } from '@/lib/validate-request';
+import { createAuditLogWithRetry } from '@/lib/audit';
 import { createReconciliationSchema } from '@/lib/validations/reconciliation';
 import { AuthError, ForbiddenError, NotFoundError, ValidationError } from '@/lib/api-error';
 import { ReconciliationService } from '@/services/reconciliation.service';
@@ -284,19 +285,17 @@ export const POST = apiHandler(async (request: NextRequest) => {
   const { reconciledCount, journalEntriesCreated } = await ReconciliationService.reconcile(body);
 
   // Audit log
-  await db.auditLog.create({
-    data: {
-      companyId,
-      userId,
-      action: 'reconcile_transactions',
-      entity: 'BankTransaction',
-      details: JSON.stringify({
-        bankAccountId,
-        count: reconciledCount,
-        journalEntriesCreated,
-        periodId,
-      }),
-    },
+  await createAuditLogWithRetry({
+    companyId,
+    userId,
+    action: 'reconcile_transactions',
+    entity: 'BankTransaction',
+    details: JSON.stringify({
+      bankAccountId,
+      count: reconciledCount,
+      journalEntriesCreated,
+      periodId,
+    }),
   });
 
   return NextResponse.json({

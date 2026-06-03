@@ -42,7 +42,8 @@ export type ViewName =
   | 'admin-company-detail'
   | 'admin-users'
   | 'admin-audit-logs'
-  | 'admin-dashboard';
+  | 'admin-dashboard'
+  | 'workflow';
 
 interface AuthState {
   user: User | null;

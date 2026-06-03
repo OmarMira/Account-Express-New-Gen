@@ -12,8 +12,9 @@
       },
       {
         "name": "remove_conf_ref_ids",
-        "regex": "(Conf#|Ref#|ID:|ID: Indn:|TRX|\\d{10,}|\\$[\\d,]+\\.\\d{2})",
-        "replacement": ""
+        "regex": "(Conf#|Ref#|ID:|ID: Indn:|TRX)\\s*\\S*|\\b\\d{10,}\\b|\\$[\\d,]+\\.\\d{2}|\\b(?:[A-Za-z]+\\d+[A-Za-z0-9]*|\\d+[A-Za-z]+[A-Za-z0-9]*)\\b",
+        "replacement": "",
+        "flags": "gi"
       },
       {
         "name": "remove_dates",
@@ -39,13 +40,13 @@
     "strategies": [
       {
         "priority": 1,
-        "pattern": "\\bINDN:\\s*([A-ZÀ-ÿ\\s\\.&]+?)(?=\\s+(?:CO ID:|ID:|CCD|WEB|$))",
-        "description": "Busca nombre tras 'INDN:' hasta marcador técnico (CO ID:, ID:, CCD, WEB). Corrige truncado por \\b."
+        "pattern": "\\bINDN:\\s*([A-ZÀ-ÿ0-9\\s\\.&\\-']+?)(?=\\s+(?:CO ID:|ID:|CCD|WEB|$))",
+        "description": "Busca nombre tras 'INDN:' hasta marcador técnico (CO ID:, ID:, CCD, WEB)."
       },
       {
         "priority": 2,
-        "pattern": "\\b(?:from|to|payee)\\s+([A-ZÀ-ÿ\\s\\.&]{2,40})\\b",
-        "description": "Busca nombre tras 'from', 'to' o 'payee'. Captura mayúsculas."
+        "pattern": "\\b(?:from|to|payee)\\s+([A-ZÀ-ÿ0-9\\s\\.&\\-']{2,40})",
+        "description": "Busca nombre tras 'from', 'to' o 'payee'. Captura mayúsculas, números, guiones y apóstrofes."
       },
       {
         "priority": 3,
@@ -54,7 +55,7 @@
       },
       {
         "priority": 4,
-        "pattern": "^([A-ZÀ-ÿ\\s\\.\\,&]{2,40})(?=\\s+(DES:|ID:|\\d{2}\\/))",
+        "pattern": "^([A-ZÀ-ÿ0-9\\s\\.\\,&\\-']{2,40})(?=\\s+(DES:|ID:|\\d{2}\\/))",
         "description": "Fallback: Primera secuencia de texto largo antes de un descriptor técnico."
       }
     ]
