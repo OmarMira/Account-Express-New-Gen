@@ -1,31 +1,6 @@
 import { db } from '@/lib/db';
 import { entityContextSchema } from '@/lib/validations/entity-context';
-
-export function normalizePattern(desc: string): string {
-  let cleaned = desc.toLowerCase().trim();
-
-  // Remove common prefixes
-  cleaned = cleaned.replace(/^(zelle\s+)?payment\s+(to|from)\s+/g, '');
-  cleaned = cleaned.replace(/^(zelle\s+)?transfer\s+(to|from)\s+/g, '');
-  cleaned = cleaned.replace(/^check\s+(to|from)\s+/g, '');
-  cleaned = cleaned.replace(/^transfer\s+(to|from)\s+/g, '');
-  cleaned = cleaned.replace(/^withdrawal\s+(to|from)\s+/g, '');
-  cleaned = cleaned.replace(/^deposit\s+(to|from)\s+/g, '');
-
-  // Raiser/Lyft/Online patterns
-  cleaned = cleaned.replace(/^raiser\s+\d*\s*des:edi\s+paymnt\s+id:[\w\d-]+\s+indn:/g, '');
-  cleaned = cleaned.replace(/^lyft\.com\s+des:lyft\s+[\d-]+\s+id:[\w\d-]+\s+indn:/g, '');
-  cleaned = cleaned.replace(/^lyft\.com\s+des:lyft\s+id:[\w\d-]+\s+indn:/g, '');
-  cleaned = cleaned.replace(/des:[\w\s\.-]+id:[\w\d-]+(indn:)?/g, '');
-  cleaned = cleaned.replace(/indn:/g, '');
-
-  // Remove common suffixes
-  cleaned = cleaned.replace(/\s+conf#\s*[\w\d]+/g, '');
-  cleaned = cleaned.replace(/\s+for\s+\"[^\"]+\"/g, '');
-  cleaned = cleaned.replace(/;\s*conf#\s*[\w\d]+/g, '');
-
-  return cleaned.trim();
-}
+import { normalizePattern } from '@/lib/services/pattern-normalizer';
 
 export async function findContext(companyId: string, description: string) {
   const normalized = normalizePattern(description);

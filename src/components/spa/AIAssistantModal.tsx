@@ -17,6 +17,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useAuthStore } from '@/store/auth-store';
 import { useLanguageStore } from '@/store/language-store';
 import { cn } from '@/lib/utils';
@@ -31,13 +39,28 @@ interface ChatMessage {
   timestamp: Date;
 }
 
+interface ConditionV2 {
+  field: 'description' | 'amount';
+  operator: 'contains' | 'starts_with' | 'ends_with' | 'equals' | 'amount_greater' | 'amount_less';
+  value: string | number;
+}
+
 interface ParsedRule {
   name: string;
-  conditionType: string;
-  conditionValue: string;
+  conditions: ConditionV2[];
   transactionDirection: string;
-  glAccountName: string;
+  glAccountName?: string | null;
+  debitGlAccountName?: string | null;
+  creditGlAccountName?: string | null;
   priority: number;
+  // Legacy V1 fields (kept for backwards compat)
+  conditionType?: string;
+  conditionValue?: string;
+}
+
+interface HistoryEntry {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
 }
 
 /* ─── Animation Variants ──────────────────────────────────────────── */
@@ -84,11 +107,35 @@ export function AIAssistantModal() {
   const [ruleReply, setRuleReply] = useState('');
   const [error, setError] = useState('');
 
+  // Conversational rule builder state
+  const [ruleMessages, setRuleMessages] = useState<ChatMessage[]>([]);
+  const [ruleHistory, setRuleHistory] = useState<HistoryEntry[]>([]);
+  const [ruleIsComplete, setRuleIsComplete] = useState(false);
+
   // Interactive Account Creation Wizard state
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardCode, setWizardCode] = useState('');
   const [wizardName, setWizardName] = useState('');
   const [wizardParentId, setWizardParentId] = useState('');
+
+  // List of accounts for form selectors
+  const [accounts, setAccounts] = useState<{ id: string; name: string; code: string }[]>([]);
+
+  // Fetch accounts on assistant mount / open
+  useEffect(() => {
+    if (aiAssistantOpen && activeCompany) {
+      fetch(`/api/accounts?companyId=${activeCompany.id}`)
+        .then((res) => {
+          if (!res.ok) throw new Error();
+          return res.json();
+        })
+        .then((data) => {
+          const accs = data.accounts ?? data.data ?? data ?? [];
+          setAccounts(accs);
+        })
+        .catch(() => {});
+    }
+  }, [aiAssistantOpen, activeCompany]);
 
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
@@ -111,15 +158,33 @@ export function AIAssistantModal() {
       setRuleInput('');
       setRuleReply('');
       setParsedRule(null);
+      setRuleMessages([]);
+      setRuleHistory([]);
+      setRuleIsComplete(false);
       setWizardOpen(false);
       setWizardCode('');
       setWizardName('');
       setWizardParentId('');
+
+      // Background LLM warmup call to wake up the serverless/API connection
+      if (activeCompany) {
+        fetch('/api/ai-assistant', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: 'Hola',
+            mode: 'chat',
+            companyId: activeCompany.id,
+            isWarmup: true,
+          }),
+        }).catch(() => {});
+      }
+
       setTimeout(() => {
         chatInputRef.current?.focus();
       }, 300);
     }
-  }, [aiAssistantOpen]);
+  }, [aiAssistantOpen, activeCompany]);
 
   const handleStartWizard = async () => {
     if (!activeCompany) return;
@@ -252,15 +317,26 @@ export function AIAssistantModal() {
     }
   }, [chatInput, isLoading, t, activeCompany]);
 
-  /* ─── Rule Submit ─────────────────────────────────────────────── */
+  /* ─── Rule Submit (conversational) ───────────────────────────── */
   const handleRuleSubmit = useCallback(async () => {
     const trimmed = ruleInput.trim();
     if (!trimmed || isLoading) return;
 
     setError('');
-    setParsedRule(null);
-    setRuleReply('');
     setIsLoading(true);
+
+    // Add user message to conversation
+    const userMsg: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: trimmed,
+      timestamp: new Date(),
+    };
+    setRuleMessages((prev) => [...prev, userMsg]);
+    setRuleInput('');
+
+    // Build updated history
+    const updatedHistory: HistoryEntry[] = [...ruleHistory, { role: 'user', content: trimmed }];
 
     try {
       const res = await fetch('/api/ai-assistant', {
@@ -270,6 +346,7 @@ export function AIAssistantModal() {
           message: trimmed,
           mode: 'create-rule',
           companyId: activeCompany?.id,
+          history: ruleHistory, // send previous history (not including this message, backend appends it)
         }),
       });
 
@@ -277,21 +354,43 @@ export function AIAssistantModal() {
 
       if (!res.ok) {
         setError(data.error || t('aiAssistant.error'));
+        setIsLoading(false);
         return;
       }
 
-      setRuleReply(data.reply || '');
-      if (data.parsedRule) {
+      const assistantContent = data.reply || '...';
+      const assistantMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: assistantContent,
+        timestamp: new Date(),
+      };
+      setRuleMessages((prev) => [...prev, assistantMsg]);
+
+      // Update history with both turns
+      const assistantContentForHistory = data.rawJson || assistantContent;
+      const newHistory: HistoryEntry[] = [
+        ...updatedHistory,
+        { role: 'assistant', content: assistantContentForHistory },
+      ];
+      setRuleHistory(newHistory);
+
+      // Handle isComplete
+      if (data.isComplete && data.parsedRule) {
         setParsedRule(data.parsedRule);
+        setRuleIsComplete(true);
+      } else {
+        setParsedRule(null);
+        setRuleIsComplete(false);
       }
     } catch {
       setError(t('aiAssistant.error'));
     } finally {
       setIsLoading(false);
     }
-  }, [ruleInput, isLoading, t, activeCompany]);
+  }, [ruleInput, isLoading, t, activeCompany, ruleHistory]);
 
-  /* ─── Save Rule ───────────────────────────────────────────────── */
+  /* ─── Save Rule (V2) ──────────────────────────────────────────── */
   const handleSaveRule = useCallback(async () => {
     if (!parsedRule || !activeCompany) return;
 
@@ -299,7 +398,6 @@ export function AIAssistantModal() {
     setError('');
 
     try {
-      // First, find the GL account by name
       const accountsRes = await fetch(`/api/accounts?companyId=${activeCompany.id}`);
       if (!accountsRes.ok) {
         setError(t('aiAssistant.error'));
@@ -308,42 +406,88 @@ export function AIAssistantModal() {
       }
 
       const accountsData = await accountsRes.json();
-      const accounts = accountsData.data ?? accountsData ?? [];
-      const glAccount = accounts.find(
-        (a: { name: string }) => a.name.toLowerCase() === parsedRule.glAccountName.toLowerCase(),
-      );
+      const accounts: { id: string; name: string }[] =
+        accountsData.accounts ?? accountsData.data ?? accountsData ?? [];
 
-      if (!glAccount) {
-        setError(
-          `No se encontró la cuenta "${parsedRule.glAccountName}". Por favor, verifica el nombre en tu Plan de Cuentas.`,
-        );
-        setIsLoading(false);
-        return;
+      const findAccount = (name: string) =>
+        accounts.find((a) => a.name.toLowerCase() === name.toLowerCase());
+
+      // Resolve GL account IDs
+      let glAccountId: string | undefined;
+      let debitGlAccountId: string | undefined;
+      let creditGlAccountId: string | undefined;
+
+      if (parsedRule.glAccountName) {
+        const acc = findAccount(parsedRule.glAccountName);
+        if (!acc) {
+          setError(`No se encontró la cuenta "${parsedRule.glAccountName}".`);
+          setIsLoading(false);
+          return;
+        }
+        glAccountId = acc.id;
       }
 
-      // Create the rule via bank-rules API
+      if (parsedRule.debitGlAccountName) {
+        const acc = findAccount(parsedRule.debitGlAccountName);
+        if (!acc) {
+          setError(`No se encontró la cuenta de débito "${parsedRule.debitGlAccountName}".`);
+          setIsLoading(false);
+          return;
+        }
+        debitGlAccountId = acc.id;
+      }
+
+      if (parsedRule.creditGlAccountName) {
+        const acc = findAccount(parsedRule.creditGlAccountName);
+        if (!acc) {
+          setError(`No se encontró la cuenta de crédito "${parsedRule.creditGlAccountName}".`);
+          setIsLoading(false);
+          return;
+        }
+        creditGlAccountId = acc.id;
+      }
+
+      // Build conditions for V2 (use first condition for legacy fields as fallback)
+      const firstCondition = parsedRule.conditions?.[0];
+
       const ruleRes = await fetch('/api/bank-rules', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           companyId: activeCompany.id,
           name: parsedRule.name,
-          conditionType: parsedRule.conditionType,
-          conditionValue: parsedRule.conditionValue,
+          // V2 fields
+          conditions: parsedRule.conditions,
+          debitGlAccountId,
+          creditGlAccountId,
+          // Legacy / fallback
+          conditionType: parsedRule.conditionType ?? firstCondition?.operator ?? 'contains',
+          conditionValue: parsedRule.conditionValue ?? String(firstCondition?.value ?? ''),
           transactionDirection: parsedRule.transactionDirection,
-          glAccountId: glAccount.id,
+          glAccountId: glAccountId ?? debitGlAccountId ?? creditGlAccountId,
           priority: parsedRule.priority,
           isActive: true,
         }),
       });
 
       if (ruleRes.ok || ruleRes.status === 201) {
+        const successMsg: ChatMessage = {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: `✅ ¡Regla "${parsedRule.name}" creada exitosamente! Ya está activa y clasificará transacciones automáticamente.`,
+          timestamp: new Date(),
+        };
+        setRuleMessages((prev) => [...prev, successMsg]);
         setParsedRule(null);
-        setRuleInput('');
-        setRuleReply(t('aiAssistant.ruleCreated'));
+        setRuleIsComplete(false);
+        setRuleHistory([]);
       } else {
         const errData = await ruleRes.json();
-        setError(errData.error || t('aiAssistant.error'));
+        let errorMsg = errData.error || t('aiAssistant.error');
+        if (errorMsg === 'A rule with identical conditions and direction already exists.') {
+          errorMsg = t('bankRules.duplicateRuleError');
+        }
+        setError(errorMsg);
       }
     } catch {
       setError(t('aiAssistant.error'));
@@ -446,6 +590,9 @@ export function AIAssistantModal() {
                       setRuleInput('');
                       setRuleReply('');
                       setParsedRule(null);
+                      setRuleMessages([]);
+                      setRuleHistory([]);
+                      setRuleIsComplete(false);
                       setTimeout(() => ruleInputRef.current?.focus(), 100);
                     }}
                     className={cn(
@@ -502,7 +649,10 @@ export function AIAssistantModal() {
                   handleRuleKeyDown={handleRuleKeyDown}
                   ruleInputRef={ruleInputRef}
                   parsedRule={parsedRule}
-                  ruleReply={ruleReply}
+                  setParsedRule={setParsedRule}
+                  accounts={accounts}
+                  ruleMessages={ruleMessages}
+                  ruleIsComplete={ruleIsComplete}
                   handleSaveRule={handleSaveRule}
                   t={t}
                 />
@@ -777,7 +927,10 @@ function RuleView({
   handleRuleKeyDown,
   ruleInputRef,
   parsedRule,
-  ruleReply,
+  setParsedRule,
+  accounts,
+  ruleMessages,
+  ruleIsComplete,
   handleSaveRule,
   t,
 }: {
@@ -789,108 +942,367 @@ function RuleView({
   handleRuleKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   ruleInputRef: React.RefObject<HTMLTextAreaElement | null>;
   parsedRule: ParsedRule | null;
-  ruleReply: string;
+  setParsedRule: React.Dispatch<React.SetStateAction<ParsedRule | null>>;
+  accounts: { id: string; name: string; code: string }[];
+  ruleMessages: ChatMessage[];
+  ruleIsComplete: boolean;
   handleSaveRule: () => void;
   t: (key: string) => string;
 }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [ruleMessages, parsedRule, isLoading]);
+
+  const hasMessages = ruleMessages.length > 0;
+
   return (
     <>
-      <div className="flex-1 overflow-y-auto px-6 py-6">
-        <div className="mx-auto max-w-lg space-y-6">
-          {/* Instructions */}
-          <div className="flex items-start gap-3">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-blue-600/15">
-              <Sparkles className="size-5 text-blue-400" />
-            </div>
-            <div>
-              <h3 className="text-base font-semibold text-white">{t('aiAssistant.ruleTitle')}</h3>
-              <p className="mt-1 text-sm leading-relaxed text-slate-400">
-                {t('aiAssistant.ruleInstructions')}
-              </p>
-              <div className="mt-3 rounded-lg bg-white/5 border border-white/10 px-3 py-2">
-                <p className="text-sm text-blue-300 font-mono">{t('aiAssistant.ruleExample')}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Rule Reply */}
-          {ruleReply && !parsedRule && (
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="rounded-lg bg-white/5 border border-white/10 px-4 py-3 text-sm text-slate-300"
-            >
-              {ruleReply}
-            </motion.div>
-          )}
-
-          {/* Parsed Rule Card */}
-          {parsedRule && (
-            <motion.div
-              initial={{ opacity: 0, y: 12, scale: 0.97 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ type: 'spring', stiffness: 250, damping: 25 }}
-              className="rounded-xl bg-white/5 border border-emerald-500/30 overflow-hidden"
-            >
-              <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-                <h4 className="text-sm font-semibold text-emerald-400 flex items-center gap-2">
-                  <Sparkles className="size-4" />
-                  {t('aiAssistant.parsedRule')}
-                </h4>
-                <Badge className="bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border-emerald-500/30">
-                  IA
-                </Badge>
-              </div>
-              <div className="grid grid-cols-2 gap-3 p-4">
-                <RuleField label={t('aiAssistant.ruleName')} value={parsedRule.name} />
-                <RuleField
-                  label={t('aiAssistant.condition')}
-                  value={`${parsedRule.conditionType}: "${parsedRule.conditionValue}"`}
-                />
-                <RuleField
-                  label={t('aiAssistant.account')}
-                  value={parsedRule.glAccountName || '—'}
-                />
-                <RuleField
-                  label={t('aiAssistant.direction')}
-                  value={parsedRule.transactionDirection}
-                />
-                <RuleField label={t('aiAssistant.priority')} value={String(parsedRule.priority)} />
-              </div>
-              <div className="border-t border-white/10 px-4 py-3">
-                <Button
-                  onClick={handleSaveRule}
-                  disabled={isLoading}
-                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-white"
-                >
-                  {isLoading ? (
-                    <Loader2 className="size-4 animate-spin mr-2" />
-                  ) : (
-                    <Save className="size-4 mr-2" />
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-6">
+        {hasMessages ? (
+          <div className="space-y-4">
+            <AnimatePresence>
+              {ruleMessages.map((msg) => (
+                <motion.div
+                  key={msg.id}
+                  variants={messageVariants}
+                  initial="hidden"
+                  animate="visible"
+                  className={cn(
+                    'flex gap-3',
+                    msg.role === 'user' ? 'justify-end' : 'justify-start',
                   )}
-                  {t('aiAssistant.saveRuleButton')}
-                </Button>
-              </div>
-            </motion.div>
-          )}
+                >
+                  {msg.role === 'assistant' && (
+                    <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-blue-600/20 mt-0.5">
+                      <Bot className="size-4 text-blue-400" />
+                    </div>
+                  )}
+                  <div
+                    className={cn(
+                      'max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap',
+                      msg.role === 'user'
+                        ? 'bg-blue-600 text-white rounded-br-md'
+                        : 'bg-white/10 text-slate-200 rounded-bl-md',
+                    )}
+                  >
+                    {msg.content}
+                  </div>
+                  {msg.role === 'user' && (
+                    <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-purple-600/20 mt-0.5">
+                      <Sparkles className="size-4 text-purple-400" />
+                    </div>
+                  )}
+                </motion.div>
+              ))}
+            </AnimatePresence>
 
-          {/* Error */}
-          <AnimatePresence>
-            {error && (
+            {/* Loading indicator */}
+            {isLoading && (
               <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-center gap-3"
               >
-                <div className="flex items-center gap-2 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2 text-sm text-red-300">
-                  <AlertCircle className="size-4 shrink-0" />
-                  {error}
+                <div className="flex size-8 items-center justify-center rounded-lg bg-blue-600/20">
+                  <Bot className="size-4 text-blue-400" />
+                </div>
+                <div className="flex items-center gap-1 rounded-2xl bg-white/10 px-4 py-3 rounded-bl-md">
+                  <span className="size-2 rounded-full bg-blue-400 animate-bounce [animation-delay:-0.3s]" />
+                  <span className="size-2 rounded-full bg-blue-400 animate-bounce [animation-delay:-0.15s]" />
+                  <span className="size-2 rounded-full bg-blue-400 animate-bounce" />
                 </div>
               </motion.div>
             )}
-          </AnimatePresence>
-        </div>
+
+            {/* Parsed Rule Card — only when complete */}
+            {ruleIsComplete && parsedRule && !isLoading && (
+              <motion.div
+                initial={{ opacity: 0, y: 12, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ type: 'spring', stiffness: 250, damping: 25 }}
+                className="rounded-xl bg-white/5 border border-emerald-500/30 overflow-hidden ml-11"
+              >
+                <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+                  <h4 className="text-sm font-semibold text-emerald-400 flex items-center gap-2">
+                    <Sparkles className="size-4" />
+                    {t('aiAssistant.parsedRule')}
+                  </h4>
+                  <Badge className="bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border-emerald-500/30">
+                    Listo
+                  </Badge>
+                </div>
+                <div className="grid grid-cols-2 gap-3 p-4">
+                  {/* Name */}
+                  <div className="space-y-1">
+                    <Label
+                      htmlFor="parsed-rule-name"
+                      className="text-[11px] font-medium uppercase tracking-wider text-slate-400"
+                    >
+                      Nombre
+                    </Label>
+                    <Input
+                      id="parsed-rule-name"
+                      value={parsedRule.name}
+                      onChange={(e) => setParsedRule({ ...parsedRule, name: e.target.value })}
+                      className="bg-slate-900/40 border-white/10 text-white text-xs h-8 focus:ring-emerald-500/50"
+                    />
+                  </div>
+
+                  {/* Direction */}
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
+                      Dirección
+                    </Label>
+                    <Select
+                      value={parsedRule.transactionDirection}
+                      onValueChange={(val) =>
+                        setParsedRule({ ...parsedRule, transactionDirection: val })
+                      }
+                    >
+                      <SelectTrigger className="bg-slate-900/40 border-white/10 text-white text-xs h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-slate-900 border-white/10 text-white text-xs">
+                        <SelectItem value="any">Cualquiera</SelectItem>
+                        <SelectItem value="debit">Débito</SelectItem>
+                        <SelectItem value="credit">Crédito</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Conditions */}
+                  {parsedRule.conditions?.map((c, i) => (
+                    <div
+                      key={i}
+                      className="col-span-2 grid grid-cols-2 gap-3 border-t border-white/5 pt-3 mt-1"
+                    >
+                      <div className="space-y-1">
+                        <Label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
+                          Condición {parsedRule.conditions.length > 1 ? i + 1 : ''} (Tipo)
+                        </Label>
+                        <Select
+                          value={c.operator}
+                          onValueChange={(val: any) => {
+                            const updated = [...parsedRule.conditions];
+                            updated[i] = { ...updated[i], operator: val };
+                            setParsedRule({ ...parsedRule, conditions: updated });
+                          }}
+                        >
+                          <SelectTrigger className="bg-slate-900/40 border-white/10 text-white text-xs h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="bg-slate-900 border-white/10 text-white text-xs">
+                            <SelectItem value="contains">Contiene</SelectItem>
+                            <SelectItem value="starts_with">Empieza con</SelectItem>
+                            <SelectItem value="ends_with">Termina con</SelectItem>
+                            <SelectItem value="equals">Igual a</SelectItem>
+                            <SelectItem value="amount_greater">Monto mayor que</SelectItem>
+                            <SelectItem value="amount_less">Monto menor que</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
+                          Condición {parsedRule.conditions.length > 1 ? i + 1 : ''} (Valor)
+                        </Label>
+                        <Input
+                          value={c.value}
+                          onChange={(e) => {
+                            const updated = [...parsedRule.conditions];
+                            updated[i] = { ...updated[i], value: e.target.value };
+                            setParsedRule({ ...parsedRule, conditions: updated });
+                          }}
+                          className="bg-slate-900/40 border-white/10 text-white text-xs h-8 focus:ring-emerald-500/50"
+                        />
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* GL Account selectors */}
+                  {(() => {
+                    const showGlAccount =
+                      parsedRule.glAccountName !== undefined && parsedRule.glAccountName !== null;
+                    const showDebitGlAccount =
+                      parsedRule.debitGlAccountName !== undefined &&
+                      parsedRule.debitGlAccountName !== null;
+                    const showCreditGlAccount =
+                      parsedRule.creditGlAccountName !== undefined &&
+                      parsedRule.creditGlAccountName !== null;
+                    const hasAnyAccountField =
+                      showGlAccount || showDebitGlAccount || showCreditGlAccount;
+                    const renderGlAccount = showGlAccount || !hasAnyAccountField;
+
+                    return (
+                      <>
+                        {renderGlAccount && (
+                          <div className="space-y-1">
+                            <Label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
+                              Cuenta
+                            </Label>
+                            <Select
+                              value={parsedRule.glAccountName || ''}
+                              onValueChange={(val) =>
+                                setParsedRule({ ...parsedRule, glAccountName: val })
+                              }
+                            >
+                              <SelectTrigger className="bg-slate-900/40 border-white/10 text-white text-xs h-8">
+                                <SelectValue placeholder="Seleccionar cuenta..." />
+                              </SelectTrigger>
+                              <SelectContent className="bg-slate-900 border-white/10 text-white text-xs max-h-60 overflow-y-auto">
+                                {accounts.map((acc) => (
+                                  <SelectItem key={acc.id} value={acc.name}>
+                                    <span className="font-mono text-slate-500 mr-2">
+                                      {acc.code}
+                                    </span>
+                                    {acc.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+
+                        {showDebitGlAccount && (
+                          <div className="space-y-1">
+                            <Label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
+                              Cuenta (salidas)
+                            </Label>
+                            <Select
+                              value={parsedRule.debitGlAccountName || ''}
+                              onValueChange={(val) =>
+                                setParsedRule({ ...parsedRule, debitGlAccountName: val })
+                              }
+                            >
+                              <SelectTrigger className="bg-slate-900/40 border-white/10 text-white text-xs h-8">
+                                <SelectValue placeholder="Seleccionar cuenta de débito..." />
+                              </SelectTrigger>
+                              <SelectContent className="bg-slate-900 border-white/10 text-white text-xs max-h-60 overflow-y-auto">
+                                {accounts.map((acc) => (
+                                  <SelectItem key={acc.id} value={acc.name}>
+                                    <span className="font-mono text-slate-500 mr-2">
+                                      {acc.code}
+                                    </span>
+                                    {acc.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+
+                        {showCreditGlAccount && (
+                          <div className="space-y-1">
+                            <Label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
+                              Cuenta (entradas)
+                            </Label>
+                            <Select
+                              value={parsedRule.creditGlAccountName || ''}
+                              onValueChange={(val) =>
+                                setParsedRule({ ...parsedRule, creditGlAccountName: val })
+                              }
+                            >
+                              <SelectTrigger className="bg-slate-900/40 border-white/10 text-white text-xs h-8">
+                                <SelectValue placeholder="Seleccionar cuenta de crédito..." />
+                              </SelectTrigger>
+                              <SelectContent className="bg-slate-900 border-white/10 text-white text-xs max-h-60 overflow-y-auto">
+                                {accounts.map((acc) => (
+                                  <SelectItem key={acc.id} value={acc.name}>
+                                    <span className="font-mono text-slate-500 mr-2">
+                                      {acc.code}
+                                    </span>
+                                    {acc.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+
+                  {/* Priority */}
+                  <div className="space-y-1">
+                    <Label
+                      htmlFor="parsed-rule-priority"
+                      className="text-[11px] font-medium uppercase tracking-wider text-slate-400"
+                    >
+                      Prioridad
+                    </Label>
+                    <Input
+                      id="parsed-rule-priority"
+                      type="number"
+                      min={0}
+                      max={20}
+                      value={parsedRule.priority}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        if (!isNaN(val)) {
+                          setParsedRule({ ...parsedRule, priority: val });
+                        }
+                      }}
+                      className="bg-slate-900/40 border-white/10 text-white text-xs h-8 focus:ring-emerald-500/50"
+                    />
+                  </div>
+                </div>
+                <div className="border-t border-white/10 px-4 py-3">
+                  <Button
+                    onClick={handleSaveRule}
+                    disabled={isLoading}
+                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white"
+                  >
+                    {isLoading ? (
+                      <Loader2 className="size-4 animate-spin mr-2" />
+                    ) : (
+                      <Save className="size-4 mr-2" />
+                    )}
+                    {t('aiAssistant.saveRuleButton')}
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+          </div>
+        ) : (
+          /* Welcome screen when no messages yet */
+          <div className="mx-auto max-w-lg space-y-6">
+            <div className="flex items-start gap-3">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-blue-600/15">
+                <Sparkles className="size-5 text-blue-400" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-white">{t('aiAssistant.ruleTitle')}</h3>
+                <p className="mt-1 text-sm leading-relaxed text-slate-400">
+                  {t('aiAssistant.ruleInstructions')}
+                </p>
+                <div className="mt-3 rounded-lg bg-white/5 border border-white/10 px-3 py-2">
+                  <p className="text-sm text-blue-300 font-mono">{t('aiAssistant.ruleExample')}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Error Banner */}
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="px-6"
+          >
+            <div className="flex items-center gap-2 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2 text-sm text-red-300">
+              <AlertCircle className="size-4 shrink-0" />
+              {error}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Input Area */}
       <div className="border-t border-white/10 px-4 py-3 sm:px-6">
@@ -901,10 +1313,17 @@ function RuleView({
               value={ruleInput}
               onChange={(e) => setRuleInput(e.target.value)}
               onKeyDown={handleRuleKeyDown}
-              placeholder={t('aiAssistant.inputPlaceholder')}
-              rows={2}
+              placeholder={
+                hasMessages ? 'Responde la pregunta de la IA...' : t('aiAssistant.inputPlaceholder')
+              }
+              rows={hasMessages ? 1 : 2}
               className="w-full resize-none rounded-xl bg-white/5 border border-white/10 px-4 py-3 pr-12 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
               style={{ maxHeight: '120px' }}
+              onInput={(e) => {
+                const el = e.target as HTMLTextAreaElement;
+                el.style.height = 'auto';
+                el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+              }}
             />
             <Button
               size="icon"

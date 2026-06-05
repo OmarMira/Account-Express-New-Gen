@@ -79,6 +79,11 @@ export function ConversationalRuleBuilder({
   } | null>(null);
   const [showSamplesModal, setShowSamplesModal] = useState(false);
 
+  // Dynamic smart chips — top GL accounts used across rules for this company
+  const [topAccounts, setTopAccounts] = useState<
+    { code: string; name: string; accountType: string }[]
+  >([]);
+
   // Sync suggestion conditions to editable state
   useEffect(() => {
     if (suggestion) {
@@ -87,6 +92,24 @@ export function ConversationalRuleBuilder({
       setEditableConditions([]);
     }
   }, [suggestion]);
+
+  // Fetch top GL accounts for dynamic smart chips
+  useEffect(() => {
+    async function fetchTopAccounts() {
+      try {
+        const res = await fetch(`/api/bank-rules/top-accounts?companyId=${companyId}`);
+        if (res.ok) {
+          const resData = await res.json();
+          if (Array.isArray(resData.data)) {
+            setTopAccounts(resData.data);
+          }
+        }
+      } catch (err) {
+        console.warn('[FAILED TO FETCH TOP ACCOUNTS]', err);
+      }
+    }
+    fetchTopAccounts();
+  }, [companyId]);
 
   // Debounced Simulation Effect
   useEffect(() => {
@@ -258,6 +281,14 @@ export function ConversationalRuleBuilder({
     }
   }, [suggestion, current, companyId, onComplete, t]);
 
+  const handleSkip = useCallback(() => {
+    setAnswer('');
+    setSuggestion(null);
+    setEditableConditions([]);
+    setSimulationResult(null);
+    setCurrentIndex((prev) => prev + 1);
+  }, []);
+
   // Renderizado de estados
   if (loading)
     return (
@@ -347,42 +378,60 @@ export function ConversationalRuleBuilder({
 
                 {/* Smart Chips / Respuestas Rápidas */}
                 <div className="flex flex-wrap gap-1.5 pt-1">
-                  {(directionLabel === t('ruleBuilder.directionCredit')
-                    ? [
-                        {
-                          label: '💰 Cobro a cliente',
-                          value: 'Es un cobro a cliente por servicios',
-                        },
-                        {
-                          label: '🏠 Renta / Alquiler',
-                          value: 'Es el cobro de un alquiler / renta',
-                        },
-                        { label: '🤝 Aporte de socio', value: 'Aporte de capital de un socio' },
-                        {
-                          label: '🔄 Transf. Interna',
-                          value: 'Es una transferencia de otra cuenta nuestra o afiliada',
-                        },
-                      ]
-                    : [
-                        { label: '🛒 Gasto general', value: 'Es un gasto general del negocio' },
-                        {
-                          label: '🚗 Préstamo de auto',
-                          value: 'Es el pago del préstamo de un vehículo',
-                        },
-                        { label: '💼 Retiro de socio', value: 'Es un retiro de dinero del socio' },
-                        {
-                          label: '🏢 Renta de oficina',
-                          value: 'Es el pago del alquiler de oficina o local',
-                        },
-                        {
-                          label: '💵 Sueldo',
-                          value: 'Es el pago de sueldo de un empleado o nómina',
-                        },
-                        {
-                          label: '💳 Tarjeta de crédito',
-                          value: 'Es un pago o gasto de tarjeta de crédito',
-                        },
-                      ]
+                  {(topAccounts.length > 0
+                    ? topAccounts.map((account) => {
+                        const emojiMap: Record<string, string> = {
+                          EXPENSE: '💸',
+                          REVENUE: '💰',
+                          ASSET: '🏦',
+                          LIABILITY: '🔗',
+                          EQUITY: '💼',
+                        };
+                        const emoji = emojiMap[account.accountType] ?? '📊';
+                        return {
+                          label: `${emoji} ${account.name} (${account.code})`,
+                          value: `Transaction for ${account.name} (${account.code})`,
+                        };
+                      })
+                    : directionLabel === t('ruleBuilder.directionCredit')
+                      ? [
+                          {
+                            label: '💰 Cobro a cliente',
+                            value: 'Es un cobro a cliente por servicios',
+                          },
+                          {
+                            label: '🏠 Renta / Alquiler',
+                            value: 'Es el cobro de un alquiler / renta',
+                          },
+                          { label: '🤝 Aporte de socio', value: 'Aporte de capital de un socio' },
+                          {
+                            label: '🔄 Transf. Interna',
+                            value: 'Es una transferencia de otra cuenta nuestra o afiliada',
+                          },
+                        ]
+                      : [
+                          { label: '🛒 Gasto general', value: 'Es un gasto general del negocio' },
+                          {
+                            label: '🚗 Préstamo de auto',
+                            value: 'Es el pago del préstamo de un vehículo',
+                          },
+                          {
+                            label: '💼 Retiro de socio',
+                            value: 'Es un retiro de dinero del socio',
+                          },
+                          {
+                            label: '🏢 Renta de oficina',
+                            value: 'Es el pago del alquiler de oficina o local',
+                          },
+                          {
+                            label: '💵 Sueldo',
+                            value: 'Es el pago de sueldo de un empleado o nómina',
+                          },
+                          {
+                            label: '💳 Tarjeta de crédito',
+                            value: 'Es un pago o gasto de tarjeta de crédito',
+                          },
+                        ]
                   ).map((chip, idx) => (
                     <Button
                       key={idx}
@@ -449,7 +498,7 @@ export function ConversationalRuleBuilder({
                 <div className="text-xs text-muted-foreground mt-2 border-t pt-2 space-y-3">
                   <div className="flex items-center justify-between">
                     <p className="font-semibold text-foreground text-sm">
-                      {t('ruleBuilder.conditionsTitle') || 'Match Conditions (AND):'}
+                      {t('ruleBuilder.conditionsTitle')}
                     </p>
                     <Button
                       type="button"
@@ -463,15 +512,13 @@ export function ConversationalRuleBuilder({
                       }}
                       className="h-7 px-2 text-[10px]"
                     >
-                      <Plus className="h-3 w-3 mr-1" />{' '}
-                      {t('ruleBuilder.addCondition') || 'Add Condition'}
+                      <Plus className="h-3 w-3 mr-1" /> {t('ruleBuilder.addCondition')}
                     </Button>
                   </div>
 
                   {editableConditions.length === 0 ? (
                     <p className="text-xs italic text-muted-foreground">
-                      {t('ruleBuilder.noConditions') ||
-                        'No conditions defined. This rule will match all transactions.'}
+                      {t('ruleBuilder.noConditions')}
                     </p>
                   ) : (
                     <div className="space-y-2">
@@ -498,13 +545,13 @@ export function ConversationalRuleBuilder({
                             className="h-8 rounded-md border border-input bg-transparent px-2 text-[11px] shadow-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                           >
                             <option value="description" className="bg-background text-foreground">
-                              Description
+                              {t('ruleBuilder.fieldDescription')}
                             </option>
                             <option value="amount" className="bg-background text-foreground">
-                              Amount
+                              {t('ruleBuilder.fieldAmount')}
                             </option>
                             <option value="reference" className="bg-background text-foreground">
-                              Reference
+                              {t('ruleBuilder.fieldReference')}
                             </option>
                           </select>
 
@@ -524,34 +571,34 @@ export function ConversationalRuleBuilder({
                             {cond.field === 'amount' ? (
                               <>
                                 <option value="equals" className="bg-background text-foreground">
-                                  Equals
+                                  {t('ruleBuilder.opEquals')}
                                 </option>
                                 <option
                                   value="greater_than"
                                   className="bg-background text-foreground"
                                 >
-                                  Greater Than
+                                  {t('ruleBuilder.opGreaterThan')}
                                 </option>
                                 <option value="less_than" className="bg-background text-foreground">
-                                  Less Than
+                                  {t('ruleBuilder.opLessThan')}
                                 </option>
                               </>
                             ) : (
                               <>
                                 <option value="contains" className="bg-background text-foreground">
-                                  Contains
+                                  {t('ruleBuilder.opContains')}
                                 </option>
                                 <option value="equals" className="bg-background text-foreground">
-                                  Equals
+                                  {t('ruleBuilder.opEquals')}
                                 </option>
                                 <option
                                   value="starts_with"
                                   className="bg-background text-foreground"
                                 >
-                                  Starts With
+                                  {t('ruleBuilder.opStartsWith')}
                                 </option>
                                 <option value="ends_with" className="bg-background text-foreground">
-                                  Ends With
+                                  {t('ruleBuilder.opEndsWith')}
                                 </option>
                               </>
                             )}
@@ -568,7 +615,7 @@ export function ConversationalRuleBuilder({
                                 return copy;
                               });
                             }}
-                            placeholder="Value..."
+                            placeholder={t('ruleBuilder.valuePlaceholder')}
                             className="h-8 text-[11px] flex-1 min-w-[80px]"
                           />
 
@@ -593,11 +640,13 @@ export function ConversationalRuleBuilder({
                   {editableConditions.length > 0 && (
                     <div className="flex flex-col gap-2 pt-2 border-t mt-2">
                       <div className="flex items-center gap-2">
-                        <span className="text-[11px] font-medium text-foreground">Simulation:</span>
+                        <span className="text-[11px] font-medium text-foreground">
+                          {t('ruleBuilder.simulation')}
+                        </span>
                         {isSimulating ? (
                           <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
                             <Loader2 className="h-3 w-3 animate-spin text-primary" />
-                            <span>Evaluating...</span>
+                            <span>{t('ruleBuilder.evaluating')}</span>
                           </div>
                         ) : simulationResult ? (
                           <Dialog open={showSamplesModal} onOpenChange={setShowSamplesModal}>
@@ -608,22 +657,24 @@ export function ConversationalRuleBuilder({
                               >
                                 <Eye className="h-3.5 w-3.5" />
                                 {simulationResult.matchCount === 1
-                                  ? 'Matches 1 transaction'
-                                  : `Matches ${simulationResult.matchCount} transactions`}
+                                  ? t('ruleBuilder.matchesSingle')
+                                  : t('ruleBuilder.matchesPlural').replace(
+                                      '{count}',
+                                      String(simulationResult.matchCount),
+                                    )}
                               </Badge>
                             </DialogTrigger>
                             <DialogContent className="sm:max-w-[500px]">
                               <DialogHeader>
-                                <DialogTitle>Simulation Preview</DialogTitle>
+                                <DialogTitle>{t('ruleBuilder.simulationPreview')}</DialogTitle>
                               </DialogHeader>
                               <div className="space-y-4 pt-2">
                                 <p className="text-xs text-muted-foreground">
-                                  Showing up to 5 sample unreconciled transactions that match your
-                                  conditions:
+                                  {t('ruleBuilder.simulationDescription')}
                                 </p>
                                 {simulationResult.samples.length === 0 ? (
                                   <div className="text-center p-6 bg-muted/30 rounded-md text-xs italic text-muted-foreground">
-                                    No matching unreconciled transactions found.
+                                    {t('ruleBuilder.noMatchingTransactions')}
                                   </div>
                                 ) : (
                                   <div className="divide-y border rounded-md overflow-hidden bg-background">
@@ -643,7 +694,9 @@ export function ConversationalRuleBuilder({
                                             {sample.reference && (
                                               <>
                                                 <span>•</span>
-                                                <span>Ref: {sample.reference}</span>
+                                                <span>
+                                                  {t('ruleBuilder.refLabel')} {sample.reference}
+                                                </span>
                                               </>
                                             )}
                                           </div>
@@ -701,7 +754,7 @@ export function ConversationalRuleBuilder({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setCurrentIndex((prev) => prev + 1)}
+                onClick={handleSkip}
                 disabled={processingAnswer || creatingRule}
               >
                 {t('ruleBuilder.skipBtn')} <ArrowRight className="ml-2 h-4 w-4" />

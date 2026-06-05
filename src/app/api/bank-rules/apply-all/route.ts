@@ -2,40 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
 
-// Helper: check if a transaction matches a rule
-function transactionMatchesRule(
-  tx: { description: string; amount: number },
-  rule: {
-    conditionType: string;
-    conditionValue: string;
-    transactionDirection: string;
-  },
-): boolean {
-  // Check direction first
-  if (rule.transactionDirection === 'debit' && tx.amount >= 0) return false;
-  if (rule.transactionDirection === 'credit' && tx.amount < 0) return false;
-
-  const rawDesc = tx.description || '';
-  const desc = rawDesc.toLowerCase().trim().replace(/\s+/g, ' '); // 🔹 Sanitización completa
-  const val = rule.conditionValue.toLowerCase().trim();
-
-  switch (rule.conditionType) {
-    case 'contains':
-      return desc.includes(val);
-    case 'starts_with':
-      return desc.startsWith(val);
-    case 'ends_with':
-      return desc.endsWith(val);
-    case 'equals':
-      return desc === val;
-    case 'amount_greater':
-      return Math.abs(tx.amount) > Number(rule.conditionValue);
-    case 'amount_less':
-      return Math.abs(tx.amount) < Number(rule.conditionValue);
-    default:
-      return false;
-  }
-}
+import { transactionMatchesRule } from '@/lib/services/rule-matching-engine';
 
 // ─── POST /api/bank-rules/apply-all ────────────────────────────────
 // Apply ALL active rules to all unmatched transactions.

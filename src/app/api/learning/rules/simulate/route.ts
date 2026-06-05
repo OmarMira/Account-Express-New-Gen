@@ -16,7 +16,7 @@ const conditionSchema = z.object({
     'amount_greater',
     'amount_less',
   ]),
-  value: z.string().min(1),
+  value: z.string(),
 });
 
 // Request body validation schema

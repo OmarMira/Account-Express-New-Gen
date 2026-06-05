@@ -1,16 +1,22 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import { AI_CONFIG } from '@/lib/constants/ai-config';
 
 export async function GET() {
   try {
     const envPath = path.join(process.cwd(), '.env');
     if (fs.existsSync(envPath)) {
       const envContent = fs.readFileSync(envPath, 'utf8');
-      // Verificamos si existe la variable AI_API_KEY y tiene algo asignado
-      const match = envContent.match(/AI_API_KEY=(.+)/);
-      if (match && match[1].trim().length > 0) {
-        return NextResponse.json({ isSaved: true, apiKey: match[1].trim() });
+      // Verificamos si existe la variable AI_API_KEY y tiene algo asignado que no sea el placeholder
+      const keyMatch = envContent.match(/AI_API_KEY=(.+)/);
+      if (keyMatch) {
+        const apiKey = keyMatch[1].trim();
+        if (apiKey.length > 0 && apiKey !== 'your_api_key_here') {
+          const modelMatch = envContent.match(/AI_MODEL=(.+)/);
+          const model = modelMatch ? modelMatch[1].trim() : AI_CONFIG.DEFAULT_MODEL;
+          return NextResponse.json({ isSaved: true, apiKey, model });
+        }
       }
     }
     return NextResponse.json({ isSaved: false });
@@ -21,7 +27,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const { apiKey } = await request.json();
+    const { apiKey, model } = await request.json();
     if (!apiKey) {
       return NextResponse.json({ error: 'La clave no puede estar vacía' }, { status: 400 });
     }
@@ -40,13 +46,27 @@ export async function POST(request: Request) {
       envContent += `\nAI_API_KEY=${apiKey}\n`;
     }
 
-    // Asegurarse de tener la URL base y modelo si no existen
+    // Mutar en memoria para efecto inmediato
+    process.env.AI_API_KEY = apiKey;
+
+    // Asegurarse de tener la URL base
     if (!envContent.includes('AI_BASE_URL=')) {
-      envContent += `AI_BASE_URL=https://openrouter.ai/api/v1\n`;
+      envContent += `AI_BASE_URL=${AI_CONFIG.BASE_URL}\n`;
     }
-    if (!envContent.includes('AI_MODEL=')) {
-      envContent += `AI_MODEL=deepseek/deepseek-chat\n`;
+    process.env.AI_BASE_URL = AI_CONFIG.BASE_URL;
+
+    // Determinar el modelo a guardar
+    const modelToUse = model || AI_CONFIG.DEFAULT_MODEL;
+
+    // Reemplazar o agregar el modelo
+    if (envContent.includes('AI_MODEL=')) {
+      envContent = envContent.replace(/AI_MODEL=.*/g, `AI_MODEL=${modelToUse}`);
+    } else {
+      envContent += `AI_MODEL=${modelToUse}\n`;
     }
+
+    // Mutar modelo en memoria
+    process.env.AI_MODEL = modelToUse;
 
     fs.writeFileSync(envPath, envContent.trim() + '\n');
 

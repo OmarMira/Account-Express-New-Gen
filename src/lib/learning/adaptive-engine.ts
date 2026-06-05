@@ -1,6 +1,16 @@
-import { readFileSync, appendFileSync, existsSync, mkdirSync } from 'fs';
-import { join } from 'path';
+import {
+  readFileSync,
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  statSync,
+  renameSync,
+  writeFileSync,
+  readdirSync,
+} from 'fs';
+import { join, dirname } from 'path';
 import { createHash } from 'crypto';
+import { sanitizeDescriptionForAdaptive as sanitizeDescription } from '@/lib/services/pattern-normalizer';
 
 export type FeedbackEvent = {
   timestamp: string;
@@ -18,25 +28,26 @@ export async function recordFeedback(event: FeedbackEvent) {
   const logPath = join(process.cwd(), config.feedbackLogPath);
 
   mkdirSync(join(process.cwd(), 'rules'), { recursive: true });
-  appendFileSync(logPath, JSON.stringify(event) + '\n', 'utf-8');
-}
 
-export function sanitizeDescription(desc: string, config: any): string {
-  let cleaned = desc.toLowerCase().trim();
-
-  // Apply configured noise sanitizers
-  if (config.sanitizeNoise) {
-    for (const pattern of Object.values(config.sanitizeNoise)) {
-      const rx = new RegExp(pattern as string, 'gi');
-      cleaned = cleaned.replace(rx, ' ');
+  // Rotate log if it exceeds 5MB
+  if (existsSync(logPath)) {
+    try {
+      const stats = statSync(logPath);
+      const maxSize = 5 * 1024 * 1024; // 5MB
+      if (stats.size > maxSize) {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const dir = dirname(logPath);
+        const archivePath = join(dir, `learning-events-archive-${timestamp}.jsonl`);
+        renameSync(logPath, archivePath);
+        // Create new empty active log
+        writeFileSync(logPath, '', 'utf-8');
+      }
+    } catch (err) {
+      // Ignore rotation errors to avoid failing the record
     }
   }
 
-  // Remove ignoreStopWords and clean spacing
-  const words = cleaned.split(/\s+/).filter(Boolean);
-  const filtered = words.filter((w) => !config.patternGeneration.ignoreStopWords.includes(w));
-
-  return filtered.join(' ').trim();
+  appendFileSync(logPath, JSON.stringify(event) + '\n', 'utf-8');
 }
 
 export function generateCandidateRules(companyId: string) {
@@ -44,11 +55,59 @@ export function generateCandidateRules(companyId: string) {
   const config = JSON.parse(readFileSync(configPath, 'utf-8'));
   const logPath = join(process.cwd(), config.feedbackLogPath);
 
-  if (!existsSync(logPath)) return [];
+  const allEvents: FeedbackEvent[] = [];
 
-  const lines = readFileSync(logPath, 'utf-8').trim().split('\n').filter(Boolean);
-  const events: FeedbackEvent[] = lines.map((l) => JSON.parse(l));
-  const companyEvents = events.filter((e) => e.companyId === companyId);
+  // Read active log
+  if (existsSync(logPath)) {
+    const lines = readFileSync(logPath, 'utf-8').trim().split('\n').filter(Boolean);
+    for (const line of lines) {
+      try {
+        allEvents.push(JSON.parse(line));
+      } catch (e) {
+        // Ignore parse error on single line
+      }
+    }
+  }
+
+  // Scan and read rotated archives in the last 30 days
+  const logDir = dirname(logPath);
+  if (existsSync(logDir)) {
+    try {
+      const files = readdirSync(logDir);
+      const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+
+      for (const file of files) {
+        if (file.startsWith('learning-events-archive-') && file.endsWith('.jsonl')) {
+          const filePath = join(logDir, file);
+          try {
+            const stats = statSync(filePath);
+            const createdTime =
+              stats.birthtimeMs ||
+              stats.birthtime?.getTime() ||
+              stats.mtimeMs ||
+              stats.mtime?.getTime() ||
+              Date.now();
+            if (createdTime >= thirtyDaysAgo) {
+              const lines = readFileSync(filePath, 'utf-8').trim().split('\n').filter(Boolean);
+              for (const line of lines) {
+                try {
+                  allEvents.push(JSON.parse(line));
+                } catch (e) {
+                  // Ignore parse error
+                }
+              }
+            }
+          } catch (err) {
+            // Ignore stats/read issues
+          }
+        }
+      }
+    } catch (err) {
+      // Ignore readdir issues
+    }
+  }
+
+  const companyEvents = allEvents.filter((e) => e.companyId === companyId);
 
   // Group by sanitized pattern
   const patternGroups: Record<string, { events: FeedbackEvent[]; count: number }> = {};

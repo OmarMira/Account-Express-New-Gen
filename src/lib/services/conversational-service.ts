@@ -97,56 +97,77 @@ export async function parseConversationalContext(
 
   // Intento con IA externa
   if (apiKey && baseUrl && model) {
+    const modelsToTry = [model];
+    if (model === 'openrouter/free') {
+      modelsToTry.push('google/gemini-2.5-flash:free');
+      modelsToTry.push('qwen/qwen-2.5-72b-instruct:free');
+    }
+
+    const configPath = join(process.cwd(), 'rules/assistant-config.json');
+    let assistantConfig: any = {};
     try {
-      const configPath = join(process.cwd(), 'rules/assistant-config.json');
-      const assistantConfig = JSON.parse(readFileSync(configPath, 'utf-8'));
+      assistantConfig = JSON.parse(readFileSync(configPath, 'utf-8'));
+    } catch {}
 
-      const response = await fetch(`${baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model,
-          temperature: assistantConfig.temperature ?? 0.1,
-          max_tokens: assistantConfig.maxTokens ?? 300,
-          response_format: { type: 'json_object' },
-          messages: [
-            { role: 'system', content: assistantConfig.systemInstruction },
-            {
-              role: 'user',
-              content: `Entidad: "${pattern}"\nDescripción del usuario: "${userInput}"\nRetorna solo el objeto JSON.`,
-            },
-          ],
-        }),
-      });
+    for (const currentModel of modelsToTry) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000); // 8s timeout per model
 
-      if (response.ok) {
-        const resData = await response.json();
-        const content = resData.choices?.[0]?.message?.content;
-        if (content) {
-          parsed = JSON.parse(content);
-
-          // 🔍 AUDITORÍA: Registrar respuesta cruda de IA externa
-          if (userId) {
-            safeAuditLog({
-              companyId,
-              userId,
-              action: 'AI_EXTERNAL_RESPONSE_RECEIVED',
-              entity: 'EntityContext',
-              details: {
-                pattern,
-                userInput,
-                aiResponse: parsed,
-                timestamp: new Date().toISOString(),
+      try {
+        const response = await fetch(`${baseUrl}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`,
+            'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+          },
+          body: JSON.stringify({
+            model: currentModel,
+            temperature: assistantConfig.temperature ?? 0.1,
+            max_tokens: assistantConfig.maxTokens ?? 300,
+            response_format: { type: 'json_object' },
+            messages: [
+              { role: 'system', content: assistantConfig.systemInstruction },
+              {
+                role: 'user',
+                content: `Entidad: "${pattern}"\nDescripción del usuario: "${userInput}"\nRetorna solo el objeto JSON.`,
               },
-            }).catch((e) => console.warn('[AI AUDIT LOG FAIL]', e));
+            ],
+          }),
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeout);
+
+        if (response.ok) {
+          const resData = await response.json();
+          const content = resData.choices?.[0]?.message?.content;
+          if (content) {
+            parsed = JSON.parse(content);
+            if (parsed && parsed.role && parsed.glAccountCode) {
+              // 🔍 AUDITORÍA: Registrar respuesta de IA externa
+              if (userId) {
+                safeAuditLog({
+                  companyId,
+                  userId,
+                  action: 'AI_EXTERNAL_RESPONSE_RECEIVED',
+                  entity: 'EntityContext',
+                  details: {
+                    pattern,
+                    userInput,
+                    aiResponse: parsed,
+                    timestamp: new Date().toISOString(),
+                  },
+                }).catch((e) => console.warn('[AI AUDIT LOG FAIL]', e));
+              }
+              break; // Success! Break out of the model loop
+            }
           }
         }
+      } catch (err) {
+        clearTimeout(timeout);
+        console.warn(`[CONVERSATIONAL PARSE AI FAIL FOR MODEL ${currentModel}]`, err);
       }
-    } catch (err) {
-      console.warn('[CONVERSATIONAL PARSE AI FAIL, FALLING BACK]', err);
     }
   }
 
@@ -192,6 +213,11 @@ export async function parseConversationalContext(
     }
   }
 
+  let conditions = parsed.conditions;
+  if (!conditions || !Array.isArray(conditions) || conditions.length === 0) {
+    conditions = [{ field: 'description', operator: 'contains', value: pattern }];
+  }
+
   return {
     role,
     glAccountCode,
@@ -202,6 +228,6 @@ export async function parseConversationalContext(
       code: glAccountCode,
       name: glAccountName,
     },
-    conditions: parsed.conditions || null,
+    conditions,
   };
 }

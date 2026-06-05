@@ -59,6 +59,7 @@ model Company {
   reconciliationPeriods ReconciliationPeriod[]
   auditLogs            AuditLog[]
   entityContexts       EntityContext[]
+  systemMemories       SystemMemory[]
 }
 
 model CompanyMember {
@@ -328,5 +329,26 @@ model EntityContext {
 
   @@unique([companyId, pattern])
   @@index([companyId])
+}
+
+model SystemMemory {
+  id             String    @id @default(cuid())
+  companyId      String
+  type           String    // 'preference' | 'decision' | 'fact' | 'rule_context'
+  title          String
+  content        String
+  keywords       String    // CSV: "omar,mira,socio"
+  importance     Int       @default(5) // Prioridad: escala 1 a 10 (10 = crítico)
+  accessCount    Int       @default(0) // Contador de lecturas
+  lastAccessedAt DateTime? // Fecha de última lectura para frescura
+  embedding      String?   // Reservado para Level 2 (JSON String de float[])
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  company        Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([type])
+  @@index([importance])
 }
 

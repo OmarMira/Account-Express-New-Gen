@@ -2,12 +2,26 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
+import { AI_CONFIG } from '@/lib/constants/ai-config';
+import { createAuditLogWithRetry } from '@/lib/audit';
+import { extractKeywords } from '@/lib/memory/keyword-extractor';
+import { join } from 'path';
+import { readFileSync, existsSync } from 'fs';
 
 // ─── Request schema ─────────────────────────────────────────────────
 const RequestBodySchema = z.object({
   message: z.string().min(1, 'Message is required'),
   mode: z.enum(['chat', 'create-rule']).default('chat'),
   companyId: z.string().optional(),
+  history: z
+    .array(
+      z.object({
+        role: z.enum(['user', 'assistant', 'system']),
+        content: z.string(),
+      }),
+    )
+    .optional(),
+  isWarmup: z.boolean().optional(),
 });
 
 // ─── AI response schema ─────────────────────────────────────────────
@@ -30,22 +44,28 @@ const AIResponseSchema = z.object({
   choices: z.array(AIChoiceSchema).optional(),
 });
 
-// ─── Parsed rule schema ─────────────────────────────────────────────
-const ConditionTypeSchema = z.enum([
-  'contains',
-  'starts_with',
-  'ends_with',
-  'equals',
-  'amount_greater',
-  'amount_less',
-]);
-const ParsedRuleSchema = z.object({
-  name: z.string().min(1),
-  conditionType: ConditionTypeSchema,
-  conditionValue: z.union([z.string(), z.number()]),
+// ─── Parsed rule schema V2 ──────────────────────────────────────────
+const ConditionV2Schema = z.object({
+  field: z.enum(['description', 'amount']),
+  operator: z.enum([
+    'contains',
+    'starts_with',
+    'ends_with',
+    'equals',
+    'amount_greater',
+    'amount_less',
+  ]),
+  value: z.union([z.string(), z.number()]),
+});
+
+const ParsedRuleV2Schema = z.object({
+  name: z.string().default(''),
+  conditions: z.array(ConditionV2Schema).default([]),
+  debitGlAccountName: z.string().optional().nullable(),
+  creditGlAccountName: z.string().optional().nullable(),
+  glAccountName: z.string().optional().nullable(),
   transactionDirection: z.enum(['any', 'debit', 'credit']).default('any'),
-  glAccountName: z.string().default(''),
-  priority: z.number().int().min(0).max(20).default(10),
+  priority: z.coerce.number().int().min(0).max(20).default(10),
 });
 
 // ─── TOOLS definition ───────────────────────────────────────────────
@@ -149,10 +169,36 @@ const TOOLS = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'save_system_memory',
+      description:
+        'Guarda un hecho importante, preferencia de usuario o decisión contable en la memoria a largo plazo del sistema para recordar en futuras sesiones.',
+      parameters: {
+        type: 'object',
+        properties: {
+          title: {
+            type: 'string',
+            description: 'Título corto de la memoria (ej: Rol de socio de Omar Mira)',
+          },
+          content: { type: 'string', description: 'Descripción detallada del hecho o preferencia' },
+          type: { type: 'string', enum: ['preference', 'decision', 'fact', 'rule_context'] },
+          keywords: {
+            type: 'array',
+            items: { type: 'string' },
+            description:
+              'Palabras clave importantes para la recuperación posterior (ej: ["omar", "mira", "socio"])',
+          },
+        },
+        required: ['title', 'content', 'type', 'keywords'],
+      },
+    },
+  },
 ];
 
 // Local execution of DB queries using Prisma
-async function executeTool(name: string, args: any, companyId: string) {
+async function executeTool(name: string, args: any, companyId: string, userId?: string) {
   try {
     switch (name) {
       case 'get_company_summary': {
@@ -314,6 +360,78 @@ async function executeTool(name: string, args: any, companyId: string) {
         };
       }
 
+      case 'save_system_memory': {
+        const { title, content, type, keywords } = args;
+        const cleanKeywordsList = keywords.map((k: string) => k.toLowerCase().trim());
+        const cleanKeywordsCsv = cleanKeywordsList.join(',');
+
+        // Deduplicación por título o palabras clave coincidentes
+        const existing = await db.systemMemory.findFirst({
+          where: {
+            companyId,
+            type,
+            OR: [
+              { title: { contains: title } },
+              { keywords: { contains: cleanKeywordsList[0] || '___' } },
+            ],
+          },
+        });
+
+        let memory;
+        let action;
+
+        if (existing) {
+          // Unir palabras clave únicas
+          const oldKeys = existing.keywords.split(',');
+          const mergedKeys = [...new Set([...oldKeys, ...cleanKeywordsList])].join(',');
+          memory = await db.systemMemory.update({
+            where: { id: existing.id },
+            data: {
+              content,
+              keywords: mergedKeys,
+              importance: Math.min(10, existing.importance + 1), // Refuerzo de importancia
+              updatedAt: new Date(),
+            },
+          });
+          action = 'SYSTEM_MEMORY_UPDATED';
+        } else {
+          memory = await db.systemMemory.create({
+            data: {
+              companyId,
+              title,
+              content,
+              type,
+              keywords: cleanKeywordsCsv,
+              importance: 5,
+            },
+          });
+          action = 'SYSTEM_MEMORY_CREATED';
+        }
+
+        // Registro en log de auditoría del sistema
+        if (userId) {
+          try {
+            await createAuditLogWithRetry({
+              companyId,
+              userId,
+              action,
+              entity: 'SystemMemory',
+              entityId: memory.id,
+              details: JSON.stringify({ title, type, keywords: cleanKeywordsCsv }),
+            });
+          } catch (auditErr) {
+            console.error('[FAILED TO WRITE SYSTEM MEMORY AUDIT LOG]', auditErr);
+          }
+        }
+
+        return {
+          success: true,
+          message: existing
+            ? `Memoria "${title}" actualizada y reforzada.`
+            : `Memoria "${title}" guardada exitosamente.`,
+        };
+      }
+
       default:
         return { error: `Tool ${name} not found` };
     }
@@ -334,11 +452,23 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
-    const { message, mode, companyId: bodyCompanyId } = parsed.data;
+    const { message, mode, companyId: bodyCompanyId, history, isWarmup } = parsed.data;
 
     const userId = await getSessionUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (isWarmup) {
+      try {
+        console.log('[AI WARMUP] Starting LLM warmup call...');
+        await callAI([{ role: 'user', content: 'Hola' }]);
+        console.log('[AI WARMUP] Warmup call completed successfully.');
+        return NextResponse.json({ reply: 'Warmup completed successfully' });
+      } catch (err: any) {
+        console.error('[AI WARMUP ERROR] Failed to warm up LLM connection:', err.message || err);
+        return NextResponse.json({ error: 'Warmup failed' }, { status: 502 });
+      }
     }
 
     let companyId = bodyCompanyId;
@@ -360,9 +490,9 @@ export async function POST(request: NextRequest) {
     }
 
     if (mode === 'create-rule') {
-      return handleCreateRule(message);
+      return handleCreateRule(message, history, companyId, userId);
     }
-    return handleChat(message, companyId);
+    return handleChat(message, history, companyId, userId);
   } catch (error) {
     console.error('[AI ASSISTANT ERROR]', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -370,49 +500,197 @@ export async function POST(request: NextRequest) {
 }
 
 // Helper to call the LLM via fetch with timeout, tool definition and error handling
-async function callAI(messages: { role: string; content: string }[], tools?: any[]) {
+async function callAI(
+  messages: { role: string; content: string }[],
+  tools?: any[],
+  requireJson?: boolean,
+) {
   const apiKey = process.env.AI_API_KEY;
-  const baseUrl = process.env.AI_BASE_URL;
-  const model = process.env.AI_MODEL;
-  if (!apiKey || !baseUrl || !model) {
+  const baseUrl = process.env.AI_BASE_URL || AI_CONFIG.BASE_URL;
+  let configuredModel = process.env.AI_MODEL;
+  if (!configuredModel || configuredModel === AI_CONFIG.LEGACY_MODEL) {
+    configuredModel = AI_CONFIG.DEFAULT_MODEL;
+  }
+  if (!apiKey || !baseUrl || !configuredModel) {
     throw new Error('AI configuration missing');
   }
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 12000); // 12s timeout for tool calling
+
+  // Crear la lista de modelos a intentar en orden de prioridad
+  const modelsToTry: string[] = [];
+
+  // Si el modelo configurado es "openrouter/free", priorizamos modelos estables e instructivos de antemano
+  if (configuredModel === 'openrouter/free') {
+    modelsToTry.push('openrouter/free');
+    modelsToTry.push('google/gemini-2.5-flash:free');
+    modelsToTry.push('qwen/qwen-2.5-72b-instruct:free');
+  } else {
+    modelsToTry.push(configuredModel);
+    if (configuredModel.includes(':free')) {
+      const fallbacks = [
+        'google/gemini-2.5-flash:free',
+        'qwen/qwen-2.5-72b-instruct:free',
+        'openrouter/free',
+      ];
+      for (const f of fallbacks) {
+        if (!modelsToTry.includes(f)) {
+          modelsToTry.push(f);
+        }
+      }
+    }
+  }
+
+  let lastError: any = null;
+
+  for (let m = 0; m < modelsToTry.length; m++) {
+    const currentModel = modelsToTry[m];
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12000); // 12s timeout por intento
+
+    try {
+      const body: any = { model: currentModel, messages };
+      if (tools && tools.length > 0) {
+        body.tools = tools;
+      }
+
+      console.log(`[AI ASSISTANT] Intentando llamar a modelo: ${currentModel}`);
+
+      const response = await fetch(`${baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeout);
+
+      if (response.status === 429) {
+        console.warn(
+          `[AI ASSISTANT] Modelo ${currentModel} saturado (Rate Limit 429). Intentando el siguiente en la lista...`,
+        );
+        lastError = new Error(`AI service error 429 for model ${currentModel}`);
+        continue;
+      }
+
+      if (!response.ok) {
+        const txt = await response.text();
+        console.error(
+          `[AI ASSISTANT] Error de servicio ${response.status} en modelo ${currentModel}: ${txt}`,
+        );
+        lastError = new Error(`AI service error ${response.status}: ${txt}`);
+        continue;
+      }
+
+      const data = await response.json();
+      const parsed = AIResponseSchema.safeParse(data);
+      if (!parsed.success) {
+        console.error('[AI RESPONSE PARSE ERROR]', parsed.error);
+        throw new Error('Invalid AI response format');
+      }
+
+      const content = parsed.data.choices?.[0]?.message?.content ?? '';
+
+      // Si requerimos JSON estructurado (por ej. para reglas), validamos que no devuelva logs de seguridad o texto plano vacío
+      if (requireJson) {
+        const hasJson = content.includes('{') && content.includes('}');
+        const isSafetyLog =
+          content.includes('User Safety:') || content.includes('Response Safety:');
+        if (!hasJson || isSafetyLog) {
+          throw new Error(
+            `El modelo ${currentModel} devolvió texto plano o log de seguridad en lugar de JSON: "${content.substring(0, 100)}"`,
+          );
+        }
+      }
+
+      console.log(`[AI ASSISTANT] Respuesta exitosa de OpenRouter usando: ${currentModel}`);
+      return parsed.data;
+    } catch (err: any) {
+      clearTimeout(timeout);
+      console.error(`[AI ASSISTANT] Excepción con el modelo ${currentModel}:`, err.message || err);
+      lastError = err;
+      continue;
+    }
+  }
+
+  throw lastError || new Error('Todos los modelos de IA fallaron.');
+}
+
+// Helper to retrieve matching memories from SQLite using keywords and scoring
+async function retrieveMemories(
+  message: string,
+  companyId: string,
+  locale: 'es' | 'en' = 'es',
+): Promise<string> {
+  const configPath = join(process.cwd(), 'rules/memory-config.json');
+  if (!existsSync(configPath)) return '';
+
   try {
-    const body: any = { model, messages };
-    if (tools && tools.length > 0) {
-      body.tools = tools;
+    const config = JSON.parse(readFileSync(configPath, 'utf-8'));
+    const keywords = extractKeywords(message, locale);
+    if (keywords.length === 0) return '';
+
+    // Expand search keywords to include singular forms for words ending with 's'
+    const searchKeywords = [...keywords];
+    for (const k of keywords) {
+      if (k.endsWith('s') && k.length > 3) {
+        const singular = k.slice(0, -1);
+        if (!searchKeywords.includes(singular)) {
+          searchKeywords.push(singular);
+        }
+      }
     }
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
+
+    // Búsqueda eficiente usando cláusulas contains/OR en Prisma para SQLite
+    const OR = searchKeywords.map((k) => ({
+      keywords: {
+        contains: k,
       },
-      body: JSON.stringify(body),
-      signal: controller.signal,
+    }));
+
+    const memories = await db.systemMemory.findMany({
+      where: {
+        companyId,
+        OR,
+      },
+      take: config.maxMemoriesToInject || 5,
+      orderBy: [{ importance: 'desc' }, { updatedAt: 'desc' }],
     });
-    clearTimeout(timeout);
-    if (!response.ok) {
-      const txt = await response.text();
-      throw new Error(`AI service error ${response.status}: ${txt}`);
-    }
-    const data = await response.json();
-    const parsed = AIResponseSchema.safeParse(data);
-    if (!parsed.success) {
-      console.error('[AI RESPONSE PARSE ERROR]', parsed.error);
-      throw new Error('Invalid AI response format');
-    }
-    return parsed.data;
+
+    if (memories.length === 0) return '';
+
+    // Actualizar lastAccessedAt y accessCount de manera asíncrona sin bloquear la respuesta principal
+    db.systemMemory
+      .updateMany({
+        where: {
+          id: {
+            in: memories.map((m) => m.id),
+          },
+        },
+        data: {
+          lastAccessedAt: new Date(),
+          accessCount: {
+            increment: 1,
+          },
+        },
+      })
+      .catch((err) => console.error('[MEMORY ACCESS UPDATE ERROR]', err));
+
+    const formatted = memories
+      .map((m) => `- [${m.type.toUpperCase()}] ${m.title}: ${m.content}`)
+      .join('\n');
+
+    return `\n## Contexto Histórico del Sistema (Hechos/Preferencias Recordadas):\n${formatted}\n`;
   } catch (err) {
-    clearTimeout(timeout);
-    throw err;
+    console.error('[RETRIEVE MEMORIES ERROR]', err);
+    return '';
   }
 }
 
 // ─── Chat Mode ─────────────────────────────────────────────────────
-async function handleChat(message: string, companyId?: string) {
+async function handleChat(message: string, history?: any[], companyId?: string, userId?: string) {
   const systemPrompt = `You are "Asistente Contable", a helpful and professional AI accounting assistant for the AccountExpress platform.
 
 LANGUAGE RULES:
@@ -448,10 +726,28 @@ YOUR STYLE:
 - Format responses with clear structure when needed (bullet points, numbered lists)
 - Keep responses concise but thorough.`;
 
-  const messages: any[] = [
-    { role: 'system', content: systemPrompt },
-    { role: 'user', content: message },
-  ];
+  const isEnglish =
+    /hello|hi|rule|amount|debit|credit|account|company|settings|reconcile|verify|archive|onboard/i.test(
+      message,
+    );
+  const locale = isEnglish ? 'en' : 'es';
+  const memoriesContext = companyId ? await retrieveMemories(message, companyId, locale) : '';
+  const finalSystemPrompt = systemPrompt + memoriesContext;
+
+  const messages: any[] = [{ role: 'system', content: finalSystemPrompt }];
+
+  if (history && Array.isArray(history)) {
+    for (const h of history) {
+      if (h.role && h.content) {
+        messages.push({ role: h.role, content: h.content });
+      }
+    }
+  }
+
+  const lastHistoryMsg = history && history.length > 0 ? history[history.length - 1] : null;
+  if (!lastHistoryMsg || lastHistoryMsg.content !== message || lastHistoryMsg.role !== 'user') {
+    messages.push({ role: 'user', content: message });
+  }
 
   for (let i = 0; i < 5; i++) {
     const response = await callAI(messages, TOOLS);
@@ -482,7 +778,7 @@ YOUR STYLE:
           console.error('[Failed to parse tool arguments]', e);
         }
 
-        const result = await executeTool(toolCall.function.name, args, companyId);
+        const result = await executeTool(toolCall.function.name, args, companyId, userId);
         messages.push({
           role: 'tool',
           tool_call_id: toolCall.id,
@@ -502,65 +798,160 @@ YOUR STYLE:
 }
 
 // ─── Create Rule Mode ──────────────────────────────────────────────
-async function handleCreateRule(message: string) {
-  const systemPrompt = `You are a rule parser for the AccountExpress accounting platform. The user will describe a bank categorization rule in natural language. You must parse it into a structured JSON object.
+async function handleCreateRule(
+  message: string,
+  history?: any[],
+  companyId?: string,
+  userId?: string,
+) {
+  // 1. Obtener el plan de cuentas de la empresa para inyectarlo en el prompt del sistema
+  let glAccountsList = '';
+  if (companyId) {
+    try {
+      const glAccounts = await db.glAccount.findMany({
+        where: { companyId, isActive: true },
+        select: { code: true, name: true, accountType: true },
+        orderBy: { code: 'asc' },
+      });
+      glAccountsList = glAccounts
+        .map((a) => `- [${a.code}] ${a.name} (${a.accountType})`)
+        .join('\n');
+    } catch (e) {
+      console.error('[Error fetching GL accounts for rule builder prompt]', e);
+    }
+  }
 
-VALID conditionType values:
-- "contains" (description contains text)
-- "starts_with" (description starts with text)
-- "ends_with" (description ends with text)
-- "equals" (description exactly matches text)
-- "amount_greater" (amount is greater than value)
-- "amount_less" (amount is less than value)
+  const systemPrompt = `You are a bank categorization rule builder for the AccountExpress platform.
+Your task is to parse user descriptions of rules (or conversations about rules) and respond with a structured JSON object.
 
-VALID transactionDirection values:
-- "debit" (outflow/payment)
-- "credit" (inflow/deposit)
-- "any" (both directions)
+We support advanced V2 rules with multiple conditions (using JSON logic) and bifurcated account matching (different accounts for incoming vs outgoing transactions).
+
+AVAILABLE GL ACCOUNTS IN THE PLAN OF ACCOUNTS:
+${glAccountsList || 'No plan of accounts loaded.'}
+
+JSON STRUCTURE TO RETURN:
+{
+  "name": "string (descriptive name for the rule)",
+  "isComplete": true/false, // set to true if we have all needed information (conditions, and accounts to assign). Set to false if we need to ask the user a clarification question.
+  "clarificationQuestion": "string (friendly question in Spanish if isComplete is false, asking for the missing info and suggesting matching accounts)",
+  "conditions": [
+    {
+      "field": "description" | "amount",
+      "operator": "contains" | "starts_with" | "ends_with" | "equals" | "amount_greater" | "amount_less",
+      "value": "string | number"
+    }
+  ],
+  "debitGlAccountName": "string (account name from the available list to assign for debits/withdrawals/outflows. Optional if isComplete is false)",
+  "creditGlAccountName": "string (account name from the available list to assign for credits/deposits/inflows. Optional if isComplete is false)",
+  "glAccountName": "string (account name to assign for both directions if they are the same. Optional if isComplete is false)",
+  "transactionDirection": "any" | "debit" | "credit",
+  "priority": number (integer between 0 and 20, default 10)
+}
 
 RULES:
-1. Parse the user's description to extract: name, conditionType, conditionValue, transactionDirection, glAccountName, priority
-2. "priority" should be an integer from 0 to 20 (default 10 if not specified)
-3. "name" should be a descriptive name for the rule
-4. "conditionValue" is the text/number to match against
-5. "glAccountName" is the GL account name to assign
-6. Respond ONLY with a valid JSON object, no markdown, no explanation
-7. If a field cannot be determined, use a reasonable default
+1. If the user does not specify a target GL account name, search the Plan of Accounts listed above for potential matches. Set "isComplete": false, and ask a clarification question in "clarificationQuestion" (in Spanish) suggesting 2-3 logical matches from the available list.
+2. Pay close attention to double quotes (") in the user input. Words or phrases wrapped in double quotes represent the precise values for conditions (e.g. description matches, name matches, etc.). Always extract these exact quoted strings as the "value" in the conditions array.
+3. BIFURCATED RULES (debit vs credit): If the user specifies different accounts for positive/deposits vs negative/withdrawals (e.g. "si el importe es positivo se considera aporte... y si es negativo préstamo..."), DO NOT create conditions checking the amount (such as greater than or less than 0). Instead, simply create the description conditions (e.g. description contains the name) and assign the different accounts to "debitGlAccountName" (for negative/withdrawals) and "creditGlAccountName" (for positive/deposits).
+4. ALLOWED OPERATORS: You can only use the following exact operator strings: 'contains', 'starts_with', 'ends_with', 'equals', 'amount_greater', 'amount_less'. Do NOT use 'greater_than', 'less_than', or any other value.
+5. STRICT JSON VALIDITY: Your response must be 100% valid JSON. Do NOT duplicate keys (do NOT output multiple separate "conditions" keys in the same object). Do NOT output invalid syntax like "value": "A" or "B". If a field has multiple alternatives, select the most important one or create separate conditions inside the array.
+6. You MUST respond ONLY with the JSON object. Do not include markdown codeblocks (no \`\`\`), no extra text outside the JSON.
+7. If the user is responding to your previous clarification question, analyze the conversational history to resolve the missing fields.
 
-EXAMPLE INPUT: "Contiene 'AMAZON', cuenta 'Office Supplies', prioridad 5"
-EXAMPLE OUTPUT:
-{"name":"AMAZON - Office Supplies","conditionType":"contains","conditionValue":"AMAZON","transactionDirection":"any","glAccountName":"Office Supplies","priority":5}
+EXAMPLE OF INCOMPLETE RULE RESPONSE:
+{"name":"Laura Quijano Rule","isComplete":false,"clarificationQuestion":"Veo que querés crear una regla para Laura Quijano, pero no especificaste la cuenta contable. ¿Deberíamos registrar las transacciones en 'Préstamos de Socios' o en 'Capital Social'?","conditions":[{"field":"description","operator":"contains","value":"Laura Quijano"}],"transactionDirection":"any","priority":10}
 
-EXAMPLE INPUT: "Si el concepto comienza con 'RENTA', asignar a Rent Expense, prioridad 3"
-EXAMPLE OUTPUT:
-{"name":"RENTA - Rent Expense","conditionType":"starts_with","conditionValue":"RENTA","transactionDirection":"any","glAccountName":"Rent Expense","priority":3}
+EXAMPLE OF COMPLETED BIFURCATED RULE RESPONSE:
+{"name":"Laura Quijano - Zelle","isComplete":true,"conditions":[{"field":"description","operator":"contains","value":"Laura Quijano"},{"field":"description","operator":"contains","value":"Zelle"}],"debitGlAccountName":"Préstamos de Socios","creditGlAccountName":"Capital Social","transactionDirection":"any","priority":10}`;
 
-Respond ONLY with the JSON object.`;
-  const aiData = await callAI([
-    { role: 'system', content: systemPrompt },
-    { role: 'user', content: message },
-  ]);
-  const rawReply = aiData.choices?.[0]?.message?.content ?? '';
-  let parsedRule: any = null;
-  let reply = rawReply;
+  const isEnglish =
+    /hello|hi|rule|amount|debit|credit|account|company|settings|reconcile|verify|archive|onboard/i.test(
+      message,
+    );
+  const locale = isEnglish ? 'en' : 'es';
+  const memoriesContext = companyId ? await retrieveMemories(message, companyId, locale) : '';
+  const finalSystemPrompt = systemPrompt + memoriesContext;
+
+  // Construir historial de mensajes para callAI
+  const apiMessages: { role: string; content: string }[] = [
+    { role: 'system', content: finalSystemPrompt },
+  ];
+
+  if (history && Array.isArray(history)) {
+    for (const h of history) {
+      if (h.role && h.content) {
+        apiMessages.push({ role: h.role, content: h.content });
+      }
+    }
+  }
+
+  // Añadir el mensaje final del usuario si no está en el history o para asegurar
+  const lastHistoryMsg = history && history.length > 0 ? history[history.length - 1] : null;
+  if (!lastHistoryMsg || lastHistoryMsg.content !== message || lastHistoryMsg.role !== 'user') {
+    apiMessages.push({ role: 'user', content: message });
+  }
+
+  let aiData;
   try {
-    const jsonMatch = rawReply.match(/```(?:json)?\s*([\s\S]*?)```/) ?? null;
-    const jsonStr = jsonMatch ? jsonMatch[1].trim() : rawReply.trim();
-    const jsonUnknown = JSON.parse(jsonStr);
-    const ruleResult = ParsedRuleSchema.safeParse(jsonUnknown);
+    aiData = await callAI(apiMessages, undefined, true);
+  } catch (aiError: any) {
+    console.error('[AI call failed in create-rule]', aiError.message);
+    return NextResponse.json({
+      reply:
+        '⚠️ El modelo de IA no respondió a tiempo. Por favor, intenta de nuevo en unos segundos.',
+      isComplete: false,
+    });
+  }
+
+  const rawReply = aiData.choices?.[0]?.message?.content ?? '';
+
+  let parsedRule: any = null;
+  let reply = '';
+  let isComplete = false;
+  let clarificationQuestion = '';
+
+  try {
+    // Limpieza de JSON flexible (por si la IA pone markdown o texto extra)
+    const jsonMatch = rawReply.match(/\{[\s\S]*\}/) ?? null;
+    const jsonStr = jsonMatch ? jsonMatch[0].trim() : rawReply.trim();
+    const parsedJson = JSON.parse(jsonStr);
+
+    isComplete = parsedJson.isComplete === true;
+    clarificationQuestion = parsedJson.clarificationQuestion || '';
+
+    // Validar esquema Zod tolerando coerción de prioridad a número
+    const ruleResult = ParsedRuleV2Schema.safeParse(parsedJson);
+
     if (ruleResult.success) {
       parsedRule = ruleResult.data;
-      reply = '✅ Regla analizada exitosamente. Revisa los campos y guarda la regla.';
+      if (isComplete) {
+        reply = '✅ Regla analizada exitosamente. Revisa los campos y guarda la regla.';
+      } else {
+        reply = clarificationQuestion || '⚠️ Necesito más detalles para poder crear la regla.';
+      }
     } else {
-      reply =
-        '⚠️ No se pudo interpretar completamente la regla. Por favor, verifica el formato e intenta de nuevo.\n\nFormato sugerido: \'Contiene "TEXTO", cuenta "Nombre de Cuenta", prioridad 5\'';
+      console.warn('[Zod validation failed for parsed rule]', ruleResult.error);
+      // If we extracted a clarification question before Zod failed, use it
+      if (clarificationQuestion) {
+        reply = clarificationQuestion;
+      } else {
+        reply =
+          '⚠️ No pude interpretar la respuesta. ¿Podrías reformular tu solicitud con más detalle?';
+      }
     }
-  } catch {
-    reply =
-      '⚠️ Error al analizar la regla. Por favor, describe la regla con más detalle.\n\nEjemplo: \'Contiene "AMAZON", cuenta "Office Supplies", prioridad 5\'';
+  } catch (e: any) {
+    console.error('[Error parsing rule JSON]', e, 'Raw reply was:', rawReply);
+    // If the AI returned plain text instead of JSON, use it as the reply
+    if (rawReply && rawReply.length > 10 && !rawReply.startsWith('{')) {
+      reply = rawReply;
+    } else {
+      reply = '⚠️ Error al analizar la regla. Por favor, describe la regla con más detalle.';
+    }
   }
+
   return NextResponse.json({
     reply,
+    isComplete,
+    rawJson: rawReply,
     ...(parsedRule ? { parsedRule } : {}),
   });
 }

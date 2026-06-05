@@ -42,6 +42,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    // Pre-resolve GL account IDs outside the transaction (read-only lookups)
     let resolvedDebitGlAccountId = debitGlAccountId || null;
     let resolvedCreditGlAccountId = creditGlAccountId || null;
 
@@ -59,130 +60,151 @@ export async function POST(request: NextRequest) {
       if (dbAcc) resolvedCreditGlAccountId = dbAcc.id;
     }
 
-    let legacyGlAccountId: string | null = null;
-
+    // Pre-resolve parent GL account for legacy path
+    let parentAccount: {
+      id: string;
+      code: string;
+      accountType: string;
+      normalBalance: string;
+    } | null = null;
     if (glAccountCode) {
-      // Find parent account
-      const parentAccount = await db.glAccount.findFirst({
+      parentAccount = await db.glAccount.findFirst({
         where: { companyId, code: glAccountCode, isActive: true },
       });
       if (!parentAccount) {
         return NextResponse.json({ error: 'Parent GL Account not found' }, { status: 400 });
       }
-
-      let finalGlAccountId = parentAccount.id;
-
-      if (createSubAccount && subAccountName?.trim()) {
-        // Find children under this parent to compute next code suffix
-        const siblings = await db.glAccount.findMany({
-          where: { companyId, parentId: parentAccount.id },
-          orderBy: { code: 'desc' },
-        });
-
-        let nextCode = `${parentAccount.code}-01`;
-        if (siblings.length > 0) {
-          const lastCode = siblings[0].code;
-          const parts = lastCode.split('-');
-          if (parts.length > 1) {
-            const suffixNum = parseInt(parts[parts.length - 1], 10) + 1;
-            const suffixStr = suffixNum.toString().padStart(2, '0');
-            nextCode = `${parentAccount.code}-${suffixStr}`;
-          }
-        }
-
-        // Create new sub-account
-        const subAccount = await db.glAccount.create({
-          data: {
-            companyId,
-            code: nextCode,
-            name: subAccountName.trim(),
-            accountType: parentAccount.accountType,
-            normalBalance: parentAccount.normalBalance,
-            parentId: parentAccount.id,
-            isActive: true,
-          },
-        });
-        finalGlAccountId = subAccount.id;
-      }
-
-      legacyGlAccountId = finalGlAccountId;
-
-      // Apply 3-way mapping logic to set bifurcated accounts if not explicitly set
-      if (!resolvedDebitGlAccountId && !resolvedCreditGlAccountId) {
-        const direction = lockedDirection || 'any';
-        if (direction === 'debit') {
-          resolvedDebitGlAccountId = finalGlAccountId;
-        } else if (direction === 'credit') {
-          resolvedCreditGlAccountId = finalGlAccountId;
-        } else {
-          resolvedDebitGlAccountId = finalGlAccountId;
-          resolvedCreditGlAccountId = finalGlAccountId;
-        }
-      }
     }
 
-    const defaultConditionType = pattern ? 'contains' : conditions?.[0]?.operator || 'contains';
-    const defaultConditionValue = pattern || conditions?.[0]?.value || '';
-
-    // Create Bank Matching Rule
-    const rule = await db.bankRule.create({
-      data: {
-        companyId,
-        name: body.name || `Regla Autogenerada: ${pattern || 'V2 Composite'}`,
-        conditionType: defaultConditionType,
-        conditionValue: defaultConditionValue,
-        transactionDirection: lockedDirection || 'any',
-        glAccountId: legacyGlAccountId,
-        conditions: conditions || null,
-        debitGlAccountId: resolvedDebitGlAccountId,
-        creditGlAccountId: resolvedCreditGlAccountId,
-        priority: body.priority || 10,
-        isActive: true,
-      },
-    });
-
-    // Upsert Entity Context if pattern and role are present
-    if (pattern && role && legacyGlAccountId) {
-      await db.entityContext.upsert({
-        where: {
-          companyId_pattern: {
-            companyId,
-            pattern,
-          },
-        },
-        update: {
-          role,
-          glAccountId: legacyGlAccountId,
-          source: 'user',
-        },
-        create: {
-          companyId,
-          pattern,
-          role,
-          glAccountId: legacyGlAccountId,
-          source: 'user',
-        },
+    // Pre-fetch siblings for sub-account code generation (read-only)
+    let siblings: { code: string }[] = [];
+    if (parentAccount && createSubAccount && subAccountName?.trim()) {
+      siblings = await db.glAccount.findMany({
+        where: { companyId, parentId: parentAccount.id },
+        orderBy: { code: 'desc' },
+        select: { code: true },
       });
     }
 
-    // Write Audit Log
-    await createAuditLogWithRetry({
-      companyId,
-      userId,
-      action: 'RULE_CREATED_WITH_CONTEXT',
-      entity: 'BankRule',
-      details: JSON.stringify({
-        ruleId: rule.id,
-        pattern,
-        lockedDirection,
-        glAccountId: legacyGlAccountId,
-        debitGlAccountId: resolvedDebitGlAccountId,
-        creditGlAccountId: resolvedCreditGlAccountId,
-        role,
-        createSubAccount,
-        subAccountName,
-      }),
+    // ─── Single atomic transaction ────────────────────────────────────
+    const rule = await db.$transaction(async (tx) => {
+      let legacyGlAccountId: string | null = null;
+
+      if (parentAccount) {
+        let finalGlAccountId = parentAccount.id;
+
+        if (createSubAccount && subAccountName?.trim()) {
+          let nextCode = `${parentAccount.code}-01`;
+          if (siblings.length > 0) {
+            const lastCode = siblings[0].code;
+            const parts = lastCode.split('-');
+            if (parts.length > 1) {
+              const suffixNum = parseInt(parts[parts.length - 1], 10) + 1;
+              const suffixStr = suffixNum.toString().padStart(2, '0');
+              nextCode = `${parentAccount.code}-${suffixStr}`;
+            }
+          }
+
+          // Create new sub-account inside transaction
+          const subAccount = await tx.glAccount.create({
+            data: {
+              companyId,
+              code: nextCode,
+              name: subAccountName.trim(),
+              accountType: parentAccount.accountType,
+              normalBalance: parentAccount.normalBalance,
+              parentId: parentAccount.id,
+              isActive: true,
+            },
+          });
+          finalGlAccountId = subAccount.id;
+        }
+
+        legacyGlAccountId = finalGlAccountId;
+
+        // Apply 3-way mapping logic to set bifurcated accounts if not explicitly set
+        if (!resolvedDebitGlAccountId && !resolvedCreditGlAccountId) {
+          const direction = lockedDirection || 'any';
+          if (direction === 'debit') {
+            resolvedDebitGlAccountId = finalGlAccountId;
+          } else if (direction === 'credit') {
+            resolvedCreditGlAccountId = finalGlAccountId;
+          } else {
+            resolvedDebitGlAccountId = finalGlAccountId;
+            resolvedCreditGlAccountId = finalGlAccountId;
+          }
+        }
+      }
+
+      const defaultConditionType = pattern ? 'contains' : conditions?.[0]?.operator || 'contains';
+      const defaultConditionValue = pattern || conditions?.[0]?.value || '';
+
+      // Create Bank Matching Rule inside transaction
+      const newRule = await tx.bankRule.create({
+        data: {
+          companyId,
+          name: body.name || `Regla Autogenerada: ${pattern || 'V2 Composite'}`,
+          conditionType: defaultConditionType,
+          conditionValue: defaultConditionValue,
+          transactionDirection: lockedDirection || 'any',
+          glAccountId: legacyGlAccountId,
+          conditions: conditions || null,
+          debitGlAccountId: resolvedDebitGlAccountId,
+          creditGlAccountId: resolvedCreditGlAccountId,
+          priority: body.priority || 10,
+          isActive: true,
+        },
+      });
+
+      // Upsert Entity Context inside transaction
+      if (pattern && role && legacyGlAccountId) {
+        await tx.entityContext.upsert({
+          where: {
+            companyId_pattern: {
+              companyId,
+              pattern,
+            },
+          },
+          update: {
+            role,
+            glAccountId: legacyGlAccountId,
+            source: 'user',
+          },
+          create: {
+            companyId,
+            pattern,
+            role,
+            glAccountId: legacyGlAccountId,
+            source: 'user',
+          },
+        });
+      }
+
+      // Write Audit Log inside transaction — if this throws, everything rolls back
+      await createAuditLogWithRetry(
+        {
+          companyId,
+          userId,
+          action: 'RULE_CREATED_WITH_CONTEXT',
+          entity: 'BankRule',
+          details: JSON.stringify({
+            ruleId: newRule.id,
+            pattern,
+            lockedDirection,
+            glAccountId: legacyGlAccountId,
+            debitGlAccountId: resolvedDebitGlAccountId,
+            creditGlAccountId: resolvedCreditGlAccountId,
+            role,
+            createSubAccount,
+            subAccountName,
+          }),
+        },
+        tx,
+      );
+
+      return newRule;
     });
+    // ─────────────────────────────────────────────────────────────────
 
     return NextResponse.json({ success: true, data: rule });
   } catch (error: any) {

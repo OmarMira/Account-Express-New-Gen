@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionUserId } from '@/lib/sessions';
 import { logger } from '@/lib/logger';
+import { createAuditLogWithRetry } from '@/lib/audit';
 
 // ─── GET /api/bank-rules ───────────────────────────────────────────
 // List bank rules for a company, sorted by priority. Includes GL account info.
@@ -26,27 +27,78 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const rules = await db.bankRule.findMany({
-    where: { companyId },
-    orderBy: { priority: 'asc' },
-    include: {
-      glAccount: {
-        select: { id: true, code: true, name: true, accountType: true },
-      },
-      _count: {
-        select: { transactions: true },
-      },
-    },
-  });
+  const pageParam = searchParams.get('page');
+  const limitParam = searchParams.get('limit');
+  const hasPagination = pageParam !== null || limitParam !== null;
 
-  const rulesWithCounts = rules.map((rule) => ({
-    ...rule,
-    createdAt: rule.createdAt.toISOString(),
-    updatedAt: rule.updatedAt.toISOString(),
-    _matchCount: rule._count.transactions,
-  }));
+  if (hasPagination) {
+    let page = parseInt(pageParam || '1', 10);
+    let limit = parseInt(limitParam || '10', 10);
+    if (isNaN(page) || page < 1) page = 1;
+    if (isNaN(limit) || limit < 1) limit = 10;
 
-  return NextResponse.json({ data: rulesWithCounts });
+    const total = await db.bankRule.count({
+      where: { companyId },
+    });
+
+    const skip = (page - 1) * limit;
+    const rules = await db.bankRule.findMany({
+      where: { companyId },
+      orderBy: { priority: 'asc' },
+      skip,
+      take: limit,
+      include: {
+        glAccount: {
+          select: { id: true, code: true, name: true, accountType: true },
+        },
+        _count: {
+          select: { transactions: true },
+        },
+      },
+    });
+
+    const rulesWithCounts = rules.map((rule) => ({
+      ...rule,
+      createdAt: rule.createdAt.toISOString(),
+      updatedAt: rule.updatedAt.toISOString(),
+      _matchCount: rule._count.transactions,
+    }));
+
+    const totalPages = Math.ceil(total / limit);
+
+    return NextResponse.json({
+      data: rulesWithCounts,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+      },
+    });
+  } else {
+    const rules = await db.bankRule.findMany({
+      where: { companyId },
+      orderBy: { priority: 'asc' },
+      take: 1000,
+      include: {
+        glAccount: {
+          select: { id: true, code: true, name: true, accountType: true },
+        },
+        _count: {
+          select: { transactions: true },
+        },
+      },
+    });
+
+    const rulesWithCounts = rules.map((rule) => ({
+      ...rule,
+      createdAt: rule.createdAt.toISOString(),
+      updatedAt: rule.updatedAt.toISOString(),
+      _matchCount: rule._count.transactions,
+    }));
+
+    return NextResponse.json({ data: rulesWithCounts });
+  }
 }
 
 // ─── POST /api/bank-rules ──────────────────────────────────────────
@@ -251,6 +303,90 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'priority must be between 0 and 20' }, { status: 400 });
     }
 
+    // ─── Conflict detection ──────────────────────────────────────────
+    // Fetch all active rules for this company to check for duplicates / overlaps
+    const existingRules = await db.bankRule.findMany({
+      where: { companyId, isActive: true },
+      select: {
+        id: true,
+        name: true,
+        transactionDirection: true,
+        conditions: true,
+        conditionType: true,
+        conditionValue: true,
+        priority: true,
+      },
+    });
+
+    const warnings: { type: string; message: string }[] = [];
+
+    // Normalise the incoming conditions to a comparable shape
+    const normalise = (cond: { field: string; operator: string; value: string }) =>
+      `${cond.field}|${cond.operator}|${String(cond.value).toLowerCase().trim()}`;
+
+    const incomingNorm = conditions.map(normalise).sort().join('::');
+    const incomingDir = transactionDirection; // already resolved above
+
+    for (const existing of existingRules) {
+      const existingConditions: Array<{ field: string; operator: string; value: string }> =
+        Array.isArray(existing.conditions) && existing.conditions.length > 0
+          ? (existing.conditions as any[])
+          : [
+              {
+                field: 'description',
+                operator: existing.conditionType,
+                value: existing.conditionValue,
+              },
+            ];
+
+      const existingNorm = existingConditions.map(normalise).sort().join('::');
+      const existingDir = existing.transactionDirection;
+
+      // Direction compatibility: 'any' is compatible with everything
+      const dirCompatible =
+        incomingDir === 'any' || existingDir === 'any' || incomingDir === existingDir;
+
+      // Step 1 — Exact duplicate check (BLOCKING)
+      if (incomingNorm === existingNorm && dirCompatible) {
+        return NextResponse.json(
+          {
+            error: 'A rule with identical conditions and direction already exists.',
+            conflictingRuleId: existing.id,
+            conflictingRuleName: existing.name,
+          },
+          { status: 409 },
+        );
+      }
+
+      // Step 2 — Partial overlap check (WARNING, non-blocking)
+      // Only applies to description-based `contains` conditions
+      if (dirCompatible) {
+        const incomingContains = conditions
+          .filter(
+            (c: { field: string; operator: string; value: string }) =>
+              c.field === 'description' && c.operator === 'contains',
+          )
+          .map((c: { value: string }) => String(c.value).toLowerCase().trim());
+
+        const existingContains = existingConditions
+          .filter((c) => c.field === 'description' && c.operator === 'contains')
+          .map((c) => String(c.value).toLowerCase().trim());
+
+        for (const inVal of incomingContains) {
+          for (const exVal of existingContains) {
+            // Overlap: existing value is a substring of the incoming value (broader pattern) AND higher priority
+            if (exVal !== inVal && inVal.includes(exVal) && existing.priority <= p) {
+              warnings.push({
+                type: 'overlap',
+                message: `This rule may be shadowed by rule '${existing.name}' (ID: ${existing.id}) which has a broader pattern and higher priority.`,
+              });
+            }
+          }
+        }
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────
+
     const rule = await db.bankRule.create({
       data: {
         companyId,
@@ -280,18 +416,89 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json(
-      {
+    await createAuditLogWithRetry({
+      companyId,
+      userId,
+      action: 'BANK_RULE_CREATED',
+      entity: 'BankRule',
+      entityId: rule.id,
+      details: JSON.stringify({
+        name: rule.name,
+        conditionType,
+        conditions,
+        transactionDirection,
+        priority: p,
+      }),
+    });
+
+    const responseBody = {
+      data: {
         ...rule,
         createdAt: rule.createdAt.toISOString(),
         updatedAt: rule.updatedAt.toISOString(),
         _matchCount: 0,
       },
-      { status: 201 },
-    );
+      ...(warnings.length > 0 ? { warnings } : {}),
+    };
+
+    return NextResponse.json(responseBody, { status: 201 });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Internal server error';
     logger.error('BANK_RULE_CREATE_ERROR', { error: msg });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+// ─── DELETE /api/bank-rules ────────────────────────────────────────
+// Bulk delete bank rules.
+// Body: { ids: string[], companyId: string }
+export async function DELETE(request: NextRequest) {
+  const userId = await getSessionUserId(request);
+  if (!userId) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  try {
+    const body = await request.json();
+    const { ids, companyId } = body;
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return NextResponse.json({ error: 'ids must be a non-empty array' }, { status: 400 });
+    }
+
+    if (!companyId) {
+      return NextResponse.json({ error: 'companyId is required' }, { status: 400 });
+    }
+
+    // Verify user has access to this company
+    const membership = await db.companyMember.findUnique({
+      where: { userId_companyId: { userId, companyId } },
+    });
+    if (!membership) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    // Delete matching rules in database
+    const deleteResult = await db.bankRule.deleteMany({
+      where: {
+        id: { in: ids },
+        companyId,
+      },
+    });
+
+    // Record bulk deletion in audit logs
+    await createAuditLogWithRetry({
+      companyId,
+      userId,
+      action: 'BANK_RULES_BULK_DELETED',
+      entity: 'BankRule',
+      details: JSON.stringify({ count: deleteResult.count, ids }),
+    });
+
+    return NextResponse.json({ success: true, count: deleteResult.count });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'Internal server error';
+    logger.error('BANK_RULES_BULK_DELETE_ERROR', { error: msg });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

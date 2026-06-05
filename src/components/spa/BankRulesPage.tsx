@@ -53,6 +53,7 @@ import {
 } from '@/components/ui/table';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useLanguageStore } from '@/store/language-store';
 import { useAuthStore } from '@/store/auth-store';
 import { AccountSelector, type GlAccountOption } from '@/components/spa/journal/AccountSelector';
@@ -204,6 +205,11 @@ export function BankRulesPage() {
   const [deletingRule, setDeletingRule] = useState<BankRule | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  // Bulk selection and deletion states
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
   // Apply all dialog
   const [applyDialogOpen, setApplyDialogOpen] = useState(false);
   const [applying, setApplying] = useState(false);
@@ -224,7 +230,7 @@ export function BankRulesPage() {
     } catch {
       // Silently fail — accounts dropdown will be empty
     }
-  }, [activeCompany?.id]);
+  }, [activeCompany]);
 
   // Fetch rules
   const fetchRules = useCallback(async () => {
@@ -235,13 +241,14 @@ export function BankRulesPage() {
       if (res.ok) {
         const data = await res.json();
         setRules(data.data ?? []);
+        setSelectedIds([]);
       }
     } catch {
       // Silently fail
     } finally {
       setLoading(false);
     }
-  }, [activeCompany?.id]);
+  }, [activeCompany]);
 
   useEffect(() => {
     fetchAccounts();
@@ -256,6 +263,49 @@ export function BankRulesPage() {
   const sortedRules = [...rules].sort((a, b) =>
     sortDir === 'asc' ? a.priority - b.priority : b.priority - a.priority,
   );
+
+  const isAllSelected =
+    sortedRules.length > 0 && sortedRules.every((r) => selectedIds.includes(r.id));
+  const isSomeSelected = selectedIds.length > 0 && !isAllSelected;
+
+  const handleSelectAll = (checked: boolean | 'indeterminate') => {
+    if (checked === true) {
+      setSelectedIds(sortedRules.map((r) => r.id));
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
+  const handleSelectRule = (ruleId: string, checked: boolean | 'indeterminate') => {
+    if (checked === true) {
+      setSelectedIds((prev) => [...prev, ruleId]);
+    } else {
+      setSelectedIds((prev) => prev.filter((id) => id !== ruleId));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0 || !activeCompany?.id) return;
+    setBulkDeleting(true);
+    try {
+      const res = await fetch('/api/bank-rules', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ids: selectedIds,
+          companyId: activeCompany.id,
+        }),
+      });
+      if (res.ok) {
+        setBulkDeleteDialogOpen(false);
+        fetchRules();
+      }
+    } catch {
+      // Silently fail
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
 
   // Open create modal
   const handleCreate = () => {
@@ -374,6 +424,17 @@ export function BankRulesPage() {
           <p className="text-sm text-muted-foreground mt-1">{t('bankRules.rulesDescription')}</p>
         </div>
         <div className="flex items-center gap-2">
+          {selectedIds.length > 0 && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setBulkDeleteDialogOpen(true)}
+              className="gap-2"
+            >
+              <Trash2 className="size-4" />
+              {t('bankRules.deleteSelected')} ({selectedIds.length})
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -427,8 +488,15 @@ export function BankRulesPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[25%]">{t('bankRules.ruleName')}</TableHead>
-                    <TableHead className="w-[35%]">{t('bankRules.condition')}</TableHead>
+                    <TableHead className="w-[4%] pr-0">
+                      <Checkbox
+                        checked={isAllSelected ? true : isSomeSelected ? 'indeterminate' : false}
+                        onCheckedChange={handleSelectAll}
+                        aria-label="Select all rules"
+                      />
+                    </TableHead>
+                    <TableHead className="w-[23%]">{t('bankRules.ruleName')}</TableHead>
+                    <TableHead className="w-[33%]">{t('bankRules.condition')}</TableHead>
                     <TableHead className="w-[25%]">{t('bankRules.assignToAccount')}</TableHead>
                     <TableHead className="w-[10%] text-center">
                       {t('bankRules.autoMatches')}
@@ -439,6 +507,13 @@ export function BankRulesPage() {
                 <TableBody>
                   {sortedRules.map((rule) => (
                     <TableRow key={rule.id} className={!rule.isActive ? 'opacity-60' : ''}>
+                      <TableCell className="pr-0">
+                        <Checkbox
+                          checked={selectedIds.includes(rule.id)}
+                          onCheckedChange={(checked) => handleSelectRule(rule.id, checked)}
+                          aria-label={`Select rule ${rule.name}`}
+                        />
+                      </TableCell>
                       <TableCell className="font-medium max-w-[200px] truncate" title={rule.name}>
                         {rule.name}
                       </TableCell>
@@ -667,6 +742,29 @@ export function BankRulesPage() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deleting && <Loader2 className="size-4 animate-spin mr-2" />}
+              {t('common.delete')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Delete Confirmation */}
+      <AlertDialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('bankRules.confirmBulkDelete')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('bankRules.bulkDeleteWarning').replace('{count}', String(selectedIds.length))}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDelete}
+              disabled={bulkDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {bulkDeleting && <Loader2 className="size-4 animate-spin mr-2" />}
               {t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>

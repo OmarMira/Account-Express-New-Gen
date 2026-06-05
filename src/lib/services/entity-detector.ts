@@ -2,6 +2,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import crypto from 'crypto';
 import { logger } from '../logger';
+import { sanitizeDescriptionForDetection } from '@/lib/services/pattern-normalizer';
 
 // ========== INTERFACES TIPIFICADAS (V3.0 Zero-Any) ==========
 export interface EntityDetectionConfig {
@@ -119,17 +120,7 @@ export function jaroWinkler(s1: string, s2: string): number {
 
 // ========== SANITIZACIÓN CON REGEX SEGURO ==========
 export function sanitizeDescription(desc: string, config: EntityDetectionConfig): string {
-  let cleaned = desc;
-  for (const pattern of config.sanitization.stripPatterns) {
-    try {
-      const flags = pattern.flags || 'gi';
-      const rx = new RegExp(pattern.regex, flags);
-      cleaned = cleaned.replace(rx, pattern.replacement ?? '');
-    } catch (err) {
-      logger.warn('ENTITY_DETECTOR_INVALID_REGEX', { pattern: pattern.name, error: String(err) });
-    }
-  }
-  return cleaned.replace(/\s+/g, ' ').trim();
+  return sanitizeDescriptionForDetection(desc, config);
 }
 
 // ========== EXTRACCIÓN CON ESTRATEGIAS PRIORIZADAS ==========
