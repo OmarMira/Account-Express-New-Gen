@@ -17,7 +17,17 @@ export interface ConversationalParseResult {
   conditions?: any[] | null;
 }
 
-// Helper: Lógica dinámica para parsear descriptores basada en rules/assistant-config.json
+// ── Internal: read assistant config from disk ──
+function readAssistantConfigSync(): any {
+  try {
+    const configPath = join(process.cwd(), 'rules/assistant-config.json');
+    return JSON.parse(readFileSync(configPath, 'utf-8'));
+  } catch {
+    return {};
+  }
+}
+
+// ── Fallback: Local heuristic parse (unchanged logic, readAssistantConfigSync) ──
 export function localHeuristicParse(userInput: string): { role: string; glAccountCode: string } {
   const text = userInput.toLowerCase().trim();
 
@@ -84,106 +94,211 @@ export function localHeuristicParse(userInput: string): { role: string; glAccoun
   return fallback;
 }
 
+// ── Layer 1: AI Parser ──
+// Pure AI interaction layer: reads config, calls external chat API via fetch,
+// returns parsed result or THROWS on failure (no silent fallback).
+// Accepts optional deps for DI: fetch and readAssistantConfig.
+export async function parseWithAI(
+  pattern: string,
+  userInput: string,
+  deps: {
+    apiKey: string;
+    baseUrl: string;
+    model: string;
+    fetch?: typeof globalThis.fetch;
+    readAssistantConfig?: () => any;
+  },
+): Promise<{
+  role: string;
+  glAccountCode: string;
+  conditions?: any[];
+  suggestSubAccount: boolean;
+  subAccountName: string | null;
+}> {
+  const { apiKey, baseUrl, model } = deps;
+  const fetchFn = deps.fetch ?? globalThis.fetch;
+  const getConfig = deps.readAssistantConfig ?? readAssistantConfigSync;
+
+  if (!apiKey || !baseUrl || !model) {
+    throw new Error('AI configuration missing: AI_API_KEY, AI_BASE_URL, and AI_MODEL must be set');
+  }
+
+  // Build model fallback list (preserving existing openrouter/free behavior)
+  const modelsToTry = [model];
+  if (model === 'openrouter/free') {
+    modelsToTry.push('google/gemini-2.5-flash:free');
+    modelsToTry.push('qwen/qwen-2.5-72b-instruct:free');
+  }
+
+  const assistantConfig = getConfig();
+  const systemInstruction = assistantConfig.systemInstruction ?? '';
+
+  for (const currentModel of modelsToTry) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout per model
+
+    try {
+      const response = await fetchFn(`${baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+        },
+        body: JSON.stringify({
+          model: currentModel,
+          temperature: assistantConfig.temperature ?? 0.1,
+          max_tokens: assistantConfig.maxTokens ?? 300,
+          response_format: { type: 'json_object' },
+          messages: [
+            { role: 'system', content: systemInstruction },
+            {
+              role: 'user',
+              content: `Entidad: "${pattern}"\nDescripción del usuario: "${userInput}"\nRetorna solo el objeto JSON.`,
+            },
+          ],
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeout);
+
+      if (!response.ok) {
+        throw new Error(`AI API returned status ${response.status}`);
+      }
+
+      const resData = await response.json();
+      const content = resData.choices?.[0]?.message?.content;
+      if (!content) {
+        throw new Error('AI response missing content');
+      }
+
+      const parsed = JSON.parse(content);
+
+      // Validate that we have the minimum required fields
+      if (!parsed.role || !parsed.glAccountCode) {
+        throw new Error('AI returned incomplete result');
+      }
+
+      // Success — return parsed data
+      return {
+        role: parsed.role,
+        glAccountCode: parsed.glAccountCode,
+        conditions: parsed.conditions,
+        suggestSubAccount: Boolean(parsed.suggestSubAccount),
+        subAccountName: parsed.subAccountName ? String(parsed.subAccountName) : null,
+      };
+    } catch (err: unknown) {
+      clearTimeout(timeout);
+
+      // If this was the last model attempt, re-throw so the facade can fallback
+      if (currentModel === modelsToTry[modelsToTry.length - 1]) {
+        throw err;
+      }
+
+      // Otherwise log and try the next model
+      logger.warn(`[CONVERSATIONAL PARSE AI FAIL FOR MODEL ${currentModel}]`, {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  // Should never reach here, but TypeScript needs it
+  throw new Error('All AI models failed');
+}
+
+// ── Layer 2: GL Account Resolver ──
+// Pure DB resolution: queries glAccount by companyId + code.
+// Returns enriched data or default fallback. Accepts optional deps for DI.
+export async function resolveGLAccount(
+  companyId: string,
+  glAccountCode: string,
+  deps?: {
+    db?: typeof db;
+  },
+): Promise<{
+  glAccountId: string | null;
+  account: { code: string; name: string };
+}> {
+  const dbClient = deps?.db ?? db;
+
+  if (!glAccountCode) {
+    return { glAccountId: null, account: { code: '', name: 'Cuenta No Clasificada' } };
+  }
+
+  try {
+    const acc = await dbClient.glAccount.findFirst({
+      where: { companyId, code: glAccountCode, isActive: true },
+    });
+
+    if (acc) {
+      return { glAccountId: acc.id, account: { code: acc.code, name: acc.name } };
+    }
+
+    return { glAccountId: null, account: { code: glAccountCode, name: 'Cuenta No Clasificada' } };
+  } catch (dbErr) {
+    logger.warn('GL_ACCOUNT_QUERY_FAIL', { companyId, glAccountCode, error: String(dbErr) });
+    return { glAccountId: null, account: { code: glAccountCode, name: 'Cuenta No Clasificada' } };
+  }
+}
+
+// ── Facade: parseConversationalContext ──
+// Orchestrates: try AI parser → fallback to heuristics → resolve GL account from DB.
+// Preserves audit logging on successful AI response.
+// Accepts optional DI params (fetchFn, prismaClient) that flow to layers.
 export async function parseConversationalContext(
   companyId: string,
   pattern: string,
   userInput: string,
   userId?: string,
+  fetchFn?: typeof globalThis.fetch,
+  prismaClient?: typeof db,
 ): Promise<ConversationalParseResult> {
   const apiKey = process.env.AI_API_KEY;
   const baseUrl = process.env.AI_BASE_URL;
   const model = process.env.AI_MODEL;
-  let parsed: any = null;
+
+  let parsed: {
+    role: string;
+    glAccountCode: string;
+    conditions?: any[];
+    suggestSubAccount: boolean;
+    subAccountName: string | null;
+  } | null = null;
 
   // Intento con IA externa
   if (apiKey && baseUrl && model) {
-    const modelsToTry = [model];
-    if (model === 'openrouter/free') {
-      modelsToTry.push('google/gemini-2.5-flash:free');
-      modelsToTry.push('qwen/qwen-2.5-72b-instruct:free');
-    }
-
-    const configPath = join(process.cwd(), 'rules/assistant-config.json');
-    let assistantConfig: any = {};
     try {
-      assistantConfig = JSON.parse(readFileSync(configPath, 'utf-8'));
-    } catch {}
+      parsed = await parseWithAI(pattern, userInput, {
+        apiKey,
+        baseUrl,
+        model,
+        fetch: fetchFn,
+      });
 
-    for (const currentModel of modelsToTry) {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout per model
-
-      try {
-        const response = await fetch(`${baseUrl}/chat/completions`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${apiKey}`,
-            'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+      // 🔍 AUDITORÍA: Registrar respuesta de IA externa (sin exponer API key)
+      if (userId) {
+        safeAuditLog({
+          companyId,
+          userId,
+          action: 'AI_EXTERNAL_RESPONSE_RECEIVED',
+          entity: 'EntityContext',
+          details: {
+            pattern,
+            userInput,
+            aiResponse: parsed,
+            model,
+            timestamp: new Date().toISOString(),
           },
-          body: JSON.stringify({
-            model: currentModel,
-            temperature: assistantConfig.temperature ?? 0.1,
-            max_tokens: assistantConfig.maxTokens ?? 300,
-            response_format: { type: 'json_object' },
-            messages: [
-              { role: 'system', content: assistantConfig.systemInstruction },
-              {
-                role: 'user',
-                content: `Entidad: "${pattern}"\nDescripción del usuario: "${userInput}"\nRetorna solo el objeto JSON.`,
-              },
-            ],
-          }),
-          signal: controller.signal,
-        });
-
-        clearTimeout(timeout);
-
-        if (response.ok) {
-          const resData = await response.json();
-          const content = resData.choices?.[0]?.message?.content;
-          if (content) {
-            parsed = JSON.parse(content);
-            if (parsed && parsed.role && parsed.glAccountCode) {
-              // 🔍 AUDITORÍA: Registrar respuesta de IA externa (sin exponer API key)
-              if (userId) {
-                safeAuditLog({
-                  companyId,
-                  userId,
-                  action: 'AI_EXTERNAL_RESPONSE_RECEIVED',
-                  entity: 'EntityContext',
-                  details: {
-                    pattern,
-                    userInput,
-                    aiResponse: parsed,
-                    model: currentModel, // Log model, not API key
-                    timestamp: new Date().toISOString(),
-                  },
-                }).catch((e) => logger.warn('[AI AUDIT LOG FAIL]', { error: String(e) }));
-              }
-              break; // Success! Break out of the model loop
-            }
-          }
-        }
-      } catch (err: unknown) {
-        clearTimeout(timeout);
-        // Catch AbortError separately and provide helpful message
-        if (err instanceof Error && err.name === 'AbortError') {
-          logger.warn(`[CONVERSATIONAL PARSE AI TIMEOUT FOR MODEL ${currentModel}]`, {
-            model: currentModel,
-            timeout: '10s',
-          });
-        } else {
-          logger.warn(`[CONVERSATIONAL PARSE AI FAIL FOR MODEL ${currentModel}]`, {
-            error: err instanceof Error ? err.message : String(err),
-          });
-        }
+        }).catch((e) => logger.warn('[AI AUDIT LOG FAIL]', { error: String(e) }));
       }
+    } catch {
+      // AI failed — fall through to heuristic below
     }
   }
 
-  // Fallback a lógica local si la IA falla o no devuelve datos válidos
-  if (!parsed || !parsed.role || !parsed.glAccountCode) {
+  // Fallback a lógica local si la IA falla o no está configurada
+  if (!parsed) {
     const local = localHeuristicParse(userInput);
     parsed = {
       role: local.role,
@@ -196,24 +311,10 @@ export async function parseConversationalContext(
   // Normalización y búsqueda en BD
   const role = String(parsed.role).toUpperCase().trim();
   const glAccountCode = String(parsed.glAccountCode).trim();
-  let glAccountId: string | null = null;
-  let glAccountName = 'Cuenta No Clasificada';
 
-  // Resolver nombre desde la BD. El hardcodeo anterior (código→nombre en español) se eliminó
-  // porque la query a BD siempre lo pisaba — era dead code. Los nombres auténticos están en la BD.
-  if (glAccountCode) {
-    try {
-      const acc = await db.glAccount.findFirst({
-        where: { companyId, code: glAccountCode, isActive: true },
-      });
-      if (acc) {
-        glAccountId = acc.id;
-        glAccountName = acc.name;
-      }
-    } catch (dbErr) {
-      logger.warn('GL_ACCOUNT_QUERY_FAIL', { companyId, glAccountCode, error: String(dbErr) });
-    }
-  }
+  const { glAccountId, account } = await resolveGLAccount(companyId, glAccountCode, {
+    db: prismaClient,
+  });
 
   let conditions = parsed.conditions;
   if (!conditions || !Array.isArray(conditions) || conditions.length === 0) {
@@ -226,10 +327,7 @@ export async function parseConversationalContext(
     glAccountId,
     suggestSubAccount: Boolean(parsed.suggestSubAccount),
     subAccountName: parsed.subAccountName ? String(parsed.subAccountName) : null,
-    account: {
-      code: glAccountCode,
-      name: glAccountName,
-    },
+    account,
     conditions,
   };
 }
