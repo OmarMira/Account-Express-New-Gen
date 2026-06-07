@@ -1,0 +1,25 @@
+# Account-Express-New-Gen Testing Capabilities Configuration
+project: Account-Express-New-Gen
+strict_tdd: true
+testing:
+  runner: vitest
+  runner_command: bunx vitest run
+  type_checker: tsc --noEmit
+  type_checker_command: bun x tsc --noEmit
+  linter: eslint
+  linter_command: bun run lint
+  formatter: prettier
+  formatter_command: bun run format
+  database_env_override:
+    variable: DATABASE_URL
+    value: file:./test.db
+  files:
+    setup: tests/setup.ts
+    teardown: tests/globalTeardown.ts
+  validation_gates:
+    - scripts/run-full-cycle-check.ts
+    - scripts/test-rbac-isolation.ts
+    - scripts/test-assistant-engine.ts
+    - scripts/test-predictive-engine.ts
+    - scripts/test-learning-loop.ts
+    - scripts/test-budget-engine.ts

@@ -111,7 +111,7 @@ export async function parseConversationalContext(
 
     for (const currentModel of modelsToTry) {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 8000); // 8s timeout per model
+      const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout per model
 
       try {
         const response = await fetch(`${baseUrl}/chat/completions`, {
@@ -145,7 +145,7 @@ export async function parseConversationalContext(
           if (content) {
             parsed = JSON.parse(content);
             if (parsed && parsed.role && parsed.glAccountCode) {
-              // 🔍 AUDITORÍA: Registrar respuesta de IA externa
+              // 🔍 AUDITORÍA: Registrar respuesta de IA externa (sin exponer API key)
               if (userId) {
                 safeAuditLog({
                   companyId,
@@ -156,17 +156,28 @@ export async function parseConversationalContext(
                     pattern,
                     userInput,
                     aiResponse: parsed,
+                    model: currentModel, // Log model, not API key
                     timestamp: new Date().toISOString(),
                   },
-                }).catch((e) => console.warn('[AI AUDIT LOG FAIL]', e));
+                }).catch((e) => logger.warn('[AI AUDIT LOG FAIL]', { error: String(e) }));
               }
               break; // Success! Break out of the model loop
             }
           }
         }
-      } catch (err) {
+      } catch (err: unknown) {
         clearTimeout(timeout);
-        console.warn(`[CONVERSATIONAL PARSE AI FAIL FOR MODEL ${currentModel}]`, err);
+        // Catch AbortError separately and provide helpful message
+        if (err instanceof Error && err.name === 'AbortError') {
+          logger.warn(`[CONVERSATIONAL PARSE AI TIMEOUT FOR MODEL ${currentModel}]`, {
+            model: currentModel,
+            timeout: '10s',
+          });
+        } else {
+          logger.warn(`[CONVERSATIONAL PARSE AI FAIL FOR MODEL ${currentModel}]`, {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
       }
     }
   }
@@ -188,17 +199,8 @@ export async function parseConversationalContext(
   let glAccountId: string | null = null;
   let glAccountName = 'Cuenta No Clasificada';
 
-  // Buscar el nombre default por el código
-  if (glAccountCode === '5000') glAccountName = 'Gastos Operativos / Generales';
-  else if (glAccountCode === '4000') glAccountName = 'Ingresos Operativos / Ventas';
-  else if (glAccountCode === '4010') glAccountName = 'Ingresos por Servicios / Ventas';
-  else if (glAccountCode === '4020') glAccountName = 'Ingresos por Renta / Alquiler';
-  else if (glAccountCode === '2020') glAccountName = 'Tarjetas de Crédito por Pagar';
-  else if (glAccountCode === '2040') glAccountName = 'Préstamos por Pagar';
-  else if (glAccountCode === '3010') glAccountName = 'Capital Social / Aportes de Socios';
-  else if (glAccountCode === '6030') glAccountName = 'Sueldos, Salarios y Beneficios';
-  else if (glAccountCode === '6070') glAccountName = 'Gasto Proveedores y Servicios';
-
+  // Resolver nombre desde la BD. El hardcodeo anterior (código→nombre en español) se eliminó
+  // porque la query a BD siempre lo pisaba — era dead code. Los nombres auténticos están en la BD.
   if (glAccountCode) {
     try {
       const acc = await db.glAccount.findFirst({

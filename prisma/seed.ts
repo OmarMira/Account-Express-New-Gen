@@ -13,6 +13,8 @@
 
 import bcrypt from 'bcryptjs';
 import { db } from '../src/lib/db';
+import { BankProfileConfigSchema } from '../src/lib/bank-profile-schema';
+import boaProfile from '../src/lib/bank-profiles/boa-standard.json';
 
 // ─────────────────────────────────────────────────────────────────────
 // Types
@@ -449,12 +451,61 @@ async function main() {
     await seedSampleBankRules(companyId, accountIdMap);
   }
 
+  // 8. Seed bank profiles
+  console.log('\n7. Seeding bank profiles...');
+  await seedBankProfiles();
+
   console.log('\n✅ Seed completed successfully!\n');
   console.log('═══════════════════════════════════════════');
   console.log('  Login: admin@accountexpress.com');
   console.log('  Password: Admin123!');
   console.log('  Company: Demo Business LLC');
   console.log('═══════════════════════════════════════════\n');
+}
+
+async function seedBankProfiles() {
+  console.log('  Seeding bank profiles...');
+
+  const profilesToSeed = [
+    {
+      bankId: boaProfile.bankId,
+      bankName: boaProfile.bankName,
+      fingerprints: boaProfile.fingerprints,
+      config: {
+        layoutType: boaProfile.layoutType,
+        lineGroupingTolerancePx: boaProfile.lineGroupingTolerancePx,
+        numberFormat: boaProfile.numberFormat,
+        rules: boaProfile.rules,
+      },
+    },
+  ];
+
+  for (const item of profilesToSeed) {
+    // Validate config structure using Zod
+    const validation = BankProfileConfigSchema.safeParse(item.config);
+    if (!validation.success) {
+      console.error(`❌ Validation failed for seed bank profile ${item.bankId}:`, validation.error);
+      continue;
+    }
+
+    // Upsert into DB; use conservative update: {} to avoid overwriting prod configurations
+    await db.bankProfile.upsert({
+      where: { bankId: item.bankId },
+      create: {
+        bankId: item.bankId,
+        bankName: item.bankName,
+        fingerprints: JSON.stringify(item.fingerprints),
+        config: JSON.stringify(validation.data),
+        isActive: true,
+      },
+      update: {
+        bankName: item.bankName,
+        fingerprints: JSON.stringify(item.fingerprints),
+        config: JSON.stringify(validation.data),
+      },
+    });
+  }
+  console.log(`  Seeded ${profilesToSeed.length} bank profiles`);
 }
 
 main()

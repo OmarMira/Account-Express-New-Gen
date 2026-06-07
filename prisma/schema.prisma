@@ -352,3 +352,18 @@ model SystemMemory {
   @@index([importance])
 }
 
+model BankProfile {
+  id             String   @id @default(cuid())
+  bankId         String   @unique
+  bankName       String
+  fingerprints   String   // Array de strings guardado como JSON string (ej. '["Bank of America", "BOA"]')
+  isActive       Boolean  @default(true)
+  requiresReview Boolean  @default(false)
+  config         String   // Configuración JSON de parseo (layoutType, rules, numberFormat, tolerance...)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([requiresReview])
+}
+
