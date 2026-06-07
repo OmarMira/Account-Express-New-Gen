@@ -1,20 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { hashPassword } from '@/lib/auth';
-import { getSessionUserId } from '@/lib/sessions';
+import { apiHandler, RouteContext } from '@/lib/api-handler';
+import { requireCompanyContext } from '@/lib/context-storage';
 import { saveLogo } from '@/lib/uploads/logo-service';
+import { createUserSchema } from '@/lib/validations/admin';
+import { parseAdminBody } from '@/lib/parse-admin-body';
 
-export async function GET(request: NextRequest) {
-  try {
-    const userId = await getSessionUserId(request);
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const user = await db.user.findUnique({ where: { id: userId } });
-    if (!user || user.role !== 'super_admin') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
+export const GET = apiHandler(
+  async (_request: NextRequest, _context: RouteContext) => {
+    requireCompanyContext();
 
     const users = await db.user.findMany({
       select: {
@@ -37,70 +32,31 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.json({ users });
-  } catch (error) {
-    console.error('[ADMIN USERS GET]', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
+  },
+  { requireSuperAdmin: true },
+);
 
-export async function POST(request: NextRequest) {
-  try {
-    const userId = await getSessionUserId(request);
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+export const POST = apiHandler(
+  async (request: NextRequest) => {
+    const { userId } = requireCompanyContext();
 
-    const user = await db.user.findUnique({ where: { id: userId } });
-    if (!user || user.role !== 'super_admin') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
+    const parsed = await parseAdminBody(request, createUserSchema);
+    if (!parsed.ok) return parsed.error;
 
-    const contentType = request.headers.get('content-type') || '';
-    let email = '';
-    let firstName = '';
-    let lastName = '';
-    let password = '';
-    let role = 'company_admin';
-    let phone = '';
-    let streetLine1 = '';
-    let streetLine2 = '';
-    let city = '';
-    let state = '';
-    let zipCode = '';
-    let avatarFile: File | null = null;
-
-    if (contentType.includes('multipart/form-data')) {
-      const formData = await request.formData();
-      email = (formData.get('email') as string) || '';
-      firstName = (formData.get('firstName') as string) || '';
-      lastName = (formData.get('lastName') as string) || '';
-      password = (formData.get('password') as string) || '';
-      role = (formData.get('role') as string) || 'company_admin';
-      phone = (formData.get('phone') as string) || '';
-      streetLine1 = (formData.get('streetLine1') as string) || '';
-      streetLine2 = (formData.get('streetLine2') as string) || '';
-      city = (formData.get('city') as string) || '';
-      state = (formData.get('state') as string) || '';
-      zipCode = (formData.get('zipCode') as string) || '';
-      avatarFile = formData.get('avatar') as File | null;
-    } else {
-      const body = await request.json();
-      email = body.email || '';
-      firstName = body.firstName || '';
-      lastName = body.lastName || '';
-      password = body.password || '';
-      role = body.role || 'company_admin';
-      phone = body.phone || '';
-      streetLine1 = body.streetLine1 || '';
-      streetLine2 = body.streetLine2 || '';
-      city = body.city || '';
-      state = body.state || '';
-      zipCode = body.zipCode || '';
-    }
-
-    if (!email || !firstName || !lastName || !password) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
-    }
+    const {
+      email,
+      firstName,
+      lastName,
+      password,
+      role,
+      phone,
+      streetLine1,
+      streetLine2,
+      city,
+      state,
+      zipCode,
+    } = parsed.body.data;
+    const avatarFile = parsed.body.files.get('avatar') ?? null;
 
     const existingUser = await db.user.findUnique({
       where: { email: email.toLowerCase().trim() },
@@ -113,7 +69,7 @@ export async function POST(request: NextRequest) {
     const passwordHash = await hashPassword(password);
 
     let avatarPath = '';
-    if (avatarFile && avatarFile.size > 0) {
+    if (avatarFile) {
       avatarPath = await saveLogo(avatarFile);
     }
 
@@ -123,14 +79,14 @@ export async function POST(request: NextRequest) {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         passwordHash,
-        role: role || 'company_admin',
+        role,
         isActive: true,
-        phone,
-        streetLine1,
-        streetLine2,
-        city,
-        state,
-        zipCode,
+        phone: phone || '',
+        streetLine1: streetLine1 || '',
+        streetLine2: streetLine2 || '',
+        city: city || '',
+        state: state || '',
+        zipCode: zipCode || '',
         avatar: avatarPath,
       },
       select: {
@@ -161,8 +117,6 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ user: newUser }, { status: 201 });
-  } catch (error) {
-    console.error('[ADMIN USERS POST]', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
+  },
+  { requireSuperAdmin: true },
+);

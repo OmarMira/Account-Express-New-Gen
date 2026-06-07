@@ -3,6 +3,7 @@ import { join } from 'path';
 import { db } from '@/lib/db';
 import { safeAuditLog } from './audit-service';
 import { logger } from '@/lib/logger';
+import { checkPromptInjection, addSystemDelimiter } from '@/lib/guardrails';
 
 export interface ConversationalParseResult {
   role: string;
@@ -123,6 +124,19 @@ export async function parseWithAI(
     throw new Error('AI configuration missing: AI_API_KEY, AI_BASE_URL, and AI_MODEL must be set');
   }
 
+  // Prompt injection guardrails
+  const patternCheck = checkPromptInjection(pattern);
+  if (!patternCheck.passed) {
+    logger.warn('PROMPT_INJECTION_BLOCKED', { reason: patternCheck.reason, pattern });
+    throw new Error('Contenido no permitido detectado en la entrada del usuario.');
+  }
+
+  const inputCheck = checkPromptInjection(userInput);
+  if (!inputCheck.passed) {
+    logger.warn('PROMPT_INJECTION_BLOCKED', { reason: inputCheck.reason, pattern });
+    throw new Error('Contenido no permitido detectado en la entrada del usuario.');
+  }
+
   // Build model fallback list (preserving existing openrouter/free behavior)
   const modelsToTry = [model];
   if (model === 'openrouter/free') {
@@ -131,7 +145,7 @@ export async function parseWithAI(
   }
 
   const assistantConfig = getConfig();
-  const systemInstruction = assistantConfig.systemInstruction ?? '';
+  const systemInstruction = addSystemDelimiter(assistantConfig.systemInstruction ?? '');
 
   for (const currentModel of modelsToTry) {
     const controller = new AbortController();

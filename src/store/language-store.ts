@@ -7,6 +7,8 @@ interface LanguageState {
   language: Locale;
   setLanguage: (lang: Locale) => void;
   t: (key: string) => string;
+  _hasHydrated: boolean;
+  setHasHydrated: (state: boolean) => void;
 }
 
 const createTranslator =
@@ -20,11 +22,17 @@ export const useLanguageStore = create<LanguageState>()(
   persist(
     (set, get) => ({
       language: 'es' as Locale,
+      _hasHydrated: false,
 
       setLanguage: (lang: Locale) =>
         set({
           language: lang,
           t: createTranslator(lang),
+        }),
+
+      setHasHydrated: (state: boolean) =>
+        set({
+          _hasHydrated: state,
         }),
 
       t: createTranslator('es' as Locale),
@@ -35,6 +43,7 @@ export const useLanguageStore = create<LanguageState>()(
       onRehydrateStorage: () => (state) => {
         if (state) {
           state.t = createTranslator(state.language);
+          state.setHasHydrated(true);
         }
       },
     },

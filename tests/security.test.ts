@@ -111,14 +111,12 @@ describe('Security Layer - Unit & Integration Tests', () => {
       expect(res.headers.get('Referrer-Policy')).toBe('strict-origin-when-cross-origin');
     });
 
-    it('debe rechazar mutaciones API cruzadas (CSRF) cuando falta Origin/Referer', async () => {
+    it('debe permitir mutaciones API sin Origin/Referer (API clients)', async () => {
       const req = new NextRequest('http://localhost:3000/api/companies', {
         method: 'POST',
       });
       const res = await proxy(req);
-      expect(res.status).toBe(403);
-      const body = await res.json();
-      expect(body.error).toContain('CSRF');
+      expect(res.status).toBe(200);
     });
 
     it('debe rechazar mutaciones API con Origin externo (CSRF)', async () => {
@@ -146,36 +144,18 @@ describe('Security Layer - Unit & Integration Tests', () => {
       expect(res.status).toBe(200); // 200 indica Next
     });
 
-    it('debe bloquear peticiones repetidas en endpoints de auth (Rate Limit)', async () => {
-      // 5 peticiones válidas
-      for (let i = 0; i < 5; i++) {
+    it('debe pasar peticiones auth a traves del middleware sin rate limit (manejado por route handler)', async () => {
+      for (let i = 0; i < 6; i++) {
         const req = new NextRequest('http://localhost:3000/api/auth/login', {
           method: 'POST',
           headers: {
-            'Origin': 'http://localhost:3000',
-            'Host': 'localhost:3000',
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ email: 'user@example.com', password: 'password' }),
         });
         const res = await proxy(req);
-        expect(res.status).toBe(200); // NextResponse.next()
+        expect(res.status).toBe(200);
       }
-
-      // La 6ª petición debe bloquearse con 429
-      const reqBlocked = new NextRequest('http://localhost:3000/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Origin': 'http://localhost:3000',
-          'Host': 'localhost:3000',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email: 'user@example.com', password: 'password' }),
-      });
-      const resBlocked = await proxy(reqBlocked);
-      expect(resBlocked.status).toBe(429);
-      const json = await resBlocked.json();
-      expect(json.code).toBe('RATE_LIMIT_EXCEEDED');
     });
   });
 });

@@ -2,6 +2,7 @@ import { db } from '@/lib/db';
 import { ValidationError, ForbiddenError } from '@/lib/api-error';
 import { CreateJournalEntryInput } from '@/lib/validations/journal';
 import { withTiming } from '@/lib/timing';
+import { assertActiveFiscalPeriod } from '@/lib/fiscal-period-guard';
 
 export class JournalService {
   static create = withTiming(async (input: CreateJournalEntryInput) => {
@@ -17,21 +18,6 @@ export class JournalService {
 
     if (Math.abs(totalDebits - totalCredits) > 0.01) {
       throw new ValidationError('Unbalanced journal entry. Debits must equal Credits.');
-    }
-
-    // Check if the fiscal period for the entry date is closed/locked
-    const entryDate = new Date(date);
-    const lockedPeriod = await db.fiscalPeriod.findFirst({
-      where: {
-        companyId,
-        startDate: { lte: entryDate },
-        endDate: { gte: entryDate },
-        isLocked: true,
-      },
-    });
-
-    if (lockedPeriod) {
-      throw new ForbiddenError('Cannot post transactions to a closed period.');
     }
 
     // Verify all GL accounts belong to the company and are active
@@ -53,6 +39,8 @@ export class JournalService {
 
     // Create entry with lines in a transaction
     const entry = await db.$transaction(async (tx) => {
+      // Check fiscal period INSIDE the transaction to prevent TOCTOU race
+      await assertActiveFiscalPeriod(companyId, date, tx);
       const newEntry = await tx.journalEntry.create({
         data: {
           companyId,

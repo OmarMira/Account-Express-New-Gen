@@ -13,7 +13,7 @@ export function generateTestUser() {
 }
 
 export function generateMockPDFBuffer() {
-  const text = `MOCK STATEMENT CYCLE
+  const text = `Bank of America MOCK STATEMENT CYCLE
 01/15/2025 DEPOSIT TEST 500.00
 01/20/2025 WITHDRAWAL TEST -150.00
 01/25/2025 TRANSFER TEST 200.00`.trim();

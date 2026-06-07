@@ -1,18 +1,16 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getSessionUserId } from '@/lib/sessions';
-import fs from 'fs';
+import { apiHandler } from '@/lib/api-handler';
+import { requireCompanyContext } from '@/lib/context-storage';
+import { stat } from 'fs/promises';
 import path from 'path';
 
 /**
  * GET /api/diagnostics — System diagnostics
  */
-export async function GET(request: Request) {
-  try {
-    const userId = await getSessionUserId(request as unknown as import('next/server').NextRequest);
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+export const GET = apiHandler(
+  async (request: NextRequest, context: { params: any }) => {
+    const { userId } = requireCompanyContext();
 
     // Verify user is admin
     const user = await db.user.findUnique({
@@ -28,7 +26,7 @@ export async function GET(request: Request) {
     let dbSize = '0KB';
     try {
       const dbPath = path.join(process.cwd(), 'db', 'custom.db');
-      const stats = fs.statSync(dbPath);
+      const stats = await stat(dbPath);
       const bytes = stats.size;
       if (bytes < 1024) dbSize = `${bytes}B`;
       else if (bytes < 1024 * 1024) dbSize = `${(bytes / 1024).toFixed(0)}KB`;
@@ -105,8 +103,6 @@ export async function GET(request: Request) {
         version: '1.0.0',
       },
     });
-  } catch (error) {
-    console.error('[DIAGNOSTICS ERROR]', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
+  },
+  { requireMembership: false },
+);

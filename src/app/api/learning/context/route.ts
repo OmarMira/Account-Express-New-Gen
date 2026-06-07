@@ -1,30 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getSessionUserId } from '@/lib/sessions';
+import { apiHandler } from '@/lib/api-handler';
+import { requireCompanyContext } from '@/lib/context-storage';
 import { findContext, saveContext } from '@/lib/services/entity-context-service';
+import { entityContextSchema } from '@/lib/validations/entity-context';
 
 // ─── GET /api/learning/context ──────────────────────────────────────
 // Retrieve the entity context for a description.
-export async function GET(request: NextRequest) {
-  const userId = await getSessionUserId(request);
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+export const GET = apiHandler(async (request: NextRequest, context: { params: any }) => {
+  const { userId, companyId } = requireCompanyContext();
 
   const { searchParams } = new URL(request.url);
-  const companyId = searchParams.get('companyId');
   const description = searchParams.get('description') || searchParams.get('pattern');
 
-  if (!companyId || !description) {
+  if (!description) {
     return NextResponse.json({ error: 'companyId and description are required' }, { status: 400 });
-  }
-
-  // Verify access
-  const membership = await db.companyMember.findUnique({
-    where: { userId_companyId: { userId, companyId } },
-  });
-  if (!membership) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   try {
@@ -34,34 +24,23 @@ export async function GET(request: NextRequest) {
     console.error('[GET ENTITY CONTEXT ERROR]', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+});
 
 // ─── POST /api/learning/context ─────────────────────────────────────
 // Save or update an entity context.
-export async function POST(request: NextRequest) {
-  const userId = await getSessionUserId(request);
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+export const POST = apiHandler(async (request: NextRequest, context: { params: any }) => {
+  const { userId, companyId } = requireCompanyContext();
 
   try {
     const body = await request.json();
-    const { companyId, pattern, role, glAccountId } = body;
-
-    if (!companyId || !pattern || !role) {
+    const parsed = entityContextSchema.safeParse(body);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: 'companyId, pattern, and role are required' },
+        { error: 'Validation failed', details: parsed.error.flatten() },
         { status: 400 },
       );
     }
-
-    // Verify access
-    const membership = await db.companyMember.findUnique({
-      where: { userId_companyId: { userId, companyId } },
-    });
-    if (!membership) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
+    const { pattern, role, glAccountId } = parsed.data;
 
     // If glAccountId is provided, verify it exists and is active
     if (glAccountId) {
@@ -87,4 +66,4 @@ export async function POST(request: NextRequest) {
     console.error('[POST ENTITY CONTEXT ERROR]', error);
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }
-}
+});

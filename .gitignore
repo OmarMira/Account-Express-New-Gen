@@ -51,8 +51,9 @@ test
 prompt
 
 server.log
-# Skills directory
+# Agent run artifacts
 /skills/
+/.atl/
 
 # Local model system files
 brain/
@@ -64,4 +65,28 @@ backups/
 test.db
 test.db-wal
 prisma/dev.db-wal
-prisma/dev.db-shm
+prisma/dev.db-shm
+
+# Build artifacts
+dist/
+dist-installer/
+node_modules_old/
+
+# Reports
+reports/
+
+# Local agent/Pi runtime state
+.atl/
+.pi/
+
+# Generated docs
+IMPLEMENTATION_SUMMARY.md
+
+# Installer artifacts
+installer/
+
+# Staging database files
+prisma/staging.db*
+
+# SDD change artifacts
+sdd/

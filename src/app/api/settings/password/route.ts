@@ -1,18 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { verifyPassword, hashPassword } from '@/lib/auth';
-import { getSessionUserId } from '@/lib/sessions';
+import { apiHandler } from '@/lib/api-handler';
+import { requireCompanyContext } from '@/lib/context-storage';
 
 /**
  * POST /api/settings/password — Change user password
  * Body: { currentPassword, newPassword }
  */
-export async function POST(request: NextRequest) {
-  try {
-    const userId = await getSessionUserId(request);
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+export const POST = apiHandler(
+  async (request: NextRequest, context: { params: any }) => {
+    const { userId } = requireCompanyContext();
 
     const body = await request.json();
     const { currentPassword, newPassword } = body;
@@ -65,8 +63,6 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ message: 'Password changed successfully' });
-  } catch (error) {
-    console.error('[PASSWORD CHANGE ERROR]', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
+  },
+  { requireMembership: false },
+);

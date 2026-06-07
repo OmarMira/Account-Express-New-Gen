@@ -1,7 +1,9 @@
 import { db } from '@/lib/db';
-import { NotFoundError } from '@/lib/api-error';
+import { NotFoundError, ValidationError } from '@/lib/api-error';
 import { CreateReconciliationInput } from '@/lib/validations/reconciliation';
 import { withTiming } from '@/lib/timing';
+import { assertActiveFiscalPeriod } from '@/lib/fiscal-period-guard';
+import { validateSemanticDirection } from '@/lib/semantic-validator';
 
 export class ReconciliationService {
   static reconcile = withTiming(async (input: CreateReconciliationInput) => {
@@ -19,18 +21,52 @@ export class ReconciliationService {
     if (!bankAccount) {
       throw new NotFoundError('Bank account not found');
     }
+    if (!bankAccount.glAccountId) {
+      throw new ValidationError(
+        'Bank account has no linked GL account. Link a GL account before reconciling.',
+      );
+    }
 
     let reconciledCount = 0;
     let journalEntriesCreated = 0;
+    const warnings: string[] = [];
 
     await db.$transaction(async (tx) => {
+      // Batch fetch all needed GL accounts before loop — elimina N+1
+      const allGlAccountIds = new Set<string>();
       for (const txn of transactions) {
-        if (!txn.id) continue;
+        if (txn.splits && txn.splits.length > 0) {
+          for (const split of txn.splits) {
+            allGlAccountIds.add(split.glAccountId);
+          }
+        } else if (txn.glAccountId) {
+          allGlAccountIds.add(txn.glAccountId);
+        }
+      }
+      const glAccountMap =
+        allGlAccountIds.size > 0
+          ? new Map(
+              (
+                await tx.glAccount.findMany({
+                  where: { id: { in: Array.from(allGlAccountIds) }, companyId },
+                })
+              ).map((a) => [a.id, a]),
+            )
+          : new Map();
 
-        const bankTx = await tx.bankTransaction.findUnique({
-          where: { id: txn.id },
+      for (const txn of transactions) {
+        // Find unreconciled bank transaction
+        const bankTx = await tx.bankTransaction.findFirst({
+          where: {
+            id: txn.id,
+            isReconciled: false,
+            statement: { bankAccountId },
+          },
         });
-        if (!bankTx || bankTx.isReconciled) continue;
+        if (!bankTx) continue;
+
+        // Verify that the transaction date is in an active fiscal period
+        await assertActiveFiscalPeriod(companyId, bankTx.date);
 
         const updateData: Record<string, any> = {
           isReconciled: true,
@@ -41,12 +77,36 @@ export class ReconciliationService {
         const mainGlId =
           txn.splits && txn.splits.length > 0 ? txn.splits[0].glAccountId : txn.glAccountId;
 
-        if (mainGlId) {
-          const glAccount = await tx.glAccount.findFirst({
-            where: { id: mainGlId, companyId },
-          });
+        // Perform semantic checks for splits or main GL account
+        if (txn.splits && txn.splits.length > 0) {
+          for (const split of txn.splits) {
+            const splitAccount = glAccountMap.get(split.glAccountId);
+            if (splitAccount) {
+              const direction = bankTx.amount > 0 ? 'credit' : 'debit';
+              const semanticWarning = validateSemanticDirection(
+                splitAccount.code,
+                direction,
+                split.description || bankTx.description,
+              );
+              if (semanticWarning) {
+                warnings.push(semanticWarning);
+              }
+            }
+          }
+          updateData.glAccountId = mainGlId;
+        } else if (mainGlId) {
+          const glAccount = glAccountMap.get(mainGlId);
           if (glAccount) {
             updateData.glAccountId = mainGlId;
+            const direction = bankTx.amount > 0 ? 'credit' : 'debit';
+            const semanticWarning = validateSemanticDirection(
+              glAccount.code,
+              direction,
+              bankTx.description,
+            );
+            if (semanticWarning) {
+              warnings.push(semanticWarning);
+            }
           }
         }
 
@@ -140,6 +200,7 @@ export class ReconciliationService {
     return {
       reconciledCount,
       journalEntriesCreated,
+      warnings,
     };
   }, 'ReconciliationService.reconcile');
 }

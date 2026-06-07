@@ -12,10 +12,11 @@ export async function createTestUser(email: string = 'test@example.com') {
   });
 }
 
-export async function createTestCompany(name: string = 'Test Company') {
+export async function createTestCompany(name: string = 'Test Company', entityType: 'INDIVIDUAL' | 'BUSINESS' = 'BUSINESS') {
   return db.company.create({
     data: {
       legalName: name,
+      entityType,
       taxId: '12-3456789',
     },
   });

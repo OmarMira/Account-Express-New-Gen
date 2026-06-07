@@ -2,7 +2,10 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import crypto from 'crypto';
 import { logger } from '../logger';
-import { sanitizeDescriptionForDetection } from '@/lib/services/pattern-normalizer';
+import {
+  sanitizeDescriptionForDetection,
+  normalizePattern,
+} from '@/lib/services/pattern-normalizer';
 
 // ========== INTERFACES TIPIFICADAS (V3.0 Zero-Any) ==========
 export interface EntityDetectionConfig {
@@ -164,7 +167,9 @@ export function clusterCandidates(
   const { minOccurrences, ignorePatterns } = config.validation;
 
   for (const tx of transactions) {
-    const cleaned = sanitizeDescription(tx.description, config);
+    // Apply centralized normalization BEFORE extraction
+    const normalized = normalizePattern(tx.description);
+    const cleaned = sanitizeDescription(normalized, config);
     const name = extractName(cleaned, config);
     if (!name) continue;
 

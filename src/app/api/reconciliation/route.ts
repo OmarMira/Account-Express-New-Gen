@@ -1,40 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getSessionUserId } from '@/lib/sessions';
 import { apiHandler } from '@/lib/api-handler';
 import { validateRequest } from '@/lib/validate-request';
 import { createAuditLogWithRetry } from '@/lib/audit';
 import { createReconciliationSchema } from '@/lib/validations/reconciliation';
-import { AuthError, ForbiddenError, NotFoundError, ValidationError } from '@/lib/api-error';
+import { NotFoundError, ValidationError } from '@/lib/api-error';
 import { ReconciliationService } from '@/services/reconciliation.service';
+import { requireCompanyContext } from '@/lib/context-storage';
 
 // ─── GET /api/reconciliation ───────────────────────────────────────
 // Get reconciliation data for a bank account with filters.
 export const GET = apiHandler(async (request: NextRequest) => {
-  const userId = await getSessionUserId(request);
-  if (!userId) {
-    throw new AuthError();
-  }
+  const { userId, companyId } = requireCompanyContext();
 
   const { searchParams } = new URL(request.url);
   const bankAccountId = searchParams.get('bankAccountId');
-  const companyId = searchParams.get('companyId');
   const startDate = searchParams.get('startDate');
   const endDate = searchParams.get('endDate');
   const statusFilter = searchParams.get('status') || 'unreconciled'; // all | unreconciled | reconciled
   const search = searchParams.get('search');
   const statementId = searchParams.get('statementId');
 
-  if (!bankAccountId || !companyId) {
-    throw new ValidationError('bankAccountId and companyId are required');
-  }
-
-  // Verify access
-  const membership = await db.companyMember.findUnique({
-    where: { userId_companyId: { userId, companyId } },
-  });
-  if (!membership) {
-    throw new ForbiddenError();
+  if (!bankAccountId) {
+    throw new ValidationError('bankAccountId is required');
   }
 
   // Get bank account with GL account info
@@ -265,24 +253,14 @@ export const GET = apiHandler(async (request: NextRequest) => {
 // ─── POST /api/reconciliation ──────────────────────────────────────
 // Reconcile transactions. Sets isReconciled=true and updates glAccountId.
 export const POST = apiHandler(async (request: NextRequest) => {
-  const userId = await getSessionUserId(request);
-  if (!userId) {
-    throw new AuthError();
-  }
+  const { userId, companyId } = requireCompanyContext();
 
   const body = await validateRequest(request, createReconciliationSchema);
   if (body instanceof NextResponse) return body;
-  const { companyId, bankAccountId, periodId } = body;
+  const { bankAccountId, periodId } = body;
 
-  // Verify access
-  const membership = await db.companyMember.findUnique({
-    where: { userId_companyId: { userId, companyId } },
-  });
-  if (!membership) {
-    throw new ForbiddenError();
-  }
-
-  const { reconciledCount, journalEntriesCreated } = await ReconciliationService.reconcile(body);
+  const { reconciledCount, journalEntriesCreated, warnings } =
+    await ReconciliationService.reconcile(body);
 
   // Audit log
   await createAuditLogWithRetry({
@@ -302,5 +280,6 @@ export const POST = apiHandler(async (request: NextRequest) => {
     success: true,
     reconciled: reconciledCount,
     journalEntriesCreated,
+    warnings,
   });
 });

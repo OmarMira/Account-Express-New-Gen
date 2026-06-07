@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
-import { getSessionUserId } from '@/lib/sessions';
+import { apiHandler } from '@/lib/api-handler';
+import { requireCompanyContext } from '@/lib/context-storage';
 
 let config: any = {
   version: '1.0',
@@ -51,12 +52,9 @@ interface NominatimResult {
 
 const cache = new Map<string, { data: AddressData[]; expiresAt: number }>();
 
-export async function GET(request: NextRequest) {
-  try {
-    const userId = await getSessionUserId(request);
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+export const GET = apiHandler(
+  async (request: NextRequest, context: { params: any }) => {
+    const { userId } = requireCompanyContext();
 
     const { searchParams } = new URL(request.url);
     const query = searchParams.get('q');
@@ -186,8 +184,6 @@ export async function GET(request: NextRequest) {
 
     cache.set(query, { data: normalized, expiresAt: now + config.cacheTtlMs });
     return NextResponse.json({ results: normalized });
-  } catch (error) {
-    console.error('[ADDRESS AUTOCOMPLETE ERROR]', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
+  },
+  { requireMembership: false },
+);

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getSessionUserId } from '@/lib/sessions';
+import { apiHandler } from '@/lib/api-handler';
+import { requireCompanyContext } from '@/lib/context-storage';
 import { z } from 'zod';
 
 // Condition schema validation
@@ -21,7 +22,6 @@ const conditionSchema = z.object({
 
 // Request body validation schema
 const simulateRequestSchema = z.object({
-  companyId: z.string().min(1),
   conditions: z.array(conditionSchema),
 });
 
@@ -78,13 +78,10 @@ function matchCondition(
   }
 }
 
-export async function POST(request: NextRequest) {
-  try {
-    const userId = await getSessionUserId(request);
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+export const POST = apiHandler(async (request: NextRequest, context: { params: any }) => {
+  const { userId, companyId } = requireCompanyContext();
 
+  try {
     const body = await request.json();
 
     // Validate request parameters using Zod
@@ -96,15 +93,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { companyId, conditions } = validation.data;
-
-    // Verify company membership
-    const membership = await db.companyMember.findUnique({
-      where: { userId_companyId: { userId, companyId } },
-    });
-    if (!membership) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
+    const { conditions } = validation.data;
 
     // Fetch all unreconciled transactions for the company
     const transactions = await db.bankTransaction.findMany({
@@ -145,4 +134,4 @@ export async function POST(request: NextRequest) {
     console.error('[POST RULE SIMULATION ERROR]', error);
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }
-}
+});

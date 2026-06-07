@@ -18,6 +18,7 @@ export const registerSchema = z.object({
   lastName: z.string().min(1, 'El apellido es requerido'),
   companyName: z.string().min(1, 'El nombre de la empresa es requerido'),
   taxId: z.string().optional().nullable(),
+  entityType: z.enum(['INDIVIDUAL', 'BUSINESS']).default('BUSINESS'),
 });
 
 export type LoginInput = z.infer<typeof loginSchema>;

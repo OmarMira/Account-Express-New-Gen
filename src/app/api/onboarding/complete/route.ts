@@ -1,22 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getSessionUserId } from '@/lib/sessions';
+import { apiHandler } from '@/lib/api-handler';
+import { requireCompanyContext } from '@/lib/context-storage';
 import { completeOnboarding } from '@/services/onboarding.service';
 import { onboardingPayloadSchema } from '@/lib/validations/onboarding';
 
-export async function POST(request: NextRequest) {
-  try {
-    // 1. Verificar autenticación del usuario
-    const userId = await getSessionUserId(request);
-    if (!userId) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    }
+export const POST = apiHandler(async (request: NextRequest, context: { params: any }) => {
+  const { userId, companyId } = requireCompanyContext();
 
+  try {
     // 2. Parsear el body de la petición
     const body = await request.json();
 
     // 3. Mapeo inteligente y tolerante (Retrocompatibilidad total con Wizard viejo y nuevo)
-    const rawCompanyId = body.companyId;
     const rawLegalName = body.legalName || 'LQ & OM LLC';
     const rawCurrency = body.currency || 'USD';
 
@@ -41,7 +37,7 @@ export async function POST(request: NextRequest) {
       body.initialCashBalance !== undefined ? parseFloat(body.initialCashBalance) : 0;
 
     const payload = {
-      companyId: rawCompanyId,
+      companyId,
       legalName: rawLegalName,
       currency: rawCurrency,
       fiscalYearStartMonth: rawMonth,
@@ -60,7 +56,6 @@ export async function POST(request: NextRequest) {
     }
 
     const {
-      companyId,
       legalName,
       currency,
       fiscalYearStartMonth,
@@ -119,4 +114,4 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
-}
+});

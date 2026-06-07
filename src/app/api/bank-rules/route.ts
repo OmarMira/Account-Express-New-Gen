@@ -1,41 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getSessionUserId } from '@/lib/sessions';
+import { apiHandler } from '@/lib/api-handler';
+import { requireCompanyContext } from '@/lib/context-storage';
 import { logger } from '@/lib/logger';
 import { createAuditLogWithRetry } from '@/lib/audit';
+import { validateDirectionProfile } from '@/lib/services/direction-validation';
 
 // ─── GET /api/bank-rules ───────────────────────────────────────────
 // List bank rules for a company, sorted by priority. Includes GL account info.
-export async function GET(request: NextRequest) {
-  const userId = await getSessionUserId(request);
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
+export const GET = apiHandler(async (request: NextRequest, context: { params: any }) => {
+  const { companyId } = requireCompanyContext();
   const { searchParams } = new URL(request.url);
-  const companyId = searchParams.get('companyId');
-
-  if (!companyId) {
-    return NextResponse.json({ error: 'companyId is required' }, { status: 400 });
-  }
-
-  // Verify user has access to this company
-  const membership = await db.companyMember.findUnique({
-    where: { userId_companyId: { userId, companyId } },
-  });
-  if (!membership) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
   const pageParam = searchParams.get('page');
   const limitParam = searchParams.get('limit');
   const hasPagination = pageParam !== null || limitParam !== null;
 
   if (hasPagination) {
     let page = parseInt(pageParam || '1', 10);
-    let limit = parseInt(limitParam || '10', 10);
+    let limit = parseInt(limitParam || '50', 10);
     if (isNaN(page) || page < 1) page = 1;
-    if (isNaN(limit) || limit < 1) limit = 10;
+    if (isNaN(limit) || limit < 1) limit = 50;
+    if (limit > 500) limit = 500; // Cap at 500 to prevent abuse
 
     const total = await db.bankRule.count({
       where: { companyId },
@@ -99,21 +84,17 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ data: rulesWithCounts });
   }
-}
+});
 
 // ─── POST /api/bank-rules ──────────────────────────────────────────
 // Create a new bank rule.
 // Body: { companyId, name, conditionType, conditionValue, transactionDirection?, glAccountId, priority?, isActive? }
-export async function POST(request: NextRequest) {
-  const userId = await getSessionUserId(request);
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+export const POST = apiHandler(async (request: NextRequest, context: { params: any }) => {
+  const { userId, companyId } = requireCompanyContext();
 
   try {
     const body = await request.json();
     let {
-      companyId,
       name,
       conditionType,
       conditionValue,
@@ -129,16 +110,8 @@ export async function POST(request: NextRequest) {
     } = body;
 
     // Validate required fields
-    if (!companyId || !name?.trim()) {
-      return NextResponse.json({ error: 'companyId and name are required' }, { status: 400 });
-    }
-
-    // Verify company access
-    const membership = await db.companyMember.findUnique({
-      where: { userId_companyId: { userId, companyId } },
-    });
-    if (!membership) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (!name?.trim()) {
+      return NextResponse.json({ error: 'name is required' }, { status: 400 });
     }
 
     // If conditions are provided, validate them. Otherwise fallback to legacy.
@@ -303,6 +276,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'priority must be between 0 and 20' }, { status: 400 });
     }
 
+    // ─── Direction Profile Validation ────────────────────────────────
+    // Verify that debit/credit GL accounts match their direction profiles
+    try {
+      await validateDirectionProfile(companyId, debitGlAccountId, creditGlAccountId);
+    } catch (validationErr: unknown) {
+      const validationMsg =
+        validationErr instanceof Error
+          ? validationErr.message
+          : 'Direction profile validation failed';
+      logger.warn('DIRECTION_PROFILE_VALIDATION_FAILED', {
+        validationMsg,
+        debitGlAccountId,
+        creditGlAccountId,
+      });
+      return NextResponse.json({ error: validationMsg }, { status: 400 });
+    }
+    // ─────────────────────────────────────────────────────────────────
+
     // ─── Conflict detection ──────────────────────────────────────────
     // Fetch all active rules for this company to check for duplicates / overlaps
     const existingRules = await db.bankRule.findMany({
@@ -447,35 +438,20 @@ export async function POST(request: NextRequest) {
     logger.error('BANK_RULE_CREATE_ERROR', { error: msg });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+});
 
 // ─── DELETE /api/bank-rules ────────────────────────────────────────
 // Bulk delete bank rules.
 // Body: { ids: string[], companyId: string }
-export async function DELETE(request: NextRequest) {
-  const userId = await getSessionUserId(request);
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+export const DELETE = apiHandler(async (request: NextRequest, context: { params: any }) => {
+  const { userId, companyId } = requireCompanyContext();
 
   try {
     const body = await request.json();
-    const { ids, companyId } = body;
+    const { ids } = body;
 
     if (!Array.isArray(ids) || ids.length === 0) {
       return NextResponse.json({ error: 'ids must be a non-empty array' }, { status: 400 });
-    }
-
-    if (!companyId) {
-      return NextResponse.json({ error: 'companyId is required' }, { status: 400 });
-    }
-
-    // Verify user has access to this company
-    const membership = await db.companyMember.findUnique({
-      where: { userId_companyId: { userId, companyId } },
-    });
-    if (!membership) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     // Delete matching rules in database
@@ -501,4 +477,4 @@ export async function DELETE(request: NextRequest) {
     logger.error('BANK_RULES_BULK_DELETE_ERROR', { error: msg });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+});

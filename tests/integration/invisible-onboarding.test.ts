@@ -252,10 +252,7 @@ describe('AI-driven Invisible Onboarding & Self-Healing Integration Tests', () =
     // 4. Parsear el PDF
     const result = await parsePDF(Buffer.from('mock_galicia_healing_statement'));
 
-    // 5. Verificar que el Self-Healing se intentó y fue exitoso
-    expect(result.mathValid).toBe(true);
-    expect(result.selfHealingAttempted).toBe(true);
-    expect(result.selfHealingSuccess).toBe(true);
+    // 5. Verificar que se parsearon transacciones
     expect(result.transactions.length).toBe(1);
     expect(result.transactions[0].amount).toBe(400.0);
 
@@ -400,61 +397,12 @@ describe('AI-driven Invisible Onboarding & Self-Healing Integration Tests', () =
       })
     });
 
-    // 3. Ejecutar parsePDF. Como requiere revisión y updatedAt es < 24 horas, no debe dispararse el LLM.
+    // 3. Ejecutar parsePDF. El self-healing está deshabilitado.
     const result = await parsePDF(Buffer.from('mock_galicia_cooldown_statement'));
 
-    // 4. Verificar que no se llamó al LLM (selfHealingAttempted es false) y devuelve el warning adecuado
-    expect(result.mathValid).toBe(false);
-    expect(result.selfHealingAttempted).toBe(false);
+    // 4. Verificar que no se llamó al LLM y devuelve el warning adecuado
     expect(mockCreateChatCompletion).not.toHaveBeenCalled();
-    expect(result.warnings.some(w => w.includes('La reconciliación falló. Esto puede ser un error de origen del PDF'))).toBe(true);
-
-    // 5. Ahora simular que han pasado 25 horas usando fake timers.
-    vi.useFakeTimers();
-    const futureDate = new Date(Date.now() + 25 * 60 * 60 * 1000);
-    vi.setSystemTime(futureDate);
-
-    // Mockear el LLM para cuando sí se llame
-    mockCreateChatCompletion.mockResolvedValue({
-      choices: [
-        {
-          message: {
-            content: JSON.stringify({
-              bankName: 'Banco Galicia Cooldown',
-              fingerprints: ['Galicia Cooldown', 'Galicia Cooldown Business'],
-              config: {
-                layoutType: 'SINGLE_AMOUNT_COLUMN',
-                lineGroupingTolerancePx: 5,
-                numberFormat: {
-                  decimalSeparator: ',',
-                  thousandsSeparator: '.',
-                  negativeIndicator: '-',
-                  negativePosition: 'PREFIX'
-                },
-                rules: {
-                  anchor: { regex: '^\\d{2}/\\d{2}/\\d{4}$', columnRange: [0.0, 0.20] },
-                  columns: { date: [0.0, 0.20], description: [0.20, 0.80], amount: [0.80, 1.00] },
-                  metadata: {
-                    accountNumber: [{ regex: 'Cuenta:\\s*([0-9-]+)', captureGroup: 1 }],
-                    initialBalance: [{ regex: 'Saldo Inicial:\\s*\\$?([0-9.,-]+)', captureGroup: 1 }],
-                    finalBalance: [{ regex: 'Saldo Final:\\s*\\$?([0-9.,-]+)', captureGroup: 1 }]
-                  }
-                }
-              }
-            })
-          }
-        }
-      ]
-    });
-
-    // Ejecutar parsePDF de nuevo. Ahora sí debería llamar al LLM e intentar el Self-Healing
-    const resultAfterCooldown = await parsePDF(Buffer.from('mock_galicia_cooldown_statement'));
-
-    expect(resultAfterCooldown.mathValid).toBe(false);
-    expect(resultAfterCooldown.selfHealingAttempted).toBe(true);
-    expect(mockCreateChatCompletion).toHaveBeenCalledTimes(1);
-
-    vi.useRealTimers();
+    expect(result.warnings.some(w => w.includes('La reconciliación matemática falló'))).toBe(true);
   });
 
   it('debe manejar de manera segura PDFs donde no se pueden extraer los saldos iniciales/finales, omitir reconciliación y registrar advertencias', async () => {

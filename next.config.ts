@@ -6,9 +6,10 @@ const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  outputFileTracingRoot: process.cwd(),
   transpilePackages: ["recharts"],
   reactStrictMode: false,
-  serverExternalPackages: ['pdf-parse', 'pdfjs-dist'],
+  serverExternalPackages: ['pdfjs-dist'],
   experimental: {
     optimizePackageImports: [
       'lucide-react',

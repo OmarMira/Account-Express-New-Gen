@@ -1,50 +1,107 @@
 // src/lib/services/direction-validation.ts
 // Centralized validation for GL account direction profiles
-// Ensures that the debit and credit GL accounts belong to the correct class based on the first digit of their code.
+// Ensures that the debit and credit GL accounts match their direction profile constraints
 
 import { db } from '@/lib/db';
+import { readFileSync, existsSync } from 'fs';
+import { join } from 'path';
+import { logger } from '@/lib/logger';
 
 /**
- * Validate that the provided GL account IDs match the expected direction profile for the company.
+ * Load direction profiles from rules/direction-profiles.json
+ * Format: { "1": { "normalBalance": "debit", "deviationThreshold": 0.85, "allowOpposite": true }, ... }
+ */
+function loadDirectionProfiles(): Record<
+  string,
+  { normalBalance: 'credit' | 'debit'; deviationThreshold: number; allowOpposite?: boolean }
+> {
+  const defaultProfiles: Record<
+    string,
+    { normalBalance: 'credit' | 'debit'; deviationThreshold: number; allowOpposite?: boolean }
+  > = {
+    '1': { normalBalance: 'debit', deviationThreshold: 0.85, allowOpposite: true },
+    '2': { normalBalance: 'credit', deviationThreshold: 0.9, allowOpposite: true },
+    '3': { normalBalance: 'credit', deviationThreshold: 0.9, allowOpposite: true },
+    '4': { normalBalance: 'credit', deviationThreshold: 0.9 },
+    '5': { normalBalance: 'debit', deviationThreshold: 0.85 },
+    '6': { normalBalance: 'debit', deviationThreshold: 0.85 },
+  };
+
+  try {
+    const profilePath = join(process.cwd(), 'rules/direction-profiles.json');
+    if (existsSync(profilePath)) {
+      const loaded = JSON.parse(readFileSync(profilePath, 'utf-8'));
+      return loaded;
+    }
+  } catch (err) {
+    logger.warn('DIRECTION_PROFILES_LOAD_FAILED', { error: String(err) });
+  }
+
+  return defaultProfiles;
+}
+
+/**
+ * Validate that the provided GL account IDs match the expected direction profile.
  *
  * @param companyId - The company to which the accounts belong.
  * @param debitGlAccountId - GL account ID used for debit transactions (optional).
  * @param creditGlAccountId - GL account ID used for credit transactions (optional).
- * @returns true if validation passes, otherwise throws an error.
+ * @returns true if validation passes, otherwise throws an error with detailed message.
  */
 export async function validateDirectionProfile(
   companyId: string,
   debitGlAccountId?: string | null,
   creditGlAccountId?: string | null,
 ): Promise<boolean> {
-  // Helper to fetch an account and extract its class (first digit of code)
-  const fetchClass = async (accountId: string) => {
+  const profiles = loadDirectionProfiles();
+
+  // Helper to fetch an account and validate against its direction profile
+  const validateAccount = async (
+    accountId: string,
+    direction: 'debit' | 'credit',
+  ): Promise<void> => {
     const acct = await db.glAccount.findUnique({
       where: { id: accountId, companyId },
     });
     if (!acct) {
-      throw new Error('GL account not found or does not belong to this company');
+      throw new Error(`GL account not found or does not belong to this company`);
     }
-    // Assume code is a string like "4..." where the first char indicates the class
-    return acct.code?.charAt(0);
+
+    const accountClass = acct.code?.charAt(0);
+    if (!accountClass) {
+      throw new Error(`Invalid GL account code format: ${acct.code}`);
+    }
+
+    const profile = profiles[accountClass];
+    if (!profile) {
+      // No profile exists for this class; allow it
+      return;
+    }
+
+    // Check if the account's normal balance matches the direction
+    const expectedBalance = profile.normalBalance;
+    const isOpposite =
+      direction === 'debit' ? expectedBalance === 'credit' : expectedBalance === 'debit';
+
+    if (isOpposite && !profile.allowOpposite) {
+      const directionLabel = direction === 'debit' ? 'débito' : 'crédito';
+      const balanceLabel = expectedBalance === 'debit' ? 'débito' : 'crédito';
+      throw new Error(
+        `GL account "${acct.name}" (${acct.code}) has a normal balance of ${balanceLabel} ` +
+          `but is being used for ${directionLabel} transactions. ` +
+          `Please select an account with matching direction profile or enable opposite transactions.`,
+      );
+    }
   };
 
   // Validate debit account if provided
   if (debitGlAccountId) {
-    const debitClass = await fetchClass(debitGlAccountId);
-    // Example rule: debit must be class "5" (expenses) – adjust as needed
-    if (debitClass !== '5') {
-      throw new Error('Debit GL account does not match required direction profile');
-    }
+    await validateAccount(debitGlAccountId, 'debit');
   }
 
   // Validate credit account if provided
   if (creditGlAccountId) {
-    const creditClass = await fetchClass(creditGlAccountId);
-    // Example rule: credit must be class "4" (income) – adjust as needed
-    if (creditClass !== '4') {
-      throw new Error('Credit GL account does not match required direction profile');
-    }
+    await validateAccount(creditGlAccountId, 'credit');
   }
 
   return true;

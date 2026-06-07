@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getSessionUserId } from '@/lib/sessions';
 import { apiHandler } from '@/lib/api-handler';
-import { AuthError, ForbiddenError, ValidationError } from '@/lib/api-error';
+import { requireCompanyContext } from '@/lib/context-storage';
+import { AuthError, ValidationError } from '@/lib/api-error';
+import { logger } from '@/lib/logger';
 import { aggregateAccountingFlow } from '@/lib/accounting/flow-aggregator';
 import { formatFlowToCSV } from '@/lib/accounting/export-formatter';
 
@@ -38,8 +39,7 @@ function checkRateLimit(ip: string): boolean {
  *   - endDate: string (ISO YYYY-MM-DD, requerido)
  */
 export const GET = apiHandler(async (request: NextRequest) => {
-  const userId = await getSessionUserId(request);
-  if (!userId) throw new AuthError();
+  const { userId, companyId } = requireCompanyContext();
 
   const ip = request.headers.get('x-forwarded-for') || '127.0.0.1';
   if (!checkRateLimit(ip)) {
@@ -52,13 +52,8 @@ export const GET = apiHandler(async (request: NextRequest) => {
   }
 
   const { searchParams } = new URL(request.url);
-  const companyId = searchParams.get('companyId');
   const startDateStr = searchParams.get('startDate');
   const endDateStr = searchParams.get('endDate');
-
-  if (!companyId) {
-    throw new ValidationError('El parámetro companyId es requerido');
-  }
 
   if (!startDateStr || !endDateStr) {
     throw new ValidationError(
@@ -66,19 +61,12 @@ export const GET = apiHandler(async (request: NextRequest) => {
     );
   }
 
-  // Verificar membresía
   const company = await db.company.findUnique({
     where: { id: companyId },
-    include: {
-      members: {
-        where: { userId },
-      },
-    },
+    select: { legalName: true },
   });
 
-  if (!company || company.members.length === 0) {
-    throw new ForbiddenError();
-  }
+  if (!company) throw new AuthError('Unauthorized');
 
   const startDate = new Date(startDateStr);
   const endDate = new Date(`${endDateStr}T23:59:59.999Z`);
@@ -94,17 +82,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
     endDate,
   });
 
-  // Log estructurado de auditoría (JSON)
-  console.log(
-    JSON.stringify({
-      level: 'info',
-      event: 'export_triggered',
-      companyId,
-      userId,
-      recordCount: data.transactions.length,
-      timestamp: new Date().toISOString(),
-    }),
-  );
+  logger.info('export_triggered', { companyId, userId, recordCount: data.transactions.length });
 
   const csvContent = formatFlowToCSV(data.transactions, company.legalName);
 

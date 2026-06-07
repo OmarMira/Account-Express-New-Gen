@@ -1,3 +1,4 @@
+import { logger } from '@/lib/logger';
 import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
 import path from 'path';
 import { pathToFileURL } from 'url';
@@ -7,7 +8,6 @@ import {
   updateRequiresReviewStatus,
   BankProfileTyped,
 } from './bank-profile-service';
-import { createProfileFromPdf, PdfAnalysisData } from './bank-profile-onboarding';
 
 // Force pdfjs-dist to use standard in-thread fake worker mode in Node/Bun to prevent worker thread loader crashes
 if (typeof window === 'undefined') {
@@ -49,8 +49,6 @@ export interface ParsedPDFResult {
   accountHolder?: string;
   mathValid?: boolean;
   mismatch?: number;
-  selfHealingAttempted?: boolean;
-  selfHealingSuccess?: boolean;
   warnings: string[];
 }
 
@@ -296,12 +294,16 @@ function parsePDFWithProfile(
     const lineText = line.text.trim();
     if (!lineText) continue;
 
-    console.log('  Line text:', lineText);
+    if (process.env.NODE_ENV === 'development') {
+      logger.info('Line text', { lineText });
+    }
 
     // Check stopSectionRegex
     if (rules.stopSectionRegex) {
       if (new RegExp(rules.stopSectionRegex, 'i').test(line.text)) {
-        console.log('  STOPPED by stopSectionRegex:', rules.stopSectionRegex);
+        if (process.env.NODE_ENV === 'development') {
+          logger.info('STOPPED by stopSectionRegex', { regex: rules.stopSectionRegex });
+        }
         break; // Detener parsing
       }
     }
@@ -311,14 +313,18 @@ function parsePDFWithProfile(
       continuationRegexes.some((r) => r.test(lineText)) ||
       (sectionContRegex && sectionContRegex.test(lineText));
     if (isContinuation) {
-      console.log('  Skipped: isContinuation');
+      if (process.env.NODE_ENV === 'development') {
+        logger.info('Skipped: isContinuation');
+      }
       continue;
     }
 
     // Ignore total lines
     const isTotal = totalRegexes.some((r) => r.test(lineText));
     if (isTotal) {
-      console.log('  Skipped: isTotal');
+      if (process.env.NODE_ENV === 'development') {
+        logger.info('Skipped: isTotal');
+      }
       continue;
     }
 
@@ -328,15 +334,23 @@ function parsePDFWithProfile(
       const textClean = el.text.trim();
       const match = relX >= anchorRange[0] && relX <= anchorRange[1] && anchorRegex.test(textClean);
       if (textClean.includes('/') || textClean.includes('-')) {
-        console.log(
-          `    Date Candidate: '${textClean}' relX: ${relX.toFixed(3)} range: [${anchorRange[0]}, ${anchorRange[1]}] regex: ${rules.anchor.regex} match: ${match}`,
-        );
+        if (process.env.NODE_ENV === 'development') {
+          logger.info('Date Candidate', {
+            text: textClean,
+            relX: relX.toFixed(3),
+            range: anchorRange,
+            regex: rules.anchor.regex,
+            match,
+          });
+        }
       }
       return match;
     });
 
     if (!dateEl) {
-      console.log('    Failed: No dateEl anchor');
+      if (process.env.NODE_ENV === 'development') {
+        logger.info('Failed: No dateEl anchor');
+      }
       continue;
     }
 
@@ -354,9 +368,14 @@ function parsePDFWithProfile(
           relX <= amountRange[1] &&
           PROFILE_CURRENCY_REGEX.test(textClean) &&
           !anchorRegex.test(textClean);
-        console.log(
-          `    Amount Candidate: '${textClean}' relX: ${relX.toFixed(3)} range: [${amountRange[0]}, ${amountRange[1]}] match: ${match}`,
-        );
+        if (process.env.NODE_ENV === 'development') {
+          logger.info('Amount Candidate', {
+            text: textClean,
+            relX: relX.toFixed(3),
+            range: amountRange,
+            match,
+          });
+        }
         return match;
       });
 
@@ -376,9 +395,14 @@ function parsePDFWithProfile(
               relX <= debitRange[1] &&
               PROFILE_CURRENCY_REGEX.test(textClean) &&
               !anchorRegex.test(textClean);
-            console.log(
-              `    Debit Candidate: '${textClean}' relX: ${relX.toFixed(3)} range: [${debitRange[0]}, ${debitRange[1]}] match: ${match}`,
-            );
+            if (process.env.NODE_ENV === 'development') {
+              logger.info('Debit Candidate', {
+                text: textClean,
+                relX: relX.toFixed(3),
+                range: debitRange,
+                match,
+              });
+            }
             return match;
           })
         : null;
@@ -392,9 +416,14 @@ function parsePDFWithProfile(
               relX <= creditRange[1] &&
               PROFILE_CURRENCY_REGEX.test(textClean) &&
               !anchorRegex.test(textClean);
-            console.log(
-              `    Credit Candidate: '${textClean}' relX: ${relX.toFixed(3)} range: [${creditRange[0]}, ${creditRange[1]}] match: ${match}`,
-            );
+            if (process.env.NODE_ENV === 'development') {
+              logger.info('Credit Candidate', {
+                text: textClean,
+                relX: relX.toFixed(3),
+                range: creditRange,
+                match,
+              });
+            }
             return match;
           })
         : null;
@@ -413,7 +442,9 @@ function parsePDFWithProfile(
     }
 
     if (!amountEl) {
-      console.log('    Failed: No amountEl');
+      if (process.env.NODE_ENV === 'development') {
+        logger.info('Failed: No amountEl');
+      }
       continue;
     }
 
@@ -540,19 +571,18 @@ function runParseWithProfile(
     }
   }
 
-  console.log('--- DEBUG RUN PARSE WITH PROFILE ---');
-  console.log('Bank Profile:', profile.bankName);
-  console.log('Fulltext Sample:', fullText.slice(0, 500));
-  console.log('Transactions parsed:', transactions);
-  console.log(
-    'Metadata Extracted: AccountNo:',
-    accountNo,
-    'Initial:',
-    openingBalance,
-    'Final:',
-    closingBalance,
-  );
-  console.log('Initial Match:', initialMatch, 'Final Match:', finalMatch);
+  if (process.env.NODE_ENV === 'development') {
+    logger.info('Run parse with profile', {
+      bankName: profile.bankName,
+      fullTextSample: fullText.slice(0, 500),
+      transactionCount: transactions.length,
+      accountNo,
+      openingBalance,
+      closingBalance,
+      initialMatch,
+      finalMatch,
+    });
+  }
 
   if (!initialMatch || !finalMatch) {
     warnings.push('No se pudo extraer el saldo inicial o final de la configuración del perfil.');
@@ -563,7 +593,12 @@ function runParseWithProfile(
     closingBalance,
     transactions,
   );
-  console.log('Math Validation:', mathValidation);
+  if (process.env.NODE_ENV === 'development') {
+    logger.info('Math validation', {
+      valid: mathValidation.valid,
+      difference: mathValidation.difference,
+    });
+  }
   const mathValid =
     !warnings.some((w) => w.includes('No se pudo extraer el saldo')) && mathValidation.valid;
   if (!mathValid && !warnings.some((w) => w.includes('No se pudo extraer el saldo'))) {
@@ -571,7 +606,9 @@ function runParseWithProfile(
       `Mathematical mismatch detected: difference $${mathValidation.difference.toFixed(2)}`,
     );
   }
-  console.log('Final MathValid:', mathValid, 'Warnings:', warnings);
+  if (process.env.NODE_ENV === 'development') {
+    logger.info('Final result', { mathValid, warnings });
+  }
 
   return {
     transactions,
@@ -683,22 +720,6 @@ export async function parsePDF(buffer: Buffer, options?: ParseOptions): Promise<
     }
   }
 
-  const firstPageSample = fullText.slice(0, 1000);
-  const blocksWithCoordinates = allElements.map((el) => ({
-    text: el.text,
-    x: el.x,
-    y: el.y,
-    width: el.width,
-    page: 1,
-  }));
-
-  const analysisData: PdfAnalysisData = {
-    fullText,
-    pageWidth,
-    blocksWithCoordinates,
-    firstPageSample,
-  };
-
   // 2. Try to match active profile by fingerprints (using some to support partial/test statement fingerprints)
   let matchedProfile: BankProfileTyped | null = null;
   try {
@@ -713,7 +734,7 @@ export async function parsePDF(buffer: Buffer, options?: ParseOptions): Promise<
       }
     }
   } catch (err) {
-    console.error('Error fetching active profiles:', err);
+    logger.error('Error fetching active profiles', { error: err });
   }
 
   let transactions: ParsedTransaction[] = [];
@@ -722,13 +743,40 @@ export async function parsePDF(buffer: Buffer, options?: ParseOptions): Promise<
   let closingBalance = 0;
   let mathValid = false;
   let mismatch = 0;
-  let selfHealingAttempted = false;
-  let selfHealingSuccess = false;
   const warnings: string[] = [];
   let accountHolder: string | undefined;
 
   if (matchedProfile) {
-    const parseResult = runParseWithProfile(linesOfElements, pageWidth, fullText, matchedProfile);
+    let parseResult = runParseWithProfile(linesOfElements, pageWidth, fullText, matchedProfile);
+
+    // Self-healing: if profile finds 0 transactions and allows it, try to re-onboard via LLM
+    if (!matchedProfile.requiresReview && parseResult.transactions.length === 0) {
+      try {
+        const { createProfileFromPdf } = await import('./bank-profile-onboarding');
+        const healedProfile = await createProfileFromPdf({
+          fullText,
+          pageWidth,
+          blocksWithCoordinates: allElements.map((el) => ({
+            text: el.text,
+            x: el.x,
+            y: el.y,
+            width: el.width,
+            page: 1,
+          })),
+          firstPageSample: fullText.slice(0, 2000),
+        });
+
+        if (healedProfile) {
+          parseResult = runParseWithProfile(linesOfElements, pageWidth, fullText, healedProfile);
+          if (parseResult.mathValid) {
+            await updateRequiresReviewStatus(healedProfile.bankId, false);
+          }
+        }
+      } catch {
+        // self-healing failed silently, keep original parse result
+      }
+    }
+
     transactions = parseResult.transactions;
     accountNo = parseResult.accountNo;
     openingBalance = parseResult.openingBalance;
@@ -748,90 +796,61 @@ export async function parsePDF(buffer: Buffer, options?: ParseOptions): Promise<
       endDate,
     );
 
-    const hasBalanceError = warnings.some((w) => w.includes('No se pudo extraer el saldo'));
-    if (!mathValid && !hasBalanceError) {
-      const cooldownHours = 24;
-      const timeSinceLastUpdate = Date.now() - new Date(matchedProfile.updatedAt).getTime();
-      const isInCooldown =
-        matchedProfile.requiresReview && timeSinceLastUpdate < cooldownHours * 60 * 60 * 1000;
-
-      if (isInCooldown) {
-        warnings.push(
-          'La reconciliación falló. Esto puede ser un error de origen del PDF o el perfil ya fue re-onboardeado recientemente.',
-        );
-      } else {
-        selfHealingAttempted = true;
-        console.log(`🔧 Self-Healing triggered for bank profile ${matchedProfile.bankId}`);
-
-        // No catch: if LLM fails, let it propagate and crash explicitly as requested
-        const healedProfile = await createProfileFromPdf(analysisData);
-        const healedResult = runParseWithProfile(
-          linesOfElements,
-          pageWidth,
-          fullText,
-          healedProfile,
-        );
-
-        if (healedResult.mathValid) {
-          selfHealingSuccess = true;
-          mathValid = true;
-          mismatch = healedResult.mismatch;
-          transactions = reconstructTransactionDates(
-            healedResult.transactions.map((t) => ({
-              dateStr: t.originalDateStr || t.date.toISOString(),
-              description: t.description,
-              amount: t.amount,
-              reference: t.reference,
-            })),
-            startDate,
-            endDate,
-          );
-          accountNo = healedResult.accountNo;
-          openingBalance = healedResult.openingBalance;
-          closingBalance = healedResult.closingBalance;
-
-          await updateRequiresReviewStatus(healedProfile.bankId, false);
-        } else {
-          selfHealingSuccess = false;
-          // Preserve original mismatch — don't overwrite with failed heal result
-          await updateRequiresReviewStatus(healedProfile.bankId, true);
-          warnings.push('El Self-Healing no pudo corregir la inconsistencia matemática.');
-        }
-      }
+    if (!mathValid) {
+      warnings.push(
+        'La reconciliación matemática falló. Las transacciones se importaron igual para revisión manual.',
+      );
     }
   } else {
-    // Unknown Bank: Invisible Onboarding (propagates error if LLM fails)
-    console.log('✨ Unknown bank statement. Triggering invisible onboarding...');
-    const inferredProfile = await createProfileFromPdf(analysisData);
-    const inferredResult = runParseWithProfile(
-      linesOfElements,
-      pageWidth,
-      fullText,
-      inferredProfile,
-    );
+    // Invisible onboarding: try to create profile via LLM inference
+    try {
+      const { createProfileFromPdf } = await import('./bank-profile-onboarding');
+      const newProfile = await createProfileFromPdf({
+        fullText,
+        pageWidth,
+        blocksWithCoordinates: allElements.map((el) => ({
+          text: el.text,
+          x: el.x,
+          y: el.y,
+          width: el.width,
+          page: 1,
+        })),
+        firstPageSample: fullText.slice(0, 2000),
+      });
 
-    transactions = reconstructTransactionDates(
-      inferredResult.transactions.map((t) => ({
-        dateStr: t.originalDateStr || t.date.toISOString(),
-        description: t.description,
-        amount: t.amount,
-        reference: t.reference,
-      })),
-      startDate,
-      endDate,
-    );
-    accountNo = inferredResult.accountNo;
-    openingBalance = inferredResult.openingBalance;
-    closingBalance = inferredResult.closingBalance;
-    mathValid = inferredResult.mathValid;
-    mismatch = inferredResult.mismatch;
-    warnings.push(...inferredResult.warnings);
+      matchedProfile = newProfile;
+      const parseResult = runParseWithProfile(linesOfElements, pageWidth, fullText, matchedProfile);
+      if (parseResult.mathValid && newProfile) {
+        await updateRequiresReviewStatus(newProfile.bankId, false);
+      }
+      transactions = parseResult.transactions;
+      accountNo = parseResult.accountNo;
+      openingBalance = parseResult.openingBalance;
+      closingBalance = parseResult.closingBalance;
+      mathValid = parseResult.mathValid;
+      mismatch = parseResult.mismatch;
+      warnings.push(...parseResult.warnings);
 
-    if (mathValid) {
-      await updateRequiresReviewStatus(inferredProfile.bankId, false);
-    } else {
-      await updateRequiresReviewStatus(inferredProfile.bankId, true);
-      warnings.push('El onboarding inicial resultó en inconsistencia matemática.');
+      transactions = reconstructTransactionDates(
+        transactions.map((t) => ({
+          dateStr: t.originalDateStr || t.date.toISOString(),
+          description: t.description,
+          amount: t.amount,
+          reference: t.reference,
+        })),
+        startDate,
+        endDate,
+      );
+
+      if (!mathValid) {
+        warnings.push(
+          'La reconciliación matemática falló. Las transacciones se importaron igual para revisión manual.',
+        );
+      }
+    } catch (onboardErr) {
+      warnings.push(
+        `No se encontró un perfil bancario y el onboarding automático falló: ${onboardErr instanceof Error ? onboardErr.message : String(onboardErr)}`,
+      );
     }
   }
 
@@ -875,6 +894,27 @@ export async function parsePDF(buffer: Buffer, options?: ParseOptions): Promise<
         accountHolder = val;
       }
     }
+
+    // Fallback: buscar nombre de empresa sin label (ej: BOA pone "LQ&OM LLC" suelto)
+    if (!accountHolder) {
+      const lines = fullText.split('\n');
+      const summaryIdx = lines.findIndex((l) => /Account summary|Beginning balance/i.test(l));
+      const searchStart = Math.max(0, summaryIdx - 8);
+      const searchEnd = summaryIdx > 0 ? summaryIdx : Math.min(20, lines.length);
+
+      for (let i = searchStart; i < searchEnd && !accountHolder; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        if (isAddressLine(line)) continue;
+        if (isHeaderOrServiceLine(line)) continue;
+        if (/\b(?:Account summary|Beginning balance|Account number|Page\b)\b/i.test(line)) continue;
+        if (
+          /\b(?:LLC|INC|CORP|L\.L\.C\.|I\.N\.C\.|CO|CO\.|LTD|LTDA|SA|S\.A\.|S\\s*A\b)\b/i.test(line)
+        ) {
+          accountHolder = line.replace(/!.*$/, '').trim();
+        }
+      }
+    }
   }
 
   // Create db audit log if mismatch is detected
@@ -896,9 +936,9 @@ export async function parsePDF(buffer: Buffer, options?: ParseOptions): Promise<
           }),
         },
       });
-      console.log(`📝 AuditLog created for math mismatch (difference: $${mismatch.toFixed(2)})`);
+      logger.info('AuditLog created for math mismatch', { mismatch });
     } catch (auditErr) {
-      console.error('Failed to create audit log for math mismatch:', auditErr);
+      logger.error('Failed to create audit log for math mismatch', { error: auditErr });
     }
   }
 
@@ -913,8 +953,6 @@ export async function parsePDF(buffer: Buffer, options?: ParseOptions): Promise<
     accountHolder,
     mathValid,
     mismatch,
-    selfHealingAttempted,
-    selfHealingSuccess,
     warnings,
   };
 }

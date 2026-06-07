@@ -1,224 +1,204 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getSessionUserId } from '@/lib/sessions';
+import { apiHandler } from '@/lib/api-handler';
+import { requireCompanyContext } from '@/lib/context-storage';
 
-export async function GET(request: NextRequest) {
-  try {
-    const userId = await getSessionUserId(request);
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+export const GET = apiHandler(async (request: NextRequest, context: { params: any }) => {
+  const { userId, companyId } = requireCompanyContext();
+
+  const { searchParams } = new URL(request.url);
+  const startDateParam = searchParams.get('startDate');
+  const endDateParam = searchParams.get('endDate');
+  const glAccountId = searchParams.get('glAccountId');
+  const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') ?? '25', 10) || 25));
+
+  // Build where clause
+  const where: Record<string, unknown> = {
+    companyId,
+    status: 'posted',
+  };
+
+  if (startDateParam || endDateParam) {
+    where.date = {};
+    if (startDateParam) {
+      (where.date as Record<string, unknown>).gte = new Date(startDateParam + 'T00:00:00.000Z');
     }
-
-    const { searchParams } = new URL(request.url);
-    const companyId = searchParams.get('companyId');
-    const startDateParam = searchParams.get('startDate');
-    const endDateParam = searchParams.get('endDate');
-    const glAccountId = searchParams.get('glAccountId');
-    const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') ?? '25', 10) || 25));
-
-    if (!companyId) {
-      return NextResponse.json({ error: 'companyId is required' }, { status: 400 });
+    if (endDateParam) {
+      (where.date as Record<string, unknown>).lte = new Date(endDateParam + 'T23:59:59.999Z');
     }
+  }
 
-    // Verify company membership
-    const membership = await db.companyMember.findFirst({
-      where: { userId, companyId },
-    });
-    if (!membership) {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
-    }
+  // Line filter for specific GL account
+  const lineWhere: Record<string, unknown> = {};
+  if (glAccountId) {
+    lineWhere.glAccountId = glAccountId;
+  }
 
-    // Build where clause
-    const where: Record<string, unknown> = {
-      companyId,
-      status: 'posted',
-    };
-
-    if (startDateParam || endDateParam) {
-      where.date = {};
-      if (startDateParam) {
-        (where.date as Record<string, unknown>).gte = new Date(startDateParam + 'T00:00:00.000Z');
-      }
-      if (endDateParam) {
-        (where.date as Record<string, unknown>).lte = new Date(endDateParam + 'T23:59:59.999Z');
-      }
-    }
-
-    // Line filter for specific GL account
-    const lineWhere: Record<string, unknown> = {};
-    if (glAccountId) {
-      lineWhere.glAccountId = glAccountId;
-    }
-
-    // Fetch real journal entries matching filter
-    const realEntries = await db.journalEntry.findMany({
-      where,
-      include: {
-        lines: {
-          include: {
-            glAccount: {
-              select: {
-                id: true,
-                code: true,
-                name: true,
-                accountType: true,
-                normalBalance: true,
-              },
+  // Fetch real journal entries matching filter
+  const realEntries = await db.journalEntry.findMany({
+    where,
+    include: {
+      lines: {
+        include: {
+          glAccount: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+              accountType: true,
+              normalBalance: true,
             },
           },
         },
       },
-      orderBy: { date: 'desc' },
-    });
+    },
+    orderBy: { date: 'desc' },
+  });
 
-    const realDescSet = new Set(realEntries.map((e) => e.description));
+  const realDescSet = new Set(realEntries.map((e) => e.description));
 
-    // Fetch virtual entries from reconciled bank transactions
-    const bankTxWhere: any = {
-      statement: { bankAccount: { companyId } },
-      isReconciled: true,
-      glAccountId: { not: null },
-    };
+  // Fetch virtual entries from reconciled bank transactions
+  const bankTxWhere: any = {
+    statement: { bankAccount: { companyId } },
+    isReconciled: true,
+    glAccountId: { not: null },
+  };
 
-    if (startDateParam || endDateParam) {
-      bankTxWhere.date = {};
-      if (startDateParam) bankTxWhere.date.gte = new Date(startDateParam + 'T00:00:00.000Z');
-      if (endDateParam) bankTxWhere.date.lte = new Date(endDateParam + 'T23:59:59.999Z');
-    }
+  if (startDateParam || endDateParam) {
+    bankTxWhere.date = {};
+    if (startDateParam) bankTxWhere.date.gte = new Date(startDateParam + 'T00:00:00.000Z');
+    if (endDateParam) bankTxWhere.date.lte = new Date(endDateParam + 'T23:59:59.999Z');
+  }
 
-    const reconciledTxs = await db.bankTransaction.findMany({
-      where: bankTxWhere,
-      select: {
-        id: true,
-        date: true,
-        amount: true,
-        description: true,
-        reference: true,
-        glAccount: {
-          select: { id: true, code: true, name: true, accountType: true, normalBalance: true },
-        },
-        statement: {
-          select: {
-            bankAccount: {
-              select: {
-                glAccount: {
-                  select: {
-                    id: true,
-                    code: true,
-                    name: true,
-                    accountType: true,
-                    normalBalance: true,
-                  },
+  const reconciledTxs = await db.bankTransaction.findMany({
+    where: bankTxWhere,
+    select: {
+      id: true,
+      date: true,
+      amount: true,
+      description: true,
+      reference: true,
+      glAccount: {
+        select: { id: true, code: true, name: true, accountType: true, normalBalance: true },
+      },
+      statement: {
+        select: {
+          bankAccount: {
+            select: {
+              glAccount: {
+                select: {
+                  id: true,
+                  code: true,
+                  name: true,
+                  accountType: true,
+                  normalBalance: true,
                 },
               },
             },
           },
         },
       },
+    },
+  });
+
+  // Convert real entries to standardized format
+  const combinedEntries: any[] = realEntries.map((entry) => ({
+    id: entry.id,
+    date: entry.date,
+    description: entry.description,
+    reference: entry.reference,
+    status: entry.status,
+    lines: entry.lines.map((l) => ({
+      id: l.id,
+      glAccountId: l.glAccountId,
+      accountCode: l.glAccount.code,
+      accountName: l.glAccount.name,
+      accountType: l.glAccount.accountType,
+      description: l.description,
+      debit: l.debit || 0,
+      credit: l.credit || 0,
+    })),
+  }));
+
+  // Add virtual entries
+  for (const tx of reconciledTxs) {
+    if (!tx.glAccount) continue;
+    if (realDescSet.has(`Reconciliation: ${tx.description}`)) continue;
+
+    const isDeposit = tx.amount > 0;
+    const absAmount = Math.abs(tx.amount);
+    const bankGlAccount = tx.statement.bankAccount.glAccount;
+
+    const lines: any[] = [];
+
+    // The assigned GL Account line
+    lines.push({
+      id: tx.id + '-1',
+      glAccountId: tx.glAccount.id,
+      accountCode: tx.glAccount.code,
+      accountName: tx.glAccount.name,
+      accountType: tx.glAccount.accountType,
+      description: tx.description,
+      debit: isDeposit ? 0 : absAmount,
+      credit: isDeposit ? absAmount : 0,
     });
 
-    // Convert real entries to standardized format
-    const combinedEntries: any[] = realEntries.map((entry) => ({
-      id: entry.id,
-      date: entry.date,
-      description: entry.description,
-      reference: entry.reference,
-      status: entry.status,
-      lines: entry.lines.map((l) => ({
-        id: l.id,
-        glAccountId: l.glAccountId,
-        accountCode: l.glAccount.code,
-        accountName: l.glAccount.name,
-        accountType: l.glAccount.accountType,
-        description: l.description,
-        debit: l.debit || 0,
-        credit: l.credit || 0,
-      })),
-    }));
-
-    // Add virtual entries
-    for (const tx of reconciledTxs) {
-      if (!tx.glAccount) continue;
-      if (realDescSet.has(`Reconciliation: ${tx.description}`)) continue;
-
-      const isDeposit = tx.amount > 0;
-      const absAmount = Math.abs(tx.amount);
-      const bankGlAccount = tx.statement.bankAccount.glAccount;
-
-      const lines: any[] = [];
-
-      // The assigned GL Account line
+    // The Bank Asset Account line
+    if (bankGlAccount) {
       lines.push({
-        id: tx.id + '-1',
-        glAccountId: tx.glAccount.id,
-        accountCode: tx.glAccount.code,
-        accountName: tx.glAccount.name,
-        accountType: tx.glAccount.accountType,
+        id: tx.id + '-2',
+        glAccountId: bankGlAccount.id,
+        accountCode: bankGlAccount.code,
+        accountName: bankGlAccount.name,
+        accountType: bankGlAccount.accountType,
         description: tx.description,
-        debit: isDeposit ? 0 : absAmount,
-        credit: isDeposit ? absAmount : 0,
-      });
-
-      // The Bank Asset Account line
-      if (bankGlAccount) {
-        lines.push({
-          id: tx.id + '-2',
-          glAccountId: bankGlAccount.id,
-          accountCode: bankGlAccount.code,
-          accountName: bankGlAccount.name,
-          accountType: bankGlAccount.accountType,
-          description: tx.description,
-          debit: isDeposit ? absAmount : 0,
-          credit: isDeposit ? 0 : absAmount,
-        });
-      }
-
-      combinedEntries.push({
-        id: tx.id,
-        date: tx.date,
-        description: tx.description,
-        reference: tx.reference,
-        status: 'posted',
-        lines,
+        debit: isDeposit ? absAmount : 0,
+        credit: isDeposit ? 0 : absAmount,
       });
     }
 
-    // Sort by date descending
-    combinedEntries.sort((a, b) => b.date.getTime() - a.date.getTime());
-
-    // Apply GL Account filter if provided
-    const filteredEntries = glAccountId
-      ? combinedEntries.filter((e) => e.lines.some((l: any) => l.glAccountId === glAccountId))
-      : combinedEntries;
-
-    const totalCount = filteredEntries.length;
-
-    // Paginate
-    const paginatedEntries = filteredEntries.slice((page - 1) * limit, page * limit);
-
-    const result = paginatedEntries.map((entry) => {
-      const totalDebit = entry.lines.reduce((sum: number, l: any) => sum + l.debit, 0);
-      const totalCredit = entry.lines.reduce((sum: number, l: any) => sum + l.credit, 0);
-      return {
-        ...entry,
-        date: entry.date.toISOString(),
-        _totalDebit: Math.round(totalDebit * 100) / 100,
-        _totalCredit: Math.round(totalCredit * 100) / 100,
-      };
+    combinedEntries.push({
+      id: tx.id,
+      date: tx.date,
+      description: tx.description,
+      reference: tx.reference,
+      status: 'posted',
+      lines,
     });
-
-    return NextResponse.json({
-      data: result,
-      pagination: {
-        page,
-        limit,
-        totalCount,
-        totalPages: Math.ceil(totalCount / limit),
-      },
-    });
-  } catch (error) {
-    console.error('[TRANSACTION REPORT ERROR]', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+
+  // Sort by date descending
+  combinedEntries.sort((a, b) => b.date.getTime() - a.date.getTime());
+
+  // Apply GL Account filter if provided
+  const filteredEntries = glAccountId
+    ? combinedEntries.filter((e) => e.lines.some((l: any) => l.glAccountId === glAccountId))
+    : combinedEntries;
+
+  const totalCount = filteredEntries.length;
+
+  // Paginate
+  const paginatedEntries = filteredEntries.slice((page - 1) * limit, page * limit);
+
+  const result = paginatedEntries.map((entry) => {
+    const totalDebit = entry.lines.reduce((sum: number, l: any) => sum + l.debit, 0);
+    const totalCredit = entry.lines.reduce((sum: number, l: any) => sum + l.credit, 0);
+    return {
+      ...entry,
+      date: entry.date.toISOString(),
+      _totalDebit: Math.round(totalDebit * 100) / 100,
+      _totalCredit: Math.round(totalCredit * 100) / 100,
+    };
+  });
+
+  return NextResponse.json({
+    data: result,
+    pagination: {
+      page,
+      limit,
+      totalCount,
+      totalPages: Math.ceil(totalCount / limit),
+    },
+  });
+});

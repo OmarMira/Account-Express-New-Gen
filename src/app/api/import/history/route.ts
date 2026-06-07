@@ -1,29 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getSessionUserId } from '@/lib/sessions';
+import { apiHandler } from '@/lib/api-handler';
+import { requireCompanyContext } from '@/lib/context-storage';
 
 // ─── GET /api/import/history?companyId=xxx ────────────────────────────
 // List all bank statements (import history) for a company
-export async function GET(request: NextRequest) {
-  const userId = await getSessionUserId(request);
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+export const GET = apiHandler(async (request: NextRequest, context: { params: any }) => {
+  const { userId, companyId } = requireCompanyContext();
 
   const { searchParams } = new URL(request.url);
-  const companyId = searchParams.get('companyId');
-
-  if (!companyId) {
-    return NextResponse.json({ error: 'companyId is required' }, { status: 400 });
-  }
-
-  // Verify membership
-  const membership = await db.companyMember.findUnique({
-    where: { userId_companyId: { userId, companyId } },
-  });
-  if (!membership) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
 
   try {
     const statements = await db.bankStatement.findMany({
@@ -82,4 +67,4 @@ export async function GET(request: NextRequest) {
     console.error('[IMPORT HISTORY ERROR]', error);
     return NextResponse.json({ error: 'Failed to fetch import history' }, { status: 500 });
   }
-}
+});

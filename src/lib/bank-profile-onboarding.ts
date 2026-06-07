@@ -1,3 +1,4 @@
+import { logger } from '@/lib/logger';
 import ZAI from 'z-ai-web-dev-sdk';
 import crypto from 'crypto';
 import {
@@ -302,9 +303,11 @@ ${JSON.stringify(coordinateSample, null, 2)}`;
 
   for (let attempt = 0; attempt < temperatures.length; attempt++) {
     try {
-      console.log(
-        `🤖 LLM Inference Attempt ${attempt + 1}/${temperatures.length} (temp = ${temperatures[attempt]})...`,
-      );
+      logger.info('LLM Inference Attempt', {
+        attempt: attempt + 1,
+        total: temperatures.length,
+        temperature: temperatures[attempt],
+      });
 
       // LLM execution with 15s timeout
       const response = await Promise.race([
@@ -349,9 +352,7 @@ ${JSON.stringify(coordinateSample, null, 2)}`;
         throw new Error('LLM did not generate any fingerprints. Cannot create profile.');
       }
       if (parsed.fingerprints.length < 3) {
-        console.warn(
-          `⚠️ LLM generated only ${parsed.fingerprints.length} fingerprints. Detection may be unreliable.`,
-        );
+        logger.warn('LLM generated few fingerprints', { count: parsed.fingerprints.length });
       }
 
       const validatedConfig = BankProfileConfigSchema.parse(parsed.config);
@@ -386,7 +387,9 @@ ${JSON.stringify(coordinateSample, null, 2)}`;
       const existingProfile = await findExistingProfile(fingerprints);
 
       if (existingProfile) {
-        console.log(`🔄 Updating existing profile ${existingProfile.bankId} with new config`);
+        logger.info('Updating existing profile with new config', {
+          bankId: existingProfile.bankId,
+        });
         const profile = await upsertBankProfile(
           existingProfile.bankId,
           existingProfile.bankName,
@@ -398,7 +401,7 @@ ${JSON.stringify(coordinateSample, null, 2)}`;
       } else {
         const sortedFp = [...fingerprints].sort().join('|');
         const bankId = `auto-${sha256(sortedFp).slice(0, 12)}`;
-        console.log(`✨ Creating new profile ${bankId}`);
+        logger.info('Creating new profile', { bankId });
         const profile = await upsertBankProfile(
           bankId,
           bankName,
@@ -409,7 +412,7 @@ ${JSON.stringify(coordinateSample, null, 2)}`;
         return profile;
       }
     } catch (err) {
-      console.warn(`⚠️ Inference attempt ${attempt + 1} failed:`, err);
+      logger.warn('Inference attempt failed', { attempt: attempt + 1, error: err });
       lastError = err;
     }
   }

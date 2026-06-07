@@ -4,29 +4,54 @@ import { apiHandler } from '@/lib/api-handler';
 import { validateRequest } from '@/lib/validate-request';
 import { loginSchema } from '@/lib/validations/auth';
 import { AuthService } from '@/services/auth.service';
+import { authRateLimiter } from '@/lib/rate-limiter';
 
 // ─── POST /api/auth/login ─────────────────────────────────────────────
-export const POST = apiHandler(async (request: NextRequest) => {
-  const body = await validateRequest(request, loginSchema);
-  if (body instanceof NextResponse) return body;
-  const result = await AuthService.login(body);
+export const POST = apiHandler(
+  async (request: NextRequest) => {
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || '127.0.0.1';
+    const body = await request.clone().json();
+    const email = typeof body?.email === 'string' ? body.email : undefined;
 
-  // Create session token using shared module
-  const token = await createSession(result.user.id);
+    const rateCheck = authRateLimiter.check(ip, email);
+    if (!rateCheck.success) {
+      return NextResponse.json(
+        {
+          error: 'Demasiados intentos de inicio de sesión. Intente nuevamente más tarde.',
+          code: 'RATE_LIMIT_EXCEEDED',
+        },
+        { status: 429 },
+      );
+    }
 
-  const response = NextResponse.json({
-    user: result.user,
-    companies: result.companies,
-  });
+    const validated = await validateRequest(request, loginSchema);
+    if (validated instanceof NextResponse) return validated;
 
-  // Set httpOnly cookie
-  response.cookies.set('session', token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/',
-    maxAge: 7 * 24 * 60 * 60, // 7 days
-  });
+    try {
+      const result = await AuthService.login(validated);
 
-  return response;
-});
+      authRateLimiter.reset(ip, email);
+
+      const token = await createSession(result.user.id);
+
+      const response = NextResponse.json({
+        user: result.user,
+        companies: result.companies,
+      });
+
+      response.cookies.set('session', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 7 * 24 * 60 * 60,
+      });
+
+      return response;
+    } catch (err) {
+      authRateLimiter.increment(ip, email);
+      throw err;
+    }
+  },
+  { allowAnonymous: true, requireMembership: false },
+);

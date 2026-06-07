@@ -1,25 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getSessionUserId } from '@/lib/sessions';
+import { apiHandler } from '@/lib/api-handler';
+import { requireCompanyContext } from '@/lib/context-storage';
 import { journalAccountsCache } from '@/lib/cache';
 
 // ─── GET /api/accounts?companyId=xxx&accountType=xxx&search=xxx ─────────
-export async function GET(request: NextRequest) {
-  const userId = await getSessionUserId(request);
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+export const GET = apiHandler(
+  async (request: NextRequest, context: { params: any }) => {
+    const { userId, companyId } = requireCompanyContext();
 
-  const { searchParams } = new URL(request.url);
-  const companyId = searchParams.get('companyId');
-  const accountType = searchParams.get('accountType');
-  const search = searchParams.get('search');
+    const { searchParams } = new URL(request.url);
+    const accountType = searchParams.get('accountType');
+    const search = searchParams.get('search');
 
-  if (!companyId) {
-    return NextResponse.json({ error: 'companyId is required' }, { status: 400 });
-  }
-
-  try {
     const where: Record<string, unknown> = { companyId };
 
     if (accountType && accountType !== 'all') {
@@ -93,22 +86,17 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.json({ accounts });
-  } catch (error) {
-    console.error('[ACCOUNTS LIST ERROR]', error);
-    return NextResponse.json({ error: 'Failed to fetch accounts' }, { status: 500 });
-  }
-}
+  },
+  { requireMembership: false },
+);
 
 // ─── POST /api/accounts ────────────────────────────────────────────────
-export async function POST(request: NextRequest) {
-  const userId = await getSessionUserId(request);
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+export const POST = apiHandler(
+  async (request: NextRequest, context: { params: any }) => {
+    const { userId, companyId } = requireCompanyContext();
 
-  try {
     const body = await request.json();
-    const { companyId, code, name, accountType, normalBalance, parentId } = body;
+    const { code, name, accountType, normalBalance, parentId } = body;
 
     // Validate required fields
     if (!companyId || !code || !name || !accountType || !normalBalance) {
@@ -186,8 +174,6 @@ export async function POST(request: NextRequest) {
     journalAccountsCache.invalidate(companyId);
 
     return NextResponse.json({ account }, { status: 201 });
-  } catch (error) {
-    console.error('[ACCOUNTS CREATE ERROR]', error);
-    return NextResponse.json({ error: 'Failed to create account' }, { status: 500 });
-  }
-}
+  },
+  { requireMembership: false },
+);

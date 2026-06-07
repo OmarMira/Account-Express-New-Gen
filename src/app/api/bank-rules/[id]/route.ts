@@ -1,17 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getSessionUserId } from '@/lib/sessions';
+import { apiHandler } from '@/lib/api-handler';
+import { requireCompanyContext } from '@/lib/context-storage';
 
 import { transactionMatchesRule } from '@/lib/services/rule-matching-engine';
 
 // ─── GET /api/bank-rules/[id] ──────────────────────────────────────
-export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const userId = await getSessionUserId(request);
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const { id } = await params;
+export const GET = apiHandler(async (request: NextRequest, context: { params: any }) => {
+  const { userId, companyId } = requireCompanyContext();
+  const { id } = await context.params;
 
   const rule = await db.bankRule.findUnique({
     where: { id },
@@ -29,110 +26,55 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ error: 'Rule not found' }, { status: 404 });
   }
 
-  // Verify user has access
-  const membership = await db.companyMember.findUnique({
-    where: { userId_companyId: { userId, companyId: rule.companyId } },
-  });
-  if (!membership) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
   return NextResponse.json({
     ...rule,
     createdAt: rule.createdAt.toISOString(),
     updatedAt: rule.updatedAt.toISOString(),
     _matchCount: rule._count.transactions,
   });
-}
+});
 
 // ─── PUT /api/bank-rules/[id] ──────────────────────────────────────
-export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const userId = await getSessionUserId(request);
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+export const PUT = apiHandler(async (request: NextRequest, context: { params: any }) => {
+  const { userId, companyId } = requireCompanyContext();
+  const { id } = await context.params;
+
+  const body = await request.json();
+  const {
+    name,
+    conditionType,
+    conditionValue,
+    transactionDirection,
+    glAccountId,
+    priority,
+    isActive,
+    conditions,
+    debitGlAccountId,
+    creditGlAccountId,
+  } = body;
+
+  // Find existing rule
+  const existing = await db.bankRule.findUnique({ where: { id } });
+  if (!existing) {
+    return NextResponse.json({ error: 'Rule not found' }, { status: 404 });
   }
 
-  const { id } = await params;
+  // Validate fields if provided
+  if (name !== undefined && !name.trim()) {
+    return NextResponse.json({ error: 'name cannot be empty' }, { status: 400 });
+  }
 
-  try {
-    const body = await request.json();
-    const {
-      name,
-      conditionType,
-      conditionValue,
-      transactionDirection,
-      glAccountId,
-      priority,
-      isActive,
-      conditions,
-      debitGlAccountId,
-      creditGlAccountId,
-    } = body;
-
-    // Find existing rule
-    const existing = await db.bankRule.findUnique({ where: { id } });
-    if (!existing) {
-      return NextResponse.json({ error: 'Rule not found' }, { status: 404 });
+  if (conditions !== undefined) {
+    if (!Array.isArray(conditions) || conditions.length === 0) {
+      return NextResponse.json({ error: 'conditions must be a non-empty array' }, { status: 400 });
     }
-
-    // Verify access
-    const membership = await db.companyMember.findUnique({
-      where: { userId_companyId: { userId, companyId: existing.companyId } },
-    });
-    if (!membership) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
-    // Validate fields if provided
-    if (name !== undefined && !name.trim()) {
-      return NextResponse.json({ error: 'name cannot be empty' }, { status: 400 });
-    }
-
-    if (conditions !== undefined) {
-      if (!Array.isArray(conditions) || conditions.length === 0) {
+    for (const cond of conditions) {
+      if (!cond.field || !['description', 'amount'].includes(cond.field.toLowerCase())) {
         return NextResponse.json(
-          { error: 'conditions must be a non-empty array' },
+          { error: "condition field must be 'description' or 'amount'" },
           { status: 400 },
         );
       }
-      for (const cond of conditions) {
-        if (!cond.field || !['description', 'amount'].includes(cond.field.toLowerCase())) {
-          return NextResponse.json(
-            { error: "condition field must be 'description' or 'amount'" },
-            { status: 400 },
-          );
-        }
-        const validConditionTypes = [
-          'contains',
-          'starts_with',
-          'ends_with',
-          'equals',
-          'amount_greater',
-          'amount_less',
-        ];
-        if (!cond.operator || !validConditionTypes.includes(cond.operator)) {
-          return NextResponse.json(
-            { error: `condition operator must be one of: ${validConditionTypes.join(', ')}` },
-            { status: 400 },
-          );
-        }
-        if (!cond.value || !cond.value.trim()) {
-          return NextResponse.json({ error: 'condition value cannot be empty' }, { status: 400 });
-        }
-        if (
-          (cond.operator === 'amount_greater' || cond.operator === 'amount_less') &&
-          isNaN(Number(cond.value))
-        ) {
-          return NextResponse.json(
-            { error: 'condition value must be a number for amount conditions' },
-            { status: 400 },
-          );
-        }
-      }
-    } else if (conditionType !== undefined || conditionValue !== undefined) {
-      const type = conditionType !== undefined ? conditionType : existing.conditionType;
-      const val = conditionValue !== undefined ? conditionValue : existing.conditionValue;
-
       const validConditionTypes = [
         'contains',
         'starts_with',
@@ -141,260 +83,249 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         'amount_greater',
         'amount_less',
       ];
-      if (!validConditionTypes.includes(type)) {
+      if (!cond.operator || !validConditionTypes.includes(cond.operator)) {
         return NextResponse.json(
-          { error: `conditionType must be one of: ${validConditionTypes.join(', ')}` },
+          { error: `condition operator must be one of: ${validConditionTypes.join(', ')}` },
           { status: 400 },
         );
       }
-      if (!val || !val.trim()) {
-        return NextResponse.json({ error: 'conditionValue cannot be empty' }, { status: 400 });
+      if (!cond.value || !cond.value.trim()) {
+        return NextResponse.json({ error: 'condition value cannot be empty' }, { status: 400 });
       }
-      if ((type === 'amount_greater' || type === 'amount_less') && isNaN(Number(val))) {
+      if (
+        (cond.operator === 'amount_greater' || cond.operator === 'amount_less') &&
+        isNaN(Number(cond.value))
+      ) {
         return NextResponse.json(
-          { error: 'conditionValue must be a number for amount conditions' },
-          { status: 400 },
-        );
-      }
-    }
-
-    if (glAccountId !== undefined) {
-      const glAccount = await db.glAccount.findFirst({
-        where: { id: glAccountId, companyId: existing.companyId },
-      });
-      if (!glAccount) {
-        return NextResponse.json(
-          { error: 'GL account not found or does not belong to this company' },
+          { error: 'condition value must be a number for amount conditions' },
           { status: 400 },
         );
       }
     }
+  } else if (conditionType !== undefined || conditionValue !== undefined) {
+    const type = conditionType !== undefined ? conditionType : existing.conditionType;
+    const val = conditionValue !== undefined ? conditionValue : existing.conditionValue;
 
-    if (debitGlAccountId !== undefined && debitGlAccountId !== null) {
-      const glAccount = await db.glAccount.findFirst({
-        where: { id: debitGlAccountId, companyId: existing.companyId },
-      });
-      if (!glAccount) {
-        return NextResponse.json(
-          { error: 'Debit GL account not found or does not belong to this company' },
-          { status: 400 },
-        );
-      }
+    const validConditionTypes = [
+      'contains',
+      'starts_with',
+      'ends_with',
+      'equals',
+      'amount_greater',
+      'amount_less',
+    ];
+    if (!validConditionTypes.includes(type)) {
+      return NextResponse.json(
+        { error: `conditionType must be one of: ${validConditionTypes.join(', ')}` },
+        { status: 400 },
+      );
     }
-
-    if (creditGlAccountId !== undefined && creditGlAccountId !== null) {
-      const glAccount = await db.glAccount.findFirst({
-        where: { id: creditGlAccountId, companyId: existing.companyId },
-      });
-      if (!glAccount) {
-        return NextResponse.json(
-          { error: 'Credit GL account not found or does not belong to this company' },
-          { status: 400 },
-        );
-      }
+    if (!val || !val.trim()) {
+      return NextResponse.json({ error: 'conditionValue cannot be empty' }, { status: 400 });
     }
-
-    if (priority !== undefined) {
-      const p = Math.round(priority);
-      if (p < 0 || p > 20) {
-        return NextResponse.json({ error: 'priority must be between 0 and 20' }, { status: 400 });
-      }
+    if ((type === 'amount_greater' || type === 'amount_less') && isNaN(Number(val))) {
+      return NextResponse.json(
+        { error: 'conditionValue must be a number for amount conditions' },
+        { status: 400 },
+      );
     }
-
-    const updateData: Record<string, unknown> = {};
-    if (name !== undefined) updateData.name = name.trim();
-    if (conditionType !== undefined) updateData.conditionType = conditionType;
-    if (conditionValue !== undefined) updateData.conditionValue = conditionValue.trim();
-
-    if (conditions !== undefined) {
-      updateData.conditions = conditions;
-      updateData.conditionType = conditions[0].operator;
-      updateData.conditionValue = conditions[0].value;
-    } else if (conditionType !== undefined || conditionValue !== undefined) {
-      const activeType = conditionType !== undefined ? conditionType : existing.conditionType;
-      const activeValue =
-        conditionValue !== undefined ? conditionValue.trim() : existing.conditionValue;
-      updateData.conditions = [
-        {
-          field: 'description',
-          operator: activeType,
-          value: activeValue,
-        },
-      ];
-    }
-
-    if (transactionDirection !== undefined) updateData.transactionDirection = transactionDirection;
-    if (glAccountId !== undefined) updateData.glAccountId = glAccountId;
-    if (debitGlAccountId !== undefined) updateData.debitGlAccountId = debitGlAccountId;
-    if (creditGlAccountId !== undefined) updateData.creditGlAccountId = creditGlAccountId;
-
-    const finalDebit =
-      debitGlAccountId !== undefined ? debitGlAccountId : existing.debitGlAccountId;
-    const finalCredit =
-      creditGlAccountId !== undefined ? creditGlAccountId : existing.creditGlAccountId;
-    const finalDirection =
-      transactionDirection !== undefined ? transactionDirection : existing.transactionDirection;
-    if (glAccountId === undefined) {
-      if (finalDirection === 'debit') {
-        updateData.glAccountId = finalDebit;
-      } else if (finalDirection === 'credit') {
-        updateData.glAccountId = finalCredit;
-      } else {
-        updateData.glAccountId = finalDebit || finalCredit || null;
-      }
-    }
-
-    if (priority !== undefined) updateData.priority = Math.round(priority);
-    if (isActive !== undefined) updateData.isActive = Boolean(isActive);
-
-    const rule = await db.bankRule.update({
-      where: { id },
-      data: updateData,
-      include: {
-        glAccount: {
-          select: { id: true, code: true, name: true, accountType: true },
-        },
-        debitGlAccount: {
-          select: { id: true, code: true, name: true, accountType: true },
-        },
-        creditGlAccount: {
-          select: { id: true, code: true, name: true, accountType: true },
-        },
-        _count: {
-          select: { transactions: true },
-        },
-      },
-    });
-
-    return NextResponse.json({
-      ...rule,
-      createdAt: rule.createdAt.toISOString(),
-      updatedAt: rule.updatedAt.toISOString(),
-      _matchCount: rule._count.transactions,
-    });
-  } catch (error) {
-    console.error('[BANK RULE UPDATE ERROR]', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+
+  if (glAccountId !== undefined) {
+    const glAccount = await db.glAccount.findFirst({
+      where: { id: glAccountId, companyId: existing.companyId },
+    });
+    if (!glAccount) {
+      return NextResponse.json(
+        { error: 'GL account not found or does not belong to this company' },
+        { status: 400 },
+      );
+    }
+  }
+
+  if (debitGlAccountId !== undefined && debitGlAccountId !== null) {
+    const glAccount = await db.glAccount.findFirst({
+      where: { id: debitGlAccountId, companyId: existing.companyId },
+    });
+    if (!glAccount) {
+      return NextResponse.json(
+        { error: 'Debit GL account not found or does not belong to this company' },
+        { status: 400 },
+      );
+    }
+  }
+
+  if (creditGlAccountId !== undefined && creditGlAccountId !== null) {
+    const glAccount = await db.glAccount.findFirst({
+      where: { id: creditGlAccountId, companyId: existing.companyId },
+    });
+    if (!glAccount) {
+      return NextResponse.json(
+        { error: 'Credit GL account not found or does not belong to this company' },
+        { status: 400 },
+      );
+    }
+  }
+
+  if (priority !== undefined) {
+    const p = Math.round(priority);
+    if (p < 0 || p > 20) {
+      return NextResponse.json({ error: 'priority must be between 0 and 20' }, { status: 400 });
+    }
+  }
+
+  const updateData: Record<string, unknown> = {};
+  if (name !== undefined) updateData.name = name.trim();
+  if (conditionType !== undefined) updateData.conditionType = conditionType;
+  if (conditionValue !== undefined) updateData.conditionValue = conditionValue.trim();
+
+  if (conditions !== undefined) {
+    updateData.conditions = conditions;
+    updateData.conditionType = conditions[0].operator;
+    updateData.conditionValue = conditions[0].value;
+  } else if (conditionType !== undefined || conditionValue !== undefined) {
+    const activeType = conditionType !== undefined ? conditionType : existing.conditionType;
+    const activeValue =
+      conditionValue !== undefined ? conditionValue.trim() : existing.conditionValue;
+    updateData.conditions = [
+      {
+        field: 'description',
+        operator: activeType,
+        value: activeValue,
+      },
+    ];
+  }
+
+  if (transactionDirection !== undefined) updateData.transactionDirection = transactionDirection;
+  if (glAccountId !== undefined) updateData.glAccountId = glAccountId;
+  if (debitGlAccountId !== undefined) updateData.debitGlAccountId = debitGlAccountId;
+  if (creditGlAccountId !== undefined) updateData.creditGlAccountId = creditGlAccountId;
+
+  const finalDebit = debitGlAccountId !== undefined ? debitGlAccountId : existing.debitGlAccountId;
+  const finalCredit =
+    creditGlAccountId !== undefined ? creditGlAccountId : existing.creditGlAccountId;
+  const finalDirection =
+    transactionDirection !== undefined ? transactionDirection : existing.transactionDirection;
+  if (glAccountId === undefined) {
+    if (finalDirection === 'debit') {
+      updateData.glAccountId = finalDebit;
+    } else if (finalDirection === 'credit') {
+      updateData.glAccountId = finalCredit;
+    } else {
+      updateData.glAccountId = finalDebit || finalCredit || null;
+    }
+  }
+
+  if (priority !== undefined) updateData.priority = Math.round(priority);
+  if (isActive !== undefined) updateData.isActive = Boolean(isActive);
+
+  const rule = await db.bankRule.update({
+    where: { id },
+    data: updateData,
+    include: {
+      glAccount: {
+        select: { id: true, code: true, name: true, accountType: true },
+      },
+      debitGlAccount: {
+        select: { id: true, code: true, name: true, accountType: true },
+      },
+      creditGlAccount: {
+        select: { id: true, code: true, name: true, accountType: true },
+      },
+      _count: {
+        select: { transactions: true },
+      },
+    },
+  });
+
+  return NextResponse.json({
+    ...rule,
+    createdAt: rule.createdAt.toISOString(),
+    updatedAt: rule.updatedAt.toISOString(),
+    _matchCount: rule._count.transactions,
+  });
+});
 
 // ─── DELETE /api/bank-rules/[id] ───────────────────────────────────
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  const userId = await getSessionUserId(request);
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+export const DELETE = apiHandler(async (request: NextRequest, context: { params: any }) => {
+  const { userId, companyId } = requireCompanyContext();
+  const { id } = await context.params;
+
+  const existing = await db.bankRule.findUnique({ where: { id } });
+  if (!existing) {
+    return NextResponse.json({ error: 'Rule not found' }, { status: 404 });
   }
 
-  const { id } = await params;
+  // Clear matchedRuleId from transactions that reference this rule
+  await db.bankTransaction.updateMany({
+    where: { matchedRuleId: id },
+    data: { matchedRuleId: null },
+  });
 
-  try {
-    const existing = await db.bankRule.findUnique({ where: { id } });
-    if (!existing) {
-      return NextResponse.json({ error: 'Rule not found' }, { status: 404 });
-    }
+  await db.bankRule.delete({ where: { id } });
 
-    // Verify access
-    const membership = await db.companyMember.findUnique({
-      where: { userId_companyId: { userId, companyId: existing.companyId } },
-    });
-    if (!membership) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
-    // Clear matchedRuleId from transactions that reference this rule
-    await db.bankTransaction.updateMany({
-      where: { matchedRuleId: id },
-      data: { matchedRuleId: null },
-    });
-
-    await db.bankRule.delete({ where: { id } });
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('[BANK RULE DELETE ERROR]', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
+  return NextResponse.json({ success: true });
+});
 
 // ─── POST /api/bank-rules/[id] (action=apply) ──────────────────────
 // Apply this single rule to all unmatched transactions.
 // Body: { action: 'apply' }
-export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const userId = await getSessionUserId(request);
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+export const POST = apiHandler(async (request: NextRequest, context: { params: any }) => {
+  const { userId, companyId } = requireCompanyContext();
+  const { id } = await context.params;
+
+  const body = await request.json();
+  const { action } = body;
+
+  if (action !== 'apply') {
+    return NextResponse.json({ error: "Invalid action. Use 'apply'." }, { status: 400 });
   }
 
-  const { id } = await params;
+  const rule = await db.bankRule.findUnique({
+    where: { id },
+  });
+  if (!rule) {
+    return NextResponse.json({ error: 'Rule not found' }, { status: 404 });
+  }
 
-  try {
-    const body = await request.json();
-    const { action } = body;
+  if (!rule.isActive) {
+    return NextResponse.json({ error: 'Cannot apply an inactive rule' }, { status: 400 });
+  }
 
-    if (action !== 'apply') {
-      return NextResponse.json({ error: "Invalid action. Use 'apply'." }, { status: 400 });
-    }
+  // Find all unmatched transactions for this company (via statements)
+  const companyStatements = await db.bankStatement.findMany({
+    where: { companyId: rule.companyId },
+    select: { id: true },
+  });
+  const statementIds = companyStatements.map((s) => s.id);
 
-    const rule = await db.bankRule.findUnique({
-      where: { id },
-    });
-    if (!rule) {
-      return NextResponse.json({ error: 'Rule not found' }, { status: 404 });
-    }
+  const unmatchedTransactions = await db.bankTransaction.findMany({
+    where: {
+      statementId: { in: statementIds },
+      isReconciled: false,
+      matchedRuleId: null,
+    },
+  });
 
-    if (!rule.isActive) {
-      return NextResponse.json({ error: 'Cannot apply an inactive rule' }, { status: 400 });
-    }
+  // Match transactions in memory
+  const matchedIds = unmatchedTransactions
+    .filter((tx) => transactionMatchesRule(tx, rule))
+    .map((tx) => tx.id);
 
-    // Verify access
-    const membership = await db.companyMember.findUnique({
-      where: { userId_companyId: { userId, companyId: rule.companyId } },
-    });
-    if (!membership) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
-    // Find all unmatched transactions for this company (via statements)
-    const companyStatements = await db.bankStatement.findMany({
-      where: { companyId: rule.companyId },
-      select: { id: true },
-    });
-    const statementIds = companyStatements.map((s) => s.id);
-
-    const unmatchedTransactions = await db.bankTransaction.findMany({
-      where: {
-        statementId: { in: statementIds },
-        isReconciled: false,
-        matchedRuleId: null,
+  // Update matched transactions
+  if (matchedIds.length > 0) {
+    await db.bankTransaction.updateMany({
+      where: { id: { in: matchedIds } },
+      data: {
+        glAccountId: rule.glAccountId,
+        matchedRuleId: rule.id,
       },
     });
-
-    // Match transactions in memory
-    const matchedIds = unmatchedTransactions
-      .filter((tx) => transactionMatchesRule(tx, rule))
-      .map((tx) => tx.id);
-
-    // Update matched transactions
-    if (matchedIds.length > 0) {
-      await db.bankTransaction.updateMany({
-        where: { id: { in: matchedIds } },
-        data: {
-          glAccountId: rule.glAccountId,
-          matchedRuleId: rule.id,
-        },
-      });
-    }
-
-    return NextResponse.json({
-      success: true,
-      matched: matchedIds.length,
-      total: unmatchedTransactions.length,
-    });
-  } catch (error) {
-    console.error('[BANK RULE APPLY ERROR]', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+
+  return NextResponse.json({
+    success: true,
+    matched: matchedIds.length,
+    total: unmatchedTransactions.length,
+  });
+});

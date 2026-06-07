@@ -1,32 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getSessionUserId } from '@/lib/sessions';
+import { apiHandler } from '@/lib/api-handler';
+import { requireCompanyContext } from '@/lib/context-storage';
 import { journalAccountsCache } from '@/lib/cache';
 
 // ─── GET /api/journal/accounts ──────────────────────────────────────
 // List active GL accounts for a company (used in account selector dropdown).
 // Query params: companyId
 // Returns: id, code, name, accountType, normalBalance
-export async function GET(request: NextRequest) {
-  const userId = await getSessionUserId(request);
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
+export const GET = apiHandler(async (request: NextRequest, context: { params: any }) => {
+  const { userId, companyId } = requireCompanyContext();
   const { searchParams } = new URL(request.url);
-  const companyId = searchParams.get('companyId');
-
-  if (!companyId) {
-    return NextResponse.json({ error: 'companyId is required' }, { status: 400 });
-  }
-
-  // Verify user has access to this company
-  const membership = await db.companyMember.findUnique({
-    where: { userId_companyId: { userId, companyId } },
-  });
-  if (!membership) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
 
   // Try cache first
   const cached = journalAccountsCache.get(companyId);
@@ -54,4 +38,4 @@ export async function GET(request: NextRequest) {
   journalAccountsCache.set(companyId, accounts);
 
   return NextResponse.json({ data: accounts });
-}
+});

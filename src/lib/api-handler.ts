@@ -1,27 +1,135 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { AppError } from './api-error';
-
+import { AppError, AuthError, ForbiddenError, ValidationError } from './api-error';
 import { getSessionUserId } from './sessions';
 import { checkRateLimit } from './security/rate-limiter';
+import { db } from './db';
+import { requestContext } from './context-storage';
 
+const API_SECURITY_HEADERS = {
+  'X-Frame-Options': 'DENY',
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+};
+
+export type RouteParams = Record<string, string>;
+export type RouteContext = { params: RouteParams | Promise<RouteParams> };
 type ApiHandler = (
   request: NextRequest,
-  context: { params: any },
+  context: RouteContext,
 ) => Promise<NextResponse> | NextResponse;
 
-export function apiHandler(handler: ApiHandler) {
-  return async (request: NextRequest, context: { params: any }) => {
-    try {
-      // 1. Obtener identificador único (sesión de usuario o IP para anónimos)
-      const userId =
-        (await getSessionUserId(request)) || request.headers.get('x-forwarded-for') || 'anonymous';
-      const { searchParams } = new URL(request.url);
-      const companyId = searchParams.get('companyId') || 'global';
+export interface ApiHandlerOptions {
+  requireMembership?: boolean; // Default: true
+  requireSuperAdmin?: boolean; // Default: false
+  allowAnonymous?: boolean; // Default: false
+}
 
-      // 2. Ejecutar validación de rate limit
+/**
+ * Extrae el companyId desde múltiples fuentes:
+ * 1. Query parameters (?companyId=xxx)
+ * 2. Cabeceras HTTP (x-company-id)
+ * 3. Cuerpo JSON de la petición (POST, PUT, PATCH, DELETE)
+ * 4. Datos de formulario Multipart (multipart/form-data)
+ */
+async function extractCompanyId(request: NextRequest): Promise<string | null> {
+  // 1. Query string (GET requests)
+  const { searchParams } = new URL(request.url);
+  const queryCompanyId = searchParams.get('companyId');
+  if (queryCompanyId) {
+    return queryCompanyId;
+  }
+
+  // 2. Headers
+  const headerCompanyId = request.headers.get('x-company-id');
+  if (headerCompanyId) {
+    return headerCompanyId;
+  }
+
+  // 3. Body (POST/PUT/PATCH/DELETE) - clone request to avoid consuming stream
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)) {
+    const contentType = request.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      try {
+        const body = await request.clone().json();
+        if (body?.companyId && typeof body.companyId === 'string') {
+          return body.companyId;
+        }
+      } catch {
+        // Ignorar errores de parseo JSON
+      }
+    } else if (contentType.includes('multipart/form-data')) {
+      try {
+        const formData = await request.clone().formData();
+        const companyId = formData.get('companyId');
+        if (companyId && typeof companyId === 'string') {
+          return companyId;
+        }
+      } catch {
+        // Ignorar errores de parseo FormData
+      }
+    }
+  }
+
+  return null;
+}
+
+export function apiHandler(handler: ApiHandler, options: ApiHandlerOptions = {}) {
+  const requireMembership = options.requireMembership ?? true;
+  const requireSuperAdmin = options.requireSuperAdmin ?? false;
+  const allowAnonymous = options.allowAnonymous ?? false;
+
+  return async (request: NextRequest, context: RouteContext) => {
+    try {
+      // 1. Obtener identificador único (sesión de usuario)
+      const userId = await getSessionUserId(request);
+
+      // Validar autenticación si no se permite anónimo
+      if (!userId && !allowAnonymous) {
+        throw new AuthError('Unauthorized');
+      }
+
+      // 2. Extraer companyId
+      const companyId: string | undefined = (await extractCompanyId(request)) ?? undefined;
+
+      // 3. Fetch user role una sola vez (para super_admin bypass y requireSuperAdmin)
+      let userRole: string | undefined;
+      const needsRole = requireSuperAdmin || (requireMembership && !!userId);
+      if (needsRole && userId) {
+        const user = await db.user.findUnique({
+          where: { id: userId },
+          select: { role: true },
+        });
+        userRole = user?.role;
+      }
+
+      // 4. Validar Super Admin si se requiere
+      if (requireSuperAdmin) {
+        if (userRole !== 'super_admin') {
+          throw new ForbiddenError('Forbidden');
+        }
+      }
+
+      // 5. Validar membresía de empresa (con bypass para super_admin)
+      if (requireMembership && userId) {
+        if (!companyId) {
+          throw new ValidationError('companyId is required');
+        }
+
+        if (userRole !== 'super_admin') {
+          const membership = await db.companyMember.findUnique({
+            where: { userId_companyId: { userId, companyId } },
+          });
+          if (!membership) {
+            throw new ForbiddenError('Forbidden');
+          }
+        }
+      }
+
+      // 5. Ejecutar validación de rate limit
+      const rateLimitKey = userId || request.headers.get('x-forwarded-for') || 'anonymous';
       const { allowed, limit, remaining, resetAt } = checkRateLimit(
-        userId,
-        companyId,
+        rateLimitKey,
+        companyId || 'global',
         request.nextUrl.pathname,
       );
       if (!allowed) {
@@ -39,10 +147,17 @@ export function apiHandler(handler: ApiHandler) {
         );
       }
 
-      const response = await handler(request, context);
+      // 6. Ejecutar el handler en AsyncLocalStorage
+      const response = await requestContext.run(
+        { userId: userId || 'anonymous', companyId: companyId || '' },
+        () => handler(request, context),
+      );
 
-      // 3. Inyectar cabeceras informativas del rate limit
+      // 7. Inyectar cabeceras de seguridad + rate limit
       if (response && response.headers) {
+        Object.entries(API_SECURITY_HEADERS).forEach(([key, value]) => {
+          response.headers.set(key, value);
+        });
         response.headers.set('X-RateLimit-Limit', limit.toString());
         response.headers.set('X-RateLimit-Remaining', remaining.toString());
         response.headers.set('X-RateLimit-Reset', resetAt.toString());
@@ -50,38 +165,34 @@ export function apiHandler(handler: ApiHandler) {
 
       return response;
     } catch (error: any) {
+      let errResponse: NextResponse;
       if (error instanceof AppError || (error && typeof error.statusCode === 'number')) {
-        return NextResponse.json(
+        errResponse = NextResponse.json(
           {
             error: error.message,
             code: error.code,
-            details: error.details,
+            ...(process.env.NODE_ENV === 'development' ? { details: error.details } : {}),
           },
           { status: error.statusCode },
         );
-      }
-
-      // Handle raw Prisma errors (like foreign key constraint or unique constraint violations)
-      if (error.code && error.clientVersion) {
-        // This is a Prisma error
+      } else if (error.code && error.clientVersion) {
         console.error('[PRISMA DB ERROR]', error);
-        return NextResponse.json(
-          {
-            error: 'Database constraint violation or error occurred.',
-            code: 'DATABASE_ERROR',
-          },
+        errResponse = NextResponse.json(
+          { error: 'Database constraint violation or error occurred.', code: 'DATABASE_ERROR' },
           { status: 400 },
+        );
+      } else {
+        console.error('[UNHANDLED API ERROR]', error);
+        errResponse = NextResponse.json(
+          { error: 'Internal server error', code: 'INTERNAL_SERVER_ERROR' },
+          { status: 500 },
         );
       }
 
-      console.error('[UNHANDLED API ERROR]', error);
-      return NextResponse.json(
-        {
-          error: 'Internal server error',
-          code: 'INTERNAL_SERVER_ERROR',
-        },
-        { status: 500 },
-      );
+      Object.entries(API_SECURITY_HEADERS).forEach(([key, value]) => {
+        errResponse.headers.set(key, value);
+      });
+      return errResponse;
     }
   };
 }

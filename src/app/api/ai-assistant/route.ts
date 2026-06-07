@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { logger } from '@/lib/logger';
 import { db } from '@/lib/db';
-import { getSessionUserId } from '@/lib/sessions';
+import { apiHandler } from '@/lib/api-handler';
+import { getRequestContext } from '@/lib/context-storage';
 import { AI_CONFIG } from '@/lib/constants/ai-config';
 import { createAuditLogWithRetry } from '@/lib/audit';
 import { extractKeywords } from '@/lib/memory/keyword-extractor';
+import { checkPromptInjection, addSystemDelimiter } from '@/lib/guardrails';
 import { join } from 'path';
 import { readFileSync, existsSync } from 'fs';
 
@@ -420,7 +423,7 @@ async function executeTool(name: string, args: any, companyId: string, userId?: 
               details: JSON.stringify({ title, type, keywords: cleanKeywordsCsv }),
             });
           } catch (auditErr) {
-            console.error('[FAILED TO WRITE SYSTEM MEMORY AUDIT LOG]', auditErr);
+            logger.error('Failed to write system memory audit log', { error: auditErr });
           }
         }
 
@@ -436,68 +439,68 @@ async function executeTool(name: string, args: any, companyId: string, userId?: 
         return { error: `Tool ${name} not found` };
     }
   } catch (error: any) {
-    console.error(`[Error executing tool ${name}]`, error);
+    logger.error('Error executing tool', { tool: name, error });
     return { error: error.message || 'Error executing query' };
   }
 }
 
 // ─── POST /api/ai-assistant ────────────────────────────────────────
-export async function POST(request: NextRequest) {
-  try {
-    const raw: unknown = await request.json();
-    const parsed = RequestBodySchema.safeParse(raw);
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: parsed.error.issues?.[0]?.message || 'Invalid request format' },
-        { status: 400 },
-      );
-    }
-    const { message, mode, companyId: bodyCompanyId, history, isWarmup } = parsed.data;
+export const POST = apiHandler(
+  async (request: NextRequest, context: { params: any }) => {
+    const { userId } = getRequestContext()!;
 
-    const userId = await getSessionUserId(request);
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    if (isWarmup) {
-      try {
-        console.log('[AI WARMUP] Starting LLM warmup call...');
-        await callAI([{ role: 'user', content: 'Hola' }]);
-        console.log('[AI WARMUP] Warmup call completed successfully.');
-        return NextResponse.json({ reply: 'Warmup completed successfully' });
-      } catch (err: any) {
-        console.error('[AI WARMUP ERROR] Failed to warm up LLM connection:', err.message || err);
-        return NextResponse.json({ error: 'Warmup failed' }, { status: 502 });
+    try {
+      const raw: unknown = await request.json();
+      const parsed = RequestBodySchema.safeParse(raw);
+      if (!parsed.success) {
+        return NextResponse.json(
+          { error: parsed.error.issues?.[0]?.message || 'Invalid request format' },
+          { status: 400 },
+        );
       }
-    }
+      const { message, mode, companyId: bodyCompanyId, history, isWarmup } = parsed.data;
 
-    let companyId = bodyCompanyId;
-    if (!companyId) {
-      const membership = await db.companyMember.findFirst({
-        where: { userId },
-        select: { companyId: true },
-      });
-      if (membership) {
-        companyId = membership.companyId;
+      if (isWarmup) {
+        try {
+          logger.info('Starting LLM warmup call');
+          await callAI([{ role: 'user', content: 'Hola' }]);
+          logger.info('AI warmup call completed successfully');
+          return NextResponse.json({ reply: 'Warmup completed successfully' });
+        } catch (err: any) {
+          logger.error('Failed to warm up LLM connection', { error: err.message || err });
+          return NextResponse.json({ error: 'Warmup failed' }, { status: 502 });
+        }
       }
-    } else {
-      const membership = await db.companyMember.findFirst({
-        where: { userId, companyId },
-      });
-      if (!membership) {
-        return NextResponse.json({ error: 'Forbidden: No membership found' }, { status: 403 });
-      }
-    }
 
-    if (mode === 'create-rule') {
-      return handleCreateRule(message, history, companyId, userId);
+      let companyId = bodyCompanyId;
+      if (!companyId) {
+        const membership = await db.companyMember.findFirst({
+          where: { userId },
+          select: { companyId: true },
+        });
+        if (membership) {
+          companyId = membership.companyId;
+        }
+      } else {
+        const membership = await db.companyMember.findFirst({
+          where: { userId, companyId },
+        });
+        if (!membership) {
+          return NextResponse.json({ error: 'Forbidden: No membership found' }, { status: 403 });
+        }
+      }
+
+      if (mode === 'create-rule') {
+        return handleCreateRule(message, history, companyId, userId);
+      }
+      return handleChat(message, history, companyId, userId);
+    } catch (error) {
+      logger.error('AI assistant error', { error });
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
-    return handleChat(message, history, companyId, userId);
-  } catch (error) {
-    console.error('[AI ASSISTANT ERROR]', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
+  },
+  { requireMembership: false },
+);
 
 // Helper to call the LLM via fetch with timeout, tool definition and error handling
 async function callAI(
@@ -552,7 +555,7 @@ async function callAI(
         body.tools = tools;
       }
 
-      console.log(`[AI ASSISTANT] Intentando llamar a modelo: ${currentModel}`);
+      logger.info('Trying AI model', { model: currentModel });
 
       const response = await fetch(`${baseUrl}/chat/completions`, {
         method: 'POST',
@@ -568,18 +571,18 @@ async function callAI(
       clearTimeout(timeout);
 
       if (response.status === 429) {
-        console.warn(
-          `[AI ASSISTANT] Modelo ${currentModel} saturado (Rate Limit 429). Intentando el siguiente en la lista...`,
-        );
+        logger.warn('Model rate limited (429), trying next model', { model: currentModel });
         lastError = new Error(`AI service error 429 for model ${currentModel}`);
         continue;
       }
 
       if (!response.ok) {
         const txt = await response.text();
-        console.error(
-          `[AI ASSISTANT] Error de servicio ${response.status} en modelo ${currentModel}: ${txt}`,
-        );
+        logger.error('AI service error', {
+          status: response.status,
+          model: currentModel,
+          responseText: txt,
+        });
         lastError = new Error(`AI service error ${response.status}: ${txt}`);
         continue;
       }
@@ -587,7 +590,7 @@ async function callAI(
       const data = await response.json();
       const parsed = AIResponseSchema.safeParse(data);
       if (!parsed.success) {
-        console.error('[AI RESPONSE PARSE ERROR]', parsed.error);
+        logger.error('AI response parse error', { zodError: parsed.error });
         throw new Error('Invalid AI response format');
       }
 
@@ -605,11 +608,11 @@ async function callAI(
         }
       }
 
-      console.log(`[AI ASSISTANT] Respuesta exitosa de OpenRouter usando: ${currentModel}`);
+      logger.info('AI response successful', { model: currentModel });
       return parsed.data;
     } catch (err: any) {
       clearTimeout(timeout);
-      console.error(`[AI ASSISTANT] Excepción con el modelo ${currentModel}:`, err.message || err);
+      logger.error('AI model exception', { model: currentModel, error: err.message || err });
       lastError = err;
       continue;
     }
@@ -624,11 +627,15 @@ async function retrieveMemories(
   companyId: string,
   locale: 'es' | 'en' = 'es',
 ): Promise<string> {
-  const configPath = join(process.cwd(), 'rules/memory-config.json');
-  if (!existsSync(configPath)) return '';
+  let config: { maxMemoriesToInject?: number; [key: string]: unknown };
+  try {
+    const { readJsonConfig } = await import('@/lib/config-loader');
+    config = await readJsonConfig<{ maxMemoriesToInject?: number }>('memory-config.json');
+  } catch {
+    return '';
+  }
 
   try {
-    const config = JSON.parse(readFileSync(configPath, 'utf-8'));
     const keywords = extractKeywords(message, locale);
     if (keywords.length === 0) return '';
 
@@ -676,7 +683,7 @@ async function retrieveMemories(
           },
         },
       })
-      .catch((err) => console.error('[MEMORY ACCESS UPDATE ERROR]', err));
+      .catch((err) => logger.error('Memory access update error', { error: err }));
 
     const formatted = memories
       .map((m) => `- [${m.type.toUpperCase()}] ${m.title}: ${m.content}`)
@@ -684,13 +691,20 @@ async function retrieveMemories(
 
     return `\n## Contexto Histórico del Sistema (Hechos/Preferencias Recordadas):\n${formatted}\n`;
   } catch (err) {
-    console.error('[RETRIEVE MEMORIES ERROR]', err);
+    logger.error('Retrieve memories error', { error: err });
     return '';
   }
 }
 
 // ─── Chat Mode ─────────────────────────────────────────────────────
 async function handleChat(message: string, history?: any[], companyId?: string, userId?: string) {
+  const guardrail = checkPromptInjection(message);
+  if (!guardrail.passed) {
+    return NextResponse.json({
+      reply: 'Lo siento, no puedo procesar ese mensaje. Contenido no permitido detectado.',
+    });
+  }
+
   const systemPrompt = `You are "Asistente Contable", a helpful and professional AI accounting assistant for the AccountExpress platform.
 
 LANGUAGE RULES:
@@ -775,7 +789,7 @@ YOUR STYLE:
               ? JSON.parse(toolCall.function.arguments)
               : toolCall.function.arguments;
         } catch (e) {
-          console.error('[Failed to parse tool arguments]', e);
+          logger.error('Failed to parse tool arguments', { error: e });
         }
 
         const result = await executeTool(toolCall.function.name, args, companyId, userId);
@@ -804,6 +818,13 @@ async function handleCreateRule(
   companyId?: string,
   userId?: string,
 ) {
+  const guardrail = checkPromptInjection(message);
+  if (!guardrail.passed) {
+    return NextResponse.json({
+      reply: 'Lo siento, no puedo procesar ese mensaje. Contenido no permitido detectado.',
+    });
+  }
+
   // 1. Obtener el plan de cuentas de la empresa para inyectarlo en el prompt del sistema
   let glAccountsList = '';
   if (companyId) {
@@ -817,7 +838,7 @@ async function handleCreateRule(
         .map((a) => `- [${a.code}] ${a.name} (${a.accountType})`)
         .join('\n');
     } catch (e) {
-      console.error('[Error fetching GL accounts for rule builder prompt]', e);
+      logger.error('Error fetching GL accounts for rule builder prompt', { error: e });
     }
   }
 
@@ -894,7 +915,7 @@ EXAMPLE OF COMPLETED BIFURCATED RULE RESPONSE:
   try {
     aiData = await callAI(apiMessages, undefined, true);
   } catch (aiError: any) {
-    console.error('[AI call failed in create-rule]', aiError.message);
+    logger.error('AI call failed in create-rule', { error: aiError.message });
     return NextResponse.json({
       reply:
         '⚠️ El modelo de IA no respondió a tiempo. Por favor, intenta de nuevo en unos segundos.',
@@ -929,7 +950,7 @@ EXAMPLE OF COMPLETED BIFURCATED RULE RESPONSE:
         reply = clarificationQuestion || '⚠️ Necesito más detalles para poder crear la regla.';
       }
     } else {
-      console.warn('[Zod validation failed for parsed rule]', ruleResult.error);
+      logger.warn('Zod validation failed for parsed rule', { zodError: ruleResult.error });
       // If we extracted a clarification question before Zod failed, use it
       if (clarificationQuestion) {
         reply = clarificationQuestion;
@@ -939,7 +960,7 @@ EXAMPLE OF COMPLETED BIFURCATED RULE RESPONSE:
       }
     }
   } catch (e: any) {
-    console.error('[Error parsing rule JSON]', e, 'Raw reply was:', rawReply);
+    logger.error('Error parsing rule JSON', { error: e, rawReply });
     // If the AI returned plain text instead of JSON, use it as the reply
     if (rawReply && rawReply.length > 10 && !rawReply.startsWith('{')) {
       reply = rawReply;

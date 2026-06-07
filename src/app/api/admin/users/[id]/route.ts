@@ -1,72 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getSessionUserId } from '@/lib/sessions';
+import { apiHandler, RouteContext } from '@/lib/api-handler';
+import { requireCompanyContext } from '@/lib/context-storage';
 import { hashPassword } from '@/lib/auth';
 import { saveLogo, deleteLogo } from '@/lib/uploads/logo-service';
+import { updateUserSchema } from '@/lib/validations/admin';
+import { parseAdminBody } from '@/lib/parse-admin-body';
 
-export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  try {
-    const sessionUserId = await getSessionUserId(request);
-    if (!sessionUserId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+export const PATCH = apiHandler(
+  async (request: NextRequest, context: RouteContext) => {
+    const { userId } = requireCompanyContext();
+    const { id } = await context.params;
 
-    const sessionUser = await db.user.findUnique({ where: { id: sessionUserId } });
-    if (!sessionUser || sessionUser.role !== 'super_admin') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
-    const { id } = await params;
     const contentType = request.headers.get('content-type') || '';
-    let firstName,
-      lastName,
-      email,
-      role,
-      isActive,
-      password,
-      phone,
-      streetLine1,
-      streetLine2,
-      city,
-      state,
-      zipCode,
-      avatarCleared,
-      avatarFile;
+    const isFormData = contentType.includes('multipart/form-data');
 
-    if (contentType.includes('multipart/form-data')) {
-      const formData = await request.formData();
-      firstName = formData.get('firstName') as string | null;
-      lastName = formData.get('lastName') as string | null;
-      email = formData.get('email') as string | null;
-      role = formData.get('role') as string | null;
-      isActive =
-        formData.get('isActive') !== null ? formData.get('isActive') === 'true' : undefined;
-      password = formData.get('password') as string | null;
-      phone = formData.get('phone') as string | null;
-      streetLine1 = formData.get('streetLine1') as string | null;
-      streetLine2 = formData.get('streetLine2') as string | null;
-      city = formData.get('city') as string | null;
-      state = formData.get('state') as string | null;
-      zipCode = formData.get('zipCode') as string | null;
+    let avatarCleared = false;
+    let avatarFile: File | null = null;
+
+    if (isFormData) {
+      const formData = await request.clone().formData();
       avatarCleared = formData.get('avatarCleared') === 'true';
-      avatarFile = formData.get('avatar') as File | null;
-    } else {
-      const body = await request.json();
-      firstName = body.firstName;
-      lastName = body.lastName;
-      email = body.email;
-      role = body.role;
-      isActive = body.isActive;
-      password = body.password;
-      phone = body.phone;
-      streetLine1 = body.streetLine1;
-      streetLine2 = body.streetLine2;
-      city = body.city;
-      state = body.state;
-      zipCode = body.zipCode;
-      avatarCleared = body.avatarCleared === true;
-      avatarFile = null;
     }
+
+    const parsed = await parseAdminBody(request, updateUserSchema, (raw) => ({
+      ...raw,
+      isActive: raw.isActive !== undefined ? raw.isActive === 'true' : undefined,
+    }));
+    if (!parsed.ok) return parsed.error;
+
+    avatarFile = parsed.body.files.get('avatar') ?? null;
 
     const userExists = await db.user.findUnique({
       where: { id },
@@ -77,10 +40,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    let newAvatarPath: string | undefined = undefined;
+    let newAvatarPath: string | undefined;
     let shouldUpdateAvatar = false;
 
-    if (avatarFile && avatarFile.size > 0) {
+    if (avatarFile) {
       newAvatarPath = await saveLogo(avatarFile);
       if (userExists.avatar) {
         await deleteLogo(userExists.avatar);
@@ -94,21 +57,23 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       shouldUpdateAvatar = true;
     }
 
-    const data: any = {};
-    if (firstName !== undefined && firstName !== null) data.firstName = firstName.trim();
-    if (lastName !== undefined && lastName !== null) data.lastName = lastName.trim();
-    if (email !== undefined && email !== null) data.email = email.toLowerCase().trim();
-    if (role !== undefined && role !== null) data.role = role;
-    if (isActive !== undefined) data.isActive = isActive;
-    if (password !== undefined && password !== null && password.trim() !== '') {
-      data.passwordHash = await hashPassword(password);
+    const fields = parsed.body.data;
+    const data: Record<string, unknown> = {};
+
+    if (fields.firstName !== undefined) data.firstName = fields.firstName.trim();
+    if (fields.lastName !== undefined) data.lastName = fields.lastName.trim();
+    if (fields.email !== undefined) data.email = fields.email.toLowerCase().trim();
+    if (fields.role !== undefined) data.role = fields.role;
+    if (fields.isActive !== undefined) data.isActive = fields.isActive;
+    if (fields.password !== undefined && fields.password.trim() !== '') {
+      data.passwordHash = await hashPassword(fields.password);
     }
-    if (phone !== undefined && phone !== null) data.phone = phone.trim();
-    if (streetLine1 !== undefined && streetLine1 !== null) data.streetLine1 = streetLine1.trim();
-    if (streetLine2 !== undefined && streetLine2 !== null) data.streetLine2 = streetLine2.trim();
-    if (city !== undefined && city !== null) data.city = city.trim();
-    if (state !== undefined && state !== null) data.state = state;
-    if (zipCode !== undefined && zipCode !== null) data.zipCode = zipCode.trim();
+    if (fields.phone !== undefined) data.phone = fields.phone.trim();
+    if (fields.streetLine1 !== undefined) data.streetLine1 = fields.streetLine1.trim();
+    if (fields.streetLine2 !== undefined) data.streetLine2 = fields.streetLine2.trim();
+    if (fields.city !== undefined) data.city = fields.city.trim();
+    if (fields.state !== undefined) data.state = fields.state;
+    if (fields.zipCode !== undefined) data.zipCode = fields.zipCode.trim();
     if (shouldUpdateAvatar) {
       data.avatar = newAvatarPath === '' ? '' : newAvatarPath;
     }
@@ -135,7 +100,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     await db.auditLog.create({
       data: {
-        userId: sessionUserId,
+        userId,
         action: 'update_user',
         entity: 'User',
         entityId: updatedUser.id,
@@ -144,30 +109,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     });
 
     return NextResponse.json({ user: updatedUser });
-  } catch (error) {
-    console.error('[ADMIN USER PATCH]', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
+  },
+  { requireSuperAdmin: true },
+);
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
-    const sessionUserId = await getSessionUserId(request);
-    if (!sessionUserId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+export const DELETE = apiHandler(
+  async (_request: NextRequest, context: RouteContext) => {
+    const { userId } = requireCompanyContext();
+    const { id } = await context.params;
 
-    const sessionUser = await db.user.findUnique({ where: { id: sessionUserId } });
-    if (!sessionUser || sessionUser.role !== 'super_admin') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
-    const { id } = await params;
-
-    if (sessionUserId === id) {
+    if (userId === id) {
       return NextResponse.json({ error: 'Cannot delete yourself' }, { status: 400 });
     }
 
@@ -180,7 +131,7 @@ export async function DELETE(
 
     await db.auditLog.create({
       data: {
-        userId: sessionUserId,
+        userId,
         action: 'delete_user',
         entity: 'User',
         entityId: id,
@@ -189,8 +140,6 @@ export async function DELETE(
     });
 
     return NextResponse.json({ message: 'User deleted successfully' });
-  } catch (error) {
-    console.error('[ADMIN USER DELETE]', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
+  },
+  { requireSuperAdmin: true },
+);

@@ -1,20 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getSessionUserId } from '@/lib/sessions';
+import { apiHandler } from '@/lib/api-handler';
+import { requireCompanyContext } from '@/lib/context-storage';
 
-export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  try {
-    const userId = await getSessionUserId(request);
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+export const GET = apiHandler(
+  async (request: NextRequest, context: { params: any }) => {
+    const { userId } = requireCompanyContext();
 
-    const user = await db.user.findUnique({ where: { id: userId } });
-    if (!user || user.role !== 'super_admin') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
-    const { id: companyId } = await params;
+    const { id: companyId } = await context.params;
 
     // Get current members of company
     const members = await db.companyMember.findMany({
@@ -46,25 +39,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     });
 
     return NextResponse.json({ members, allUsers });
-  } catch (error) {
-    console.error('[ADMIN COMPANY MEMBERS GET]', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
+  },
+  { requireSuperAdmin: true },
+);
 
-export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  try {
-    const userId = await getSessionUserId(request);
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+export const POST = apiHandler(
+  async (request: NextRequest, context: { params: any }) => {
+    const { userId } = requireCompanyContext();
 
-    const user = await db.user.findUnique({ where: { id: userId } });
-    if (!user || user.role !== 'super_admin') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
-    const { id: companyId } = await params;
+    const { id: companyId } = await context.params;
     const body = await request.json();
     const { userId: targetUserId, role = 'company_admin' } = body;
 
@@ -119,8 +102,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     });
 
     return NextResponse.json({ member }, { status: 201 });
-  } catch (error) {
-    console.error('[ADMIN COMPANY MEMBERS POST]', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
+  },
+  { requireSuperAdmin: true },
+);

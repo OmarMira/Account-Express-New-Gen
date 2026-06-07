@@ -1,33 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { apiHandler } from '@/lib/api-handler';
 import { db } from '@/lib/db';
-import { readFileSync } from 'fs';
-import { join } from 'path';
-import { getSessionUserId } from '@/lib/sessions';
+import { requireCompanyContext } from '@/lib/context-storage';
+import { readJsonConfig } from '@/lib/config-loader';
 
 export const GET = apiHandler(async (req: NextRequest) => {
-  const userId = await getSessionUserId(req);
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const { userId, companyId } = requireCompanyContext();
 
-  const { searchParams } = new URL(req.url);
-  const companyId = searchParams.get('companyId');
-  if (!companyId) {
-    return NextResponse.json({ error: 'companyId is required' }, { status: 400 });
-  }
-
-  // Verificar membresía del usuario
-  const membership = await db.companyMember.findFirst({
-    where: { userId, companyId },
-  });
-  if (!membership) {
-    return NextResponse.json({ error: 'Access denied' }, { status: 403 });
-  }
-
-  const config = JSON.parse(
-    readFileSync(join(process.cwd(), 'rules/dashboard-config.json'), 'utf-8'),
-  );
+  const config = await readJsonConfig<any>('dashboard-config.json');
   const now = new Date();
 
   // Descubrir el año fiscal activo prioritariamente en base a las transacciones bancarias importadas

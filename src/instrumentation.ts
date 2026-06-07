@@ -48,10 +48,20 @@ export async function register() {
     const { optimizeSQLite } = await import('./lib/db-optimizer');
     const { resetMetrics } = await import('./lib/metrics');
     const { startSessionCleanupInterval } = await import('./lib/maintenance/cleanupSessions');
+    const { decrypt } = await import('./lib/crypto');
 
     await optimizeSQLite();
     resetMetrics();
     startSessionCleanupInterval();
+
+    // Auto-decrypt API key at startup if encrypted variant exists
+    if (process.env.AI_API_KEY_ENCRYPTED && !process.env.AI_API_KEY) {
+      try {
+        process.env.AI_API_KEY = decrypt(process.env.AI_API_KEY_ENCRYPTED);
+      } catch {
+        // encrypted key exists but decryption failed (e.g. SESSION_SECRET changed)
+      }
+    }
   }
 }
 

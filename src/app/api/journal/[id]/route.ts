@@ -1,68 +1,64 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getSessionUserId } from '@/lib/sessions';
+import { apiHandler } from '@/lib/api-handler';
+import { requireCompanyContext } from '@/lib/context-storage';
 
 // ─── GET /api/journal/[id] ──────────────────────────────────────────
 // Get a single journal entry with all lines and GL account info.
-export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const userId = await getSessionUserId(request);
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+export const GET = apiHandler(
+  async (request: NextRequest, context: { params: any }) => {
+    const { userId } = requireCompanyContext();
+    const { id } = await context.params;
 
-  const { id } = await params;
-
-  const entry = await db.journalEntry.findUnique({
-    where: { id },
-    include: {
-      lines: {
-        include: {
-          glAccount: {
-            select: {
-              id: true,
-              code: true,
-              name: true,
-              accountType: true,
-              normalBalance: true,
+    const entry = await db.journalEntry.findUnique({
+      where: { id },
+      include: {
+        lines: {
+          include: {
+            glAccount: {
+              select: {
+                id: true,
+                code: true,
+                name: true,
+                accountType: true,
+                normalBalance: true,
+              },
             },
           },
+          orderBy: { id: 'asc' },
         },
-        orderBy: { id: 'asc' },
       },
-    },
-  });
+    });
 
-  if (!entry) {
-    return NextResponse.json({ error: 'Entry not found' }, { status: 404 });
-  }
+    if (!entry) {
+      return NextResponse.json({ error: 'Entry not found' }, { status: 404 });
+    }
 
-  // Verify user has access
-  const membership = await db.companyMember.findUnique({
-    where: { userId_companyId: { userId, companyId: entry.companyId } },
-  });
-  if (!membership) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+    // Verify user has access
+    const membership = await db.companyMember.findUnique({
+      where: { userId_companyId: { userId, companyId: entry.companyId } },
+    });
+    if (!membership) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
-  return NextResponse.json({
-    ...entry,
-    date: entry.date.toISOString(),
-    createdAt: entry.createdAt.toISOString(),
-    updatedAt: entry.updatedAt.toISOString(),
-  });
-}
+    return NextResponse.json({
+      ...entry,
+      date: entry.date.toISOString(),
+      createdAt: entry.createdAt.toISOString(),
+      updatedAt: entry.updatedAt.toISOString(),
+    });
+  },
+  { requireMembership: false },
+);
 
 // ─── PUT /api/journal/[id] ──────────────────────────────────────────
 // Update a draft journal entry. Posted/void entries cannot be modified.
-export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const userId = await getSessionUserId(request);
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+export const PUT = apiHandler(
+  async (request: NextRequest, context: { params: any }) => {
+    const { userId } = requireCompanyContext();
+    const { id } = await context.params;
 
-  const { id } = await params;
-
-  try {
     // Verify entry exists and is a draft
     const existing = await db.journalEntry.findUnique({
       where: { id },
@@ -200,24 +196,18 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       createdAt: updated.createdAt.toISOString(),
       updatedAt: updated.updatedAt.toISOString(),
     });
-  } catch (error) {
-    console.error('[JOURNAL UPDATE ERROR]', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
+  },
+  { requireMembership: false },
+);
 
 // ─── POST /api/journal/[id] ─────────────────────────────────────────
 // Actions: post | void
 // Body: { action: 'post' | 'void' }
-export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const userId = await getSessionUserId(request);
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+export const POST = apiHandler(
+  async (request: NextRequest, context: { params: any }) => {
+    const { userId } = requireCompanyContext();
+    const { id } = await context.params;
 
-  const { id } = await params;
-
-  try {
     const entry = await db.journalEntry.findUnique({
       where: { id },
       include: { lines: true },
@@ -305,8 +295,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     return NextResponse.json({ error: 'Invalid action. Use "post" or "void".' }, { status: 400 });
-  } catch (error) {
-    console.error('[JOURNAL ACTION ERROR]', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
+  },
+  { requireMembership: false },
+);

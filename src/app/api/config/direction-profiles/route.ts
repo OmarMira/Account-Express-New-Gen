@@ -1,11 +1,9 @@
 import { NextResponse } from 'next/server';
-import { readFileSync } from 'fs';
-import { join } from 'path';
+import { readJsonConfig } from '@/lib/config-loader';
 
 export async function GET() {
   try {
-    const filePath = join(process.cwd(), 'rules/direction-profiles.json');
-    const profiles = JSON.parse(readFileSync(filePath, 'utf-8'));
+    const profiles = await readJsonConfig('direction-profiles.json');
     return NextResponse.json({ success: true, data: profiles });
   } catch (err) {
     console.error('[DIRECTION PROFILES CONFIG ERROR]', err);

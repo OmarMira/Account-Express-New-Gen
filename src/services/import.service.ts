@@ -1,3 +1,4 @@
+import { logger } from '@/lib/logger';
 import { db } from '@/lib/db';
 import { createAuditLogWithRetry } from '@/lib/audit';
 import { parseCSV } from '@/lib/csv-parser';
@@ -12,6 +13,7 @@ import {
   NotFoundError,
   ConflictError,
   BankAccountRequiredError,
+  MathMismatchError,
 } from '@/lib/api-error';
 import { trackPDFParseDuration } from '@/lib/metrics';
 import { withTiming } from '@/lib/timing';
@@ -47,8 +49,6 @@ export class ImportService {
     userId?: string;
     bypassHolderValidation?: boolean;
   }): Promise<ImportResult> {
-    const newAccountCreated = !bankAccountId;
-
     // ─── PDF parsing ──────────────────────────────────────────────────
     if (extension === 'pdf') {
       let transactions: any[] = [];
@@ -62,8 +62,21 @@ export class ImportService {
 
       try {
         const pdfStart = performance.now();
-        const parsed = await parsePDFAsync(buffer);
+        logger.info('Starting PDF parse', { fileName });
+        const parsed = await parsePDFAsync(buffer, { fileName, companyId, userId });
         trackPDFParseDuration(fileName, performance.now() - pdfStart);
+        logger.info('PDF parsed', {
+          fileName,
+          durationSec: Number(((performance.now() - pdfStart) / 1000).toFixed(1)),
+          transactionCount: parsed.transactions.length,
+        });
+
+        if (parsed.mathValid === false) {
+          logger.warn('Math mismatch — saving with warning for manual review', {
+            mismatch: parsed.mismatch,
+          });
+        }
+
         transactions = parsed.transactions;
         bankName = parsed.bankName || this.extractBankNameFromFilename(fileName);
         accountNo = parsed.accountNo;
@@ -73,6 +86,9 @@ export class ImportService {
         endDate = parsed.endDate;
         accountHolder = parsed.accountHolder;
       } catch (parseError) {
+        if (parseError instanceof MathMismatchError) {
+          throw parseError;
+        }
         throw new ValidationError(
           parseError instanceof Error ? parseError.message : 'Error al parsear el archivo PDF',
         );
@@ -81,39 +97,48 @@ export class ImportService {
       // Pre-validation of account holder name
       const company = await db.company.findUnique({
         where: { id: companyId },
-        select: { legalName: true },
+        select: { legalName: true, entityType: true },
       });
 
       let holderDecision: 'auto_approved' | 'user_approved' | 'rejected' = 'auto_approved';
       let similarityScore = 1.0;
 
       if (company && accountHolder) {
-        const validation = validateAccountHolder(accountHolder, company.legalName);
+        const entityType = (company.entityType ?? 'BUSINESS') as 'INDIVIDUAL' | 'BUSINESS';
+        const validation = validateAccountHolder(accountHolder, company.legalName, entityType);
         similarityScore = validation.score;
 
         if (validation.requiresApproval) {
-          if (isStrictModeEnabled()) {
-            throw new ValidationError(
-              `EL_TITULAR_NO_COINCIDE_STRICT:${accountHolder}:${company.legalName}:${Math.round(validation.score * 100)}`,
-            );
-          }
-          if (!bypassHolderValidation) {
+          logger.warn('Account holder mismatch — saving with warning', {
+            extractedHolder: accountHolder,
+            legalName: company.legalName,
+            entityType,
+            score: validation.score,
+            method: validation.method,
+          });
+          holderDecision = validation.score > 0.3 ? 'user_approved' : 'rejected';
+          if (holderDecision === 'rejected') {
             throw new ValidationError(
               `EL_TITULAR_NO_COINCIDE:${accountHolder}:${company.legalName}:${Math.round(validation.score * 100)}`,
             );
           }
-          holderDecision = 'user_approved';
         }
       }
 
-      const bankAccount = await this.findOrCreateBankAccount(
-        companyId,
-        bankAccountId,
-        bankName,
-        transactions,
-        accountNo,
-        openingBalance || 0,
-      );
+      logger.info('Looking up bank account', { bankName, accountNo: accountNo || null });
+      const { account: bankAccount, newAccountCreated: pdfNewAccount } =
+        await this.findOrCreateBankAccount(
+          companyId,
+          bankAccountId,
+          bankName,
+          transactions,
+          accountNo,
+          openingBalance || 0,
+        );
+      logger.info('Bank account resolved', {
+        accountName: bankAccount.accountName,
+        accountId: bankAccount.id,
+      });
 
       const balanceInfo: any = {};
       if (startDate) balanceInfo.startDate = startDate;
@@ -121,6 +146,7 @@ export class ImportService {
       if (openingBalance !== undefined) balanceInfo.openingBalance = openingBalance;
       if (closingBalance !== undefined) balanceInfo.closingBalance = closingBalance;
 
+      logger.info('Saving transactions to database', { count: transactions.length });
       const result = await this.importTransactions(
         companyId,
         bankAccount.id,
@@ -129,6 +155,10 @@ export class ImportService {
         fileName,
         balanceInfo,
       );
+      logger.info('Import done', {
+        saved: result.transactionCount,
+        duplicatesSkipped: result.duplicatesSkipped,
+      });
 
       // Create Audit Log for holder validation
       if (userId && accountHolder && company) {
@@ -153,7 +183,7 @@ export class ImportService {
 
       return {
         ...result,
-        newAccountCreated,
+        newAccountCreated: pdfNewAccount,
         bankAccountName: bankAccount.accountName,
       };
     }
@@ -172,12 +202,8 @@ export class ImportService {
         );
       }
 
-      const bankAccount = await this.findOrCreateBankAccount(
-        companyId,
-        bankAccountId,
-        bankName,
-        transactions,
-      );
+      const { account: bankAccount, newAccountCreated: csvNewAccount } =
+        await this.findOrCreateBankAccount(companyId, bankAccountId, bankName, transactions);
 
       const result = await this.importTransactions(
         companyId,
@@ -189,7 +215,7 @@ export class ImportService {
 
       return {
         ...result,
-        newAccountCreated,
+        newAccountCreated: csvNewAccount,
         bankAccountName: bankAccount.accountName,
       };
     }
@@ -208,14 +234,15 @@ export class ImportService {
 
       const bankName = parsed.bankName;
 
-      const bankAccount = await this.findOrCreateBankAccount(
-        companyId,
-        bankAccountId,
-        bankName,
-        parsed.transactions,
-        parsed.accountNumber,
-        parsed.openingBalance || 0,
-      );
+      const { account: bankAccount, newAccountCreated: ofxNewAccount } =
+        await this.findOrCreateBankAccount(
+          companyId,
+          bankAccountId,
+          bankName,
+          parsed.transactions,
+          parsed.accountNumber,
+          parsed.openingBalance || 0,
+        );
 
       const result = await this.importTransactions(
         companyId,
@@ -233,7 +260,7 @@ export class ImportService {
 
       return {
         ...result,
-        newAccountCreated,
+        newAccountCreated: ofxNewAccount,
         bankAccountName: bankAccount.accountName,
       };
     }
@@ -251,7 +278,7 @@ export class ImportService {
     accountNumber?: string,
     openingBalance: number = 0,
     currency: string = 'USD',
-  ) {
+  ): Promise<{ account: any; newAccountCreated: boolean }> {
     if (bankAccountId) {
       const account = await db.bankAccount.findFirst({
         where: { id: bankAccountId, companyId },
@@ -259,21 +286,21 @@ export class ImportService {
       if (!account) {
         throw new NotFoundError('La cuenta bancaria especificada no existe');
       }
-      return account;
+      return { account, newAccountCreated: false };
     }
 
     if (bankName) {
       const existing = await db.bankAccount.findFirst({
         where: { companyId, bankName, isActive: true },
       });
-      if (existing) return existing;
+      if (existing) return { account: existing, newAccountCreated: false };
     }
 
     if (accountNumber) {
       const existing = await db.bankAccount.findFirst({
         where: { companyId, accountNo: accountNumber, isActive: true },
       });
-      if (existing) return existing;
+      if (existing) return { account: existing, newAccountCreated: false };
     }
 
     // Si no existe, lanzamos un error que pre-rellenará el modal de creación

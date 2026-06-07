@@ -29,6 +29,13 @@ let cachedConfig: RateLimitConfig | null = null;
 let lastLoadedTime = 0;
 const CACHE_TTL = 300 * 1000; // 300s TTL in development
 
+const DEFAULT_CONFIG: RateLimitConfig = {
+  default: { requestsPerMinute: 60, burstMultiplier: 2 },
+  criticalEndpoints: {},
+  scope: 'global',
+  windowMs: 60000,
+};
+
 function getRateLimitConfig(): RateLimitConfig {
   const isProd = process.env.NODE_ENV === 'production';
   const now = Date.now();
@@ -37,11 +44,16 @@ function getRateLimitConfig(): RateLimitConfig {
     return cachedConfig;
   }
 
-  const configPath = join(process.cwd(), 'rules/security-config.json');
-  const fullConfig = JSON.parse(readFileSync(configPath, 'utf-8')) as SecurityConfig;
-  cachedConfig = fullConfig.rateLimit;
-  lastLoadedTime = now;
-  return cachedConfig;
+  try {
+    const configPath = join(process.cwd(), 'rules/security-config.json');
+    const fullConfig = JSON.parse(readFileSync(configPath, 'utf-8')) as SecurityConfig;
+    cachedConfig = fullConfig.rateLimit;
+    lastLoadedTime = now;
+    return cachedConfig;
+  } catch {
+    console.warn('[RATE LIMIT] Config file missing or corrupt, using defaults');
+    return DEFAULT_CONFIG;
+  }
 }
 
 export function checkRateLimit(
@@ -54,13 +66,6 @@ export function checkRateLimit(
 
     const key = `${userId}:${companyId}`;
     const now = Date.now();
-
-    // Limpieza pasiva activa (in-line garbage collection para evitar memory leaks)
-    for (const [winKey, winVal] of requestWindows.entries()) {
-      if (now >= winVal.resetAt) {
-        requestWindows.delete(winKey);
-      }
-    }
 
     // Determinar límite según ruta
     let limit = config.default.requestsPerMinute;

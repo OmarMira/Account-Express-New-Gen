@@ -20,7 +20,8 @@ function log(level: LogLevel, message: string, meta?: Record<string, unknown>) {
   };
 
   // JSON structured output — machine-parseable for log aggregators
-  console.log(JSON.stringify(entry));
+  const output = level === 'error' ? console.error : level === 'warn' ? console.warn : console.log;
+  output(JSON.stringify(entry));
 }
 
 export const logger = {

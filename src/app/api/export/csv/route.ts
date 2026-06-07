@@ -1,73 +1,53 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getSessionUserId } from '@/lib/sessions';
+import { apiHandler } from '@/lib/api-handler';
+import { requireCompanyContext } from '@/lib/context-storage';
 
 /**
  * GET /api/export/csv?type=trial_balance|transactions|reconciliation&companyId=xxx&...
  * Returns a CSV file download.
  */
-export async function GET(request: NextRequest) {
-  try {
-    const userId = await getSessionUserId(request);
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+export const GET = apiHandler(async (request: NextRequest, context: { params: any }) => {
+  const { userId, companyId } = requireCompanyContext();
 
-    const { searchParams } = new URL(request.url);
-    const type = searchParams.get('type');
-    const companyId = searchParams.get('companyId');
+  const { searchParams } = new URL(request.url);
+  const type = searchParams.get('type');
 
-    if (!companyId) {
-      return NextResponse.json({ error: 'companyId is required' }, { status: 400 });
-    }
+  let csvContent: string;
+  let filename: string;
 
-    // Verify membership
-    const membership = await db.companyMember.findFirst({
-      where: { userId, companyId },
-    });
-    if (!membership) {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
-    }
-
-    let csvContent: string;
-    let filename: string;
-
-    switch (type) {
-      case 'trial_balance':
-        ({ csvContent, filename } = await generateTrialBalanceCSV(companyId, searchParams));
-        break;
-      case 'transactions':
-        ({ csvContent, filename } = await generateTransactionsCSV(companyId, searchParams));
-        break;
-      case 'reconciliation':
-        ({ csvContent, filename } = await generateReconciliationCSV(companyId, searchParams));
-        break;
-      case 'chart_of_accounts':
-        ({ csvContent, filename } = await generateChartOfAccountsCSV(companyId));
-        break;
-      default:
-        return NextResponse.json(
-          {
-            error:
-              'Invalid type. Use: trial_balance, transactions, reconciliation, chart_of_accounts',
-          },
-          { status: 400 },
-        );
-    }
-
-    // Return CSV with BOM for Excel compatibility
-    const bom = '\uFEFF';
-    return new NextResponse(bom + csvContent, {
-      headers: {
-        'Content-Type': 'text/csv; charset=utf-8',
-        'Content-Disposition': `attachment; filename="${filename}"`,
-      },
-    });
-  } catch (error) {
-    console.error('[CSV EXPORT ERROR]', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  switch (type) {
+    case 'trial_balance':
+      ({ csvContent, filename } = await generateTrialBalanceCSV(companyId, searchParams));
+      break;
+    case 'transactions':
+      ({ csvContent, filename } = await generateTransactionsCSV(companyId, searchParams));
+      break;
+    case 'reconciliation':
+      ({ csvContent, filename } = await generateReconciliationCSV(companyId, searchParams));
+      break;
+    case 'chart_of_accounts':
+      ({ csvContent, filename } = await generateChartOfAccountsCSV(companyId));
+      break;
+    default:
+      return NextResponse.json(
+        {
+          error:
+            'Invalid type. Use: trial_balance, transactions, reconciliation, chart_of_accounts',
+        },
+        { status: 400 },
+      );
   }
-}
+
+  // Return CSV with BOM for Excel compatibility
+  const bom = '\uFEFF';
+  return new NextResponse(bom + csvContent, {
+    headers: {
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+    },
+  });
+});
 
 /* ─── Trial Balance CSV ─────────────────────────────────────── */
 

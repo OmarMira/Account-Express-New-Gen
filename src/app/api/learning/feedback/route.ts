@@ -1,27 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { apiHandler } from '@/lib/api-handler';
 import { recordFeedback } from '@/lib/learning/adaptive-engine';
-import { getSessionUserId } from '@/lib/sessions';
-import { db } from '@/lib/db';
+import { requireCompanyContext } from '@/lib/context-storage';
+import { learningFeedbackSchema } from '@/lib/validations/learning-feedback';
 
 export const PATCH = apiHandler(async (req: NextRequest) => {
-  const userId = await getSessionUserId(req);
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const { userId, companyId } = requireCompanyContext();
 
-  const { companyId, bankDescription, glAccountCode, confidence } = await req.json();
-  if (!companyId || !bankDescription || !glAccountCode) {
-    throw new Error('Faltan parámetros requeridos para feedback');
+  const body = await req.json();
+  const parsed = learningFeedbackSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: 'Validation failed', details: parsed.error.flatten() },
+      { status: 400 },
+    );
   }
-
-  // Verify company membership
-  const membership = await db.companyMember.findFirst({
-    where: { userId, companyId },
-  });
-  if (!membership) {
-    return NextResponse.json({ error: 'Forbidden: No membership found' }, { status: 403 });
-  }
+  const { bankDescription, glAccountCode, role, source } = parsed.data;
+  const { confidence } = body;
 
   await recordFeedback({
     timestamp: new Date().toISOString(),

@@ -1,40 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getSessionUserId } from '@/lib/sessions';
 import { apiHandler } from '@/lib/api-handler';
+import { requireCompanyContext } from '@/lib/context-storage';
 import { validateRequest } from '@/lib/validate-request';
 import { createJournalEntrySchema } from '@/lib/validations/journal';
-import { AuthError, ForbiddenError, ValidationError } from '@/lib/api-error';
 import { JournalService } from '@/services/journal.service';
 
 // ─── GET /api/journal ───────────────────────────────────────────────
 // List journal entries for a company.
 export const GET = apiHandler(async (request: NextRequest) => {
-  const userId = await getSessionUserId(request);
-  if (!userId) {
-    throw new AuthError();
-  }
+  const { userId, companyId } = requireCompanyContext();
 
   const { searchParams } = new URL(request.url);
-  const companyId = searchParams.get('companyId');
   const status = searchParams.get('status');
   const startDate = searchParams.get('startDate');
   const endDate = searchParams.get('endDate');
   const search = searchParams.get('search');
   const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10) || 1);
   const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') ?? '20', 10) || 20));
-
-  if (!companyId) {
-    throw new ValidationError('companyId is required');
-  }
-
-  // Verify user has access to this company
-  const membership = await db.companyMember.findUnique({
-    where: { userId_companyId: { userId, companyId } },
-  });
-  if (!membership) {
-    throw new ForbiddenError();
-  }
 
   // Build where clause
   const where: Record<string, unknown> = { companyId };
@@ -172,22 +155,10 @@ export const GET = apiHandler(async (request: NextRequest) => {
 // ─── POST /api/journal ──────────────────────────────────────────────
 // Create a new journal entry with lines.
 export const POST = apiHandler(async (request: NextRequest) => {
-  const userId = await getSessionUserId(request);
-  if (!userId) {
-    throw new AuthError();
-  }
+  const { userId, companyId } = requireCompanyContext();
 
   const body = await validateRequest(request, createJournalEntrySchema);
   if (body instanceof NextResponse) return body;
-  const { companyId } = body;
-
-  // Verify user has access
-  const membership = await db.companyMember.findUnique({
-    where: { userId_companyId: { userId, companyId } },
-  });
-  if (!membership) {
-    throw new ForbiddenError();
-  }
 
   const entry = await JournalService.create(body);
 

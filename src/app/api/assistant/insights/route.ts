@@ -1,28 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { apiHandler } from '@/lib/api-handler';
 import { generateInsights } from '@/lib/assistant/insight-engine';
-import { getSessionUserId } from '@/lib/sessions';
 import { db } from '@/lib/db';
-import { ValidationError, AuthError, ForbiddenError } from '@/lib/api-error';
-import { readFileSync } from 'fs';
-import { join } from 'path';
+import { ForbiddenError } from '@/lib/api-error';
+import { readJsonConfig } from '@/lib/config-loader';
+import { requireCompanyContext } from '@/lib/context-storage';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 300;
 
 export const GET = apiHandler(async (req: NextRequest) => {
-  const userId = await getSessionUserId(req);
-  if (!userId) {
-    throw new AuthError();
-  }
+  const { userId, companyId } = requireCompanyContext();
 
-  const { searchParams } = new URL(req.url);
-  const companyId = searchParams.get('companyId');
-  if (!companyId) {
-    throw new ValidationError('companyId is required');
-  }
-
-  // Get user role for this company
+  // Get user role for this company (membership is already verified by apiHandler)
   const member = await db.companyMember.findUnique({
     where: { userId_companyId: { userId, companyId } },
   });
@@ -39,8 +29,9 @@ export const GET = apiHandler(async (req: NextRequest) => {
 
   const insights = await generateInsights(companyId, role);
 
-  const configPath = join(process.cwd(), 'rules/assistant-config.json');
-  const config = JSON.parse(readFileSync(configPath, 'utf-8'));
+  const config = await readJsonConfig<{ auditActions: { insightGenerated: string } }>(
+    'assistant-config.json',
+  );
 
   await db.auditLog.create({
     data: {

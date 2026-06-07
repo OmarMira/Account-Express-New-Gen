@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getSessionUserId } from '@/lib/sessions';
 import { apiHandler } from '@/lib/api-handler';
-import { AuthError, ForbiddenError, ValidationError } from '@/lib/api-error';
+import { requireCompanyContext } from '@/lib/context-storage';
+import { ValidationError } from '@/lib/api-error';
 import { fetchFuzzyCandidates } from '@/lib/accounting/fuzzy-pre-filter';
 import { runFuzzyMatch } from '@/lib/accounting/fuzzy-matcher';
 import { createDateWindow } from '@/lib/accounting/date-window';
@@ -23,23 +23,16 @@ import { logger } from '@/lib/logger';
  *   - windowDays?: number — ventana de días ±N (default: 7)
  */
 export const POST = apiHandler(async (request: NextRequest) => {
-  const userId = await getSessionUserId(request);
-  if (!userId) throw new AuthError();
+  const { userId, companyId } = requireCompanyContext();
 
   const body = await request.json();
-  const { companyId, targetDescription, date, amount, minScore = 65, windowDays = 7 } = body;
+  const { targetDescription, date, amount, minScore = 65, windowDays = 7 } = body;
 
-  if (!companyId || !targetDescription || !date || amount === undefined) {
+  if (!targetDescription || !date || amount === undefined) {
     throw new ValidationError(
       'Faltan campos requeridos: companyId, targetDescription, date, amount',
     );
   }
-
-  // Verificar membresía
-  const membership = await db.companyMember.findUnique({
-    where: { userId_companyId: { userId, companyId } },
-  });
-  if (!membership) throw new ForbiddenError();
 
   const baseDate = new Date(date);
   if (isNaN(baseDate.getTime())) {

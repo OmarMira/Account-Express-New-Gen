@@ -23,24 +23,25 @@ export async function executeYearClose(companyId: string, year: number, config: 
     where: { companyId, accountType: { in: ['revenue', 'expense'] }, isActive: true },
   });
 
-  // ⚠️ AGREGACIÓN NATIVA SQLITE
-  const netBalances = await Promise.all(
-    accounts.map(async (acc) => {
-      const totals = await db.journalLine.aggregate({
-        _sum: { debit: true, credit: true },
-        where: {
-          glAccountId: acc.id,
-          entry: { companyId, date: { gte: fiscalStart, lte: fiscalEnd }, status: 'posted' },
-        },
-      });
-      const d = totals._sum.debit ?? 0,
-        c = totals._sum.credit ?? 0;
-      return {
-        id: acc.id,
-        net: acc.normalBalance === 'credit' ? c - d : d - c,
-      };
-    }),
+  // Agregación única — reemplaza N+1 queries por un solo groupBy
+  const totals = await db.journalLine.groupBy({
+    by: ['glAccountId'],
+    _sum: { debit: true, credit: true },
+    where: {
+      glAccountId: { in: accounts.map((a) => a.id) },
+      entry: { companyId, date: { gte: fiscalStart, lte: fiscalEnd }, status: 'posted' },
+    },
+  });
+  const balanceMap = new Map(
+    totals.map((t) => [t.glAccountId, { debit: t._sum.debit ?? 0, credit: t._sum.credit ?? 0 }]),
   );
+  const netBalances = accounts.map((acc) => {
+    const { debit, credit } = balanceMap.get(acc.id) ?? { debit: 0, credit: 0 };
+    return {
+      id: acc.id,
+      net: acc.normalBalance === 'credit' ? credit - debit : debit - credit,
+    };
+  });
 
   const lines = netBalances
     .filter((b) => Math.abs(b.net) > 0.01)
@@ -93,7 +94,7 @@ export async function executeYearClose(companyId: string, year: number, config: 
       tx,
     );
     await tx.fiscalPeriod.updateMany({
-      where: { companyId, endDate: { gte: fiscalEnd } },
+      where: { companyId, startDate: { lte: fiscalEnd }, endDate: { lte: fiscalEnd } },
       data: { isLocked: true },
     });
     return { success: true, entryId: entry.id };

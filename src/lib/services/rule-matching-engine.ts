@@ -16,6 +16,7 @@ export type Rule = {
 
 /**
  * Evaluate a single condition against a transaction.
+ * Ensures consistent whitespace normalization: lowercase, trim, collapse multiple spaces.
  */
 function evaluateCondition(tx: Transaction, cond: any): boolean {
   if (!cond || typeof cond !== 'object') return false;
@@ -28,8 +29,9 @@ function evaluateCondition(tx: Transaction, cond: any): boolean {
   const txValue = tx[field as keyof Transaction];
   if (txValue === undefined || txValue === null) return false;
 
-  const strTxVal = String(txValue).toLowerCase();
-  const strCondVal = String(value).toLowerCase();
+  // Normalize: lowercase, trim, and collapse multiple spaces to single space
+  const strTxVal = String(txValue).toLowerCase().trim().replace(/\s+/g, ' ');
+  const strCondVal = String(value).toLowerCase().trim().replace(/\s+/g, ' ');
 
   switch (operator) {
     case 'equals':

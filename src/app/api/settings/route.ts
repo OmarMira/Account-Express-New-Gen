@@ -1,34 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getSessionUserId } from '@/lib/sessions';
+import { apiHandler } from '@/lib/api-handler';
+import { requireCompanyContext } from '@/lib/context-storage';
 import { companySettingsCache } from '@/lib/cache';
 
 /**
  * GET /api/settings — Get company settings
  * PUT /api/settings — Update company info
  */
-export async function GET(request: NextRequest) {
+export const GET = apiHandler(async (request: NextRequest, context: { params: any }) => {
+  const { userId, companyId } = requireCompanyContext();
+
   try {
-    const userId = await getSessionUserId(request);
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { searchParams } = new URL(request.url);
-    const companyId = searchParams.get('companyId');
-
-    if (!companyId) {
-      return NextResponse.json({ error: 'companyId is required' }, { status: 400 });
-    }
-
-    // Verify membership
-    const membership = await db.companyMember.findFirst({
-      where: { userId, companyId },
-    });
-    if (!membership) {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
-    }
-
     // Try cache first for company data
     let companyData = companySettingsCache.get(companyId);
 
@@ -118,29 +101,14 @@ export async function GET(request: NextRequest) {
     console.error('[SETTINGS GET ERROR]', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+});
 
-export async function PUT(request: NextRequest) {
+export const PUT = apiHandler(async (request: NextRequest, context: { params: any }) => {
+  const { userId, companyId } = requireCompanyContext();
+
   try {
-    const userId = await getSessionUserId(request);
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const body = await request.json();
-    const { companyId, legalName, taxId, address, phone, email } = body;
-
-    if (!companyId) {
-      return NextResponse.json({ error: 'companyId is required' }, { status: 400 });
-    }
-
-    // Verify membership (only admins can edit company)
-    const membership = await db.companyMember.findFirst({
-      where: { userId, companyId },
-    });
-    if (!membership) {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
-    }
+    const { legalName, taxId, address, phone, email } = body;
 
     // Check if user is company admin or super admin
     const user = await db.user.findUnique({
@@ -204,4 +172,4 @@ export async function PUT(request: NextRequest) {
     console.error('[SETTINGS PUT ERROR]', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+});

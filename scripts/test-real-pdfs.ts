@@ -98,10 +98,7 @@ async function main() {
         console.log(`   Diferencia (mismatch): $${result.mismatch}`);
       }
 
-      console.log(`🩹 Self-Healing intentado: ${result.selfHealingAttempted ? 'Sí' : 'No'}`);
-      if (result.selfHealingAttempted) {
-        console.log(`   Resultado Self-Healing: ${result.selfHealingSuccess ? '✅ EXITOSO' : '❌ FALLIDO'}`);
-      }
+      console.log(`🩹 Self-Healing: deshabilitado (las transacciones se importan igual con advertencia)`);
 
       if (result.warnings.length > 0) {
         console.log('⚠️ Advertencias:');

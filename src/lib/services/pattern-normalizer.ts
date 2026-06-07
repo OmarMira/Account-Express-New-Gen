@@ -1,8 +1,9 @@
 import { logger } from '@/lib/logger';
 
 /**
- * Normalizes a transaction description or pattern to a standard format
- * for entity context storage and matching.
+ * Centralizes pattern normalization for all matching operations.
+ * Applied before fuzzy matching AND before exact lookup in context storage.
+ * Ensures: lowercase, trim, collapse spaces, remove metadata patterns.
  */
 export function normalizePattern(desc: string): string {
   let cleaned = desc.toLowerCase().trim();
@@ -26,7 +27,8 @@ export function normalizePattern(desc: string): string {
   cleaned = cleaned.replace(/(;\s*|\s+)conf#\s*[\w\d]+/g, '');
   cleaned = cleaned.replace(/\s+for\s+\"[^\"]+\"/g, '');
 
-  return cleaned.trim();
+  // Final normalization: trim and collapse multiple spaces to single space
+  return cleaned.trim().replace(/\s+/g, ' ');
 }
 
 /**

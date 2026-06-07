@@ -1,22 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getSessionUserId } from '@/lib/sessions';
+import { apiHandler } from '@/lib/api-handler';
+import { requireCompanyContext } from '@/lib/context-storage';
 import { journalAccountsCache } from '@/lib/cache';
 
-interface RouteParams {
-  params: Promise<{ id: string }>;
-}
-
 // ─── GET /api/accounts/[id] ────────────────────────────────────────────
-export async function GET(_request: NextRequest, { params }: RouteParams) {
-  const userId = getSessionUserId(_request);
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+export const GET = apiHandler(
+  async (_request: NextRequest, context: { params: any }) => {
+    const { userId } = requireCompanyContext();
 
-  const { id } = await params;
+    const { id } = await context.params;
 
-  try {
     const account = await db.glAccount.findUnique({
       where: { id },
       include: {
@@ -45,22 +39,16 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     }
 
     return NextResponse.json({ account });
-  } catch (error) {
-    console.error('[ACCOUNT GET ERROR]', error);
-    return NextResponse.json({ error: 'Failed to fetch account' }, { status: 500 });
-  }
-}
+  },
+  { requireMembership: false },
+);
 
 // ─── PUT /api/accounts/[id] ────────────────────────────────────────────
-export async function PUT(request: NextRequest, { params }: RouteParams) {
-  const userId = await getSessionUserId(request);
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+export const PUT = apiHandler(
+  async (request: NextRequest, context: { params: any }) => {
+    const { userId } = requireCompanyContext();
 
-  const { id } = await params;
-
-  try {
+    const { id } = await context.params;
     const body = await request.json();
     const { name, isActive, code, accountType, normalBalance, parentId } = body;
 
@@ -169,22 +157,16 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     journalAccountsCache.invalidate(existing.companyId);
 
     return NextResponse.json({ account });
-  } catch (error) {
-    console.error('[ACCOUNT UPDATE ERROR]', error);
-    return NextResponse.json({ error: 'Failed to update account' }, { status: 500 });
-  }
-}
+  },
+  { requireMembership: false },
+);
 
 // ─── DELETE /api/accounts/[id] (hard delete) ───────────────────────────
-export async function DELETE(request: NextRequest, { params }: RouteParams) {
-  const userId = await getSessionUserId(request);
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+export const DELETE = apiHandler(
+  async (request: NextRequest, context: { params: any }) => {
+    const { userId } = requireCompanyContext();
 
-  const { id } = await params;
-
-  try {
+    const { id } = await context.params;
     const account = await db.glAccount.findUnique({
       where: { id },
       include: {
@@ -260,8 +242,6 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     journalAccountsCache.invalidate(account.companyId);
 
     return NextResponse.json({ account: deleted });
-  } catch (error) {
-    console.error('[ACCOUNT DELETE ERROR]', error);
-    return NextResponse.json({ error: 'Failed to delete account' }, { status: 500 });
-  }
-}
+  },
+  { requireMembership: false },
+);

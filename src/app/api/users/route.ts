@@ -1,26 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { hashPassword } from '@/lib/auth';
-import { getSessionUserId } from '@/lib/sessions';
+import { apiHandler } from '@/lib/api-handler';
+import { requireCompanyContext } from '@/lib/context-storage';
 
 /**
  * GET /api/users?companyId=xxx — List users in a company
  * POST /api/users — Invite a new user to a company
  */
-export async function GET(request: NextRequest) {
+export const GET = apiHandler(async (request: NextRequest, context: { params: any }) => {
+  const { userId, companyId } = requireCompanyContext();
+
   try {
-    const userId = await getSessionUserId(request);
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { searchParams } = new URL(request.url);
-    const companyId = searchParams.get('companyId');
-
-    if (!companyId) {
-      return NextResponse.json({ error: 'companyId is required' }, { status: 400 });
-    }
-
     // Verify requesting user is admin
     const requestingUser = await db.user.findUnique({
       where: { id: userId },
@@ -32,14 +23,6 @@ export async function GET(request: NextRequest) {
       (requestingUser.role !== 'company_admin' && requestingUser.role !== 'super_admin')
     ) {
       return NextResponse.json({ error: 'Only admins can view users' }, { status: 403 });
-    }
-
-    // Verify membership
-    const membership = await db.companyMember.findFirst({
-      where: { userId, companyId },
-    });
-    if (!membership) {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
     // Get all members with user info
@@ -79,19 +62,16 @@ export async function GET(request: NextRequest) {
     console.error('[USERS LIST ERROR]', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+});
 
-export async function POST(request: NextRequest) {
+export const POST = apiHandler(async (request: NextRequest, context: { params: any }) => {
+  const { userId, companyId } = requireCompanyContext();
+
   try {
-    const userId = await getSessionUserId(request);
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const body = await request.json();
-    const { companyId, email, firstName, lastName, password, role = 'company_admin' } = body;
+    const { email, firstName, lastName, password, role = 'company_admin' } = body;
 
-    if (!companyId || !email || !firstName || !lastName || !password) {
+    if (!email || !firstName || !lastName || !password) {
       return NextResponse.json(
         { error: 'companyId, email, firstName, lastName, and password are required' },
         { status: 400 },
@@ -116,14 +96,6 @@ export async function POST(request: NextRequest) {
       (requestingUser.role !== 'company_admin' && requestingUser.role !== 'super_admin')
     ) {
       return NextResponse.json({ error: 'Only admins can invite users' }, { status: 403 });
-    }
-
-    // Verify membership in target company
-    const membership = await db.companyMember.findFirst({
-      where: { userId, companyId },
-    });
-    if (!membership) {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
     // Check if user already exists
@@ -226,4 +198,4 @@ export async function POST(request: NextRequest) {
     console.error('[USER CREATE ERROR]', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+});

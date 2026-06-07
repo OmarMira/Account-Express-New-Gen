@@ -45,6 +45,7 @@ describe('Bank Rules Phase 3 Integration Tests', () => {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify(rule1Payload),
     });
@@ -57,6 +58,7 @@ describe('Bank Rules Phase 3 Integration Tests', () => {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         companyId: company.id,
@@ -100,6 +102,7 @@ describe('Bank Rules Phase 3 Integration Tests', () => {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify(ruleBroadPayload),
     });
@@ -122,6 +125,7 @@ describe('Bank Rules Phase 3 Integration Tests', () => {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify(ruleSpecificPayload),
     });

@@ -51,3 +51,15 @@ export class BankAccountRequiredError extends AppError {
     super(400, 'Se requiere crear la cuenta bancaria.', 'BANK_CREATION_REQUIRED', metadata);
   }
 }
+
+export class MathMismatchError extends AppError {
+  constructor(
+    message: string,
+    metadata: {
+      transactions: any[];
+      mismatch: number;
+    },
+  ) {
+    super(400, message, 'MATH_MISMATCH', metadata);
+  }
+}

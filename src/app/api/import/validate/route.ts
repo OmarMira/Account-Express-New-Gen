@@ -1,47 +1,52 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getSessionUserId } from '@/lib/sessions';
 import { apiHandler } from '@/lib/api-handler';
-import { AuthError, ForbiddenError, ValidationError } from '@/lib/api-error';
+import { requireCompanyContext } from '@/lib/context-storage';
+import { ValidationError } from '@/lib/api-error';
 import { parsePDFAsync } from '@/lib/pdf-processor';
 import {
   validateAccountHolder,
   isStrictModeEnabled,
 } from '@/lib/validation/account-holder-validator';
+import { validateFile } from '@/lib/file-validation';
 
 export const POST = apiHandler(async (request: NextRequest) => {
-  const userId = await getSessionUserId(request);
-  if (!userId) {
-    throw new AuthError();
-  }
+  const { userId, companyId } = requireCompanyContext();
 
   const formData = await request.formData();
-  const companyId = formData.get('companyId') as string | null;
   const files = formData.getAll('files') as File[];
-
-  if (!companyId) {
-    throw new ValidationError('El companyId es requerido.');
-  }
 
   if (!files || files.length === 0) {
     throw new ValidationError('Se requieren uno o más archivos para validar.');
   }
 
-  // Verify company membership
-  const membership = await db.companyMember.findUnique({
-    where: { userId_companyId: { userId, companyId } },
-    include: { company: true },
+  const company = await db.company.findUnique({
+    where: { id: companyId },
+    select: { legalName: true },
   });
-  if (!membership) {
-    throw new ForbiddenError();
-  }
-
-  const companyName = membership.company.legalName;
+  const companyName = company?.legalName || '';
   const results: any[] = [];
 
   for (const file of files) {
     const fileName = file.name;
-    const extension = fileName.split('.').pop()?.toLowerCase() || '';
+    const buffer = Buffer.from(await file.arrayBuffer());
+
+    let extension: string;
+    try {
+      extension = validateFile(file, buffer);
+    } catch {
+      results.push({
+        fileName,
+        extension: fileName.split('.').pop()?.toLowerCase() || '',
+        extractedHolder: 'Error de validación',
+        companyName,
+        score: 0.0,
+        matches: false,
+        requiresApproval: true,
+        error: 'El archivo no pasó la validación de seguridad',
+      });
+      continue;
+    }
 
     if (extension !== 'pdf') {
       // Non-PDF files are approved by default as they don't contain holder name metadata in standard text form
@@ -58,7 +63,6 @@ export const POST = apiHandler(async (request: NextRequest) => {
     }
 
     try {
-      const buffer = Buffer.from(await file.arrayBuffer());
       const parsed = await parsePDFAsync(buffer);
       const extractedHolder = parsed.accountHolder || '';
 

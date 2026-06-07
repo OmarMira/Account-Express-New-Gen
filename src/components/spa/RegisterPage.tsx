@@ -17,6 +17,7 @@ import { ThemeToggle } from '@/components/spa/ThemeToggle';
 import { LanguageSelector } from '@/components/spa/LanguageSelector';
 import { useLanguageStore } from '@/store/language-store';
 import { useAuthStore, type User } from '@/store/auth-store';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 export function RegisterPage() {
   const t = useLanguageStore((s) => s.t);
@@ -28,6 +29,7 @@ export function RegisterPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [companyName, setCompanyName] = useState('');
+  const [entityType, setEntityType] = useState<'BUSINESS' | 'INDIVIDUAL'>('BUSINESS');
   const [taxId, setTaxId] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -59,6 +61,7 @@ export function RegisterPage() {
           email,
           password,
           companyName,
+          entityType,
           taxId: taxId || null,
         }),
       });
@@ -200,6 +203,28 @@ export function RegisterPage() {
                   required
                   placeholder="Acme Corp"
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label>{t('auth.entityType')}</Label>
+                <RadioGroup
+                  value={entityType}
+                  onValueChange={(v) => setEntityType(v as 'BUSINESS' | 'INDIVIDUAL')}
+                  className="flex gap-4"
+                >
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="BUSINESS" id="entity-business" />
+                    <Label htmlFor="entity-business" className="font-normal cursor-pointer">
+                      {t('auth.business')}
+                    </Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="INDIVIDUAL" id="entity-individual" />
+                    <Label htmlFor="entity-individual" className="font-normal cursor-pointer">
+                      {t('auth.individual')}
+                    </Label>
+                  </div>
+                </RadioGroup>
               </div>
 
               <div className="space-y-2">

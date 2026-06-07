@@ -1,30 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getSessionUserId } from '@/lib/sessions';
 import { apiHandler } from '@/lib/api-handler';
-import { AuthError, ForbiddenError, ValidationError } from '@/lib/api-error';
+import { requireCompanyContext } from '@/lib/context-storage';
+import { ForbiddenError, ValidationError } from '@/lib/api-error';
 import { usAddressSchema } from '@/lib/validations/us-address';
 import { saveLogo, deleteLogo } from '@/lib/uploads/logo-service';
 
 export const PATCH = apiHandler(async (request: NextRequest) => {
-  const userId = await getSessionUserId(request);
-  if (!userId) {
-    throw new AuthError();
-  }
+  const { userId, companyId } = requireCompanyContext();
 
   const formData = await request.formData();
-  const companyId = formData.get('companyId') as string | null;
 
-  if (!companyId) {
-    throw new ValidationError('El companyId es requerido.');
-  }
-
-  // Verify company membership and roles (admin check)
+  // Verify company admin role
   const membership = await db.companyMember.findUnique({
     where: { userId_companyId: { userId, companyId } },
   });
 
-  if (!membership || membership.role !== 'company_admin') {
+  if (membership?.role !== 'company_admin') {
     throw new ForbiddenError('No tiene permisos para modificar la configuración de esta empresa.');
   }
 

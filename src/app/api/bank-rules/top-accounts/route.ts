@@ -1,30 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getSessionUserId } from '@/lib/sessions';
+import { apiHandler } from '@/lib/api-handler';
+import { requireCompanyContext } from '@/lib/context-storage';
 
 // ─── GET /api/bank-rules/top-accounts?companyId=xxx ───────────────────────────
 // Returns up to 8 most-used GL accounts across bank rules for this company.
 // Response: { data: [{ code, name, accountType, useCount }] }
-export async function GET(request: NextRequest) {
-  const userId = await getSessionUserId(request);
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
+export const GET = apiHandler(async (request: NextRequest, context: { params: any }) => {
+  const { userId, companyId } = requireCompanyContext();
   const { searchParams } = new URL(request.url);
-  const companyId = searchParams.get('companyId');
-
-  if (!companyId) {
-    return NextResponse.json({ error: 'companyId is required' }, { status: 400 });
-  }
-
-  // Verify user has access to this company
-  const membership = await db.companyMember.findUnique({
-    where: { userId_companyId: { userId, companyId } },
-  });
-  if (!membership) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
 
   // Aggregate rule counts per glAccountId (use the legacy glAccountId field as canonical reference)
   const grouped = await db.bankRule.groupBy({
@@ -65,4 +49,4 @@ export async function GET(request: NextRequest) {
     });
 
   return NextResponse.json({ data });
-}
+});

@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { readFileSync } from 'fs';
-import { join } from 'path';
+import { readJsonConfig } from '@/lib/config-loader';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -12,8 +11,7 @@ export async function GET() {
     await db.$queryRaw`SELECT 1`;
 
     // 2. Cargar versión de configuración de seguridad
-    const configPath = join(process.cwd(), 'rules/security-config.json');
-    const config = JSON.parse(readFileSync(configPath, 'utf-8'));
+    const config = await readJsonConfig<any>('security-config.json');
 
     // 3. Métricas operativas (no sensibles)
     const [lastBackup, audit24h, lockedPeriods] = await Promise.all([

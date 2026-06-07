@@ -1,121 +1,10 @@
+import { logger } from '@/lib/logger';
 import { db } from '@/lib/db';
 import { createAuditLogWithRetry } from '@/lib/audit';
 import { getPeriodStrategy } from '@/lib/fiscal-period/strategies';
+import { CHART_OF_ACCOUNTS, seedChartOfAccounts } from '@/lib/chart-of-accounts';
 import * as fs from 'fs';
 import * as path from 'path';
-
-const CHART_OF_ACCOUNTS = [
-  // Assets
-  { code: '1000', name: 'Assets', type: 'asset', normalBalance: 'debit' },
-  {
-    code: '1010',
-    name: 'Cash & Cash Equivalents',
-    type: 'asset',
-    normalBalance: 'debit',
-    parentCode: '1000',
-  },
-  {
-    code: '1020',
-    name: 'Accounts Receivable',
-    type: 'asset',
-    normalBalance: 'debit',
-    parentCode: '1000',
-  },
-  { code: '1030', name: 'Inventory', type: 'asset', normalBalance: 'debit', parentCode: '1000' },
-  { code: '1100', name: 'Fixed Assets', type: 'asset', normalBalance: 'debit', parentCode: '1000' },
-  { code: '1110', name: 'Equipment', type: 'asset', normalBalance: 'debit', parentCode: '1100' },
-
-  // Liabilities
-  { code: '2000', name: 'Liabilities', type: 'liability', normalBalance: 'credit' },
-  {
-    code: '2010',
-    name: 'Accounts Payable',
-    type: 'liability',
-    normalBalance: 'credit',
-    parentCode: '2000',
-  },
-  {
-    code: '2020',
-    name: 'Credit Cards Payable',
-    type: 'liability',
-    normalBalance: 'credit',
-    parentCode: '2000',
-  },
-
-  // Equity
-  { code: '3000', name: 'Equity', type: 'equity', normalBalance: 'credit' },
-  {
-    code: '3010',
-    name: "Owner's Equity",
-    type: 'equity',
-    normalBalance: 'credit',
-    parentCode: '3000',
-  },
-  {
-    code: '3020',
-    name: 'Retained Earnings',
-    type: 'equity',
-    normalBalance: 'credit',
-    parentCode: '3000',
-  },
-
-  // Revenue
-  { code: '4000', name: 'Revenue', type: 'revenue', normalBalance: 'credit' },
-  {
-    code: '4010',
-    name: 'Sales Revenue',
-    type: 'revenue',
-    normalBalance: 'credit',
-    parentCode: '4000',
-  },
-  {
-    code: '4020',
-    name: 'Service Revenue',
-    type: 'revenue',
-    normalBalance: 'credit',
-    parentCode: '4000',
-  },
-
-  // Expenses
-  { code: '5000', name: 'Cost of Goods Sold', type: 'expense', normalBalance: 'debit' },
-  { code: '6000', name: 'Operating Expenses', type: 'expense', normalBalance: 'debit' },
-  {
-    code: '6010',
-    name: 'Rent Expense',
-    type: 'expense',
-    normalBalance: 'debit',
-    parentCode: '6000',
-  },
-  {
-    code: '6020',
-    name: 'Utilities Expense',
-    type: 'expense',
-    normalBalance: 'debit',
-    parentCode: '6000',
-  },
-  {
-    code: '6030',
-    name: 'Salaries & Wages',
-    type: 'expense',
-    normalBalance: 'debit',
-    parentCode: '6000',
-  },
-  {
-    code: '6060',
-    name: 'Office Supplies',
-    type: 'expense',
-    normalBalance: 'debit',
-    parentCode: '6000',
-  },
-  { code: '7000', name: 'Other Expenses', type: 'expense', normalBalance: 'debit' },
-  {
-    code: '7030',
-    name: 'Miscellaneous Expense',
-    type: 'expense',
-    normalBalance: 'debit',
-    parentCode: '7000',
-  },
-];
 
 // Helper seguro para guardar configs en JSON sin modificar el schema de Prisma
 function saveCompanyConfig(companyId: string, currency: string, periodType: string) {
@@ -130,7 +19,7 @@ function saveCompanyConfig(companyId: string, currency: string, periodType: stri
       configData = JSON.parse(fs.readFileSync(configPath, 'utf8'));
     }
   } catch (err) {
-    console.error('[ONBOARDING] Error reading company-config.json, creating new', err);
+    logger.error('Error reading company-config.json, creating new', { error: err });
   }
   if (!configData.companies) {
     configData.companies = {};
@@ -163,7 +52,7 @@ export async function completeOnboarding(
       throw new Error(`La compañía con ID ${companyId} no existe.`);
     }
 
-    console.log(`[ONBOARDING] Initializing onboarding for: ${legalName}`);
+    logger.info('Initializing onboarding', { legalName });
 
     // Actualizar nombre legal
     await tx.company.update({
@@ -210,9 +99,10 @@ export async function completeOnboarding(
         });
       }
     }
-    console.log(
-      `[ONBOARDING] Generated ${calculatedPeriods.length} periods via ${periodType} strategy`,
-    );
+    logger.info('Generated periods via strategy', {
+      count: calculatedPeriods.length,
+      strategy: periodType,
+    });
 
     // 3. Crear Plan de Cuentas GAAP (COA) - Obligatorio antes del asiento de apertura (FK Constraint Guardrail 1)
     const existingAccountsCount = await tx.glAccount.count({
@@ -222,7 +112,7 @@ export async function completeOnboarding(
     const accountIdMap = new Map<string, string>();
 
     if (existingAccountsCount === 0) {
-      console.log(`[ONBOARDING] Seeding GAAP chart of accounts...`);
+      logger.info('Seeding GAAP chart of accounts');
       for (const account of CHART_OF_ACCOUNTS) {
         const created = await tx.glAccount.create({
           data: {
@@ -238,7 +128,7 @@ export async function completeOnboarding(
         });
         accountIdMap.set(account.code, created.id);
       }
-      console.log(`[ONBOARDING] Created ${CHART_OF_ACCOUNTS.length} standard accounts`);
+      logger.info('Created standard accounts', { count: CHART_OF_ACCOUNTS.length });
     } else {
       const accounts = await tx.glAccount.findMany({
         where: { companyId },
@@ -287,7 +177,7 @@ export async function completeOnboarding(
         },
       });
       journalEntryId = openingEntry.id;
-      console.log(`[ONBOARDING] Opening Journal Entry posted successfully: $${initialCashBalance}`);
+      logger.info('Opening Journal Entry posted successfully', { initialCashBalance });
 
       // Crear BankAccount por defecto vinculada al efectivo
       await tx.bankAccount.create({
@@ -338,9 +228,7 @@ export async function completeOnboarding(
       tx,
     );
 
-    console.log(
-      `[ONBOARDING] Complete system activation succeeded for: ${updatedCompany.legalName}`,
-    );
+    logger.info('Complete system activation succeeded', { legalName: updatedCompany.legalName });
 
     return {
       success: true,

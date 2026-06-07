@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getSessionUserId } from '@/lib/sessions';
 import { apiHandler } from '@/lib/api-handler';
-import { AuthError, ForbiddenError, ValidationError } from '@/lib/api-error';
+import { requireCompanyContext } from '@/lib/context-storage';
+import { ForbiddenError, ValidationError } from '@/lib/api-error';
 
 /**
  * PATCH /api/accounting-flow/audit/link
@@ -15,8 +15,7 @@ import { AuthError, ForbiddenError, ValidationError } from '@/lib/api-error';
  *   - journalLineId: string (requerido)
  */
 export const PATCH = apiHandler(async (request: NextRequest) => {
-  const userId = await getSessionUserId(request);
-  if (!userId) throw new AuthError();
+  const { userId, companyId } = requireCompanyContext();
 
   const body = await request.json();
   const { bankTransactionId, journalLineId } = body;
@@ -40,14 +39,6 @@ export const PATCH = apiHandler(async (request: NextRequest) => {
   if (!bankTx) {
     throw new ValidationError('Transacción bancaria no encontrada');
   }
-
-  const companyId = bankTx.statement.bankAccount.companyId;
-
-  // 2. Verificar membresía del usuario
-  const membership = await db.companyMember.findUnique({
-    where: { userId_companyId: { userId, companyId } },
-  });
-  if (!membership) throw new ForbiddenError();
 
   // 3. Verificar que la transacción no esté ya vinculada a otra línea
   if (bankTx.journalLineId) {

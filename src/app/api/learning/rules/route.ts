@@ -1,18 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getSessionUserId } from '@/lib/sessions';
+import { apiHandler } from '@/lib/api-handler';
+import { requireCompanyContext } from '@/lib/context-storage';
 import { createAuditLogWithRetry } from '@/lib/audit';
+import { createLearningRuleSchema } from '@/lib/validations/learning-rule';
 
-export async function POST(request: NextRequest) {
-  const userId = await getSessionUserId(request);
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+export const POST = apiHandler(async (request: NextRequest, context: { params: any }) => {
+  const { userId, companyId } = requireCompanyContext();
+
+  const body = await request.json();
+  const parsed = createLearningRuleSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: 'Validation failed', details: parsed.error.flatten() },
+      { status: 400 },
+    );
   }
 
   try {
-    const body = await request.json();
     const {
-      companyId,
       pattern,
       lockedDirection,
       glAccountCode,
@@ -25,21 +31,13 @@ export async function POST(request: NextRequest) {
       creditGlAccountId,
       debitGlAccountCode,
       creditGlAccountCode,
-    } = body;
+    } = parsed.data;
 
-    if (!companyId || (!pattern && (!conditions || !Array.isArray(conditions)))) {
+    if (!pattern && (!conditions || !Array.isArray(conditions))) {
       return NextResponse.json(
         { error: 'companyId, and pattern or conditions are required' },
         { status: 400 },
       );
-    }
-
-    // Verify access
-    const membership = await db.companyMember.findUnique({
-      where: { userId_companyId: { userId, companyId } },
-    });
-    if (!membership) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     // Pre-resolve GL account IDs outside the transaction (read-only lookups)
@@ -105,7 +103,16 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          // Create new sub-account inside transaction
+          // Create new sub-account inside transaction — find free code if race
+          while (
+            await tx.glAccount.findUnique({
+              where: { companyId_code: { companyId, code: nextCode } },
+            })
+          ) {
+            const parts = nextCode.split('-');
+            const suffixNum = parseInt(parts[parts.length - 1], 10) + 1;
+            nextCode = `${parentAccount.code}-${suffixNum.toString().padStart(2, '0')}`;
+          }
           const subAccount = await tx.glAccount.create({
             data: {
               companyId,
@@ -211,4 +218,4 @@ export async function POST(request: NextRequest) {
     console.error('[POST LEARNING RULE ERROR]', error);
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }
-}
+});

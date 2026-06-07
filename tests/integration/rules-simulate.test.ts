@@ -46,6 +46,7 @@ describe('Rules Simulation API Integration Tests', () => {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         companyId: company.id,
@@ -67,6 +68,7 @@ describe('Rules Simulation API Integration Tests', () => {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         companyId: company.id,
@@ -128,6 +130,7 @@ describe('Rules Simulation API Integration Tests', () => {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         companyId: company.id,

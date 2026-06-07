@@ -1,3 +1,4 @@
+import { logger } from '@/lib/logger';
 import { db } from './db';
 import {
   BankProfileConfig,
@@ -19,20 +20,20 @@ function mapToTypedProfile(raw: any): BankProfileTyped {
     parsedFingerprints =
       typeof raw.fingerprints === 'string' ? JSON.parse(raw.fingerprints) : raw.fingerprints;
   } catch (e) {
-    console.error(`Error parsing fingerprints for profile ${raw.bankId}:`, e);
+    logger.error('Error parsing fingerprints for profile', { bankId: raw.bankId, error: e });
   }
 
   let parsedConfig: any = {};
   try {
     parsedConfig = typeof raw.config === 'string' ? JSON.parse(raw.config) : raw.config;
   } catch (e) {
-    console.error(`Error parsing config for profile ${raw.bankId}:`, e);
+    logger.error('Error parsing config for profile', { bankId: raw.bankId, error: e });
   }
 
   // Validate the configuration using Zod
   const validation = BankProfileConfigSchema.safeParse(parsedConfig);
   if (!validation.success) {
-    console.error(`❌ INVALID CONFIG for profile ${raw.bankId}:`, validation.error);
+    logger.error('INVALID CONFIG for profile', { bankId: raw.bankId, zodError: validation.error });
     throw new Error(
       `Bank profile "${raw.bankId}" has invalid configuration in database. Please fix or deactivate it.`,
     );
@@ -95,7 +96,7 @@ export async function getAllActiveProfiles(): Promise<BankProfileTyped[]> {
 export function invalidateProfileCache(bankId: string): void {
   profileCache.delete(bankId);
   allActiveProfilesCache = null;
-  console.log(`♻️ In-memory cache invalidated for bank profile: ${bankId}`);
+  logger.info('In-memory cache invalidated for bank profile', { bankId });
 }
 
 /**
@@ -104,7 +105,7 @@ export function invalidateProfileCache(bankId: string): void {
 export function invalidateAllProfilesCache(): void {
   profileCache.clear();
   allActiveProfilesCache = null;
-  console.log('♻️ Global in-memory bank profile cache invalidated');
+  logger.info('Global in-memory bank profile cache invalidated');
 }
 
 /**

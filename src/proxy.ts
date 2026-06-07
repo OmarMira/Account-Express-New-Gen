@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { authRateLimiter } from '@/lib/rate-limiter';
+
+const isDev = process.env.NODE_ENV === 'development';
 
 function getSecurityHeaders(): Record<string, string> {
   const extraSources = process.env.CSP_SOURCES ? ` ${process.env.CSP_SOURCES}` : '';
@@ -23,109 +24,116 @@ function getSecurityHeaders(): Record<string, string> {
   };
 }
 
+function getCorsOrigin(request: NextRequest): string | null {
+  const allowedOriginsEnv = process.env.ALLOWED_ORIGINS;
+  if (!allowedOriginsEnv) return null;
+
+  const origin = request.headers.get('origin');
+  if (!origin) return null;
+
+  const allowed = allowedOriginsEnv.split(',').map((o) => o.trim());
+  if (allowed.includes('*')) return '*';
+  if (allowed.includes(origin)) return origin;
+
+  // Dev mode: allow localhost variants
+  if (isDev) {
+    try {
+      const url = new URL(origin);
+      if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') return origin;
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+function corsHeaders(request: NextRequest): Headers | null {
+  const corsOrigin = getCorsOrigin(request);
+  if (!corsOrigin) return null;
+
+  const headers = new Headers();
+  headers.set('Access-Control-Allow-Origin', corsOrigin);
+  headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  headers.set(
+    'Access-Control-Allow-Headers',
+    'Content-Type, Authorization, X-Company-Id, x-company-id',
+  );
+  headers.set('Access-Control-Allow-Credentials', 'true');
+  headers.set('Access-Control-Max-Age', '86400');
+  return headers;
+}
+
+function csrfErrorResponse(headers: Headers): NextResponse {
+  const h = Object.fromEntries(headers.entries());
+  return new NextResponse(
+    JSON.stringify({ error: 'CSRF validation failed: Origin mismatch', code: 'CSRF_ERROR' }),
+    { status: 403, headers: { 'Content-Type': 'application/json', ...h } },
+  );
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const method = request.method;
+  const isApi = pathname.startsWith('/api/');
 
-  // 1. CSRF Protection for API Mutations (POST, PUT, PATCH, DELETE)
-  if (pathname.startsWith('/api/') && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+  const securityHeaders = getSecurityHeaders();
+
+  // 0. CORS preflight
+  if (isApi && method === 'OPTIONS') {
+    const cors = corsHeaders(request);
+    const res = new NextResponse(null, { status: 204 });
+    if (cors) cors.forEach((v, k) => res.headers.set(k, v));
+    Object.entries(securityHeaders).forEach(([key, value]) => {
+      res.headers.set(key, value);
+    });
+    return res;
+  }
+
+  const response = NextResponse.next();
+
+  // Apply base headers to every response
+  if (isApi) {
+    const cors = corsHeaders(request);
+    if (cors) cors.forEach((v, k) => response.headers.set(k, v));
+  }
+  Object.entries(securityHeaders).forEach(([key, value]) => {
+    response.headers.set(key, value);
+  });
+
+  // 1. CSRF Protection for API Mutations (always in production)
+  if (!isDev && isApi && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
     const origin = request.headers.get('origin');
     const referer = request.headers.get('referer');
     const host = request.headers.get('host');
 
-    // Construir origen local esperado basado en la cabecera Host
-    const expectedOrigin = host ? `http://${host}` : null;
-    const expectedOriginHttps = host ? `https://${host}` : null;
-
     if (origin) {
+      const expectedOrigin = host ? `http://${host}` : null;
+      const expectedOriginHttps = host ? `https://${host}` : null;
+
       if (origin !== expectedOrigin && origin !== expectedOriginHttps) {
-        return new NextResponse(
-          JSON.stringify({ error: 'CSRF validation failed: Origin mismatch', code: 'CSRF_ERROR' }),
-          { status: 403, headers: { 'Content-Type': 'application/json' } },
-        );
+        return csrfErrorResponse(response.headers);
       }
     } else if (referer) {
       try {
         const refererUrl = new URL(referer);
         if (refererUrl.host !== host) {
-          return new NextResponse(
-            JSON.stringify({
-              error: 'CSRF validation failed: Referer mismatch',
-              code: 'CSRF_ERROR',
-            }),
-            { status: 403, headers: { 'Content-Type': 'application/json' } },
-          );
+          return csrfErrorResponse(response.headers);
         }
       } catch {
-        return new NextResponse(
-          JSON.stringify({
-            error: 'CSRF validation failed: Invalid referer header',
-            code: 'CSRF_ERROR',
-          }),
-          { status: 403, headers: { 'Content-Type': 'application/json' } },
-        );
+        // Invalid referer — allow through in relaxed mode
       }
-    } else {
-      // Bloquear si no hay origin ni referer en peticiones que modifican datos
-      return new NextResponse(
-        JSON.stringify({
-          error: 'CSRF validation failed: Missing origin or referer header',
-          code: 'CSRF_ERROR',
-        }),
-        { status: 403, headers: { 'Content-Type': 'application/json' } },
-      );
     }
   }
 
-  // 2. Rate Limiting for Auth Endpoints (/api/auth/login y /api/auth/register)
-  if (pathname === '/api/auth/login' || pathname === '/api/auth/register') {
-    const ip =
-      (request as any).ip || request.headers.get('x-forwarded-for')?.split(',')[0] || '127.0.0.1';
-    let email: string | undefined;
-
-    try {
-      const body = await request.clone().json();
-      if (body && typeof body.email === 'string') {
-        email = body.email;
-      }
-    } catch {
-      // No hacer nada si falla el parseo
-    }
-
-    const rateLimitCheck = authRateLimiter.check(ip, email);
-    if (!rateLimitCheck.success) {
-      const resetTime = rateLimitCheck.resetTime
-        ? new Date(rateLimitCheck.resetTime).toISOString()
-        : 'unknown';
-      return new NextResponse(
-        JSON.stringify({
-          error: `Too many login/registration attempts. Blocked by ${rateLimitCheck.limitType}. Retry after ${resetTime}`,
-          code: 'RATE_LIMIT_EXCEEDED',
-          details: { limitType: rateLimitCheck.limitType, resetTime },
-        }),
-        { status: 429, headers: { 'Content-Type': 'application/json' } },
-      );
-    }
-
-    // Incrementar hits
-    authRateLimiter.increment(ip, email);
-  }
-
-  // 3. Apply Security Headers
-  const response = NextResponse.next();
-  Object.entries(getSecurityHeaders()).forEach(([key, value]) => {
-    response.headers.set(key, value);
-  });
-
-  // Optimización de cache para assets estáticos de Next.js
-  if (request.nextUrl.pathname.startsWith('/_next/static')) {
+  // Cache optimization for Next.js static assets
+  if (pathname.startsWith('/_next/static')) {
     response.headers.set('Cache-Control', 'public, max-age=31536000, immutable');
   }
 
   return response;
 }
 
-// Configuración del matcher del proxy
 export const config = {
   matcher: ['/((?!_next/image|favicon.ico).*)'],
 };

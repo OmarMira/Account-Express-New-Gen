@@ -38,7 +38,7 @@ describe('PDF Parser Fail Graceful tests', () => {
 
   it('debe parsear un PDF consistente normalmente con mathValid: true y mismatch: 0', async () => {
     const pdfBuffer = readFileSync(join(fixturesPath, 'eStmt_2025-03-31.pdf'));
-    const result = await parsePDF(pdfBuffer);
+    const result = await parsePDF(pdfBuffer, { fileName: 'eStmt_2025-03-31.pdf' });
 
     expect(result.mathValid).toBe(true);
     expect(result.mismatch).toBeCloseTo(0, 10);
@@ -101,7 +101,7 @@ describe('PDF Parser Fail Graceful tests', () => {
     expect(details.parsedData.closingBalance).toBe(2000);
   });
 
-  it('ImportService lanza error de mismatch cuando mathValid es false', async () => {
+  it('debe importar con mismatch matemático como warning y persistir el statement', async () => {
     const company = await createTestCompany('Import Company');
     const glAccount = await createTestGlAccount({
       companyId: company.id,
@@ -143,28 +143,24 @@ describe('PDF Parser Fail Graceful tests', () => {
       })
     });
 
-    try {
-      await ImportService.importFile({
-        companyId: company.id,
-        bankAccountId: bankAccount.id,
-        fileName: 'mismatch.pdf',
-        extension: 'pdf',
-        buffer: Buffer.from('dummy_pdf'),
-        content: '',
-      });
-      throw new Error('Should have thrown MathMismatchError');
-    } catch (err: any) {
-      expect(err).toBeInstanceOf(MathMismatchError);
-      expect(err.details).toBeDefined();
-      expect(err.details.transactions.length).toBe(2);
-      expect(err.details.mismatch).toBe(400);
-    }
+    // Import succeeds despite math mismatch (non-fatal)
+    const result = await ImportService.importFile({
+      companyId: company.id,
+      bankAccountId: bankAccount.id,
+      fileName: 'mismatch.pdf',
+      extension: 'pdf',
+      buffer: Buffer.from('dummy_pdf'),
+      content: '',
+    });
 
-    // Verify no statement was created
+    expect(result.transactionCount).toBe(2);
+    expect(result.statementId).toBeTruthy();
+
+    // Verify statement was created
     const statementsCount = await db.bankStatement.count({
       where: { bankAccountId: bankAccount.id }
     });
-    expect(statementsCount).toBe(0);
+    expect(statementsCount).toBe(1);
   });
 
   // LEGACY TEST — Skipped because BoA PDFs do not have multi-column individual checks.

@@ -1,104 +1,84 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getSessionUserId } from '@/lib/sessions';
+import { apiHandler } from '@/lib/api-handler';
+import { requireCompanyContext } from '@/lib/context-storage';
 
 /**
  * GET /api/export/pdf?type=trial_balance|transactions|reconciliation&companyId=xxx&...
  * Returns a well-formatted HTML table as a PDF-downloadable file.
  * Content-Type is set to allow "Print to PDF" from the browser.
  */
-export async function GET(request: NextRequest) {
-  try {
-    const userId = await getSessionUserId(request);
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+export const GET = apiHandler(async (request: NextRequest, context: { params: any }) => {
+  const { userId, companyId } = requireCompanyContext();
 
-    const { searchParams } = new URL(request.url);
-    const type = searchParams.get('type');
-    const companyId = searchParams.get('companyId');
+  const { searchParams } = new URL(request.url);
+  const type = searchParams.get('type');
 
-    if (!companyId) {
-      return NextResponse.json({ error: 'companyId is required' }, { status: 400 });
-    }
+  // Get company name and logo for header
+  const company = await db.company.findUnique({
+    where: { id: companyId },
+    select: { legalName: true, logo: true },
+  });
 
-    // Verify membership
-    const membership = await db.companyMember.findFirst({
-      where: { userId, companyId },
-    });
-    if (!membership) {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
-    }
+  // Get user name/email for footer
+  const user = await db.user.findUnique({
+    where: { id: userId },
+    select: { firstName: true, lastName: true, email: true },
+  });
+  const userName = user
+    ? `${user.firstName} ${user.lastName}`.trim() || user.email
+    : 'Unknown user';
 
-    // Get company name and logo for header
-    const company = await db.company.findUnique({
-      where: { id: companyId },
-      select: { legalName: true, logo: true },
-    });
+  let htmlContent: string;
+  let filename: string;
 
-    // Get user name/email for footer
-    const user = await db.user.findUnique({
-      where: { id: userId },
-      select: { firstName: true, lastName: true, email: true },
-    });
-    const userName = user
-      ? `${user.firstName} ${user.lastName}`.trim() || user.email
-      : 'Unknown user';
-
-    let htmlContent: string;
-    let filename: string;
-
-    switch (type) {
-      case 'trial_balance':
-        ({ htmlContent, filename } = await generateTrialBalanceHTML(
-          companyId,
-          searchParams,
-          company?.legalName ?? '',
-          userName,
-        ));
-        break;
-      case 'transactions':
-        ({ htmlContent, filename } = await generateTransactionsHTML(
-          companyId,
-          searchParams,
-          company?.legalName ?? '',
-          userName,
-        ));
-        break;
-      case 'reconciliation':
-        ({ htmlContent, filename } = await generateReconciliationHTML(
-          companyId,
-          searchParams,
-          company?.legalName ?? '',
-          userName,
-        ));
-        break;
-      default:
-        return NextResponse.json(
-          { error: 'Invalid type. Use: trial_balance, transactions, reconciliation' },
-          { status: 400 },
-        );
-    }
-
-    // Inject company logo if present
-    const baseUrl =
-      process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-    const logoHtml = company?.logo
-      ? `<img src="${company.logo.startsWith('http') ? company.logo : `${baseUrl}${company.logo}`}" style="max-height: 48px; max-width: 150px; object-fit: contain;" />`
-      : '';
-    htmlContent = htmlContent.replace('<!--COMPANY_LOGO_PLACEHOLDER-->', logoHtml);
-
-    return new NextResponse(htmlContent, {
-      headers: {
-        'Content-Type': 'text/html; charset=utf-8',
-        'Content-Disposition': `attachment; filename="${filename}"`,
-      },
-    });
-  } catch (error) {
-    console.error('[PDF EXPORT ERROR]', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  switch (type) {
+    case 'trial_balance':
+      ({ htmlContent, filename } = await generateTrialBalanceHTML(
+        companyId,
+        searchParams,
+        company?.legalName ?? '',
+        userName,
+      ));
+      break;
+    case 'transactions':
+      ({ htmlContent, filename } = await generateTransactionsHTML(
+        companyId,
+        searchParams,
+        company?.legalName ?? '',
+        userName,
+      ));
+      break;
+    case 'reconciliation':
+      ({ htmlContent, filename } = await generateReconciliationHTML(
+        companyId,
+        searchParams,
+        company?.legalName ?? '',
+        userName,
+      ));
+      break;
+    default:
+      return NextResponse.json(
+        { error: 'Invalid type. Use: trial_balance, transactions, reconciliation' },
+        { status: 400 },
+      );
   }
-}
+
+  // Inject company logo if present
+  const baseUrl =
+    process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const logoHtml = company?.logo
+    ? `<img src="${company.logo.startsWith('http') ? company.logo : `${baseUrl}${company.logo}`}" style="max-height: 48px; max-width: 150px; object-fit: contain;" />`
+    : '';
+  htmlContent = htmlContent.replace('<!--COMPANY_LOGO_PLACEHOLDER-->', logoHtml);
+
+  return new NextResponse(htmlContent, {
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+    },
+  });
+});
 
 /* ─── HTML Template ─────────────────────────────────────────── */
 

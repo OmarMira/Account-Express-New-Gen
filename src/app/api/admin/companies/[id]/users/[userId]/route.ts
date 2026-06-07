@@ -1,23 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getSessionUserId } from '@/lib/sessions';
+import { apiHandler } from '@/lib/api-handler';
+import { requireCompanyContext } from '@/lib/context-storage';
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string; userId: string }> },
-) {
-  try {
-    const sessionUserId = await getSessionUserId(request);
-    if (!sessionUserId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+export const DELETE = apiHandler(
+  async (request: NextRequest, context: { params: any }) => {
+    const { userId } = requireCompanyContext();
 
-    const user = await db.user.findUnique({ where: { id: sessionUserId } });
-    if (!user || user.role !== 'super_admin') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
-    const { id: companyId, userId: targetUserId } = await params;
+    const { id: companyId, userId: targetUserId } = await context.params;
 
     const member = await db.companyMember.findUnique({
       where: {
@@ -47,7 +37,7 @@ export async function DELETE(
     await db.auditLog.create({
       data: {
         companyId,
-        userId: sessionUserId,
+        userId,
         action: 'revoke_user_company',
         entity: 'CompanyMember',
         entityId: member.id,
@@ -56,8 +46,6 @@ export async function DELETE(
     });
 
     return NextResponse.json({ message: 'User access revoked successfully' });
-  } catch (error) {
-    console.error('[ADMIN COMPANY MEMBERS DELETE]', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
+  },
+  { requireSuperAdmin: true },
+);

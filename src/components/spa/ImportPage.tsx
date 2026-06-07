@@ -434,6 +434,7 @@ export function ImportPage() {
       let newAccountCreated = false;
       let bankAccountName = '';
       let statementId = '';
+      const skippedMonths: string[] = [];
 
       for (let i = 0; i < selectedFiles.length; i++) {
         const file = selectedFiles[i];
@@ -487,6 +488,14 @@ export function ImportPage() {
               return;
             }
 
+            // Skip CONFLICT (existing statement) — collect and continue
+            if (err.code === 'CONFLICT') {
+              const monthMatch = err.error?.match(/período que inicia el\s+([^\s.]+)/i);
+              skippedMonths.push(monthMatch ? monthMatch[1] : file.name.replace('.pdf', ''));
+              setUploadProgress(endProgress);
+              continue;
+            }
+
             throw new Error(err.error || `${file.name}: ${t('banks.importFailed')}`);
           } else {
             throw new Error(`${file.name}: Error del servidor (${res.status})`);
@@ -504,6 +513,21 @@ export function ImportPage() {
         setUploadProgress(endProgress);
       }
 
+      // If ALL files were skipped, show a clear message
+      if (skippedMonths.length > 0 && totalTransactions === 0) {
+        setUploadError(
+          `Los meses ${skippedMonths.join(', ')} ya estaban importados. No hay nuevos datos.`,
+        );
+        clearFiles();
+        setUploading(false);
+        setUploadProgress(0);
+        stopProcessing();
+        return;
+      }
+
+      const skippedNote =
+        skippedMonths.length > 0 ? ` (${skippedMonths.join(', ')} ya estaban importados)` : '';
+
       setImportResult({
         statementId,
         transactionCount: totalTransactions,
@@ -511,7 +535,8 @@ export function ImportPage() {
         duplicatesSkipped: totalDuplicatesSkipped,
         newAccountCreated,
         bankAccountName,
-      });
+        skippedNote,
+      } as any);
       setResultOpen(true);
       clearFiles();
       fetchBankAccounts();
@@ -975,6 +1000,14 @@ export function ImportPage() {
                     <AlertCircle className="size-4 text-amber-600 dark:text-amber-400" />
                     <span className="text-amber-700 dark:text-amber-300">
                       {importResult.duplicatesSkipped} {t('reconciliation.duplicatesSkipped')}
+                    </span>
+                  </div>
+                )}
+                {(importResult as any).skippedNote && (
+                  <div className="flex items-center gap-2 rounded-md bg-blue-50 dark:bg-blue-950/30 p-2 text-sm">
+                    <AlertCircle className="size-4 text-blue-600 dark:text-blue-400" />
+                    <span className="text-blue-700 dark:text-blue-300">
+                      {(importResult as any).skippedNote}
                     </span>
                   </div>
                 )}

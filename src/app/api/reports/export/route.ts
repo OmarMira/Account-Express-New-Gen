@@ -1,35 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { apiHandler } from '@/lib/api-handler';
 import { db } from '@/lib/db';
-import { getSessionUserId } from '@/lib/sessions';
+import { requireCompanyContext } from '@/lib/context-storage';
 import { toUTCRange } from '@/lib/reports/date-filter';
 import { aggregateFinancialData } from '@/lib/reports/aggregation';
 import { exportToCSVContent } from '@/lib/reports/export-csv';
 import { generateHash } from '@/lib/reports/integrity';
 
 export const GET = apiHandler(async (req: NextRequest) => {
-  const userId = await getSessionUserId(req);
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const { userId, companyId } = requireCompanyContext();
 
   const { searchParams } = new URL(req.url);
-  const companyId = searchParams.get('companyId') || '';
-  const type = searchParams.get('type') || ''; // trial_balance | income_statement | balance_sheet
-  const format = searchParams.get('format') || 'csv'; // csv o pdf
+  const type = searchParams.get('type') || '';
+  const format = searchParams.get('format') || 'csv';
   const startDateStr = searchParams.get('startDate');
   const endDateStr = searchParams.get('endDate');
 
-  if (!companyId || !type) {
+  if (!type) {
     return NextResponse.json({ error: 'companyId y type son requeridos' }, { status: 400 });
-  }
-
-  // Verificar membresía del usuario
-  const membership = await db.companyMember.findFirst({
-    where: { userId, companyId },
-  });
-  if (!membership) {
-    return NextResponse.json({ error: 'Access denied' }, { status: 403 });
   }
 
   try {

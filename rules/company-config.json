@@ -1139,6 +1139,954 @@
       "periodType": "WEEK_52_53",
       "taxModuleEnabled": false,
       "updatedAt": "2026-06-04T23:20:58.307Z"
+    },
+    "cmq1bnm970000c7uw0qeujla8": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-05T19:33:14.738Z"
+    },
+    "cmq1bnmcj0028c7uwoeamulum": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-05T19:33:14.855Z"
+    },
+    "cmq1komtr0000c75oplx9bhhc": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-05T23:45:58.678Z"
+    },
+    "cmq1komw80028c75olu6l1bsy": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-05T23:45:58.764Z"
+    },
+    "cmq1kxh100000c7fojunbsoxl": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-05T23:52:51.063Z"
+    },
+    "cmq1kxh340028c7fowgttq41k": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-05T23:52:51.137Z"
+    },
+    "cmq1kyvwh0000c7b4bcwdu220": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-05T23:53:56.999Z"
+    },
+    "cmq1kyvza0028c7b45xpremn0": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-05T23:53:57.098Z"
+    },
+    "cmq1la98d0000c7hkh4x5opds": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T00:02:47.492Z"
+    },
+    "cmq1la9ak0028c7hkxo8z17i7": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T00:02:47.568Z"
+    },
+    "cmq1lcnrm0000c7hgpq8iq1rh": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T00:04:39.652Z"
+    },
+    "cmq1lcoar0028c7hgnq99nvip": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T00:04:40.338Z"
+    },
+    "cmq1ldlvs0000c7o0jdb9x419": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T00:05:23.883Z"
+    },
+    "cmq1ldmh50028c7o04ukei0no": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T00:05:24.656Z"
+    },
+    "cmq1lf22y0000c7acdpxnqle8": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T00:06:31.655Z"
+    },
+    "cmq1lf2sr0028c7acxx6b3l4w": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T00:06:32.542Z"
+    },
+    "cmq1ljr7s0000c7aclumqnhjv": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T00:10:10.707Z"
+    },
+    "cmq1ljrat0028c7acw5yjsh4b": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T00:10:10.810Z"
+    },
+    "cmq1lo7410000c7p85g2lftq4": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T00:13:37.961Z"
+    },
+    "cmq1lo85d0028c7p8mkch4ib4": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T00:13:39.300Z"
+    },
+    "cmq1lu7140000c7tcpidu0e31": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T00:18:17.761Z"
+    },
+    "cmq1lu7420028c7tcpx8on6c0": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T00:18:17.864Z"
+    },
+    "cmq1ly2k80000c7686wy7xd92": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T00:21:18.594Z"
+    },
+    "cmq1ly2pe0028c768kn5mjwsr": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T00:21:18.811Z"
+    },
+    "cmq1m12gj0000c7xcxbv6trqu": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T00:23:38.441Z"
+    },
+    "cmq1m137i0028c7xc88cy1odw": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T00:23:39.404Z"
+    },
+    "cmq1msliv0000c7zgaekclvi0": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T00:45:02.852Z"
+    },
+    "cmq1mslmo0028c7zgefggstfp": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T00:45:02.983Z"
+    },
+    "cmq1my2rf0000c7m8gmq3g93y": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T00:49:18.482Z"
+    },
+    "cmq1my3au0028c7m8gk8m9hyn": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T00:49:19.176Z"
+    },
+    "cmq1n0jm60000c7j0rfyd5u8z": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T00:51:13.641Z"
+    },
+    "cmq1n0k7j0028c7j09zz5gtog": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T00:51:14.399Z"
+    },
+    "cmq1n4s1b0000c74wm8phfq23": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T00:54:31.157Z"
+    },
+    "cmq1n4s3n0028c74w917z69n6": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T00:54:31.239Z"
+    },
+    "cmq1n81zt0000c7ac8lpee7fv": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T00:57:04.034Z"
+    },
+    "cmq1n82210028c7accjvac8d8": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T00:57:04.108Z"
+    },
+    "cmq1n9azq0000c7x4earqa96o": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T00:58:02.350Z"
+    },
+    "cmq1n9b2g0028c7x43dxzzncx": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T00:58:02.446Z"
+    },
+    "cmq1nb1mz0000c7kcvds85cvl": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T00:59:23.539Z"
+    },
+    "cmq1nb1p40028c7kc5kb9jt6k": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T00:59:23.612Z"
+    },
+    "cmq1o9cm80000c70w9kugexeo": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T01:26:04.073Z"
+    },
+    "cmq1o9cox0028c70wlff5vt6x": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T01:26:04.166Z"
+    },
+    "cmq1nm8wy0001c7qs5p7dbdmc": {
+      "currency": "USD",
+      "periodType": "CUSTOM_MONTHS",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T01:30:28.609Z"
+    },
+    "cmq1osq9k0000c7hw2cq01gce": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T01:41:08.222Z"
+    },
+    "cmq1osqb90028c7hw3cu7hrg4": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T01:41:08.280Z"
+    },
+    "cmq1p90jb0001c7y41i7yizzh": {
+      "currency": "USD",
+      "periodType": "CUSTOM_MONTHS",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T01:54:25.682Z"
+    },
+    "cmq1peahb000uc7jgycvnpt01": {
+      "currency": "USD",
+      "periodType": "CUSTOM_MONTHS",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T01:58:29.586Z"
+    },
+    "cmq1t1nfc0000c7l8o292e0on": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T03:40:02.912Z"
+    },
+    "cmq1t1nhn0028c7l8isj66vo8": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T03:40:02.991Z"
+    },
+    "cmq1t26ie0000c7ck2vro65od": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T03:40:27.645Z"
+    },
+    "cmq1t26km0028c7ckff592smy": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T03:40:27.722Z"
+    },
+    "cmq1t7muk0000c7b4bi83yxe2": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T03:44:42.098Z"
+    },
+    "cmq1t7mwl0028c7b48qwytpsk": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T03:44:42.169Z"
+    },
+    "cmq1t89vw0000c76otxvr2kj1": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T03:45:11.955Z"
+    },
+    "cmq1t89yj0028c76o0ilxthda": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T03:45:12.048Z"
+    },
+    "cmq1t8ogi0000c78choitf4pl": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T03:45:30.841Z"
+    },
+    "cmq1t8oiv0028c78c1h065fv6": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T03:45:30.923Z"
+    },
+    "cmq1t9xbk0000c7wcw9jmli27": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T03:46:28.983Z"
+    },
+    "cmq1t9xdn0028c7wcpmada5nd": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T03:46:29.054Z"
+    },
+    "cmq1to75f0000c7t89id94dwi": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T03:57:34.905Z"
+    },
+    "cmq1to77h0028c7t8jw9hxcxh": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T03:57:34.977Z"
+    },
+    "cmq1u88y30000c7iszyodxoi0": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T04:13:10.357Z"
+    },
+    "cmq1u89080028c7is0f9krhjg": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T04:13:10.428Z"
+    },
+    "cmq1ucson0000c7ekvvp49qri": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T04:16:42.558Z"
+    },
+    "cmq1ucsrn0028c7ek0j8q38nq": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T04:16:42.663Z"
+    },
+    "cmq1wxvhg0000c79kj7si5xtg": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T05:29:05.196Z"
+    },
+    "cmq1wxvjw0028c79kwx01mmwk": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T05:29:05.282Z"
+    },
+    "cmq1xw1tr0000c7y48qgsv203": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T05:55:39.719Z"
+    },
+    "cmq1xw1x50028c7y4c102bgrf": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T05:55:39.837Z"
+    },
+    "cmq1xy8ic0000c7ncq67wacmq": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T05:57:21.690Z"
+    },
+    "cmq1xy8kk0028c7ncadajuksf": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T05:57:21.768Z"
+    },
+    "cmq1xz4kn0000c7dcrrmzdih4": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T05:58:03.247Z"
+    },
+    "cmq1xz4n70028c7dcjdz1sd8o": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T05:58:03.334Z"
+    },
+    "cmq1y1pm20000c750rm6y5uha": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T06:00:03.846Z"
+    },
+    "cmq1y1po50028c7505c1ufgmd": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T06:00:03.896Z"
+    },
+    "cmq2ihnvt0000c7isqas67q3l": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T15:32:20.400Z"
+    },
+    "cmq2ihnxh0028c7isag3pd8e9": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T15:32:20.456Z"
+    },
+    "cmq2ijxjx0000c708ov7nzpgj": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T15:34:06.243Z"
+    },
+    "cmq2ijxlk0028c708s1pm63f0": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T15:34:06.300Z"
+    },
+    "cmq2ilr3c0001c74o571b9qx9": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T15:35:31.180Z"
+    },
+    "cmq2ilr4y0029c74oz8eaxccf": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T15:35:31.238Z"
+    },
+    "cmq2ins3y0001c7ng65gse9dt": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T15:37:05.811Z"
+    },
+    "cmq2ins5q0029c7ngindkr020": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T15:37:05.873Z"
+    },
+    "cmq2ivw2s0001c7aw6z0ht0sr": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T15:43:24.201Z"
+    },
+    "cmq2ivw4k0029c7awt56bgh0h": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T15:43:24.263Z"
+    },
+    "cmq2jdc2a0001c7owobcd2hq7": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T15:56:58.072Z"
+    },
+    "cmq2jdc4o0029c7owa2nkwppf": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T15:56:58.155Z"
+    },
+    "cmq2jqtd60001c7ekxn8ytlmq": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T16:07:27.023Z"
+    },
+    "cmq2jqteu0029c7ek6d9ekcqz": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T16:07:27.081Z"
+    },
+    "cmq2jysll0001c7mokpp8f49p": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T16:13:39.278Z"
+    },
+    "cmq2jysn50029c7mooxscy9nu": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T16:13:39.332Z"
+    },
+    "cmq2tfvfx0001c7ewns49wvyh": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T20:38:52.688Z"
+    },
+    "cmq2tfw570029c7ewz2ub52rr": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T20:38:53.615Z"
+    },
+    "cmq2tjc990001c7g044x51ume": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T20:41:34.418Z"
+    },
+    "cmq2tjcbu0029c7g016g0aazi": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T20:41:34.510Z"
+    },
+    "cmq2xew4y0001c7zw08zvei8r": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T22:30:05.371Z"
+    },
+    "cmq2xew7t0029c7zw7baia3ea": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T22:30:05.469Z"
+    },
+    "cmq2xvzcc0001c7vcocy005nn": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T22:43:22.673Z"
+    },
+    "cmq2xvzed0029c7vcxvufh5z7": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T22:43:22.746Z"
+    },
+    "cmq2y24fj0001c70gzmt6x56h": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T22:48:09.203Z"
+    },
+    "cmq2y24h90029c70gd793e1mh": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-06T22:48:09.263Z"
+    },
+    "cmq328thn0001c76k10dxdfmr": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T00:45:20.073Z"
+    },
+    "cmq328tk30029c76k8dimp6cq": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T00:45:20.163Z"
+    },
+    "cmq3466m60006c7aco9pqz252": {
+      "currency": "USD",
+      "periodType": "CUSTOM_MONTHS",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T01:39:35.550Z"
+    },
+    "cmq357uho0001c7bwdwliw6ju": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T02:08:33.713Z"
+    },
+    "cmq357vdt0029c7bw96gi20o4": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T02:08:34.866Z"
+    },
+    "cmq3dgnuo0001c7r8r9c5jqt4": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T05:59:21.796Z"
+    },
+    "cmq3dgnws0029c7r8l3nr96mo": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T05:59:21.871Z"
+    },
+    "cmq3v2esw0001c75c8im7scok": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T14:12:09.973Z"
+    },
+    "cmq3v2ex50029c75cfh9udisj": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T14:12:10.125Z"
+    },
+    "cmq3vesck0001c7io74hp8pvt": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T14:21:47.401Z"
+    },
+    "cmq3vesel0029c7io1z627kqh": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T14:21:47.472Z"
+    },
+    "cmq3vghoz0001c7mkgizrz6y3": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T14:23:06.905Z"
+    },
+    "cmq3vghqt0029c7mk1skwdw7p": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T14:23:06.969Z"
+    },
+    "cmq3w962v0001c7pso4eszs75": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T14:45:24.869Z"
+    },
+    "cmq3w964k0029c7psqx5jn2yt": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T14:45:24.929Z"
+    },
+    "cmq3zwp1g0001c7tk6z45y3lg": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T16:27:41.386Z"
+    },
+    "cmq3zwp3g0029c7tkmcm29vbt": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T16:27:41.457Z"
+    },
+    "cmq400tm60001c788cu4oui08": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T16:30:53.927Z"
+    },
+    "cmq400tny0029c788wg6txy2o": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T16:30:53.988Z"
+    },
+    "cmq4220hn0001c71opgustwb2": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T17:27:48.741Z"
+    },
+    "cmq4220kf0029c71owcq7xvwh": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T17:27:48.836Z"
+    },
+    "cmq427sk10001c7kofi9229rk": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T17:32:18.394Z"
+    },
+    "cmq427smw0029c7koc4c3tm5v": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T17:32:18.493Z"
+    },
+    "cmq43grax0001c7fw25butexl": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T18:07:16.288Z"
+    },
+    "cmq43grdx0029c7fwr4ye0jpb": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T18:07:16.393Z"
+    },
+    "cmq43ksbt0001c75wwuuvuhh0": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T18:10:24.237Z"
+    },
+    "cmq43ksgy0029c75ww28rtwnb": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T18:10:24.426Z"
+    },
+    "cmq43n44w0001c7ogsz3ozm3x": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T18:12:12.856Z"
+    },
+    "cmq43n47x0029c7ogmxd8kl40": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T18:12:12.962Z"
+    },
+    "cmq43y93c0001c7r0zssm77qp": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T18:20:52.497Z"
+    },
+    "cmq43y9810029c7r0n8cp2hdz": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T18:20:52.663Z"
+    },
+    "cmq444uvj0001c7o8iecpxvwe": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T18:26:00.670Z"
+    },
+    "cmq444v0q0029c7o812wpzp2v": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T18:26:00.851Z"
+    },
+    "cmq449g8f0001c7x0tnm2fnhh": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T18:29:34.968Z"
+    },
+    "cmq449gc00029c7x0gtbw4rp7": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T18:29:35.098Z"
+    },
+    "cmq44h8jx0001c758vhvy2kln": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T18:35:38.262Z"
+    },
+    "cmq44h8n40029c7580mj6z0wo": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T18:35:38.377Z"
+    },
+    "cmq46or630001c7a4lhsw2adg": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T19:37:28.231Z"
+    },
+    "cmq46orix003vc7a4wqbgdxdo": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T19:37:28.679Z"
+    },
+    "cmq46suk40001c7e44gb92nqf": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T19:40:39.246Z"
+    },
+    "cmq46suvl003vc7e42stct9kg": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T19:40:39.645Z"
+    },
+    "cmq470iom0001c7pwvdwazw9z": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T19:46:37.111Z"
+    },
+    "cmq470j8t003vc7pw26iawius": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T19:46:37.827Z"
+    },
+    "cmq47cpv50001c74wdyh52cbu": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T19:56:06.262Z"
+    },
+    "cmq47cpx5003vc74wivjhkxsz": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T19:56:06.333Z"
+    },
+    "cmq480npm0001c7rcbyov72h2": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T20:14:43.254Z"
+    },
+    "cmq480o0o003vc7rc8fbi5aa5": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T20:14:43.621Z"
+    },
+    "cmq4c61dl0001c71clkq5rkhf": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T22:10:52.671Z"
+    },
+    "cmq4c61g7003vc71c6v2qjqsq": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T22:10:52.763Z"
+    },
+    "cmq4f0atl0001c7rcxqv40f5k": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T23:30:23.822Z"
+    },
+    "cmq4f0avl003vc7rcmyg1h959": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T23:30:23.893Z"
+    },
+    "cmq4f3x330001c7r4hxe0kg7s": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T23:33:12.646Z"
+    },
+    "cmq4f3x6a003vc7r47er4ib80": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T23:33:12.758Z"
+    },
+    "cmq4f5zre0001c768xq7vqgnj": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T23:34:49.427Z"
+    },
+    "cmq4f5zv2003vc768t8417tm3": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T23:34:49.557Z"
+    },
+    "cmq4f80cz0001c7ngj81ybzqb": {
+      "currency": "USD",
+      "periodType": "CALENDAR",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T23:36:23.509Z"
+    },
+    "cmq4f80gv003vc7ngai1vdo46": {
+      "currency": "USD",
+      "periodType": "WEEK_52_53",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-07T23:36:23.650Z"
     }
   }
 }
