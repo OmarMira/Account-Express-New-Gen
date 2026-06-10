@@ -427,29 +427,7 @@ export async function parseConversationalContext(
     }
   }
 
-  // ── SOCIO enforcement ──────────────────────────────────────────────
-  // Regardless of what the AI suggested (3041, 3042, etc.), partners must
-  // always be sub-accounts of 3040 (Owner's Draw). We hard-enforce the
-  // parent account and require sub-account creation so the hierarchy is:
-  //   3040  Owner's Draw
-  //   └── 3040-01  Partner A
-  //   └── 3040-02  Partner B
-  if (role === 'SOCIO') {
-    const SOCIO_PARENT_CODE = '3040';
-    if (glAccountCode !== SOCIO_PARENT_CODE) {
-      logger.info('[SOCIO ENFORCEMENT] Overriding GL account to parent 3040', {
-        originalCode: glAccountCode,
-        companyId,
-      });
-      const resolved = await resolveGLAccount(companyId, SOCIO_PARENT_CODE, { db: prismaClient });
-      glAccountId = resolved.glAccountId;
-      account = resolved.account;
-    }
-    // Always require sub-account creation for partners
-    parsed.suggestSubAccount = true;
-    // If the AI did not provide a sub-account name, leave null so the UI can prompt the user
-  }
-  // ───────────────────────────────────────────────────────────────────
+
 
   let conditions = parsed.conditions;
   if (!conditions || !Array.isArray(conditions) || conditions.length === 0) {
@@ -458,7 +436,7 @@ export async function parseConversationalContext(
 
   return {
     role,
-    glAccountCode: role === 'SOCIO' ? '3040' : glAccountCode,
+    glAccountCode,
     glAccountId,
     suggestSubAccount: Boolean(parsed.suggestSubAccount),
     subAccountName: parsed.subAccountName ? String(parsed.subAccountName) : null,

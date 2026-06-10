@@ -16,6 +16,7 @@ import {
   Plus,
   Trash2,
   Eye,
+  ChevronRight,
 } from 'lucide-react';
 import { type EntityCandidate } from '@/lib/services/entity-detector';
 import {
@@ -67,6 +68,28 @@ function accountTypeLabel(type?: string): string {
     expense: 'Expense (Gasto)',
   };
   return type ? labels[type] || 'Expense (Gasto)' : 'Expense (Gasto)';
+}
+
+function getIndividualCode(parentCode: string, accounts: GlAccountOption[]): string {
+  const num = parseInt(parentCode, 10);
+  if (isNaN(num)) return parentCode;
+  return getNextCode(String(num + 1), accounts);
+}
+
+function buildAccountChain(
+  accounts: GlAccountOption[],
+  code: string,
+): { id: string; code: string; name: string }[] {
+  const byCode = new Map(accounts.filter(Boolean).map((a) => [a.code, a]));
+  const byId = new Map(accounts.filter(Boolean).map((a) => [a.id, a]));
+  const chain: { id: string; code: string; name: string }[] = [];
+  let current = byCode.get(code) ?? null;
+  while (current) {
+    chain.unshift({ id: current.id, code: current.code, name: current.name });
+    if (!current.parentId) break;
+    current = byId.get(current.parentId) ?? null;
+  }
+  return chain;
 }
 
 interface RuleCondition {
@@ -126,6 +149,7 @@ export function ConversationalRuleBuilder({
 
   // Live simulation & condition editor states
   const [editableConditions, setEditableConditions] = useState<RuleCondition[]>([]);
+  const [localSuggestSubAccount, setLocalSuggestSubAccount] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);
   const [simulationResult, setSimulationResult] = useState<{
     matchCount: number;
@@ -138,12 +162,14 @@ export function ConversationalRuleBuilder({
     { code: string; name: string; accountType: string }[]
   >([]);
 
-  // Sync suggestion conditions when suggestion changes
+  // Sync suggestion conditions + sub-account flag when suggestion changes
   useEffect(() => {
     if (suggestion) {
       setEditableConditions(suggestion.conditions || []);
+      setLocalSuggestSubAccount(suggestion.suggestSubAccount);
     } else {
       setEditableConditions([]);
+      setLocalSuggestSubAccount(false);
     }
   }, [suggestion]);
 
@@ -170,6 +196,7 @@ export function ConversationalRuleBuilder({
             name: a.name,
             accountType: a.accountType,
             normalBalance: a.normalBalance,
+            parentId: a.parentId ?? null,
           })),
         );
       }
@@ -322,17 +349,17 @@ export function ConversationalRuleBuilder({
         const resData = await res.json();
         if (resData.success && resData.data) {
           const sug = resData.data;
-          // Calculate next available code ONCE here, before setting state
-          const nextCode = getNextCode(sug.account.code, allGlAccounts);
           setGlAccountMode('create');
-          setGlAccountCodeInput(nextCode);
-          setGlAccountNameInput(sug.account.name);
-          // If we assigned a different code than the AI suggested, it's
-          // a sibling-level account, not a sub-account of the original
-          if (nextCode !== sug.account.code) {
+          if (sug.suggestSubAccount) {
+            // Preserve parent code — server will create sub-account under it
+            setGlAccountCodeInput(sug.account.code);
+          } else {
+            // Standalone account: find next available code
+            const nextCode = getNextCode(sug.account.code, allGlAccounts);
             sug.account.code = nextCode;
-            sug.suggestSubAccount = false;
+            setGlAccountCodeInput(nextCode);
           }
+          setGlAccountNameInput(sug.account.name);
           setSuggestion(sug);
           // Cache suggestion per session for consistent re-edits
           suggestionCache.current[`${current.canonicalName}::${value.trim()}`] = sug;
@@ -374,7 +401,7 @@ export function ConversationalRuleBuilder({
             lockedDirection: current.directionProfile.creditPct >= threshold ? 'credit' : 'debit',
             glAccountCode: code,
             role: suggestion.role,
-            createSubAccount: suggestion.suggestSubAccount,
+            createSubAccount: localSuggestSubAccount,
             subAccountName: suggestion.subAccountName || undefined,
             conditions: editableConditions.filter((c) => c.value.trim().length > 0),
           }),
@@ -412,7 +439,27 @@ export function ConversationalRuleBuilder({
       setCreatingRule(false);
       creatingRuleRef.current = false;
     }
-  }, [suggestion, current, companyId, onComplete, t, glAccountCodeInput, glAccountNameInput, editableConditions, fetchAccounts]);
+  }, [suggestion, current, companyId, onComplete, t, glAccountCodeInput, glAccountNameInput, editableConditions, fetchAccounts, localSuggestSubAccount]);
+
+  const handleToggleGrouping = useCallback(
+    (value: boolean) => {
+      if (!suggestion) return;
+      setLocalSuggestSubAccount(value);
+      if (value) {
+        // Agrupar: only restore parent code if the original AI suggestion intended a sub-account
+        if (suggestion.suggestSubAccount) {
+          setGlAccountCodeInput(suggestion.account.code);
+          setGlAccountNameInput(suggestion.account.name);
+        }
+      } else {
+        // Individual: compute standalone code starting after the parent
+        const individualCode = getIndividualCode(suggestion.account.code, allGlAccounts);
+        setGlAccountCodeInput(individualCode);
+        setGlAccountNameInput(suggestion.subAccountName || suggestion.account.name);
+      }
+    },
+    [suggestion, allGlAccounts],
+  );
 
   const handleSkip = useCallback(() => {
     setAnswer('');
@@ -469,7 +516,7 @@ export function ConversationalRuleBuilder({
           lockedDirection: current.directionProfile.creditPct >= th ? 'credit' : 'debit',
           glAccountCode: finalCode,
           role: suggestion.role,
-          createSubAccount: suggestion.suggestSubAccount,
+          createSubAccount: localSuggestSubAccount,
           subAccountName: suggestion.subAccountName || undefined,
           conditions: editableConditions.filter((c) => c.value.trim().length > 0),
         }),
@@ -511,6 +558,7 @@ export function ConversationalRuleBuilder({
     allGlAccounts,
     editableConditions,
     fetchAccounts,
+    localSuggestSubAccount,
   ]);
 
   // Renderizado de estados
@@ -710,11 +758,70 @@ export function ConversationalRuleBuilder({
                   {t('ruleBuilder.suggestedAccount')}
                 </p>
 
-                {/* Current selection preview — shows actual values that will be submitted */}
-                <div className="flex items-center gap-2 text-sm font-bold text-primary bg-primary/10 rounded px-3 py-2">
-                  {glAccountCodeInput || suggestion.account.code}{' '}
-                  <span className="text-muted-foreground font-normal">—</span>{' '}
-                  {glAccountNameInput || suggestion.account.name}
+                {/* Ancestor chain tree view */}
+                {(() => {
+                  const currentCode = glAccountCodeInput || suggestion.account.code;
+                  const chain = buildAccountChain(allGlAccounts, currentCode);
+                  if (chain.length > 1 || localSuggestSubAccount) {
+                    return (
+                      <div className="flex items-center gap-1.5 text-xs flex-wrap bg-background/50 rounded px-3 py-2 border">
+                        {chain.map((acc, i) => (
+                          <span key={acc.id} className="flex items-center gap-1">
+                            <span className="text-muted-foreground font-mono">{acc.code}</span>
+                            <span className="text-foreground">{acc.name}</span>
+                            {i < chain.length - 1 && (
+                              <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />
+                            )}
+                          </span>
+                        ))}
+                        {localSuggestSubAccount && (
+                          <>
+                            <ChevronRight className="h-3 w-3 text-primary shrink-0" />
+                            <span className="text-primary font-semibold">
+                              🔽 {suggestion.subAccountName || current.canonicalName}
+                              <span className="text-primary/70 font-mono ml-1">
+                                ({chain.length > 0 ? `${chain[chain.length - 1].code}-01` : `${currentCode}-01`})
+                              </span>
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="text-xs font-mono text-primary bg-background/50 rounded px-3 py-2 border">
+                      🔽 {glAccountNameInput || suggestion.account.name} ({currentCode})
+                    </div>
+                  );
+                })()}
+
+                {/* Agrupar / Individual toggle */}
+                <div className="space-y-1">
+                  <label className="text-xs font-medium">Agrupación</label>
+                  <div className="grid grid-cols-2 gap-2 bg-slate-900/50 dark:bg-slate-900/80 p-1 rounded-lg border">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleGrouping(true)}
+                      className={`py-1.5 text-xs font-semibold rounded-md transition-all ${
+                        localSuggestSubAccount
+                          ? 'bg-blue-600 text-white shadow-sm'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      Agrupar bajo {suggestion.account.code}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleGrouping(false)}
+                      className={`py-1.5 text-xs font-semibold rounded-md transition-all ${
+                        !localSuggestSubAccount
+                          ? 'bg-blue-600 text-white shadow-sm'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      Individual
+                    </button>
+                  </div>
                 </div>
 
                 {/* Toggle Crear / Vincular */}
@@ -785,7 +892,7 @@ export function ConversationalRuleBuilder({
                   </div>
                 )}
 
-                {suggestion.suggestSubAccount && (
+                {localSuggestSubAccount && (
                   <p className="text-xs text-muted-foreground border-t pt-2">
                     {t('ruleBuilder.subAccountHint').replace(
                       '{name}',

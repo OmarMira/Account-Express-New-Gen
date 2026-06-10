@@ -23,6 +23,7 @@ export interface GlAccountOption {
   name: string;
   accountType: string;
   normalBalance: string;
+  parentId?: string | null;
 }
 
 interface AccountSelectorProps {
