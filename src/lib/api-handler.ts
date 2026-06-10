@@ -4,6 +4,7 @@ import { getSessionUserId } from './sessions';
 import { checkRateLimit } from './security/rate-limiter';
 import { db } from './db';
 import { requestContext } from './context-storage';
+import { logger } from './logger';
 
 const API_SECURITY_HEADERS = {
   'X-Frame-Options': 'DENY',
@@ -12,7 +13,7 @@ const API_SECURITY_HEADERS = {
 };
 
 export type RouteParams = Record<string, string>;
-export type RouteContext = { params: RouteParams | Promise<RouteParams> };
+export type RouteContext = { params: Promise<RouteParams> };
 type ApiHandler = (
   request: NextRequest,
   context: RouteContext,
@@ -164,9 +165,10 @@ export function apiHandler(handler: ApiHandler, options: ApiHandlerOptions = {})
       }
 
       return response;
-    } catch (error: any) {
+    } catch (error: unknown) {
       let errResponse: NextResponse;
-      if (error instanceof AppError || (error && typeof error.statusCode === 'number')) {
+
+      if (error instanceof AppError) {
         errResponse = NextResponse.json(
           {
             error: error.message,
@@ -175,14 +177,24 @@ export function apiHandler(handler: ApiHandler, options: ApiHandlerOptions = {})
           },
           { status: error.statusCode },
         );
-      } else if (error.code && error.clientVersion) {
-        console.error('[PRISMA DB ERROR]', error);
+      } else if (typeof error === 'object' && error !== null && 'statusCode' in error) {
+        const appErr = error as { message?: string; code?: string; details?: unknown; statusCode: number };
+        errResponse = NextResponse.json(
+          {
+            error: appErr.message || 'Error',
+            code: appErr.code,
+            ...(process.env.NODE_ENV === 'development' ? { details: appErr.details } : {}),
+          },
+          { status: appErr.statusCode },
+        );
+      } else if (typeof error === 'object' && error !== null && 'code' in error && 'clientVersion' in error) {
+        logger.error('[PRISMA DB ERROR]', { error: String(error) });
         errResponse = NextResponse.json(
           { error: 'Database constraint violation or error occurred.', code: 'DATABASE_ERROR' },
           { status: 400 },
         );
       } else {
-        console.error('[UNHANDLED API ERROR]', error);
+        logger.error('[UNHANDLED API ERROR]', { error: String(error) });
         errResponse = NextResponse.json(
           { error: 'Internal server error', code: 'INTERNAL_SERVER_ERROR' },
           { status: 500 },

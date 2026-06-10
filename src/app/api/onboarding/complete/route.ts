@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { apiHandler } from '@/lib/api-handler';
+import { apiHandler, type RouteContext } from '@/lib/api-handler';
 import { requireCompanyContext } from '@/lib/context-storage';
-import { completeOnboarding } from '@/services/onboarding.service';
+import { completeOnboarding } from '@/lib/services/onboarding.service';
 import { onboardingPayloadSchema } from '@/lib/validations/onboarding';
+import { logger } from '@/lib/logger';
 
-export const POST = apiHandler(async (request: NextRequest, context: { params: any }) => {
+export const POST = apiHandler(async (request: NextRequest, context: RouteContext) => {
   const { userId, companyId } = requireCompanyContext();
 
   try {
@@ -107,10 +108,10 @@ export const POST = apiHandler(async (request: NextRequest, context: { params: a
     );
 
     return NextResponse.json(result);
-  } catch (error: any) {
-    console.error('[API ONBOARDING COMPLETE ERROR]', error);
+  } catch (error: unknown) {
+    logger.error('[API ONBOARDING COMPLETE ERROR]', { error: String(error) });
     return NextResponse.json(
-      { error: error.message || 'Error interno del servidor' },
+      { error: error instanceof Error ? error.message : String(error) },
       { status: 500 },
     );
   }

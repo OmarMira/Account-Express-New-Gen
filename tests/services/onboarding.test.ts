@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { completeOnboarding } from '@/services/onboarding.service';
+import { completeOnboarding } from '@/lib/services/onboarding.service';
 import { createTestCompany, clearDatabase } from '../helpers/factories';
 import { db } from '@/lib/db';
 

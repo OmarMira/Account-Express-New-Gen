@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { apiHandler } from '@/lib/api-handler';
+import { apiHandler, type RouteContext } from '@/lib/api-handler';
 import { requireCompanyContext } from '@/lib/context-storage';
 import { findContext } from '@/lib/services/entity-context-service';
+import {
+  loadConfig,
+  sanitizeDescription,
+  extractName,
+} from '@/lib/services/entity-detector';
 
 /**
  * POST /api/ai-rules/scan
@@ -12,8 +17,9 @@ import { findContext } from '@/lib/services/entity-context-service';
  * description patterns (≥ 3 occurrences).  No external AI is used —
  * everything runs locally with pure string heuristics.
  */
-export const POST = apiHandler(async (request: NextRequest, context: { params: any }) => {
+export const POST = apiHandler(async (request: NextRequest, context: RouteContext) => {
   const { userId, companyId } = requireCompanyContext();
+  const entityConfig = loadConfig();
 
   // ── 1. Get all bank accounts for the company ───────────────────
   const bankAccounts = await db.bankAccount.findMany({
@@ -176,6 +182,11 @@ export const POST = apiHandler(async (request: NextRequest, context: { params: a
 
     const isDebit = entry.debitCount >= entry.creditCount;
 
+    // Extract entity name from the raw sample — skip if no identifiable entity
+    const sanitized = sanitizeDescription(entry.sample, entityConfig);
+    const entityName = extractName(sanitized, entityConfig);
+    if (!entityName) continue;
+
     // Look up entity context
     const context = await findContext(companyId, entry.sample);
     let suggested: { name: string; code: string; id: string } | null = null;
@@ -194,12 +205,9 @@ export const POST = apiHandler(async (request: NextRequest, context: { params: a
       suggested = suggestAccount(entry.sample, isDebit);
     }
 
-    // Pretty-print the normalized key
-    const prettyKey = key.replace(/\b\w/g, (c) => c.toUpperCase());
-
     patterns.push({
       id: Buffer.from(key).toString('base64').replace(/=/g, ''),
-      description: prettyKey || entry.sample.substring(0, 60),
+      description: entityName,
       rawDescription: entry.sample,
       occurrences: entry.count,
       direction: isDebit ? 'debit' : 'credit',

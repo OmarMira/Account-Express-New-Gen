@@ -337,7 +337,7 @@ export function BankRulesPage() {
     try {
       const url = editingRule ? `/api/bank-rules/${editingRule.id}` : '/api/bank-rules';
       const method = editingRule ? 'PUT' : 'POST';
-      const body = editingRule ? { ...form } : { companyId: activeCompany.id, ...form };
+      const body = editingRule ? { ...form, companyId: activeCompany.id } : { companyId: activeCompany.id, ...form };
 
       const res = await fetch(url, {
         method,
@@ -373,11 +373,13 @@ export function BankRulesPage() {
 
   // Delete
   const handleDelete = async () => {
-    if (!deletingRule) return;
+    if (!deletingRule || !activeCompany?.id) return;
     setDeleting(true);
     try {
       const res = await fetch(`/api/bank-rules/${deletingRule.id}`, {
         method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyId: activeCompany.id }),
       });
       if (res.ok) {
         setDeleteDialogOpen(false);
@@ -525,13 +527,19 @@ export function BankRulesPage() {
                       </TableCell>
                       <TableCell
                         className="max-w-[200px] truncate"
-                        title={`${rule.glAccount.code} ${rule.glAccount.name}`}
+                        title={rule.glAccount ? `${rule.glAccount.code} ${rule.glAccount.name}` : '—'}
                       >
                         <span className="flex items-center gap-2">
-                          <span className="font-mono text-xs text-teal-600 dark:text-teal-400">
-                            {rule.glAccount.code}
-                          </span>
-                          <span className="text-sm">{rule.glAccount.name}</span>
+                          {rule.glAccount ? (
+                            <>
+                              <span className="font-mono text-xs text-teal-600 dark:text-teal-400">
+                                {rule.glAccount.code}
+                              </span>
+                              <span className="text-sm">{rule.glAccount.name}</span>
+                            </>
+                          ) : (
+                            <span className="text-xs text-muted-foreground italic">—</span>
+                          )}
                         </span>
                       </TableCell>
                       <TableCell className="text-center">

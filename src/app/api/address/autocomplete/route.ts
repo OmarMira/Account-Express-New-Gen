@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
-import { apiHandler } from '@/lib/api-handler';
-import { requireCompanyContext } from '@/lib/context-storage';
+import { apiHandler, type RouteContext } from '@/lib/api-handler';
+import { requireCurrentUserId } from '@/lib/context-storage';
 
 let config: any = {
   version: '1.0',
@@ -53,8 +53,8 @@ interface NominatimResult {
 const cache = new Map<string, { data: AddressData[]; expiresAt: number }>();
 
 export const GET = apiHandler(
-  async (request: NextRequest, context: { params: any }) => {
-    const { userId } = requireCompanyContext();
+  async (request: NextRequest, context: RouteContext) => {
+    const userId = requireCurrentUserId();
 
     const { searchParams } = new URL(request.url);
     const query = searchParams.get('q');

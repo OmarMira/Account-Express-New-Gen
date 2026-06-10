@@ -18,7 +18,7 @@ export async function parseAdminBody<T>(
     const raw: Record<string, string> = {};
     const files = new Map<string, File>();
 
-    for (const [key, value] of formData.entries() as any) {
+    for (const [key, value] of formData.entries() as IterableIterator<[string, string | File]>) {
       if (typeof value !== 'string') {
         if (value.size > 0) files.set(key, value);
         continue;

@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { apiHandler } from '@/lib/api-handler';
+import { apiHandler, type RouteContext } from '@/lib/api-handler';
 import { requireCompanyContext } from '@/lib/context-storage';
 
 import { transactionMatchesRule } from '@/lib/services/rule-matching-engine';
 
 // ─── GET /api/bank-rules/[id] ──────────────────────────────────────
-export const GET = apiHandler(async (request: NextRequest, context: { params: any }) => {
+export const GET = apiHandler(async (request: NextRequest, context: RouteContext) => {
   const { userId, companyId } = requireCompanyContext();
   const { id } = await context.params;
 
@@ -35,7 +35,7 @@ export const GET = apiHandler(async (request: NextRequest, context: { params: an
 });
 
 // ─── PUT /api/bank-rules/[id] ──────────────────────────────────────
-export const PUT = apiHandler(async (request: NextRequest, context: { params: any }) => {
+export const PUT = apiHandler(async (request: NextRequest, context: RouteContext) => {
   const { userId, companyId } = requireCompanyContext();
   const { id } = await context.params;
 
@@ -247,7 +247,7 @@ export const PUT = apiHandler(async (request: NextRequest, context: { params: an
 });
 
 // ─── DELETE /api/bank-rules/[id] ───────────────────────────────────
-export const DELETE = apiHandler(async (request: NextRequest, context: { params: any }) => {
+export const DELETE = apiHandler(async (request: NextRequest, context: RouteContext) => {
   const { userId, companyId } = requireCompanyContext();
   const { id } = await context.params;
 
@@ -270,7 +270,7 @@ export const DELETE = apiHandler(async (request: NextRequest, context: { params:
 // ─── POST /api/bank-rules/[id] (action=apply) ──────────────────────
 // Apply this single rule to all unmatched transactions.
 // Body: { action: 'apply' }
-export const POST = apiHandler(async (request: NextRequest, context: { params: any }) => {
+export const POST = apiHandler(async (request: NextRequest, context: RouteContext) => {
   const { userId, companyId } = requireCompanyContext();
   const { id } = await context.params;
 

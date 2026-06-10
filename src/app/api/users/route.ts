@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { hashPassword } from '@/lib/auth';
-import { apiHandler } from '@/lib/api-handler';
+import { apiHandler, type RouteContext } from '@/lib/api-handler';
 import { requireCompanyContext } from '@/lib/context-storage';
+import { logger } from '@/lib/logger';
 
 /**
  * GET /api/users?companyId=xxx — List users in a company
  * POST /api/users — Invite a new user to a company
  */
-export const GET = apiHandler(async (request: NextRequest, context: { params: any }) => {
+export const GET = apiHandler(async (request: NextRequest, context: RouteContext) => {
   const { userId, companyId } = requireCompanyContext();
 
   try {
@@ -59,12 +60,12 @@ export const GET = apiHandler(async (request: NextRequest, context: { params: an
 
     return NextResponse.json({ users });
   } catch (error) {
-    console.error('[USERS LIST ERROR]', error);
+    logger.error('[USERS LIST ERROR]', { error: String(error) });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 });
 
-export const POST = apiHandler(async (request: NextRequest, context: { params: any }) => {
+export const POST = apiHandler(async (request: NextRequest, context: RouteContext) => {
   const { userId, companyId } = requireCompanyContext();
 
   try {
@@ -195,7 +196,7 @@ export const POST = apiHandler(async (request: NextRequest, context: { params: a
       { status: 201 },
     );
   } catch (error) {
-    console.error('[USER CREATE ERROR]', error);
+    logger.error('[USER CREATE ERROR]', { error: String(error) });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 });

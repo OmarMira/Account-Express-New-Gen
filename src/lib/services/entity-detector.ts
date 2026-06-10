@@ -54,6 +54,8 @@ export interface EntityCandidate {
     debitPct: number;
   };
   sampleDescriptions: string[];
+  hasContext?: boolean;
+  contextRole?: string;
 }
 
 // ========== CACHE DE CONFIGURACIÓN ==========

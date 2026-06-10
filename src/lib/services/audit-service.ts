@@ -1,4 +1,5 @@
 import { createAuditLogWithRetry } from '../audit';
+import { logger } from '../logger';
 
 export async function safeAuditLog(data: {
   companyId: string;
@@ -10,7 +11,7 @@ export async function safeAuditLog(data: {
 }) {
   let entity = data.entity;
   if (!entity) {
-    console.warn('⚠️ AuditLog sin entidad, aplicando fallback "System"');
+    logger.warn('⚠️ AuditLog sin entidad, aplicando fallback "System"');
     entity = 'System';
   }
 

@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { apiHandler } from '@/lib/api-handler';
-import { requireCompanyContext } from '@/lib/context-storage';
+import { apiHandler, type RouteContext } from '@/lib/api-handler';
+import { requireCurrentUserId } from '@/lib/context-storage';
 
 // ─── GET /api/journal/[id] ──────────────────────────────────────────
 // Get a single journal entry with all lines and GL account info.
 export const GET = apiHandler(
-  async (request: NextRequest, context: { params: any }) => {
-    const { userId } = requireCompanyContext();
+  async (request: NextRequest, context: RouteContext) => {
+    const userId = requireCurrentUserId();
     const { id } = await context.params;
 
     const entry = await db.journalEntry.findUnique({
@@ -55,8 +55,8 @@ export const GET = apiHandler(
 // ─── PUT /api/journal/[id] ──────────────────────────────────────────
 // Update a draft journal entry. Posted/void entries cannot be modified.
 export const PUT = apiHandler(
-  async (request: NextRequest, context: { params: any }) => {
-    const { userId } = requireCompanyContext();
+  async (request: NextRequest, context: RouteContext) => {
+    const userId = requireCurrentUserId();
     const { id } = await context.params;
 
     // Verify entry exists and is a draft
@@ -204,8 +204,8 @@ export const PUT = apiHandler(
 // Actions: post | void
 // Body: { action: 'post' | 'void' }
 export const POST = apiHandler(
-  async (request: NextRequest, context: { params: any }) => {
-    const { userId } = requireCompanyContext();
+  async (request: NextRequest, context: RouteContext) => {
+    const userId = requireCurrentUserId();
     const { id } = await context.params;
 
     const entry = await db.journalEntry.findUnique({

@@ -104,13 +104,40 @@ export class LRUCache<K, V> {
   }
 }
 
+// ─── Cache value type definitions ──────────────────────────────────────────
+// These match the shape returned by the respective API routes.
+
+interface GlAccountSummary {
+  id: string;
+  code: string;
+  name: string;
+  accountType: string;
+  normalBalance: string | null;
+}
+
+interface CompanySettingsData {
+  company: Record<string, unknown>;
+  stats: {
+    memberCount: number;
+    accountCount: number;
+    periodCount: number;
+  };
+  periods: Array<{
+    id: string;
+    name: string;
+    startDate: Date;
+    endDate: Date;
+    isLocked: boolean;
+  }>;
+}
+
 // Global cached instances
-export const journalAccountsCache = new LRUCache<string, any[]>(
+export const journalAccountsCache = new LRUCache<string, GlAccountSummary[]>(
   100,
   5 * 60 * 1000,
   'journal-accounts-cache-sync',
 );
-export const companySettingsCache = new LRUCache<string, any>(
+export const companySettingsCache = new LRUCache<string, CompanySettingsData>(
   100,
   5 * 60 * 1000,
   'company-settings-cache-sync',

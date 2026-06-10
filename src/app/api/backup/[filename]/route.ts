@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { apiHandler } from '@/lib/api-handler';
+import { apiHandler, type RouteContext } from '@/lib/api-handler';
 import { requireCompanyContext } from '@/lib/context-storage';
 import { getBackupFile } from '@/lib/backup';
 
@@ -8,7 +8,7 @@ import { getBackupFile } from '@/lib/backup';
  * GET /api/backup/[filename] — Download a specific backup file
  * Query: ?companyId=xxx
  */
-export const GET = apiHandler(async (request: NextRequest, context: { params: any }) => {
+export const GET = apiHandler(async (request: NextRequest, context: RouteContext) => {
   const { companyId } = requireCompanyContext();
   const { filename } = await context.params;
 

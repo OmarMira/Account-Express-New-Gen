@@ -50,7 +50,7 @@ describe('Bank Rules Phase 3 Integration Tests', () => {
       body: JSON.stringify(rule1Payload),
     });
 
-    const res1 = await POST(req1);
+    const res1 = await POST(req1, { params: Promise.resolve({}) });
     expect(res1.status).toBe(201);
 
     // Try to create the exact duplicate rule
@@ -72,7 +72,7 @@ describe('Bank Rules Phase 3 Integration Tests', () => {
       }),
     });
 
-    const res2 = await POST(req2);
+    const res2 = await POST(req2, { params: Promise.resolve({}) });
     expect(res2.status).toBe(409);
     const body2 = await res2.json();
     expect(body2.error).toContain('identical conditions');
@@ -106,7 +106,7 @@ describe('Bank Rules Phase 3 Integration Tests', () => {
       },
       body: JSON.stringify(ruleBroadPayload),
     });
-    const res1 = await POST(req1);
+    const res1 = await POST(req1, { params: Promise.resolve({}) });
     expect(res1.status).toBe(201);
 
     // Create specific rule with lower priority (priority = 10)
@@ -129,7 +129,7 @@ describe('Bank Rules Phase 3 Integration Tests', () => {
       },
       body: JSON.stringify(ruleSpecificPayload),
     });
-    const res2 = await POST(req2);
+    const res2 = await POST(req2, { params: Promise.resolve({}) });
     expect(res2.status).toBe(201);
 
     const body2 = await res2.json();
@@ -193,7 +193,7 @@ describe('Bank Rules Phase 3 Integration Tests', () => {
       },
     });
 
-    const res = await getTopAccounts(req);
+    const res = await getTopAccounts(req, { params: Promise.resolve({}) });
     expect(res.status).toBe(200);
 
     const body = await res.json();

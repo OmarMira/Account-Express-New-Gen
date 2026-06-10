@@ -1,12 +1,12 @@
 import { useState, useCallback } from 'react';
 
 export function useReconciliation() {
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<Record<string, unknown> | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchReconciliation = useCallback(
-    async (companyId: string, bankAccountId: string, filters: any = {}) => {
+    async (companyId: string, bankAccountId: string, filters: Record<string, string> = {}) => {
       if (!companyId || !bankAccountId) return;
       setIsLoading(true);
       setError(null);
@@ -18,8 +18,8 @@ export function useReconciliation() {
           throw new Error(result.error || 'Failed to fetch reconciliation data');
         }
         setData(result);
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : String(err));
       } finally {
         setIsLoading(false);
       }
@@ -27,7 +27,7 @@ export function useReconciliation() {
     [],
   );
 
-  const reconcile = async (payload: any) => {
+  const reconcile = async (payload: Record<string, unknown>) => {
     setIsLoading(true);
     setError(null);
     try {
@@ -41,8 +41,8 @@ export function useReconciliation() {
         throw new Error(result.error || 'Failed to reconcile transactions');
       }
       return result;
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
       throw err;
     } finally {
       setIsLoading(false);

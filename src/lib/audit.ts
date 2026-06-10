@@ -1,5 +1,6 @@
 import { db } from './db';
 import { Prisma } from '@prisma/client';
+import { logger } from './logger';
 
 export interface AuditLogData {
   companyId?: string | null;
@@ -16,7 +17,7 @@ export interface AuditLogData {
  */
 export async function createAuditLogWithRetry(
   data: AuditLogData,
-  tx?: Prisma.TransactionClient | any,
+  tx?: Prisma.TransactionClient,
   maxAttempts = 3,
   delayMs = 100,
 ) {
@@ -36,15 +37,16 @@ export async function createAuditLogWithRetry(
           details: data.details || null,
         },
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const auditErr = error as { message?: string; code?: string };
       const isDatabaseLocked =
-        error.message?.includes('database is locked') ||
-        error.code === 'P2034' ||
-        error.code === 'P2002' ||
-        error.code === 'P2003';
+        auditErr.message?.includes('database is locked') ||
+        auditErr.code === 'P2034' ||
+        auditErr.code === 'P2002' ||
+        auditErr.code === 'P2003';
 
       if (isDatabaseLocked && attempt < maxAttempts) {
-        console.warn(
+        logger.warn(
           `⚠️ [AuditLog Retry] SQLite locked on attempt ${attempt}/${maxAttempts}. Retrying in ${delayMs}ms...`,
         );
         await new Promise((resolve) => setTimeout(resolve, delayMs));

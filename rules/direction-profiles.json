@@ -1,8 +1,7 @@
 {
-  "1": { "normalBalance": "debit", "deviationThreshold": 0.85, "allowOpposite": true },
-  "2": { "normalBalance": "credit", "deviationThreshold": 0.90, "allowOpposite": true },
-  "3": { "normalBalance": "credit", "deviationThreshold": 0.90, "allowOpposite": true },
-  "4": { "normalBalance": "credit", "deviationThreshold": 0.90 },
-  "5": { "normalBalance": "debit", "deviationThreshold": 0.85 },
-  "6": { "normalBalance": "debit", "deviationThreshold": 0.85 }
+  "asset": { "normalBalance": "debit", "deviationThreshold": 0.85, "allowOpposite": true },
+  "liability": { "normalBalance": "credit", "deviationThreshold": 0.90, "allowOpposite": true },
+  "equity": { "normalBalance": "credit", "deviationThreshold": 0.90, "allowOpposite": true },
+  "revenue": { "normalBalance": "credit", "deviationThreshold": 0.90 },
+  "expense": { "normalBalance": "debit", "deviationThreshold": 0.85 }
 }

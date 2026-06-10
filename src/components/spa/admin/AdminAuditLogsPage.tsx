@@ -63,6 +63,7 @@ const LOCAL_TRANSLATIONS: Record<string, Record<string, string>> = {
 };
 
 import { useLanguageStore } from '@/store/language-store';
+import { logger } from '@/lib/logger';
 
 export default function AdminAuditLogsPage() {
   const language = useLanguageStore((s) => s.language) || 'es';
@@ -87,7 +88,7 @@ export default function AdminAuditLogsPage() {
         setLogs(data.auditLogs || []);
       }
     } catch (err) {
-      console.error(err);
+      logger.error(String(err));
     } finally {
       setLoading(false);
     }

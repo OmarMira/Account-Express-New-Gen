@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { apiHandler } from '@/lib/api-handler';
+import { apiHandler, type RouteContext } from '@/lib/api-handler';
 import { requireCompanyContext } from '@/lib/context-storage';
 import { findContext, saveContext } from '@/lib/services/entity-context-service';
 import { entityContextSchema } from '@/lib/validations/entity-context';
+import { logger } from '@/lib/logger';
 
 // ─── GET /api/learning/context ──────────────────────────────────────
 // Retrieve the entity context for a description.
-export const GET = apiHandler(async (request: NextRequest, context: { params: any }) => {
+export const GET = apiHandler(async (request: NextRequest, context: RouteContext) => {
   const { userId, companyId } = requireCompanyContext();
 
   const { searchParams } = new URL(request.url);
@@ -21,14 +22,14 @@ export const GET = apiHandler(async (request: NextRequest, context: { params: an
     const context = await findContext(companyId, description);
     return NextResponse.json({ data: context });
   } catch (error) {
-    console.error('[GET ENTITY CONTEXT ERROR]', error);
+    logger.error('[GET ENTITY CONTEXT ERROR]', { error: String(error) });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 });
 
 // ─── POST /api/learning/context ─────────────────────────────────────
 // Save or update an entity context.
-export const POST = apiHandler(async (request: NextRequest, context: { params: any }) => {
+export const POST = apiHandler(async (request: NextRequest, context: RouteContext) => {
   const { userId, companyId } = requireCompanyContext();
 
   try {
@@ -62,8 +63,8 @@ export const POST = apiHandler(async (request: NextRequest, context: { params: a
     });
 
     return NextResponse.json({ success: true, data: context });
-  } catch (error: any) {
-    console.error('[POST ENTITY CONTEXT ERROR]', error);
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+  } catch (error: unknown) {
+    logger.error('[POST ENTITY CONTEXT ERROR]', { error: String(error) });
+    return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }
 });

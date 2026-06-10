@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { POST as conversationalParsePost } from '@/app/api/learning/conversational-parse/route';
-import { createTestUser, createTestCompany, createTestCompanyMember, clearDatabase } from '../helpers/factories';
+import { createTestUser, createTestCompany, createTestCompanyMember, createTestGlAccount, clearDatabase } from '../helpers/factories';
 import { createSession } from '@/lib/sessions';
 import { NextRequest } from 'next/server';
 import { parseConversationalContext } from '@/lib/services/conversational-service';
@@ -25,6 +25,22 @@ describe('Direction Profiles Integration Exception Flag', () => {
     company = await createTestCompany('Direction Test Corp');
     await createTestCompanyMember(user.id, company.id);
     token = await createSession(user.id);
+
+    // Create the GL accounts referenced by mock parseConversationalContext results
+    await createTestGlAccount({
+      companyId: company.id,
+      code: '3010',
+      name: 'Capital Social / Aportes de Socios',
+      accountType: 'equity',
+      normalBalance: 'credit',
+    });
+    await createTestGlAccount({
+      companyId: company.id,
+      code: '2010',
+      name: 'Cuentas por Pagar',
+      accountType: 'liability',
+      normalBalance: 'credit',
+    });
   });
 
   afterEach(async () => {
@@ -63,7 +79,7 @@ describe('Direction Profiles Integration Exception Flag', () => {
       }),
     });
 
-    const response = await conversationalParsePost(req);
+    const response = await conversationalParsePost(req, { params: Promise.resolve({}) });
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -104,7 +120,7 @@ describe('Direction Profiles Integration Exception Flag', () => {
       }),
     });
 
-    const response = await conversationalParsePost(req);
+    const response = await conversationalParsePost(req, { params: Promise.resolve({}) });
     const body = await response.json();
 
     // 200: paying down a liability is valid accounting, must NOT be blocked

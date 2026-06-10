@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { apiHandler } from '@/lib/api-handler';
+import { apiHandler, type RouteContext } from '@/lib/api-handler';
 import { requireCompanyContext } from '@/lib/context-storage';
 import { companySettingsCache } from '@/lib/cache';
+import { logger } from '@/lib/logger';
 
 /**
  * GET /api/settings — Get company settings
  * PUT /api/settings — Update company info
  */
-export const GET = apiHandler(async (request: NextRequest, context: { params: any }) => {
+export const GET = apiHandler(async (request: NextRequest, context: RouteContext) => {
   const { userId, companyId } = requireCompanyContext();
 
   try {
@@ -98,12 +99,12 @@ export const GET = apiHandler(async (request: NextRequest, context: { params: an
       periods: companyData.periods,
     });
   } catch (error) {
-    console.error('[SETTINGS GET ERROR]', error);
+    logger.error('[SETTINGS GET ERROR]', { error: String(error) });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 });
 
-export const PUT = apiHandler(async (request: NextRequest, context: { params: any }) => {
+export const PUT = apiHandler(async (request: NextRequest, context: RouteContext) => {
   const { userId, companyId } = requireCompanyContext();
 
   try {
@@ -169,7 +170,7 @@ export const PUT = apiHandler(async (request: NextRequest, context: { params: an
       company: updated,
     });
   } catch (error) {
-    console.error('[SETTINGS PUT ERROR]', error);
+    logger.error('[SETTINGS PUT ERROR]', { error: String(error) });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 });

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { apiHandler } from '@/lib/api-handler';
+import { apiHandler, type RouteContext } from '@/lib/api-handler';
 import { requireCompanyContext } from '@/lib/context-storage';
 import { logger } from '@/lib/logger';
 import { createAuditLogWithRetry } from '@/lib/audit';
@@ -8,7 +8,7 @@ import { validateDirectionProfile } from '@/lib/services/direction-validation';
 
 // ─── GET /api/bank-rules ───────────────────────────────────────────
 // List bank rules for a company, sorted by priority. Includes GL account info.
-export const GET = apiHandler(async (request: NextRequest, context: { params: any }) => {
+export const GET = apiHandler(async (request: NextRequest, context: RouteContext) => {
   const { companyId } = requireCompanyContext();
   const { searchParams } = new URL(request.url);
   const pageParam = searchParams.get('page');
@@ -89,7 +89,7 @@ export const GET = apiHandler(async (request: NextRequest, context: { params: an
 // ─── POST /api/bank-rules ──────────────────────────────────────────
 // Create a new bank rule.
 // Body: { companyId, name, conditionType, conditionValue, transactionDirection?, glAccountId, priority?, isActive? }
-export const POST = apiHandler(async (request: NextRequest, context: { params: any }) => {
+export const POST = apiHandler(async (request: NextRequest, context: RouteContext) => {
   const { userId, companyId } = requireCompanyContext();
 
   try {
@@ -443,7 +443,7 @@ export const POST = apiHandler(async (request: NextRequest, context: { params: a
 // ─── DELETE /api/bank-rules ────────────────────────────────────────
 // Bulk delete bank rules.
 // Body: { ids: string[], companyId: string }
-export const DELETE = apiHandler(async (request: NextRequest, context: { params: any }) => {
+export const DELETE = apiHandler(async (request: NextRequest, context: RouteContext) => {
   const { userId, companyId } = requireCompanyContext();
 
   try {

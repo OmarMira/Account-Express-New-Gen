@@ -3,7 +3,7 @@ import { createSession } from '@/lib/sessions';
 import { apiHandler } from '@/lib/api-handler';
 import { validateRequest } from '@/lib/validate-request';
 import { registerSchema } from '@/lib/validations/auth';
-import { AuthService } from '@/services/auth.service';
+import { AuthService } from '@/lib/services/auth.service';
 import { authRateLimiter } from '@/lib/rate-limiter';
 
 // ─── POST /api/auth/register ──────────────────────────────────────────

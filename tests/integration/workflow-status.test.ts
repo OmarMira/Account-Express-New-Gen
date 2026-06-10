@@ -34,7 +34,7 @@ describe('Workflow Status API Integration Tests', () => {
       },
     });
 
-    const response = await GET(req);
+    const response = await GET(req, { params: Promise.resolve({}) });
     expect(response.status).toBe(200);
 
     const body = await response.json();
@@ -59,7 +59,7 @@ describe('Workflow Status API Integration Tests', () => {
       },
     });
 
-    const response = await GET(req);
+    const response = await GET(req, { params: Promise.resolve({}) });
     expect(response.status).toBe(200);
 
     const body = await response.json();
@@ -78,7 +78,7 @@ describe('Workflow Status API Integration Tests', () => {
       },
     });
 
-    const response = await GET(req);
+    const response = await GET(req, { params: Promise.resolve({}) });
     expect(response.status).toBe(403);
 
     const body = await response.json();
@@ -106,7 +106,7 @@ describe('Workflow Status API Integration Tests', () => {
       },
     });
 
-    const response = await GET(req);
+    const response = await GET(req, { params: Promise.resolve({}) });
     expect(response.status).toBe(200);
 
     const body = await response.json();

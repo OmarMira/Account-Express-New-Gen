@@ -1,14 +1,9 @@
 import type { NextConfig } from "next";
-import createNextIntlPlugin from 'next-intl/plugin';
 import { withSentryConfig } from "@sentry/nextjs";
 
-const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
-
 const nextConfig: NextConfig = {
-  output: "standalone",
-  outputFileTracingRoot: process.cwd(),
   transpilePackages: ["recharts"],
-  reactStrictMode: false,
+  reactStrictMode: true,
   serverExternalPackages: ['pdfjs-dist'],
   experimental: {
     optimizePackageImports: [
@@ -19,15 +14,14 @@ const nextConfig: NextConfig = {
     ],
   },
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
 };
 
-const intlConfig = withNextIntl(nextConfig);
-
-export default withSentryConfig(intlConfig, {
+export default withSentryConfig(nextConfig, {
   org: "tu-organizacion",
   project: "account-express",
   authToken: process.env.SENTRY_AUTH_TOKEN,
   silent: true,
 });
+

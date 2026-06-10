@@ -3,7 +3,7 @@ export class AppError extends Error {
     public statusCode: number,
     message: string,
     public code?: string,
-    public details?: any,
+    public details?: unknown,
   ) {
     super(message);
     this.name = this.constructor.name;
@@ -12,7 +12,7 @@ export class AppError extends Error {
 }
 
 export class ValidationError extends AppError {
-  constructor(message: string, details?: any) {
+  constructor(message: string, details?: unknown) {
     super(400, message, 'VALIDATION_ERROR', details);
   }
 }
@@ -56,7 +56,7 @@ export class MathMismatchError extends AppError {
   constructor(
     message: string,
     metadata: {
-      transactions: any[];
+      transactions: Record<string, unknown>[];
       mismatch: number;
     },
   ) {

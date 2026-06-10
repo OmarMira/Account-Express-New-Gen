@@ -23,3 +23,11 @@ export function requireCompanyContext(): RequestContext {
   }
   return ctx;
 }
+
+export function requireCurrentUserId(): string {
+  const ctx = requestContext.getStore();
+  if (!ctx?.userId) {
+    throw new AppError(401, 'Authentication required', 'AUTH_REQUIRED');
+  }
+  return ctx.userId;
+}

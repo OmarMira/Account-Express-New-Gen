@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { verifyPassword, hashPassword } from '@/lib/auth';
-import { apiHandler } from '@/lib/api-handler';
-import { requireCompanyContext } from '@/lib/context-storage';
+import { apiHandler, type RouteContext } from '@/lib/api-handler';
+import { requireCurrentUserId } from '@/lib/context-storage';
 
 /**
  * POST /api/settings/password — Change user password
  * Body: { currentPassword, newPassword }
  */
 export const POST = apiHandler(
-  async (request: NextRequest, context: { params: any }) => {
-    const { userId } = requireCompanyContext();
+  async (request: NextRequest, context: RouteContext) => {
+    const userId = requireCurrentUserId();
 
     const body = await request.json();
     const { currentPassword, newPassword } = body;

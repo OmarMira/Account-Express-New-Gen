@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { apiHandler } from '@/lib/api-handler';
+import { apiHandler, type RouteContext } from '@/lib/api-handler';
 import { db } from '@/lib/db';
 import { companySettingsCache } from '@/lib/cache';
 
 export const PATCH = apiHandler(
-  async (req: NextRequest, context: { params: Promise<{ id: string }> }) => {
-    const { id } = await context.params;
+  async (req: NextRequest, context: RouteContext) => {
+    const { id } = await context.params as { id: string };
     const { companyId, isLocked } = await req.json();
 
     if (!companyId || isLocked === undefined) {

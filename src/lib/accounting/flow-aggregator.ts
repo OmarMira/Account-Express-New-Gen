@@ -6,6 +6,7 @@ import type {
   FlowByAccount,
   FlowSummary,
 } from '../../types/accounting-flow';
+import { logger } from '../logger';
 
 export interface AggregatorFilters {
   companyId: string;
@@ -251,7 +252,7 @@ export async function aggregateAccountingFlow(
       transactions: aggregatedTransactions,
     };
   } catch (error) {
-    console.error('Error calculating accounting flow:', error);
+    logger.error('Error calculating accounting flow:', { error: String(error) });
     return fallbackResponse;
   }
 }

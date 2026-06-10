@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { logger } from '@/lib/logger';
 import { db } from './db';
 import {
@@ -14,7 +15,7 @@ let allActiveProfilesCache: BankProfileTyped[] | null = null;
 /**
  * Transforms a raw database BankProfile model into the strictly typed BankProfileTyped interface.
  */
-function mapToTypedProfile(raw: any): BankProfileTyped {
+function mapToTypedProfile(raw: Prisma.BankProfileGetPayload<{}>): BankProfileTyped {
   let parsedFingerprints: string[] = [];
   try {
     parsedFingerprints =
@@ -23,7 +24,7 @@ function mapToTypedProfile(raw: any): BankProfileTyped {
     logger.error('Error parsing fingerprints for profile', { bankId: raw.bankId, error: e });
   }
 
-  let parsedConfig: any = {};
+  let parsedConfig: unknown = {};
   try {
     parsedConfig = typeof raw.config === 'string' ? JSON.parse(raw.config) : raw.config;
   } catch (e) {

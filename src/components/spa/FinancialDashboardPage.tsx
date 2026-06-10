@@ -46,6 +46,7 @@ import { Button } from '@/components/ui/button';
 import { useLanguageStore } from '@/store/language-store';
 import { useAuthStore } from '@/store/auth-store';
 import { formatCurrency } from '@/lib/format';
+import { logger } from '@/lib/logger';
 
 // --- TYPES & STRUCTURES ---
 interface Transaction {
@@ -570,7 +571,7 @@ export function FinancialDashboardPage() {
         }
       }
     } catch (err) {
-      console.error('Failed to load dashboard bank transactions:', err);
+      logger.error('Failed to load dashboard bank transactions:', { error: String(err) });
     } finally {
       setLoading(false);
     }
@@ -880,7 +881,7 @@ export function FinancialDashboardPage() {
 
   const recurrentExpensesData = useMemo(() => {
     return monthlyAggregatedData.map((m) => {
-      const data: Record<string, any> = { month: m.monthLabel };
+      const data: Record<string, unknown> = { month: m.monthLabel };
       top3ExpenseCategories.forEach((cat) => {
         data[cat] = m.txs.filter((t) => t.categoria === cat).reduce((s, t) => s + t.monto, 0);
       });
@@ -905,7 +906,7 @@ export function FinancialDashboardPage() {
 
   const platformIncomeData = useMemo(() => {
     return monthlyAggregatedData.map((m) => {
-      const data: Record<string, any> = { month: m.monthLabel };
+      const data: Record<string, unknown> = { month: m.monthLabel };
       top3IncomeCategories.forEach((cat) => {
         data[cat] = m.txs.filter((t) => t.categoria === cat).reduce((s, t) => s + t.monto, 0);
       });

@@ -18,6 +18,7 @@ import {
 import { useAuthStore, type ViewName } from '@/store/auth-store';
 import { useLanguageStore } from '@/store/language-store';
 import { cn } from '@/lib/utils';
+import { logger } from '@/lib/logger';
 
 interface WorkflowPanelProps {
   open?: boolean;
@@ -135,7 +136,7 @@ export function WorkflowPanel({ open, onOpenChange }: WorkflowPanelProps = {}) {
             setStatus(data);
           }
         } catch (err) {
-          console.error('Error fetching workflow status:', err);
+          logger.error('Error fetching workflow status:', { error: String(err) });
         } finally {
           setStatus((prev) => prev);
           setLoading(false);

@@ -33,7 +33,7 @@ describe('Rules Simulation API Integration Tests', () => {
       }),
     });
 
-    const response = await POST(req);
+    const response = await POST(req, { params: Promise.resolve({}) });
     expect(response.status).toBe(401);
   });
 
@@ -54,7 +54,7 @@ describe('Rules Simulation API Integration Tests', () => {
       }),
     });
 
-    const response = await POST(req);
+    const response = await POST(req, { params: Promise.resolve({}) });
     expect(response.status).toBe(403);
   });
 
@@ -82,7 +82,7 @@ describe('Rules Simulation API Integration Tests', () => {
       }),
     });
 
-    const response = await POST(req);
+    const response = await POST(req, { params: Promise.resolve({}) });
     expect(response.status).toBe(400);
   });
 
@@ -149,7 +149,7 @@ describe('Rules Simulation API Integration Tests', () => {
       }),
     });
 
-    const response = await POST(req);
+    const response = await POST(req, { params: Promise.resolve({}) });
     expect(response.status).toBe(200);
 
     const result = await response.json();

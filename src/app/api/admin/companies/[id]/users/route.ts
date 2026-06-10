@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { apiHandler } from '@/lib/api-handler';
-import { requireCompanyContext } from '@/lib/context-storage';
-
+import { apiHandler, type RouteContext } from '@/lib/api-handler';
+import { requireCurrentUserId } from '@/lib/context-storage';
 export const GET = apiHandler(
-  async (request: NextRequest, context: { params: any }) => {
-    const { userId } = requireCompanyContext();
+  async (request: NextRequest, context: RouteContext) => {
 
     const { id: companyId } = await context.params;
 
@@ -40,12 +38,12 @@ export const GET = apiHandler(
 
     return NextResponse.json({ members, allUsers });
   },
-  { requireSuperAdmin: true },
+  { requireSuperAdmin: true, requireMembership: false },
 );
 
 export const POST = apiHandler(
-  async (request: NextRequest, context: { params: any }) => {
-    const { userId } = requireCompanyContext();
+  async (request: NextRequest, context: RouteContext) => {
+    const userId = requireCurrentUserId();
 
     const { id: companyId } = await context.params;
     const body = await request.json();
@@ -103,5 +101,5 @@ export const POST = apiHandler(
 
     return NextResponse.json({ member }, { status: 201 });
   },
-  { requireSuperAdmin: true },
+  { requireSuperAdmin: true, requireMembership: false },
 );

@@ -111,6 +111,8 @@ const LOCAL_TRANSLATIONS: Record<string, Record<string, string>> = {
 };
 
 import { useLanguageStore } from '@/store/language-store';
+import { logger } from '@/lib/logger';
+import { toast } from 'sonner';
 
 export default function AdminCompanyDetailPage() {
   const language = useLanguageStore((s) => s.language) || 'es';
@@ -165,7 +167,7 @@ export default function AdminCompanyDetailPage() {
         setAllUsers(memData.allUsers || []);
       }
     } catch (err) {
-      console.error(err);
+      logger.error(String(err));
       setError('Error de red al cargar datos.');
     } finally {
       setLoading(false);
@@ -194,10 +196,10 @@ export default function AdminCompanyDetailPage() {
         loadData();
       } else {
         const data = await res.json();
-        alert(data.error || 'Error al asignar usuario.');
+        toast.error(data.error || 'Error al asignar usuario.');
       }
     } catch (err) {
-      console.error(err);
+      logger.error(String(err));
     } finally {
       setAssigning(false);
     }
@@ -217,7 +219,7 @@ export default function AdminCompanyDetailPage() {
         loadData();
       }
     } catch (err) {
-      console.error(err);
+      logger.error(String(err));
     } finally {
       setRevokingId(null);
     }

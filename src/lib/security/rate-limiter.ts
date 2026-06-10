@@ -1,6 +1,7 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { db } from '@/lib/db';
+import { logger } from '../logger';
 
 type RateLimitConfig = {
   default: { requestsPerMinute: number; burstMultiplier: number };
@@ -51,7 +52,7 @@ function getRateLimitConfig(): RateLimitConfig {
     lastLoadedTime = now;
     return cachedConfig;
   } catch {
-    console.warn('[RATE LIMIT] Config file missing or corrupt, using defaults');
+    logger.warn('[RATE LIMIT] Config file missing or corrupt, using defaults');
     return DEFAULT_CONFIG;
   }
 }
@@ -103,12 +104,12 @@ export function checkRateLimit(
             details: JSON.stringify({ userId, path, limit: maxAllowed, attempts: window.count }),
           },
         })
-        .catch((e) => console.error('[RATE LIMIT AUDIT LOG ERROR]', e));
+        .catch((e) => logger.error('[RATE LIMIT AUDIT LOG ERROR]', { error: String(e) }));
     }
 
     return { allowed, limit: maxAllowed, remaining, resetAt: Math.ceil(window.resetAt / 1000) };
   } catch (error) {
-    console.error('[RATE LIMIT ERROR] Fail-safe active, allowing request:', error);
+    logger.error('[RATE LIMIT ERROR] Fail-safe active, allowing request:', { error: String(error) });
     // Fail-safe: Si hay algún error, permitimos la petición para no bloquear el sistema contable
     return {
       allowed: true,

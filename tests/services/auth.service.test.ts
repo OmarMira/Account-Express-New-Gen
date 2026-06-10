@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { AuthService } from '@/services/auth.service';
+import { AuthService } from '@/lib/services/auth.service';
 import { createTestUser, createTestCompany, createTestCompanyMember, clearDatabase } from '../helpers/factories';
 import { db } from '@/lib/db';
 import bcrypt from 'bcryptjs';
@@ -21,6 +21,7 @@ describe('AuthService', () => {
       lastName: 'Doe',
       companyName: 'Johns Accounting LLC',
       taxId: '99-888888',
+      entityType: 'BUSINESS',
     });
 
     expect(result.user).toBeDefined();

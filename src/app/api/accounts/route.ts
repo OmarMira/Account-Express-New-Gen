@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { apiHandler } from '@/lib/api-handler';
+import { apiHandler, type RouteContext } from '@/lib/api-handler';
 import { requireCompanyContext } from '@/lib/context-storage';
 import { journalAccountsCache } from '@/lib/cache';
+import { readJsonConfig } from '@/lib/config-loader';
 
 // ─── GET /api/accounts?companyId=xxx&accountType=xxx&search=xxx ─────────
 export const GET = apiHandler(
-  async (request: NextRequest, context: { params: any }) => {
+  async (request: NextRequest, context: RouteContext) => {
     const { userId, companyId } = requireCompanyContext();
 
     const { searchParams } = new URL(request.url);
@@ -92,11 +93,13 @@ export const GET = apiHandler(
 
 // ─── POST /api/accounts ────────────────────────────────────────────────
 export const POST = apiHandler(
-  async (request: NextRequest, context: { params: any }) => {
+  async (request: NextRequest, context: RouteContext) => {
     const { userId, companyId } = requireCompanyContext();
 
     const body = await request.json();
     const { code, name, accountType, normalBalance, parentId } = body;
+
+    console.log('[POST /api/accounts]', { code, name, accountType, normalBalance, parentId: parentId ?? null });
 
     // Validate required fields
     if (!companyId || !code || !name || !accountType || !normalBalance) {
@@ -106,9 +109,10 @@ export const POST = apiHandler(
       );
     }
 
-    // Validate accountType
-    const validTypes = ['asset', 'liability', 'equity', 'revenue', 'expense'];
-    if (!validTypes.includes(accountType)) {
+    // Validate accountType against config
+    const accountTypeConfig = await readJsonConfig<Record<string, unknown>>('account-types.json');
+    if (!(accountType in accountTypeConfig)) {
+      const validTypes = Object.keys(accountTypeConfig);
       return NextResponse.json(
         { error: `Invalid accountType. Must be one of: ${validTypes.join(', ')}` },
         { status: 400 },

@@ -29,6 +29,7 @@ import AdminCompaniesPage from './AdminCompaniesPage';
 import AdminUsersPage from './AdminUsersPage';
 import AdminAuditLogsPage from './AdminAuditLogsPage';
 import AdminCompanyDetailPage from './AdminCompanyDetailPage';
+import { logger } from '@/lib/logger';
 
 // Nav menu item component
 interface NavBtnProps {
@@ -162,7 +163,7 @@ export default function SuperAdminDashboardPage() {
           });
         }
       } catch (err) {
-        console.error('Error loading stats:', err);
+        logger.error('Error loading stats:', { error: String(err) });
       } finally {
         setStatsLoading(false);
       }

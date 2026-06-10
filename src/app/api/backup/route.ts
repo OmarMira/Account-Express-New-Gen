@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { apiHandler } from '@/lib/api-handler';
+import { apiHandler, type RouteContext } from '@/lib/api-handler';
 import { requireCompanyContext } from '@/lib/context-storage';
 import { createBackup, listBackups, deleteBackup } from '@/lib/backup';
 
@@ -8,7 +8,7 @@ import { createBackup, listBackups, deleteBackup } from '@/lib/backup';
  * POST /api/backup — Create a full backup for a company
  * Body: { companyId: string }
  */
-export const POST = apiHandler(async (request: NextRequest, context: { params: any }) => {
+export const POST = apiHandler(async (request: NextRequest, context: RouteContext) => {
   const { companyId } = requireCompanyContext();
 
   const result = await createBackup(companyId);
@@ -27,7 +27,7 @@ export const POST = apiHandler(async (request: NextRequest, context: { params: a
  * GET /api/backup — List backups for a company
  * Query: ?companyId=xxx
  */
-export const GET = apiHandler(async (request: NextRequest, context: { params: any }) => {
+export const GET = apiHandler(async (request: NextRequest, context: RouteContext) => {
   const { companyId } = requireCompanyContext();
 
   const backups = listBackups(companyId);
@@ -39,7 +39,7 @@ export const GET = apiHandler(async (request: NextRequest, context: { params: an
  * DELETE /api/backup — Delete a specific backup
  * Body: { companyId: string, filename: string }
  */
-export const DELETE = apiHandler(async (request: NextRequest, context: { params: any }) => {
+export const DELETE = apiHandler(async (request: NextRequest, context: RouteContext) => {
   const { companyId } = requireCompanyContext();
   const body = await request.json();
   const { filename } = body;

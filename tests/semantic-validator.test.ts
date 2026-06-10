@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { validateSemanticDirection } from '@/lib/semantic-validator';
-import { ReconciliationService } from '@/services/reconciliation.service';
+import { ReconciliationService } from '@/lib/services/reconciliation.service';
 import { createTestCompany, createTestGlAccount, clearDatabase } from './helpers/factories';
 import { db } from '@/lib/db';
 
@@ -14,51 +14,51 @@ describe('Accounting Semantic Validator', () => {
   });
 
   describe('validateSemanticDirection Unit Tests', () => {
-    it('debe advertir (retornar warning) si cuenta Clase 3 (Patrimonio) se debita sin palabras clave de retiro/socio', () => {
-      const warning = validateSemanticDirection('3010', 'debit', 'Pago de servicios de internet de la oficina');
+    it('debe advertir si cuenta equity se debita sin palabras clave de retiro/socio', () => {
+      const warning = validateSemanticDirection('equity', 'debit', 'Pago de servicios de internet de la oficina');
       expect(warning).not.toBeNull();
-      expect(warning).toContain('La cuenta de patrimonio (Clase 3) registra un débito');
+      expect(warning).toContain('La cuenta de patrimonio registra un débito');
     });
 
-    it('debe permitir si cuenta Clase 3 se debita con palabras clave de retiro/socio', () => {
-      const warning = validateSemanticDirection('3010', 'debit', 'Retiro de capital del socio Juan Pérez');
+    it('debe permitir si cuenta equity se debita con palabras clave de retiro/socio', () => {
+      const warning = validateSemanticDirection('equity', 'debit', 'Retiro de capital del socio Juan Pérez');
       expect(warning).toBeNull();
     });
 
-    it('debe permitir créditos normales en cuenta Clase 3 sin warnings', () => {
-      const warning = validateSemanticDirection('3010', 'credit', 'Aporte de capital inicial');
+    it('debe permitir créditos normales en cuenta equity sin warnings', () => {
+      const warning = validateSemanticDirection('equity', 'credit', 'Aporte de capital inicial');
       expect(warning).toBeNull();
     });
 
-    it('debe advertir si cuenta Clase 4 (Ingresos) se debita sin palabras clave de reembolso/devolución', () => {
-      const warning = validateSemanticDirection('4010', 'debit', 'Pago ordinario de factura mensual');
+    it('debe advertir si cuenta revenue se debita sin palabras clave de reembolso/devolución', () => {
+      const warning = validateSemanticDirection('revenue', 'debit', 'Pago ordinario de factura mensual');
       expect(warning).not.toBeNull();
-      expect(warning).toContain('La cuenta de ingresos (Clase 4) registra un débito');
+      expect(warning).toContain('La cuenta de ingresos registra un débito');
     });
 
-    it('debe permitir si cuenta Clase 4 se debita con palabras clave de reembolso/devolución', () => {
-      const warning = validateSemanticDirection('4010', 'debit', 'Reembolso por servicio no prestado');
+    it('debe permitir si cuenta revenue se debita con palabras clave de reembolso/devolución', () => {
+      const warning = validateSemanticDirection('revenue', 'debit', 'Reembolso por servicio no prestado');
       expect(warning).toBeNull();
     });
 
-    it('debe permitir créditos normales en cuenta Clase 4 sin warnings', () => {
-      const warning = validateSemanticDirection('4010', 'credit', 'Venta de mercaderías facturada');
+    it('debe permitir créditos normales en cuenta revenue sin warnings', () => {
+      const warning = validateSemanticDirection('revenue', 'credit', 'Venta de mercaderías facturada');
       expect(warning).toBeNull();
     });
 
-    it('debe advertir si cuenta Clase 5 (Gastos) se acredita sin palabras clave de reembolso/abono', () => {
-      const warning = validateSemanticDirection('5010', 'credit', 'Compra de suministros varios');
+    it('debe advertir si cuenta expense se acredita sin palabras clave de reembolso/abono', () => {
+      const warning = validateSemanticDirection('expense', 'credit', 'Compra de suministros varios');
       expect(warning).not.toBeNull();
-      expect(warning).toContain('La cuenta de gastos o costos (Clase 5/6) registra un crédito');
+      expect(warning).toContain('La cuenta de gastos o costos registra un crédito');
     });
 
-    it('debe permitir si cuenta Clase 5 se acredita con palabras clave de reembolso/abono', () => {
-      const warning = validateSemanticDirection('5010', 'credit', 'Abono de nota de crédito por materiales defectuosos');
+    it('debe permitir si cuenta expense se acredita con palabras clave de reembolso/abono', () => {
+      const warning = validateSemanticDirection('expense', 'credit', 'Abono de nota de crédito por materiales defectuosos');
       expect(warning).toBeNull();
     });
 
-    it('debe permitir débitos normales en cuenta Clase 5 sin warnings', () => {
-      const warning = validateSemanticDirection('5010', 'debit', 'Pago de alquiler de oficina');
+    it('debe permitir débitos normales en cuenta expense sin warnings', () => {
+      const warning = validateSemanticDirection('expense', 'debit', 'Pago de alquiler de oficina');
       expect(warning).toBeNull();
     });
   });
@@ -101,8 +101,8 @@ describe('Accounting Semantic Validator', () => {
         },
       });
 
-      // Cuenta destino Clase 3 (Patrimonio) - debitar patrimonio sin keywords asociadas a retiro/socio debe advertir
-      const glAccount = await createTestGlAccount({ companyId: company.id, code: '3010', name: 'Capital' });
+      // Cuenta destino equity - debitar patrimonio sin keywords asociadas a retiro/socio debe advertir
+      const glAccount = await createTestGlAccount({ companyId: company.id, code: '3010', name: 'Capital', accountType: 'equity', normalBalance: 'credit' });
 
       // Configurar período activo
       await db.fiscalPeriod.create({
@@ -129,7 +129,7 @@ describe('Accounting Semantic Validator', () => {
 
       expect(result.reconciledCount).toBe(1);
       expect(result.warnings).toHaveLength(1);
-      expect(result.warnings![0]).toContain('La cuenta de patrimonio (Clase 3) registra un débito');
+      expect(result.warnings![0]).toContain('La cuenta de patrimonio registra un débito');
     });
   });
 });

@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { apiHandler } from '@/lib/api-handler';
-import { requireCompanyContext } from '@/lib/context-storage';
+import { requireCurrentUserId } from '@/lib/context-storage';
 import { ValidationError } from '@/lib/api-error';
 import { usAddressSchema } from '@/lib/validations/us-address';
 import { saveLogo, deleteLogo } from '@/lib/uploads/logo-service';
 
 export const PATCH = apiHandler(
   async (request: NextRequest) => {
-    const { userId } = requireCompanyContext();
+    const userId = requireCurrentUserId();
 
     const formData = await request.formData();
 

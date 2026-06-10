@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { assertActiveFiscalPeriod } from '@/lib/fiscal-period-guard';
-import { ReconciliationService } from '@/services/reconciliation.service';
+import { ReconciliationService } from '@/lib/services/reconciliation.service';
 import { createTestCompany, createTestGlAccount, clearDatabase, createTestCompanyMember } from './helpers/factories';
 import { db } from '@/lib/db';
 

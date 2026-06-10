@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { parsePDF } from '@/lib/pdf-parser';
-import { ImportService } from '@/services/import.service';
+import { ImportService } from '@/lib/services/import.service';
 import { ConflictError, BankAccountRequiredError } from '@/lib/api-error';
 import { createTestCompany, createTestGlAccount, clearDatabase } from '../helpers/factories';
 import { readFileSync } from 'fs';

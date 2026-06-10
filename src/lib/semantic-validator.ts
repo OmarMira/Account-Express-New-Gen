@@ -1,21 +1,15 @@
-/**
- * Validador semántico contable.
- * Evalúa la coherencia entre la clase de cuenta (Patrimonio, Ingresos, Gastos/Costos),
- * el tipo de movimiento (débito/crédito) y la descripción del movimiento.
- */
 export function validateSemanticDirection(
-  glAccountCode: string,
+  accountType: string,
   direction: 'debit' | 'credit',
   description: string,
 ): string | null {
-  if (!glAccountCode || !direction || !description) {
+  if (!accountType || !direction || !description) {
     return null;
   }
 
   const descLower = description.toLowerCase();
 
-  // Clase 3: Patrimonio
-  if (glAccountCode.startsWith('3')) {
+  if (accountType === 'equity') {
     if (direction === 'debit') {
       const keywords = [
         'retiro',
@@ -32,13 +26,10 @@ export function validateSemanticDirection(
       ];
       const hasKeyword = keywords.some((kw) => descLower.includes(kw));
       if (!hasKeyword) {
-        return 'Advertencia semántica: La cuenta de patrimonio (Clase 3) registra un débito pero la descripción no contiene palabras clave asociadas a retiro, socio o disminución de capital.';
+        return 'Advertencia semántica: La cuenta de patrimonio registra un débito pero la descripción no contiene palabras clave asociadas a retiro, socio o disminución de capital.';
       }
     }
-  }
-
-  // Clase 4: Ingresos
-  else if (glAccountCode.startsWith('4')) {
+  } else if (accountType === 'revenue') {
     if (direction === 'debit') {
       const keywords = [
         'devolucion',
@@ -53,13 +44,10 @@ export function validateSemanticDirection(
       ];
       const hasKeyword = keywords.some((kw) => descLower.includes(kw));
       if (!hasKeyword) {
-        return 'Advertencia semántica: La cuenta de ingresos (Clase 4) registra un débito pero la descripción no contiene palabras clave de devolución, reembolso o descuento.';
+        return 'Advertencia semántica: La cuenta de ingresos registra un débito pero la descripción no contiene palabras clave de devolución, reembolso o descuento.';
       }
     }
-  }
-
-  // Clases 5 y 6: Gastos y Costos
-  else if (glAccountCode.startsWith('5') || glAccountCode.startsWith('6')) {
+  } else if (accountType === 'expense') {
     if (direction === 'credit') {
       const keywords = [
         'reembolso',
@@ -74,7 +62,7 @@ export function validateSemanticDirection(
       ];
       const hasKeyword = keywords.some((kw) => descLower.includes(kw));
       if (!hasKeyword) {
-        return 'Advertencia semántica: La cuenta de gastos o costos (Clase 5/6) registra un crédito pero la descripción no contiene palabras clave de reembolso, abono o ajuste.';
+        return 'Advertencia semántica: La cuenta de gastos o costos registra un crédito pero la descripción no contiene palabras clave de reembolso, abono o ajuste.';
       }
     }
   }

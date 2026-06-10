@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { Check, ChevronsUpDown, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { GAAP_TYPE_ORDER } from '@/lib/constants/account-types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -72,7 +73,7 @@ export function AccountSelector({
     return groups;
   }, [accounts]);
 
-  const typeOrder = ['asset', 'liability', 'equity', 'revenue', 'expense'];
+  const typeOrder = GAAP_TYPE_ORDER;
 
   const lang = useLanguageStore((s) => s.language);
 

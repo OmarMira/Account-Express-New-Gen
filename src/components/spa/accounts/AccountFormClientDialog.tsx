@@ -19,9 +19,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useTranslations, useLocale } from 'next-intl';
-
-const ACCOUNT_TYPES = ['asset', 'liability', 'equity', 'revenue', 'expense'];
+import { useLanguageStore } from '@/store/language-store';
+import { ACCOUNT_TYPES } from '@/lib/constants/account-types';
 
 const TYPE_HELPERS: Record<string, { en: string; es: string }> = {
   asset: {
@@ -102,8 +101,8 @@ export function AccountFormClientDialog({
   onFormChange,
   onSubmit,
 }: Props) {
-  const t = useTranslations();
-  const language = useLocale();
+  const t = useLanguageStore((s) => s.t);
+  const language = useLanguageStore((s) => s.language);
 
   function getTypeHelper(type: string) {
     const h = TYPE_HELPERS[type];

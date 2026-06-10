@@ -5,8 +5,8 @@
 import { trackAPIResponseTime } from './metrics';
 import { logger } from './logger';
 
-export function withTiming<T extends (...args: any[]) => Promise<any>>(fn: T, label: string): T {
-  return (async (...args: any[]) => {
+export function withTiming<T extends (...args: any[]) => Promise<unknown>>(fn: T, label: string): T {
+  return (async (...args: Parameters<T>) => {
     const start = performance.now();
     try {
       return await fn(...args);

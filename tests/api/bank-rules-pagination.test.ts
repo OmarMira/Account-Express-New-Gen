@@ -36,7 +36,7 @@ vi.mock('../../src/lib/db', () => ({
 describe('GET /api/bank-rules Pagination', () => {
   it('should return all rules under data array if page/limit are NOT provided (backward-compatible)', async () => {
     const request = new NextRequest('http://localhost:3000/api/bank-rules?companyId=c123');
-    const response = await bankRulesGET(request);
+    const response = await bankRulesGET(request, { params: Promise.resolve({}) });
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -47,7 +47,7 @@ describe('GET /api/bank-rules Pagination', () => {
 
   it('should return paginated rules with pagination metadata if page/limit are provided', async () => {
     const request = new NextRequest('http://localhost:3000/api/bank-rules?companyId=c123&page=2&limit=2');
-    const response = await bankRulesGET(request);
+    const response = await bankRulesGET(request, { params: Promise.resolve({}) });
     const body = await response.json();
 
     expect(response.status).toBe(200);

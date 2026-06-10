@@ -323,7 +323,7 @@ export function AppShell({ children }: { children?: React.ReactNode }) {
   }, [logout]);
 
   const handleChangeCompany = useCallback(() => {
-    useAuthStore.getState().setActiveCompany(null as any);
+    useAuthStore.getState().setActiveCompany(null);
     useAuthStore.getState().setCurrentView('select-company');
     router.push('/');
   }, [router]);

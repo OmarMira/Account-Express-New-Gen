@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { apiHandler } from '@/lib/api-handler';
 import { ValidationError } from '@/lib/api-error';
-import { ImportService } from '@/services/import.service';
+import { ImportService } from '@/lib/services/import.service';
 import { trackAPIResponseTime } from '@/lib/metrics';
 import { requireCompanyContext } from '@/lib/context-storage';
 import { validateFile } from '@/lib/file-validation';

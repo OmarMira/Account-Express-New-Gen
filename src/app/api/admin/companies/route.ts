@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { apiHandler, RouteContext } from '@/lib/api-handler';
-import { requireCompanyContext } from '@/lib/context-storage';
+import { requireCurrentUserId } from '@/lib/context-storage';
 import { saveLogo } from '@/lib/uploads/logo-service';
 import { createAdminCompanySchema } from '@/lib/validations/admin';
 import { seedChartOfAccounts } from '@/lib/chart-of-accounts';
@@ -9,20 +9,18 @@ import { parseAdminBody } from '@/lib/parse-admin-body';
 
 export const GET = apiHandler(
   async () => {
-    requireCompanyContext();
-
     const companies = await db.company.findMany({
       orderBy: { createdAt: 'desc' },
     });
 
     return NextResponse.json({ companies });
   },
-  { requireSuperAdmin: true },
+  { requireSuperAdmin: true, requireMembership: false },
 );
 
 export const POST = apiHandler(
   async (request: NextRequest) => {
-    const { userId } = requireCompanyContext();
+    const userId = requireCurrentUserId();
 
     const parsed = await parseAdminBody(request, createAdminCompanySchema);
     if (!parsed.ok) return parsed.error;
@@ -83,5 +81,5 @@ export const POST = apiHandler(
 
     return NextResponse.json({ company }, { status: 201 });
   },
-  { requireSuperAdmin: true },
+  { requireSuperAdmin: true, requireMembership: false },
 );

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ACCOUNT_TYPES } from '@/lib/constants/account-types';
 import {
   Plus,
   Search,
@@ -40,6 +41,7 @@ import type {
   GlAccount as GlAccountType,
   AccountFormData,
 } from '@/components/spa/accounts/AccountFormDialog';
+import { logger } from '@/lib/logger';
 
 // ── Lazy-loaded modals — not included in the initial bundle ──────────
 const AccountFormDialog = dynamic(
@@ -67,8 +69,6 @@ const DEFAULT_FORM: AccountFormData = {
   normalBalance: '',
   parentId: '',
 };
-
-const ACCOUNT_TYPES = ['asset', 'liability', 'equity', 'revenue', 'expense'];
 
 /* ─── Type section config ─── */
 interface TypeSectionConfig {
@@ -224,7 +224,7 @@ export function AccountsPage() {
       const data = await res.json();
       setAccounts(data.accounts);
     } catch (err) {
-      console.error('[ACCOUNTS PAGE FETCH]', err);
+      logger.error('[ACCOUNTS PAGE FETCH]', { error: String(err) });
     } finally {
       setLoading(false);
     }
@@ -395,12 +395,16 @@ export function AccountsPage() {
 
   /* ── Delete account ── */
   async function handleDelete() {
-    if (!deleteTarget) return;
+    if (!deleteTarget || !activeCompany?.id) return;
     setDeleting(true);
     setDeleteError('');
 
     try {
-      const res = await fetch(`/api/accounts/${deleteTarget.id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/accounts/${deleteTarget.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyId: activeCompany.id }),
+      });
       if (!res.ok) {
         const data = await res.json();
         setDeleteError(data.error || t('common.error'));

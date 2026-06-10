@@ -5,6 +5,7 @@ import { useAuthStore } from '@/store/auth-store';
 import { useLanguageStore } from '@/store/language-store';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Brain } from 'lucide-react';
+import { logger } from '@/lib/logger';
 
 export function AIRulesGeneratorTab() {
   const t = useLanguageStore((s) => s.t);
@@ -34,7 +35,7 @@ export function AIRulesGeneratorTab() {
           <ConversationalRuleBuilder
             companyId={activeCompany.id}
             onComplete={(ruleData) => {
-              console.log('✅ Regla creada con contexto:', ruleData);
+              logger.info('✅ Regla creada con contexto:', { data: ruleData });
             }}
           />
         </CardContent>

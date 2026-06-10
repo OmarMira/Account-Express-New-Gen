@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { readFile, access, writeFile } from 'fs/promises';
 import path from 'path';
 import { AI_CONFIG } from '@/lib/constants/ai-config';
-import { apiHandler } from '@/lib/api-handler';
-import { requireCompanyContext } from '@/lib/context-storage';
+import { apiHandler, type RouteContext } from '@/lib/api-handler';
+import { requireCurrentUserId } from '@/lib/context-storage';
 import { decrypt, encrypt } from '@/lib/crypto';
 
 export const GET = apiHandler(
-  async (request: NextRequest, context: { params: any }) => {
-    const { userId } = requireCompanyContext();
+  async (request: NextRequest, context: RouteContext) => {
+    const userId = requireCurrentUserId();
 
     try {
       const envPath = path.join(process.cwd(), '.env');
@@ -56,8 +56,8 @@ export const GET = apiHandler(
 );
 
 export const POST = apiHandler(
-  async (request: NextRequest, context: { params: any }) => {
-    const { userId } = requireCompanyContext();
+  async (request: NextRequest, context: RouteContext) => {
+    const userId = requireCurrentUserId();
 
     try {
       const { apiKey, model } = await request.json();

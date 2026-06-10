@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { apiHandler } from '@/lib/api-handler';
-import { requireCompanyContext } from '@/lib/context-storage';
+import { apiHandler, type RouteContext } from '@/lib/api-handler';
+import { requireCurrentUserId } from '@/lib/context-storage';
 
 export const DELETE = apiHandler(
-  async (request: NextRequest, context: { params: any }) => {
-    const { userId } = requireCompanyContext();
+  async (request: NextRequest, context: RouteContext) => {
+    const userId = requireCurrentUserId();
 
     const { id: companyId, userId: targetUserId } = await context.params;
 
@@ -47,5 +47,5 @@ export const DELETE = apiHandler(
 
     return NextResponse.json({ message: 'User access revoked successfully' });
   },
-  { requireSuperAdmin: true },
+  { requireSuperAdmin: true, requireMembership: false },
 );

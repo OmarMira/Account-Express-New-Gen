@@ -328,17 +328,27 @@ async function main() {
 
   // 1. Create super_admin user
   console.log('1. Creating super_admin user...');
+
+  const adminEmail = process.env.SEED_ADMIN_EMAIL || 'admin@accountexpress.com';
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD || 'Admin123!';
+
+  if (!process.env.SEED_ADMIN_EMAIL || !process.env.SEED_ADMIN_PASSWORD) {
+    console.warn(
+      '   ⚠️  Using default admin credentials. Set SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD env vars for production.',
+    );
+  }
+
   const existingAdmin = await db.user.findUnique({
-    where: { email: 'admin@accountexpress.com' },
+    where: { email: adminEmail },
   });
 
   if (existingAdmin) {
     console.log('   ⚠️  Super admin already exists, skipping.');
   } else {
-    const passwordHash = await bcrypt.hash('Admin123!', 12);
+    const passwordHash = await bcrypt.hash(adminPassword, 12);
     await db.user.create({
       data: {
-        email: 'admin@accountexpress.com',
+        email: adminEmail,
         passwordHash,
         firstName: 'Admin',
         lastName: 'User',
@@ -346,7 +356,7 @@ async function main() {
         isActive: true,
       },
     });
-    console.log('   ✅ Created super_admin (admin@accountexpress.com)');
+    console.log(`   ✅ Created super_admin (${adminEmail})`);
   }
 
   // 2. Create demo company
@@ -373,7 +383,7 @@ async function main() {
 
   // 3. Link admin to demo company (if not already linked)
   const admin = await db.user.findUnique({
-    where: { email: 'admin@accountexpress.com' },
+    where: { email: adminEmail },
   });
   if (admin) {
     const existingMembership = await db.companyMember.findUnique({

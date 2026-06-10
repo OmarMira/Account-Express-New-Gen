@@ -20,8 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useLanguageStore } from '@/store/language-store';
-
-const ACCOUNT_TYPES = ['asset', 'liability', 'equity', 'revenue', 'expense'];
+import { ACCOUNT_TYPES } from '@/lib/constants/account-types';
 
 const TYPE_HELPERS: Record<string, { en: string; es: string }> = {
   asset: {

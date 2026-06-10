@@ -13,6 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { AddressAutocomplete } from '@/components/ui/address-autocomplete';
 import { usAddressClientSchema } from '@/lib/validations/us-address-client';
 import { toast } from 'sonner';
+import { logger } from '@/lib/logger';
 
 const US_STATES = [
   'AL',
@@ -144,7 +145,7 @@ export function UserProfileTab() {
     });
 
     if (!addressParse.success) {
-      console.error('[USER PROFILE VALIDATION ERROR]', addressParse.error);
+      logger.error('[USER PROFILE VALIDATION ERROR]', { error: String(addressParse.error) });
       const errorMsg = addressParse.error.issues[0]?.message || 'Datos de dirección inválidos';
       toast.error(errorMsg);
       return;
@@ -198,7 +199,7 @@ export function UserProfileTab() {
         toast.error(err.error || 'Ocurrió un error al guardar.');
       }
     } catch (err) {
-      console.error(err);
+      logger.error(String(err));
       toast.error('Ocurrió un error al guardar.');
     }
     setSavingUser(false);

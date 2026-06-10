@@ -71,6 +71,7 @@ import { useLanguageStore } from '@/store/language-store';
 import { useAuthStore } from '@/store/auth-store';
 import { AccountSelector, type GlAccountOption } from '@/components/spa/journal/AccountSelector';
 import { toast } from 'sonner';
+import { logger } from '@/lib/logger';
 
 /* ─── Types ─── */
 interface BankAccountOption {
@@ -117,6 +118,7 @@ interface ReconciliationSummary {
   totalTransactions: number;
   reconciledCount: number;
   unreconciledCount: number;
+  pendingReviewCount: number;
   depositsTotal: number;
   paymentsTotal: number;
   filteredCount: number;
@@ -174,9 +176,9 @@ export function ReconciliationPage() {
   const [loadingData, setLoadingData] = useState(false);
 
   // Filters
-  const [statusFilter, setStatusFilter] = useState<'unreconciled' | 'reconciled' | 'all'>(
-    'unreconciled',
-  );
+  const [statusFilter, setStatusFilter] = useState<
+    'unreconciled' | 'reconciled' | 'all' | 'pending_review'
+  >('unreconciled');
   const [search, setSearch] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -378,7 +380,7 @@ export function ReconciliationPage() {
           }
         }
       } catch (err) {
-        console.error('Failed to fetch auto-preview', err);
+        logger.error('Failed to fetch auto-preview', { error: String(err) });
       }
     };
     fetchPreview();
@@ -527,6 +529,54 @@ export function ReconciliationPage() {
     } finally {
       setUnreconciling(false);
       stopProcessing();
+    }
+  };
+
+  // Approve pending review transaction
+  const handleApproveReview = async (transactionId: string) => {
+    try {
+      const res = await fetch('/api/reconciliation/review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId: activeCompany?.id,
+          transactionId,
+          action: 'approve',
+        }),
+      });
+      if (res.ok) {
+        toast.success('Transaction approved');
+        fetchReconciliation();
+      } else {
+        const err = await res.json();
+        toast.error(err.error || 'Failed to approve');
+      }
+    } catch {
+      toast.error('Failed to approve transaction');
+    }
+  };
+
+  // Reject pending review transaction
+  const handleRejectReview = async (transactionId: string) => {
+    try {
+      const res = await fetch('/api/reconciliation/review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId: activeCompany?.id,
+          transactionId,
+          action: 'reject',
+        }),
+      });
+      if (res.ok) {
+        toast.success('Transaction rejected and moved to suspense');
+        fetchReconciliation();
+      } else {
+        const err = await res.json();
+        toast.error(err.error || 'Failed to reject');
+      }
+    } catch {
+      toast.error('Failed to reject transaction');
     }
   };
 
@@ -756,8 +806,8 @@ export function ReconciliationPage() {
             <span className="text-xs text-muted-foreground">—</span>
           )}
         </TableCell>
-        <TableCell className="w-[100px] text-right">
-          {!isReconciled && (
+        <TableCell className="w-[140px] text-right">
+          {!isReconciled && statusFilter !== 'pending_review' && (
             <Button
               variant="ghost"
               size="icon"
@@ -768,7 +818,29 @@ export function ReconciliationPage() {
               <Scissors className="size-4" />
             </Button>
           )}
-          {isReconciled && tx.reconciledAt && (
+          {statusFilter === 'pending_review' && (
+            <div className="flex items-center gap-1 justify-end">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950"
+                onClick={() => handleApproveReview(tx.id)}
+              >
+                <Check className="size-3 mr-1" />
+                Approve
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950"
+                onClick={() => handleRejectReview(tx.id)}
+              >
+                <X className="size-3 mr-1" />
+                Reject
+              </Button>
+            </div>
+          )}
+          {isReconciled && tx.reconciledAt && statusFilter !== 'pending_review' && (
             <Badge variant="outline" className="text-xs gap-1 border-emerald-300 text-emerald-600">
               <Check className="size-3" />
               {formatDate(tx.reconciledAt)}
@@ -980,6 +1052,10 @@ export function ReconciliationPage() {
                   <TabsList className="h-8">
                     <TabsTrigger value="unreconciled" className="text-xs px-3 h-6">
                       {t('reconciliation.showUnreconciled')} ({summary.unreconciledCount})
+                    </TabsTrigger>
+                    <TabsTrigger value="pending_review" className="text-xs px-3 h-6">
+                      <AlertTriangle className="size-3 mr-1 text-amber-500" />
+                      {summary.pendingReviewCount}
                     </TabsTrigger>
                     <TabsTrigger value="reconciled" className="text-xs px-3 h-6">
                       {t('reconciliation.showReconciled')} ({summary.reconciledCount})

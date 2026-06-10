@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { useLanguageStore } from '@/store/language-store';
 import { useAuthStore } from '@/store/auth-store';
+import { logger } from '@/lib/logger';
 
 // Pasos del Wizard
 const STEPS = [
@@ -110,9 +111,9 @@ export function OnboardingWizard() {
       setTimeout(() => {
         window.location.reload();
       }, 1500);
-    } catch (error: any) {
-      console.error(error);
-      setErrorMessage(error.message || 'Error en onboarding de configuración');
+    } catch (error: unknown) {
+      logger.error(String(error));
+      setErrorMessage(error instanceof Error ? error.message : String(error));
     } finally {
       setIsLoading(false);
     }

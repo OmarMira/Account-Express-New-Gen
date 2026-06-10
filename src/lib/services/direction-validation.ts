@@ -9,7 +9,7 @@ import { logger } from '@/lib/logger';
 
 /**
  * Load direction profiles from rules/direction-profiles.json
- * Format: { "1": { "normalBalance": "debit", "deviationThreshold": 0.85, "allowOpposite": true }, ... }
+ * Format: { "asset": { "normalBalance": "debit", "deviationThreshold": 0.85, "allowOpposite": true }, ... }
  */
 function loadDirectionProfiles(): Record<
   string,
@@ -19,12 +19,11 @@ function loadDirectionProfiles(): Record<
     string,
     { normalBalance: 'credit' | 'debit'; deviationThreshold: number; allowOpposite?: boolean }
   > = {
-    '1': { normalBalance: 'debit', deviationThreshold: 0.85, allowOpposite: true },
-    '2': { normalBalance: 'credit', deviationThreshold: 0.9, allowOpposite: true },
-    '3': { normalBalance: 'credit', deviationThreshold: 0.9, allowOpposite: true },
-    '4': { normalBalance: 'credit', deviationThreshold: 0.9 },
-    '5': { normalBalance: 'debit', deviationThreshold: 0.85 },
-    '6': { normalBalance: 'debit', deviationThreshold: 0.85 },
+    asset: { normalBalance: 'debit', deviationThreshold: 0.85, allowOpposite: true },
+    liability: { normalBalance: 'credit', deviationThreshold: 0.9, allowOpposite: true },
+    equity: { normalBalance: 'credit', deviationThreshold: 0.9, allowOpposite: true },
+    revenue: { normalBalance: 'credit', deviationThreshold: 0.9 },
+    expense: { normalBalance: 'debit', deviationThreshold: 0.85 },
   };
 
   try {
@@ -67,9 +66,9 @@ export async function validateDirectionProfile(
       throw new Error(`GL account not found or does not belong to this company`);
     }
 
-    const accountClass = acct.code?.charAt(0);
+    const accountClass = acct.accountType;
     if (!accountClass) {
-      throw new Error(`Invalid GL account code format: ${acct.code}`);
+      throw new Error(`GL account "${acct.name}" (${acct.code}) has no accountType defined`);
     }
 
     const profile = profiles[accountClass];

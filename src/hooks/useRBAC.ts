@@ -13,6 +13,7 @@ export function useRBAC(
 ): boolean {
   if (!authCtx) return false;
 
-  const allowedRoles = (config as any).permissions?.[resource]?.[action] || [];
+  const permissions = config.permissions as Record<string, Record<string, string[]>> | undefined;
+  const allowedRoles = permissions?.[resource]?.[action] || [];
   return allowedRoles.includes(authCtx.role);
 }

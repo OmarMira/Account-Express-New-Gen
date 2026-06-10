@@ -25,6 +25,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { useLanguageStore } from '@/store/language-store';
 import { toast } from 'sonner';
+import { logger } from '@/lib/logger';
 
 const DEFAULT_ROLES = ['INQUILINO', 'PROVEEDOR', 'SOCIO', 'CLIENTE', 'EMPLEADO'];
 
@@ -88,7 +89,7 @@ export function ContextClarificationModal({
           }
         }
       } catch (err) {
-        console.error('Error fetching accounts for context', err);
+        logger.error('Error fetching accounts for context', { error: String(err) });
       } finally {
         setLoadingAccounts(false);
       }
@@ -165,7 +166,7 @@ export function ContextClarificationModal({
         toast.error(t('learning.aiError'));
       }
     } catch (err) {
-      console.error('Error in conversational parsing', err);
+      logger.error('Error in conversational parsing', { error: String(err) });
       toast.error(t('learning.aiError'));
     } finally {
       setParsing(false);
@@ -194,7 +195,7 @@ export function ContextClarificationModal({
         onClose();
       }
     } catch (err) {
-      console.error('Error saving context', err);
+      logger.error('Error saving context', { error: String(err) });
     } finally {
       setSaving(false);
     }

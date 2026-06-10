@@ -22,7 +22,7 @@ export const createLearningRuleSchema = z
     glAccountCode: z.string().optional(),
     role: z.string().optional(),
     createSubAccount: z.boolean().optional(),
-    subAccountName: z.string().optional(),
+    subAccountName: z.string().nullable().optional(),
     conditions: z.array(conditionSchema).optional(),
     debitGlAccountId: z.string().optional(),
     creditGlAccountId: z.string().optional(),

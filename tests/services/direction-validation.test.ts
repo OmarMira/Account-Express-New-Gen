@@ -16,7 +16,7 @@ import { validateDirectionProfile } from '@/lib/services/direction-validation';
 const mockFindUnique = db.glAccount.findUnique as unknown as Mock;
 
 function account(overrides: Record<string, any> = {}): any {
-  return { id: 'acct-1', name: 'Caja', code: '1010', companyId: 'c1', ...overrides };
+  return { id: 'acct-1', name: 'Caja', code: '1010', companyId: 'c1', accountType: 'asset', ...overrides };
 }
 
 describe('validateDirectionProfile', () => {
@@ -30,19 +30,19 @@ describe('validateDirectionProfile', () => {
   });
 
   it('returns true when account class has no profile', async () => {
-    mockFindUnique.mockResolvedValue(account({ code: '9000' }));
+    mockFindUnique.mockResolvedValue(account({ code: '9000', accountType: 'other' }));
     await expect(validateDirectionProfile('c1', 'acct-1', null)).resolves.toBe(true);
   });
 
   it('throws when debit account has normalBalance=credit and allowOpposite=false', async () => {
-    mockFindUnique.mockResolvedValue(account({ code: '4010' }));
+    mockFindUnique.mockResolvedValue(account({ code: '4010', accountType: 'revenue' }));
     await expect(validateDirectionProfile('c1', 'acct-1', null)).rejects.toThrow(
       'normal balance of crédito but is being used for débito transactions',
     );
   });
 
   it('throws when credit account has normalBalance=debit and allowOpposite=false', async () => {
-    mockFindUnique.mockResolvedValue(account({ code: '5010' }));
+    mockFindUnique.mockResolvedValue(account({ code: '5010', accountType: 'expense' }));
     await expect(validateDirectionProfile('c1', null, 'acct-1')).rejects.toThrow(
       'normal balance of débito but is being used for crédito transactions',
     );
@@ -60,10 +60,10 @@ describe('validateDirectionProfile', () => {
     );
   });
 
-  it('throws when account code is missing or invalid', async () => {
-    mockFindUnique.mockResolvedValue(account({ code: null }));
+  it('throws when account has no accountType', async () => {
+    mockFindUnique.mockResolvedValue(account({ accountType: null }));
     await expect(validateDirectionProfile('c1', 'acct-1', null)).rejects.toThrow(
-      'Invalid GL account code format',
+      'has no accountType defined',
     );
   });
 

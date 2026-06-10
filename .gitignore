@@ -88,5 +88,11 @@ installer/
 # Staging database files
 prisma/staging.db*
 
+# npm lockfile (Bun is the official package manager)
+package-lock.json
+
+# Runtime state (rate limiter, etc.)
+data/
+
 # SDD change artifacts
 sdd/

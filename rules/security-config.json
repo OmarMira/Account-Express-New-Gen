@@ -1,12 +1,12 @@
 {
   "version": "1.0",
   "rateLimit": {
-    "default": { "requestsPerMinute": 60, "burstMultiplier": 1.5 },
+    "default": { "requestsPerMinute": 120, "burstMultiplier": 2.0 },
     "criticalEndpoints": {
-      "/api/reconciliation": { "requestsPerMinute": 20, "burstMultiplier": 1.2 },
-      "/api/reports/export": { "requestsPerMinute": 15, "burstMultiplier": 1.2 },
+      "/api/reconciliation": { "requestsPerMinute": 120, "burstMultiplier": 2.0 },
+      "/api/reports/export": { "requestsPerMinute": 30, "burstMultiplier": 1.5 },
       "/api/admin/backup": { "requestsPerMinute": 5, "burstMultiplier": 1.0 },
-      "/api/auth/login": { "requestsPerMinute": 10, "burstMultiplier": 1.0 }
+      "/api/auth/login": { "requestsPerMinute": 20, "burstMultiplier": 1.5 }
     },
     "scope": "per_user_company",
     "windowMs": 60000

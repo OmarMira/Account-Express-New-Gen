@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { trackQueryDuration } from './metrics';
 import { logger } from './logger';
 
@@ -41,15 +41,20 @@ if (!isEdge && db && !globalForPrisma.prisma) {
       }
     })
     .catch((err) => {
-      console.error('⚠️ DB connect failed:', err);
+      logger.error('⚠️ DB connect failed:', { error: String(err) });
     });
 }
 
 // ─── Query Profiling Singleton real ─────────────────────────────────────────
+// Prisma's $on type only exposes events configured via log emit — the
+// default PrismaClient generic loses this context, so we cast narrowly.
+type DBWithQueryEvents = PrismaClient & {
+  $on(event: 'query', callback: (event: Prisma.QueryEvent) => void): void;
+};
 if (!isEdge && db && !globalForPrisma.isListenerRegistered) {
-  (db as any).$on('query', (e: any) => {
-    const duration = e.duration as number;
-    const query = e.query as string;
+  (db as DBWithQueryEvents).$on('query', (e) => {
+    const duration = e.duration;
+    const query = e.query;
 
     trackQueryDuration(query, duration);
 

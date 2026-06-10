@@ -245,7 +245,10 @@ function validateMathematicalConsistency(
 }
 
 // ========== PROFILE-GUIDED PARSER SUPPORT ==========
-function parseAmountWithProfileFormat(val: string, format: any): number {
+function parseAmountWithProfileFormat(
+  val: string,
+  format: { decimalSeparator: string; thousandsSeparator: string },
+): number {
   let cleaned = val.replace(/[^0-9.,()+\\-]/g, '');
 
   let isNegative = false;
@@ -626,7 +629,6 @@ export async function parsePDF(buffer: Buffer, options?: ParseOptions): Promise<
   const loadingTask = pdfjs.getDocument({
     data: new Uint8Array(buffer),
     useWorkerFetch: false,
-    isEvalSupported: false,
     useSystemFonts: true,
   });
 
@@ -637,11 +639,19 @@ export async function parsePDF(buffer: Buffer, options?: ParseOptions): Promise<
   let fullText = '';
   let pageWidth = 612;
 
+  // pdfjs-dist does not export TextItem — define the subset we access
+  interface RawTextItem {
+    str: string;
+    transform: number[];
+    width: number;
+    height: number;
+  }
+
   for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
     const page = await pdf.getPage(pageNum);
     const textContent = await page.getTextContent();
-    const items = textContent.items as any[];
-    const linesMap = new Map<number, any[]>();
+    const items = textContent.items as RawTextItem[];
+    const linesMap = new Map<number, PdfElement[]>();
 
     const viewport = page.getViewport ? page.getViewport({ scale: 1.0 }) : null;
     if (viewport && viewport.width) {
@@ -849,7 +859,7 @@ export async function parsePDF(buffer: Buffer, options?: ParseOptions): Promise<
       }
     } catch (onboardErr) {
       warnings.push(
-        `No se encontró un perfil bancario y el onboarding automático falló: ${onboardErr instanceof Error ? onboardErr.message : String(onboardErr)}`,
+        `No se encontró un perfil bancario. El extracto requiere alineación manual — el sistema no pudo determinar el layout automáticamente.`,
       );
     }
   }
@@ -914,6 +924,15 @@ export async function parsePDF(buffer: Buffer, options?: ParseOptions): Promise<
           accountHolder = line.replace(/!.*$/, '').trim();
         }
       }
+    }
+  }
+
+  // Validate LLM-extracted data against raw text (catches hallucinations)
+  if (transactions.length > 0) {
+    const { validateLlmOutput } = await import('./llm-output-validator');
+    const validationErrors = validateLlmOutput(fullText, transactions);
+    for (const ve of validationErrors) {
+      warnings.push(ve);
     }
   }
 

@@ -1,3 +1,4 @@
+import { logger } from './logger';
 // ─── Metrics Ring Buffer ─────────────────────────────────────────────────────
 // Bounded in-memory metrics collection. MAX_METRICS entries per buffer (~200KB total).
 // Metrics reset on server restart (by design — see README Observabilidad section).
@@ -124,5 +125,5 @@ export function resetMetrics() {
   metrics.queries.clear();
   metrics.apiRequests.clear();
   metrics.pdfParses.clear();
-  console.log('📊 Metrics reset (server restart detected)');
+  logger.info('📊 Metrics reset (server restart detected)');
 }

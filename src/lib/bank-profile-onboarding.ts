@@ -292,132 +292,126 @@ RESULT:
 
 IMPORTANT: Return ONLY the JSON object. Do not include markdown codeblocks (like \`\`\`json) or any conversational text.`;
 
-  const userPrompt = `TEXT COMPLETO DEL PDF (primeros 4000 caracteres):
-${analysisData.fullText.slice(0, 4000)}
+  const userPrompt = `TEXTO DEL PDF (primeros 2000 caracteres — suficiente para identificar el layout y fingerprints):
+${analysisData.fullText.slice(0, 2000)}
 
 MUESTRA DE COORDENADAS (primeros 100 bloques):
-${JSON.stringify(coordinateSample, null, 2)}`;
+${JSON.stringify(coordinateSample, null, 2)}
 
-  const temperatures = [0.1, 0.3, 0.5];
-  let lastError: any = null;
+CRITICAL: Do NOT invent or fabricate data. Only use patterns you can clearly identify in the provided text. If you are unsure about a column boundary, estimate conservatively (wider range). Never hallucinate amounts, balances, or account numbers.`;
 
-  for (let attempt = 0; attempt < temperatures.length; attempt++) {
-    try {
-      logger.info('LLM Inference Attempt', {
-        attempt: attempt + 1,
-        total: temperatures.length,
-        temperature: temperatures[attempt],
-      });
+  let lastError: unknown = null;
 
-      // LLM execution with 15s timeout
-      const response = await Promise.race([
-        zai.chat.completions.create({
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt },
-          ],
-          temperature: temperatures[attempt],
-        }),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('LLM call timed out')), LLM_TIMEOUT_MS),
-        ),
-      ]);
+  logger.info('LLM inference for bank profile creation', { temperature: 0 });
 
-      const content = response.choices?.[0]?.message?.content || '';
-      if (!content) {
-        throw new Error('AI returned an empty response.');
-      }
+  try {
+    const response = await Promise.race([
+      zai.chat.completions.create({
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0,
+      }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('LLM call timed out')), LLM_TIMEOUT_MS),
+      ),
+    ]);
 
-      // Clean markdown code blocks
-      let cleanJson = content.trim();
-      if (cleanJson.startsWith('```')) {
-        const lines = cleanJson.split('\n');
-        if (lines[0].startsWith('```json') || lines[0].startsWith('```')) {
-          lines.shift();
-        }
-        if (lines[lines.length - 1].startsWith('```')) {
-          lines.pop();
-        }
-        cleanJson = lines.join('\n').trim();
-      }
-
-      const parsed = JSON.parse(cleanJson);
-
-      // Validate fingerprints
-      if (
-        !parsed.fingerprints ||
-        !Array.isArray(parsed.fingerprints) ||
-        parsed.fingerprints.length === 0
-      ) {
-        throw new Error('LLM did not generate any fingerprints. Cannot create profile.');
-      }
-      if (parsed.fingerprints.length < 3) {
-        logger.warn('LLM generated few fingerprints', { count: parsed.fingerprints.length });
-      }
-
-      const validatedConfig = BankProfileConfigSchema.parse(parsed.config);
-
-      // Validate all generated regexes
-      validateRegex(validatedConfig.rules.anchor.regex, 'anchor');
-      for (const rule of validatedConfig.rules.metadata.accountNumber) {
-        validateRegex(rule.regex, 'metadata.accountNumber');
-      }
-      for (const rule of validatedConfig.rules.metadata.initialBalance) {
-        validateRegex(rule.regex, 'metadata.initialBalance');
-      }
-      for (const rule of validatedConfig.rules.metadata.finalBalance) {
-        validateRegex(rule.regex, 'metadata.finalBalance');
-      }
-      if (validatedConfig.rules.stopSectionRegex) {
-        validateRegex(validatedConfig.rules.stopSectionRegex, 'stopSectionRegex');
-      }
-      if (validatedConfig.rules.sectionContinuationRegex) {
-        validateRegex(validatedConfig.rules.sectionContinuationRegex, 'sectionContinuationRegex');
-      }
-      if (validatedConfig.rules.totalLinePatterns) {
-        for (const pattern of validatedConfig.rules.totalLinePatterns) {
-          validateRegex(pattern, 'totalLinePatterns');
-        }
-      }
-
-      const bankName = parsed.bankName || 'Inferred Bank Profile';
-      const fingerprints = parsed.fingerprints;
-
-      // Find if an existing profile is Jaccard matched (>= 0.6)
-      const existingProfile = await findExistingProfile(fingerprints);
-
-      if (existingProfile) {
-        logger.info('Updating existing profile with new config', {
-          bankId: existingProfile.bankId,
-        });
-        const profile = await upsertBankProfile(
-          existingProfile.bankId,
-          existingProfile.bankName,
-          fingerprints,
-          validatedConfig,
-          true,
-        );
-        return profile;
-      } else {
-        const sortedFp = [...fingerprints].sort().join('|');
-        const bankId = `auto-${sha256(sortedFp).slice(0, 12)}`;
-        logger.info('Creating new profile', { bankId });
-        const profile = await upsertBankProfile(
-          bankId,
-          bankName,
-          fingerprints,
-          validatedConfig,
-          true,
-        );
-        return profile;
-      }
-    } catch (err) {
-      logger.warn('Inference attempt failed', { attempt: attempt + 1, error: err });
-      lastError = err;
+    const content = response.choices?.[0]?.message?.content || '';
+    if (!content) {
+      throw new Error('AI returned an empty response.');
     }
+
+    // Clean markdown code blocks
+    let cleanJson = content.trim();
+    if (cleanJson.startsWith('```')) {
+      const lines = cleanJson.split('\n');
+      if (lines[0].startsWith('```json') || lines[0].startsWith('```')) {
+        lines.shift();
+      }
+      if (lines[lines.length - 1].startsWith('```')) {
+        lines.pop();
+      }
+      cleanJson = lines.join('\n').trim();
+    }
+
+    const parsed = JSON.parse(cleanJson);
+
+    // Validate fingerprints
+    if (
+      !parsed.fingerprints ||
+      !Array.isArray(parsed.fingerprints) ||
+      parsed.fingerprints.length === 0
+    ) {
+      throw new Error('LLM did not generate any fingerprints. Cannot create profile.');
+    }
+    if (parsed.fingerprints.length < 3) {
+      logger.warn('LLM generated few fingerprints', { count: parsed.fingerprints.length });
+    }
+
+    const validatedConfig = BankProfileConfigSchema.parse(parsed.config);
+
+    // Validate all generated regexes
+    validateRegex(validatedConfig.rules.anchor.regex, 'anchor');
+    for (const rule of validatedConfig.rules.metadata.accountNumber) {
+      validateRegex(rule.regex, 'metadata.accountNumber');
+    }
+    for (const rule of validatedConfig.rules.metadata.initialBalance) {
+      validateRegex(rule.regex, 'metadata.initialBalance');
+    }
+    for (const rule of validatedConfig.rules.metadata.finalBalance) {
+      validateRegex(rule.regex, 'metadata.finalBalance');
+    }
+    if (validatedConfig.rules.stopSectionRegex) {
+      validateRegex(validatedConfig.rules.stopSectionRegex, 'stopSectionRegex');
+    }
+    if (validatedConfig.rules.sectionContinuationRegex) {
+      validateRegex(validatedConfig.rules.sectionContinuationRegex, 'sectionContinuationRegex');
+    }
+    if (validatedConfig.rules.totalLinePatterns) {
+      for (const pattern of validatedConfig.rules.totalLinePatterns) {
+        validateRegex(pattern, 'totalLinePatterns');
+      }
+    }
+
+    const bankName = parsed.bankName || 'Inferred Bank Profile';
+    const fingerprints = parsed.fingerprints;
+
+    // Find if an existing profile is Jaccard matched (>= 0.6)
+    const existingProfile = await findExistingProfile(fingerprints);
+
+    if (existingProfile) {
+      logger.info('Updating existing profile with new config', {
+        bankId: existingProfile.bankId,
+      });
+      const profile = await upsertBankProfile(
+        existingProfile.bankId,
+        existingProfile.bankName,
+        fingerprints,
+        validatedConfig,
+        true,
+      );
+      return profile;
+    } else {
+      const sortedFp = [...fingerprints].sort().join('|');
+      const bankId = `auto-${sha256(sortedFp).slice(0, 12)}`;
+      logger.info('Creating new profile', { bankId });
+      const profile = await upsertBankProfile(
+        bankId,
+        bankName,
+        fingerprints,
+        validatedConfig,
+        true,
+      );
+      return profile;
+    }
+  } catch (err) {
+    logger.warn('Single LLM inference attempt failed', { error: err });
+    lastError = err;
   }
 
   throw new Error(
-    `Failed to generate valid bank profile after ${temperatures.length} attempts. Last error: ${lastError instanceof Error ? lastError.message : String(lastError)}`,
+    `Failed to generate valid bank profile. Last error: ${lastError instanceof Error ? lastError.message : String(lastError)}`,
   );
 }

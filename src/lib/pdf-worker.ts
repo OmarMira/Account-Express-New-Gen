@@ -1,3 +1,4 @@
+import { logger } from './logger';
 // src/lib/pdf-worker.ts
 // Inicialización idempotente del worker de pdfjs-dist para Next.js 16 + ESM
 
@@ -17,9 +18,9 @@ export async function initPdfWorker() {
     GlobalWorkerOptions.workerSrc = new URL(`file://${workerPath}`).href;
 
     initialized = true;
-    console.log('[PDF Worker] Inicializado correctamente.');
+    logger.info('[PDF Worker] Inicializado correctamente.');
   } catch (error) {
-    console.warn('[PDF Worker] Fallo en resolución primaria:', error);
+    logger.warn('[PDF Worker] Fallo en resolución primaria:', { error: String(error) });
     try {
       // Fallback por ruta absoluta (seguro en Docker/Vercel/Railway con hoisting)
       const fallback =
@@ -28,7 +29,7 @@ export async function initPdfWorker() {
       GlobalWorkerOptions.workerSrc = new URL(`file://${fallback}`).href;
       initialized = true;
     } catch (fallbackErr) {
-      console.error('[PDF Worker] No se pudo inicializar el worker:', fallbackErr);
+      logger.error('[PDF Worker] No se pudo inicializar el worker:', { error: String(fallbackErr) });
     }
   }
 }

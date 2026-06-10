@@ -160,6 +160,7 @@ export function SelectCompanyPage() {
                         value={legalName}
                         onChange={(e) => setLegalName(e.target.value)}
                         required
+                        autoFocus
                         placeholder="Ej. Mi Negocio S.A."
                       />
                     </div>

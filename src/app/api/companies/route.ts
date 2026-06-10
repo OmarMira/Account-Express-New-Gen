@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { apiHandler } from '@/lib/api-handler';
-import { requireCompanyContext } from '@/lib/context-storage';
+import { apiHandler, type RouteContext } from '@/lib/api-handler';
+import { requireCurrentUserId } from '@/lib/context-storage';
 import { createAuditLogWithRetry } from '@/lib/audit';
-import { CHART_OF_ACCOUNTS, seedChartOfAccounts } from '@/lib/chart-of-accounts';
+import { seedChartOfAccounts } from '@/lib/chart-of-accounts';
 
 export const POST = apiHandler(
-  async (request: NextRequest, context: { params: any }) => {
-    const { userId } = requireCompanyContext();
+  async (request: NextRequest, context: RouteContext) => {
+    const userId = requireCurrentUserId();
 
     const body = await request.json();
     const { legalName, taxId } = body;

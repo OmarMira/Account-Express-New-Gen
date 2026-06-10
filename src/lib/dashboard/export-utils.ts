@@ -1,4 +1,5 @@
 import { createHash } from 'crypto';
+import { logger } from '../logger';
 
 function generateHash(payload: any) {
   return createHash('sha256').update(JSON.stringify(payload)).digest('hex').slice(0, 16);
@@ -21,8 +22,8 @@ export function exportToCSV(kpi: any, trend: any[], companyId: string) {
 export function exportToPDF(kpi: any, alerts: any, trend: any[], companyId: string) {
   const payload = { kpi, alerts, trend, companyId, exportedAt: new Date().toISOString() };
   const hash = generateHash(payload);
-  console.log(
+  logger.info(
     `🖨️ Generando PDF. Payload firmable: ${JSON.stringify({ ...payload, integrityHash: hash })}`,
   );
-  alert(`Exportación iniciada. Hash de integridad del reporte: ${hash}`);
+  logger.info(`Exportación iniciada. Hash de integridad del reporte: ${hash}`);
 }

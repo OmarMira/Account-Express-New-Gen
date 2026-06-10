@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ACCOUNT_TYPES } from '@/lib/constants/account-types';
 import {
   Plus,
   Search,
@@ -35,13 +36,14 @@ import {
 } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useTranslations } from 'next-intl';
+import { useLanguageStore } from '@/store/language-store';
 import { useAuthStore } from '@/store/auth-store';
 import { BalanceBadge } from '@/components/spa/accounts/BalanceBadge';
 import type {
   GlAccount as GlAccountType,
   AccountFormData,
 } from '@/components/spa/accounts/AccountFormClientDialog';
+import { logger } from '@/lib/logger';
 
 // ── Lazy-loaded modals — not included in the initial bundle ──────────
 const AccountFormDialog = dynamic(
@@ -69,8 +71,6 @@ const DEFAULT_FORM: AccountFormData = {
   normalBalance: '',
   parentId: 'none',
 };
-
-const ACCOUNT_TYPES = ['asset', 'liability', 'equity', 'revenue', 'expense'];
 
 /* ─── Type section config ─── */
 interface TypeSectionConfig {
@@ -197,7 +197,7 @@ const rowVariants = {
 
 /* ─── AccountsPage ─── */
 export function AccountsClient({ initialAccounts }: { initialAccounts?: GlAccount[] }) {
-  const t = useTranslations();
+  const t = useLanguageStore((s) => s.t);
   const activeCompany = useAuthStore((s) => s.activeCompany);
 
   // ── State ──
@@ -232,9 +232,9 @@ export function AccountsClient({ initialAccounts }: { initialAccounts?: GlAccoun
       const res = await fetch(`/api/accounts?${params}`);
       if (!res.ok) throw new Error('Failed to fetch');
       const data = await res.json();
-      setAccounts(data.accounts);
+      setAccounts((data.accounts || []).filter(Boolean));
     } catch (err) {
-      console.error('[ACCOUNTS PAGE FETCH]', err);
+      logger.error('[ACCOUNTS PAGE FETCH]', { error: String(err) });
     } finally {
       setLoading(false);
     }
@@ -373,6 +373,8 @@ export function AccountsClient({ initialAccounts }: { initialAccounts?: GlAccoun
         parentId: formData.parentId === 'none' || !formData.parentId ? null : formData.parentId,
       };
 
+      console.log('[ACCOUNTS CLIENT] handleSubmit', { method: editingAccount ? 'PUT' : 'POST', body });
+
       let res: Response;
       if (editingAccount) {
         res = await fetch(`/api/accounts/${editingAccount.id}`, {
@@ -420,12 +422,16 @@ export function AccountsClient({ initialAccounts }: { initialAccounts?: GlAccoun
 
   /* ── Delete account ── */
   async function handleDelete() {
-    if (!deleteTarget) return;
+    if (!deleteTarget || !activeCompany?.id) return;
     setDeleting(true);
     setDeleteError('');
 
     try {
-      const res = await fetch(`/api/accounts/${deleteTarget.id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/accounts/${deleteTarget.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyId: activeCompany.id }),
+      });
       if (!res.ok) {
         const data = await res.json();
         setDeleteError(data.error || t('common.error'));
@@ -441,17 +447,18 @@ export function AccountsClient({ initialAccounts }: { initialAccounts?: GlAccoun
   }
 
   async function handleToggleActive(account: GlAccount) {
+    if (!activeCompany?.id) return;
     try {
       const res = await fetch(`/api/accounts/${account.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isActive: !account.isActive }),
+        body: JSON.stringify({ isActive: !account.isActive, companyId: activeCompany.id }),
       });
       if (res.ok) {
         fetchAccounts();
       }
     } catch (err) {
-      console.error('[TOGGLE ACTIVE ERROR]', err);
+      logger.error('[TOGGLE ACTIVE ERROR]', { error: String(err) });
     }
   }
 

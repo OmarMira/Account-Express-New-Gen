@@ -54,7 +54,7 @@ vi.mock('../src/lib/db', () => ({
 describe('Paginación Cursor + Offset', () => {
   it('GET /api/journal sin cursor debe retornar paginación por offset (comportamiento original)', async () => {
     const request = new NextRequest('http://localhost:3000/api/journal?companyId=c123&page=1&limit=2');
-    const response = await journalGET(request, { params: {} });
+    const response = await journalGET(request, { params: Promise.resolve({}) });
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -66,7 +66,7 @@ describe('Paginación Cursor + Offset', () => {
 
   it('GET /api/journal con cursor debe retornar nextCursor y hasMore (comportamiento cursor-based)', async () => {
     const request = new NextRequest('http://localhost:3000/api/journal?companyId=c123&cursor=&limit=1');
-    const response = await journalGET(request, { params: {} });
+    const response = await journalGET(request, { params: Promise.resolve({}) });
     const body = await response.json();
 
     expect(response.status).toBe(200);

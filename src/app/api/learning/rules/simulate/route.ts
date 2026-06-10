@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { apiHandler } from '@/lib/api-handler';
+import { apiHandler, type RouteContext } from '@/lib/api-handler';
 import { requireCompanyContext } from '@/lib/context-storage';
 import { z } from 'zod';
+import { logger } from '@/lib/logger';
 
 // Condition schema validation
 const conditionSchema = z.object({
@@ -78,7 +79,7 @@ function matchCondition(
   }
 }
 
-export const POST = apiHandler(async (request: NextRequest, context: { params: any }) => {
+export const POST = apiHandler(async (request: NextRequest, context: RouteContext) => {
   const { userId, companyId } = requireCompanyContext();
 
   try {
@@ -130,8 +131,8 @@ export const POST = apiHandler(async (request: NextRequest, context: { params: a
       matchCount,
       samples,
     });
-  } catch (error: any) {
-    console.error('[POST RULE SIMULATION ERROR]', error);
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+  } catch (error: unknown) {
+    logger.error('[POST RULE SIMULATION ERROR]', { error: String(error) });
+    return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }
 });

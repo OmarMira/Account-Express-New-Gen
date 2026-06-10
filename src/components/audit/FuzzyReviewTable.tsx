@@ -26,6 +26,7 @@ import { useFuzzyMatchAudit } from '@/hooks/useFuzzyMatchAudit';
 import { LinkJournalModal } from './LinkJournalModal';
 import { formatCurrency, formatDate } from '@/lib/format';
 import { toast } from 'sonner';
+import { logger } from '@/lib/logger';
 
 interface FuzzyCandidate {
   id: string;
@@ -79,7 +80,7 @@ export function FuzzyReviewTable({
       setFuzzyMatches((prev) => ({ ...prev, [tx.id]: data.matches || [] }));
       setActiveFuzzyTxId(tx.id);
     } catch (error) {
-      console.error('Error fetching matches:', error);
+      logger.error('Error fetching matches:', { error: String(error) });
       toast.error('No se pudieron buscar coincidencias para esta transacción');
     } finally {
       setIsSearchingMatches((prev) => ({ ...prev, [tx.id]: false }));
@@ -94,8 +95,8 @@ export function FuzzyReviewTable({
       });
       toast.success('Transacción contable vinculada exitosamente');
       onRefresh?.();
-    } catch (error: any) {
-      toast.error(error.message || 'Error al vincular la transacción');
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : String(error));
     }
   };
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { apiHandler } from '@/lib/api-handler';
+import { apiHandler, type RouteContext } from '@/lib/api-handler';
 import { requireCompanyContext } from '@/lib/context-storage';
 import { restoreBackup, validateBackup, type BackupData } from '@/lib/backup';
 
@@ -9,7 +9,7 @@ import { restoreBackup, validateBackup, type BackupData } from '@/lib/backup';
  * Body (JSON): { companyId: string, data: string (base64) }
  * Body (FormData): companyId (field) + file (File attachment)
  */
-export const POST = apiHandler(async (request: NextRequest, context: { params: any }) => {
+export const POST = apiHandler(async (request: NextRequest, context: RouteContext) => {
   const { companyId } = requireCompanyContext();
 
   let backupData: BackupData;

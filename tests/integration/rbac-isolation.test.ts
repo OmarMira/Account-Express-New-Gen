@@ -35,7 +35,7 @@ describe('Multi-Tenant Protection - RBAC Isolation', () => {
       }),
     });
 
-    const response = await feedbackPatch(req, { params: {} });
+    const response = await feedbackPatch(req, { params: Promise.resolve({}) });
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.success).toBe(true);
@@ -61,7 +61,7 @@ describe('Multi-Tenant Protection - RBAC Isolation', () => {
       }),
     });
 
-    const response = await feedbackPatch(req, { params: {} });
+    const response = await feedbackPatch(req, { params: Promise.resolve({}) });
     expect(response.status).toBe(403);
     const body = await response.json();
     expect(body.error).toContain('Forbidden');
@@ -85,7 +85,7 @@ describe('Multi-Tenant Protection - RBAC Isolation', () => {
       }),
     });
 
-    const response = await assistantPost(req);
+    const response = await assistantPost(req, { params: Promise.resolve({}) });
     expect(response.status).toBe(403);
     const body = await response.json();
     expect(body.error).toContain('Forbidden');

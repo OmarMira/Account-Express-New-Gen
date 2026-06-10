@@ -77,7 +77,7 @@ export const POST = apiHandler(async (request: NextRequest) => {
         matches: validation.matches,
         requiresApproval: validation.requiresApproval,
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       results.push({
         fileName,
         extension,
@@ -86,7 +86,7 @@ export const POST = apiHandler(async (request: NextRequest) => {
         score: 0.0,
         matches: false,
         requiresApproval: true,
-        error: err.message || 'Error de parseo',
+        error: err instanceof Error ? err.message : String(err),
       });
     }
   }

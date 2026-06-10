@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { apiHandler } from '@/lib/api-handler';
+import { apiHandler, type RouteContext } from '@/lib/api-handler';
 import { getRequestContext } from '@/lib/context-storage';
 import { AuthError } from '@/lib/api-error';
 
 // ─── GET /api/auth/me ─────────────────────────────────────────────────
 export const GET = apiHandler(
-  async (request: NextRequest, context: { params: any }) => {
+  async (request: NextRequest, context: RouteContext) => {
     const ctx = getRequestContext();
     if (!ctx?.userId) throw new AuthError('Unauthorized');
     const userId = ctx.userId;

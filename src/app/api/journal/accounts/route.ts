@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { apiHandler } from '@/lib/api-handler';
+import { apiHandler, type RouteContext } from '@/lib/api-handler';
 import { requireCompanyContext } from '@/lib/context-storage';
 import { journalAccountsCache } from '@/lib/cache';
 
@@ -8,7 +8,7 @@ import { journalAccountsCache } from '@/lib/cache';
 // List active GL accounts for a company (used in account selector dropdown).
 // Query params: companyId
 // Returns: id, code, name, accountType, normalBalance
-export const GET = apiHandler(async (request: NextRequest, context: { params: any }) => {
+export const GET = apiHandler(async (request: NextRequest, context: RouteContext) => {
   const { userId, companyId } = requireCompanyContext();
   const { searchParams } = new URL(request.url);
 

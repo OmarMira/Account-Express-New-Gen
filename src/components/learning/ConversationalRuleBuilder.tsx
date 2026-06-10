@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useLanguageStore } from '@/store/language-store';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -23,8 +23,51 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
+  DialogFooter,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { AccountSelector, type GlAccountOption } from '@/components/spa/journal/AccountSelector';
+import { logger } from '@/lib/logger';
+
+function formatValidationError(errData: any, t: (key: string) => string): string {
+  if (errData.details) {
+    const fieldErrors = errData.details.fieldErrors || {};
+    const fields = Object.keys(fieldErrors);
+    if (fields.length > 0) {
+      const msgs = fields.map((f) => `${f}: ${fieldErrors[f].join(', ')}`);
+      return `Error de validación: ${msgs.join('; ')}`;
+    }
+  }
+  // Traduce el error base si es el mensaje hardcodeado en inglés
+  const msg = errData.error || '';
+  if (msg === 'Validation failed') return 'Error de validación. Revisá los datos ingresados.';
+  if (msg === 'pattern or conditions are required') return 'Se requiere un patrón o al menos una condición.';
+  return msg || t('ruleBuilder.createError');
+}
+
+function getNextCode(baseCode: string, existingAccounts: GlAccountOption[]): string {
+  const existing = new Set(existingAccounts.filter(Boolean).map((a) => a.code));
+  let code = baseCode;
+  for (let i = 0; i < 100; i++) {
+    if (!existing.has(code)) return code;
+    const num = parseInt(code, 10);
+    if (isNaN(num)) break;
+    code = String(num + 1);
+  }
+  return baseCode;
+}
+
+function accountTypeLabel(type?: string): string {
+  const labels: Record<string, string> = {
+    equity: 'Equity (Capital)',
+    revenue: 'Revenue (Ingresos)',
+    asset: 'Asset (Activo)',
+    liability: 'Liability (Pasivo)',
+    expense: 'Expense (Gasto)',
+  };
+  return type ? labels[type] || 'Expense (Gasto)' : 'Expense (Gasto)';
+}
 
 interface RuleCondition {
   field: 'description' | 'amount' | 'reference';
@@ -42,7 +85,7 @@ interface RuleCondition {
 
 interface AISuggestion {
   role: string;
-  account: { code: string; name: string };
+  account: { code: string; name: string; accountType?: string; normalBalance?: string };
   suggestSubAccount: boolean;
   subAccountName?: string;
   conditions?: RuleCondition[];
@@ -69,6 +112,17 @@ export function ConversationalRuleBuilder({
   const [suggestion, setSuggestion] = useState<AISuggestion | null>(null);
   const [creatingRule, setCreatingRule] = useState(false);
   const [clickCount, setClickCount] = useState(0);
+  const creatingRuleRef = useRef(false);
+  const suggestionCache = useRef<Record<string, AISuggestion>>({});
+
+  // GL account creation/link modal (like bank import flow)
+  const [glAccountModalOpen, setGlAccountModalOpen] = useState(false);
+  const [glAccountMode, setGlAccountMode] = useState<'create' | 'link'>('create');
+  const [glAccountCodeInput, setGlAccountCodeInput] = useState('');
+  const [glAccountNameInput, setGlAccountNameInput] = useState('');
+  const [glAccountId, setGlAccountId] = useState<string | null>(null);
+  const [savingGlAccount, setSavingGlAccount] = useState(false);
+  const [allGlAccounts, setAllGlAccounts] = useState<GlAccountOption[]>([]);
 
   // Live simulation & condition editor states
   const [editableConditions, setEditableConditions] = useState<RuleCondition[]>([]);
@@ -84,7 +138,7 @@ export function ConversationalRuleBuilder({
     { code: string; name: string; accountType: string }[]
   >([]);
 
-  // Sync suggestion conditions to editable state
+  // Sync suggestion conditions when suggestion changes
   useEffect(() => {
     if (suggestion) {
       setEditableConditions(suggestion.conditions || []);
@@ -93,23 +147,40 @@ export function ConversationalRuleBuilder({
     }
   }, [suggestion]);
 
-  // Fetch top GL accounts for dynamic smart chips
-  useEffect(() => {
-    async function fetchTopAccounts() {
-      try {
-        const res = await fetch(`/api/bank-rules/top-accounts?companyId=${companyId}`);
-        if (res.ok) {
-          const resData = await res.json();
-          if (Array.isArray(resData.data)) {
-            setTopAccounts(resData.data);
-          }
+  // Fetch top GL accounts for dynamic smart chips + all accounts for linking
+  const fetchAccounts = useCallback(async () => {
+    try {
+      const [topRes, allRes] = await Promise.all([
+        fetch(`/api/bank-rules/top-accounts?companyId=${companyId}`),
+        fetch(`/api/accounts?companyId=${companyId}`),
+      ]);
+      if (topRes.ok) {
+        const topData = await topRes.json();
+        if (Array.isArray(topData.data)) {
+          setTopAccounts(topData.data);
         }
-      } catch (err) {
-        console.warn('[FAILED TO FETCH TOP ACCOUNTS]', err);
       }
+      if (allRes.ok) {
+        const allData = await allRes.json();
+        const accounts = (allData.accounts ?? allData.data ?? []).filter(Boolean);
+        setAllGlAccounts(
+          accounts.map((a: any) => ({
+            id: a.id,
+            code: a.code,
+            name: a.name,
+            accountType: a.accountType,
+            normalBalance: a.normalBalance,
+          })),
+        );
+      }
+    } catch (err) {
+      logger.warn('[FAILED TO FETCH ACCOUNTS]', { error: String(err) });
     }
-    fetchTopAccounts();
   }, [companyId]);
+
+  useEffect(() => {
+    fetchAccounts();
+  }, [fetchAccounts]);
 
   // Debounced Simulation Effect
   useEffect(() => {
@@ -126,7 +197,7 @@ export function ConversationalRuleBuilder({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             companyId,
-            conditions: editableConditions,
+          conditions: editableConditions.filter((c) => c.value.trim().length > 0),
           }),
         });
 
@@ -140,7 +211,7 @@ export function ConversationalRuleBuilder({
           }
         }
       } catch (err) {
-        console.error('[SIMULATION ERROR]', err);
+        logger.error('[SIMULATION ERROR]', { error: String(err) });
       } finally {
         setIsSimulating(false);
       }
@@ -172,7 +243,7 @@ export function ConversationalRuleBuilder({
           }
         }
       } catch (err) {
-        console.warn('[FAILED TO FETCH DIRECTION PROFILES]', err);
+        logger.warn('[FAILED TO FETCH DIRECTION PROFILES]', { error: String(err) });
       }
     }
     fetchProfiles();
@@ -180,15 +251,32 @@ export function ConversationalRuleBuilder({
 
   const current = candidates[currentIndex];
 
-  // Carga inicial de candidatos
+  // Carga inicial de candidatos desde scan (sin clustering)
   useEffect(() => {
     async function fetchCandidates() {
       try {
         setLoading(true);
-        const res = await fetch(`/api/learning/pending-entities?companyId=${companyId}`);
+        const res = await fetch(`/api/ai-rules/scan?companyId=${companyId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
         if (!res.ok) throw new Error(t('ruleBuilder.fetchError'));
         const data = await res.json();
-        setCandidates(data.candidates || []);
+        const raw = data.patterns || [];
+        // Map scan patterns to EntityCandidate format
+        const mapped: EntityCandidate[] = raw.map((p: any) => ({
+          id: p.id,
+          canonicalName: p.description,
+          occurrences: p.occurrences,
+          directionProfile: {
+            creditPct: p.direction === 'credit' ? 1 : 0,
+            debitPct: p.direction === 'debit' ? 1 : 0,
+          },
+          sampleDescriptions: [p.rawDescription],
+          hasContext: p.hasContext ?? false,
+          contextRole: p.contextRole ?? undefined,
+        }));
+        setCandidates(mapped);
       } catch (err) {
         setError(err instanceof Error ? err.message : t('ruleBuilder.unknownError'));
       } finally {
@@ -202,6 +290,16 @@ export function ConversationalRuleBuilder({
   const submitWithAnswer = useCallback(
     async (value: string) => {
       if (!value.trim() || !current) return;
+
+      // Check session cache first
+      const cacheKey = `${current.canonicalName}::${value.trim()}`;
+      const cached = suggestionCache.current[cacheKey];
+      if (cached) {
+        setAnswer(value);
+        setSuggestion(cached);
+        return;
+      }
+
       setAnswer(value);
       setProcessingAnswer(true);
       setError(null);
@@ -223,7 +321,21 @@ export function ConversationalRuleBuilder({
         }
         const resData = await res.json();
         if (resData.success && resData.data) {
-          setSuggestion(resData.data);
+          const sug = resData.data;
+          // Calculate next available code ONCE here, before setting state
+          const nextCode = getNextCode(sug.account.code, allGlAccounts);
+          setGlAccountMode('create');
+          setGlAccountCodeInput(nextCode);
+          setGlAccountNameInput(sug.account.name);
+          // If we assigned a different code than the AI suggested, it's
+          // a sibling-level account, not a sub-account of the original
+          if (nextCode !== sug.account.code) {
+            sug.account.code = nextCode;
+            sug.suggestSubAccount = false;
+          }
+          setSuggestion(sug);
+          // Cache suggestion per session for consistent re-edits
+          suggestionCache.current[`${current.canonicalName}::${value.trim()}`] = sug;
         } else {
           throw new Error(t('ruleBuilder.interpretError'));
         }
@@ -233,7 +345,7 @@ export function ConversationalRuleBuilder({
         setProcessingAnswer(false);
       }
     },
-    [current, companyId, t],
+    [current, companyId, t, allGlAccounts],
   );
 
   // Paso 1: Interpretar respuesta libre con IA
@@ -243,28 +355,44 @@ export function ConversationalRuleBuilder({
 
   // Paso 2: Confirmar y generar regla
   const handleConfirm = useCallback(async () => {
-    if (!suggestion || !current) return;
+    if (!suggestion || !current || creatingRuleRef.current) return;
+    creatingRuleRef.current = true;
     setCreatingRule(true);
     try {
-      const typeKey = suggestion.account.code.charAt(0);
-      const profile = directionProfiles[typeKey];
+      const typeKey = suggestion.account.accountType;
+      const profile = typeKey ? directionProfiles[typeKey] : undefined;
       const threshold = profile?.deviationThreshold ?? 0.9;
+      const code = glAccountCodeInput || suggestion.account.code;
+      const name = glAccountNameInput || suggestion.account.name;
 
-      const res = await fetch('/api/learning/rules', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          companyId,
-          pattern: current.canonicalName,
-          lockedDirection: current.directionProfile.creditPct >= threshold ? 'credit' : 'debit',
-          glAccountCode: suggestion.account.code,
-          role: suggestion.role,
-          createSubAccount: suggestion.suggestSubAccount,
-          subAccountName: suggestion.subAccountName,
-          conditions: editableConditions,
-        }),
+        const res = await fetch('/api/learning/rules', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            companyId,
+            pattern: current.canonicalName,
+            lockedDirection: current.directionProfile.creditPct >= threshold ? 'credit' : 'debit',
+            glAccountCode: code,
+            role: suggestion.role,
+            createSubAccount: suggestion.suggestSubAccount,
+            subAccountName: suggestion.subAccountName || undefined,
+            conditions: editableConditions.filter((c) => c.value.trim().length > 0),
+          }),
       });
-      if (!res.ok) throw new Error(t('ruleBuilder.createError'));
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        if (errData.code === 'GL_ACCOUNT_NOT_FOUND') {
+          setGlAccountCodeInput(code);
+          setGlAccountNameInput(name);
+          setGlAccountId(null);
+          setGlAccountMode('create');
+          setGlAccountModalOpen(true);
+          creatingRuleRef.current = false;
+          setCreatingRule(false);
+          return;
+        }
+        throw new Error(formatValidationError(errData, t));
+      }
 
       onComplete?.(await res.json());
 
@@ -273,13 +401,18 @@ export function ConversationalRuleBuilder({
       setSuggestion(null);
       setEditableConditions([]);
       setSimulationResult(null);
+      suggestionCache.current = {};
       setCurrentIndex((prev) => prev + 1);
+
+      // Refresh accounts so next entity sees newly created sub-accounts or parent
+      fetchAccounts();
     } catch (err) {
       setError(err instanceof Error ? err.message : t('ruleBuilder.unknownError'));
     } finally {
       setCreatingRule(false);
+      creatingRuleRef.current = false;
     }
-  }, [suggestion, current, companyId, onComplete, t]);
+  }, [suggestion, current, companyId, onComplete, t, glAccountCodeInput, glAccountNameInput, editableConditions, fetchAccounts]);
 
   const handleSkip = useCallback(() => {
     setAnswer('');
@@ -288,6 +421,97 @@ export function ConversationalRuleBuilder({
     setSimulationResult(null);
     setCurrentIndex((prev) => prev + 1);
   }, []);
+
+  const handleSaveGlAccount = useCallback(async () => {
+    if (!suggestion || !current) return;
+    setSavingGlAccount(true);
+    try {
+      let finalCode = glAccountCodeInput;
+      let createdAccountType: string | undefined;
+      if (glAccountMode === 'create') {
+        createdAccountType = suggestion.account.accountType || 'equity';
+        const res = await fetch('/api/accounts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            companyId,
+            code: glAccountCodeInput,
+            name: glAccountNameInput,
+            accountType: createdAccountType,
+            normalBalance: suggestion.account.normalBalance || 'debit',
+            isActive: true,
+          }),
+        });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(
+            errData.error ||
+              `No se pudo crear la cuenta ${glAccountCodeInput}. Creala manualmente e intentá de nuevo.`,
+          );
+        }
+      } else {
+        const selected = allGlAccounts.find((a) => a.id === glAccountId);
+        if (!selected) throw new Error('Seleccioná una cuenta contable existente');
+        finalCode = selected.code;
+        createdAccountType = selected.accountType;
+      }
+
+      const typeKey = createdAccountType;
+      const profile = typeKey ? directionProfiles[typeKey] : undefined;
+      const th = profile?.deviationThreshold ?? 0.9;
+
+      const retryRes = await fetch('/api/learning/rules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId,
+          pattern: current.canonicalName,
+          lockedDirection: current.directionProfile.creditPct >= th ? 'credit' : 'debit',
+          glAccountCode: finalCode,
+          role: suggestion.role,
+          createSubAccount: suggestion.suggestSubAccount,
+          subAccountName: suggestion.subAccountName || undefined,
+          conditions: editableConditions.filter((c) => c.value.trim().length > 0),
+        }),
+      });
+      if (!retryRes.ok) {
+        const retryErrData = await retryRes.json().catch(() => ({}));
+        throw new Error(formatValidationError(retryErrData, t));
+      }
+
+      setGlAccountModalOpen(false);
+      onComplete?.(await retryRes.json());
+
+      setAnswer('');
+      setSuggestion(null);
+      setEditableConditions([]);
+      setSimulationResult(null);
+      suggestionCache.current = {};
+      setCurrentIndex((prev) => prev + 1);
+
+      // Refresh accounts list so next entity sees newly created account
+      if (glAccountMode === 'create') {
+        fetchAccounts();
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al crear la cuenta contable');
+    } finally {
+      setSavingGlAccount(false);
+    }
+  }, [
+    suggestion,
+    current,
+    companyId,
+    onComplete,
+    t,
+    glAccountCodeInput,
+    glAccountNameInput,
+    glAccountMode,
+    glAccountId,
+    allGlAccounts,
+    editableConditions,
+    fetchAccounts,
+  ]);
 
   // Renderizado de estados
   if (loading)
@@ -313,8 +537,8 @@ export function ConversationalRuleBuilder({
       </div>
     );
 
-  const suggestedAccountType = suggestion?.account.code.charAt(0) || '';
-  const profile = directionProfiles[suggestedAccountType];
+  const suggestedAccountType = suggestion?.account.accountType || '';
+  const profile = suggestedAccountType ? directionProfiles[suggestedAccountType] : undefined;
   const threshold = profile?.deviationThreshold ?? 0.9;
 
   const directionLabel =
@@ -373,7 +597,11 @@ export function ConversationalRuleBuilder({
             <div className="space-y-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium leading-none">
-                  {t('ruleBuilder.question').replace('{entity}', current.canonicalName)}
+                  {current.hasContext
+                    ? t('ruleBuilder.questionContext')
+                        .replace('{entity}', current.canonicalName)
+                        .replace('{role}', current.contextRole || '')
+                    : t('ruleBuilder.question').replace('{entity}', current.canonicalName)}
                 </label>
 
                 {/* Smart Chips / Respuestas Rápidas */}
@@ -477,17 +705,88 @@ export function ConversationalRuleBuilder({
                 </div>
               </div>
 
-              <div className="rounded-md bg-primary/5 border border-primary/20 p-4">
-                <p className="text-sm font-medium mb-1 text-foreground">
+              <div className="rounded-md bg-primary/5 border border-primary/20 p-4 space-y-3">
+                <p className="text-sm font-medium text-foreground">
                   {t('ruleBuilder.suggestedAccount')}
                 </p>
-                <div className="flex items-center gap-2 text-xl font-bold text-primary">
-                  {suggestion.account.code}{' '}
+
+                {/* Current selection preview — shows actual values that will be submitted */}
+                <div className="flex items-center gap-2 text-sm font-bold text-primary bg-primary/10 rounded px-3 py-2">
+                  {glAccountCodeInput || suggestion.account.code}{' '}
                   <span className="text-muted-foreground font-normal">—</span>{' '}
-                  {suggestion.account.name}
+                  {glAccountNameInput || suggestion.account.name}
                 </div>
+
+                {/* Toggle Crear / Vincular */}
+                <div className="space-y-1">
+                  <label className="text-xs font-medium">Cuenta Contable (Plan de Cuentas)</label>
+                  <div className="grid grid-cols-2 gap-2 bg-slate-900/50 dark:bg-slate-900/80 p-1 rounded-lg border">
+                    <button
+                      type="button"
+                      onClick={() => setGlAccountMode('create')}
+                      className={`py-1.5 text-xs font-semibold rounded-md transition-all ${
+                        glAccountMode === 'create'
+                          ? 'bg-blue-600 text-white shadow-sm'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      Crear Nueva (Automático)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setGlAccountMode('link')}
+                      className={`py-1.5 text-xs font-semibold rounded-md transition-all ${
+                        glAccountMode === 'link'
+                          ? 'bg-blue-600 text-white shadow-sm'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      Vincular Existente
+                    </button>
+                  </div>
+                </div>
+
+                {glAccountMode === 'create' ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-medium">Código</label>
+                      <Input
+                        value={glAccountCodeInput}
+                        onChange={(e) => setGlAccountCodeInput(e.target.value)}
+                        className="h-7 text-xs font-mono"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-medium">Nombre</label>
+                      <Input
+                        value={glAccountNameInput}
+                        onChange={(e) => setGlAccountNameInput(e.target.value)}
+                        className="h-7 text-xs"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    <AccountSelector
+                      accounts={allGlAccounts.filter(
+                        (a) => !suggestion.account.accountType || a.accountType === suggestion.account.accountType,
+                      )}
+                      value={glAccountId}
+                      onChange={(id) => {
+                        setGlAccountId(id);
+                        const selected = allGlAccounts.find((a) => a.id === id);
+                        if (selected) {
+                          setGlAccountCodeInput(selected.code);
+                          setGlAccountNameInput(selected.name);
+                        }
+                      }}
+                      placeholder="Seleccioná una cuenta contable"
+                    />
+                  </div>
+                )}
+
                 {suggestion.suggestSubAccount && (
-                  <p className="text-xs text-muted-foreground mt-2 border-t pt-2">
+                  <p className="text-xs text-muted-foreground border-t pt-2">
                     {t('ruleBuilder.subAccountHint').replace(
                       '{name}',
                       suggestion.subAccountName || current.canonicalName,
@@ -559,7 +858,7 @@ export function ConversationalRuleBuilder({
                           <select
                             value={cond.operator}
                             onChange={(e) => {
-                              const op = e.target.value as any;
+                              const op = e.target.value as RuleCondition['operator'];
                               setEditableConditions((prev) => {
                                 const copy = [...prev];
                                 copy[idx] = { ...copy[idx], operator: op };
@@ -763,6 +1062,129 @@ export function ConversationalRuleBuilder({
           )}
         </CardContent>
       </Card>
+
+      {/* GL Account creation/link modal */}
+      <Dialog open={glAccountModalOpen} onOpenChange={setGlAccountModalOpen}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>Cuenta contable no encontrada</DialogTitle>
+            <DialogDescription>
+              La cuenta <code className="font-mono bg-muted px-1 rounded">{glAccountCodeInput}</code>{' '}
+              no existe en esta compañía. Crealá o vinculá una existente.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {/* Toggle Crear / Vincular */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Cuenta Contable (Plan de Cuentas)</label>
+              <div className="grid grid-cols-2 gap-2 bg-slate-900/50 dark:bg-slate-900/80 p-1 rounded-lg border">
+                <button
+                  type="button"
+                  onClick={() => setGlAccountMode('create')}
+                  className={`py-1.5 text-xs font-semibold rounded-md transition-all ${
+                    glAccountMode === 'create'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Crear Nueva (Automático)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGlAccountMode('link')}
+                  className={`py-1.5 text-xs font-semibold rounded-md transition-all ${
+                    glAccountMode === 'link'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Vincular Existente
+                </button>
+              </div>
+            </div>
+
+            {glAccountMode === 'create' ? (
+              <>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">
+                    Código <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    placeholder="3040"
+                    value={glAccountCodeInput}
+                    onChange={(e) => setGlAccountCodeInput(e.target.value)}
+                    className="font-mono"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">
+                    Nombre <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    placeholder="Owner's Draw / Retiros de Socio"
+                    value={glAccountNameInput}
+                    onChange={(e) => setGlAccountNameInput(e.target.value)}
+                  />
+                </div>
+                <div className="rounded-lg bg-blue-500/10 border border-blue-500/20 p-3 text-xs leading-relaxed text-blue-300 space-y-2">
+                  <p className="font-semibold text-blue-400">✨ Autoconfiguración Contable:</p>
+                  <p>Se creará la cuenta contable con tipo:</p>
+                  <div className="mt-1 bg-slate-950/80 p-2.5 rounded border border-white/5 font-mono text-[11px] text-white space-y-1">
+                    <div>
+                      <span className="text-slate-400">Código GL:</span>{' '}
+                      <span className="text-blue-400 font-bold">{glAccountCodeInput || '---'}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400">Nombre GL:</span>{' '}
+                      <span className="text-emerald-400 font-bold">
+                        {glAccountNameInput || '---'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400">Tipo:</span>{' '}
+                      <span className="text-amber-400 font-bold">
+                        {accountTypeLabel(suggestion?.account.accountType)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">
+                  Cuenta existente <span className="text-red-500">*</span>
+                </label>
+                <AccountSelector
+                  accounts={allGlAccounts.filter(
+                    (a) => !suggestion?.account.accountType || a.accountType === suggestion.account.accountType,
+                  )}
+                  value={glAccountId}
+                  onChange={setGlAccountId}
+                  placeholder="Seleccioná una cuenta contable"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Solo se muestran cuentas del mismo tipo ({accountTypeLabel(suggestion?.account.accountType)}).
+                </p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setGlAccountModalOpen(false)}
+              disabled={savingGlAccount}
+            >
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveGlAccount} disabled={savingGlAccount}>
+              {savingGlAccount && <Loader2 className="size-4 mr-1 animate-spin" />}
+              Guardar y continuar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

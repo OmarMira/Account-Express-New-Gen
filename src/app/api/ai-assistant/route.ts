@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { logger } from '@/lib/logger';
 import { db } from '@/lib/db';
-import { apiHandler } from '@/lib/api-handler';
+import { apiHandler, type RouteContext } from '@/lib/api-handler';
 import { getRequestContext } from '@/lib/context-storage';
 import { AI_CONFIG } from '@/lib/constants/ai-config';
 import { createAuditLogWithRetry } from '@/lib/audit';
@@ -438,15 +438,15 @@ async function executeTool(name: string, args: any, companyId: string, userId?: 
       default:
         return { error: `Tool ${name} not found` };
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Error executing tool', { tool: name, error });
-    return { error: error.message || 'Error executing query' };
+    return { error: error instanceof Error ? error.message : String(error) };
   }
 }
 
 // ─── POST /api/ai-assistant ────────────────────────────────────────
 export const POST = apiHandler(
-  async (request: NextRequest, context: { params: any }) => {
+  async (request: NextRequest, context: RouteContext) => {
     const { userId } = getRequestContext()!;
 
     try {
@@ -466,8 +466,8 @@ export const POST = apiHandler(
           await callAI([{ role: 'user', content: 'Hola' }]);
           logger.info('AI warmup call completed successfully');
           return NextResponse.json({ reply: 'Warmup completed successfully' });
-        } catch (err: any) {
-          logger.error('Failed to warm up LLM connection', { error: err.message || err });
+        } catch (err: unknown) {
+          logger.error('Failed to warm up LLM connection', { error: err instanceof Error ? err.message : String(err) });
           return NextResponse.json({ error: 'Warmup failed' }, { status: 502 });
         }
       }
@@ -610,9 +610,9 @@ async function callAI(
 
       logger.info('AI response successful', { model: currentModel });
       return parsed.data;
-    } catch (err: any) {
+    } catch (err: unknown) {
       clearTimeout(timeout);
-      logger.error('AI model exception', { model: currentModel, error: err.message || err });
+      logger.error('AI model exception', { model: currentModel, error: err instanceof Error ? err.message : String(err) });
       lastError = err;
       continue;
     }
@@ -914,8 +914,8 @@ EXAMPLE OF COMPLETED BIFURCATED RULE RESPONSE:
   let aiData;
   try {
     aiData = await callAI(apiMessages, undefined, true);
-  } catch (aiError: any) {
-    logger.error('AI call failed in create-rule', { error: aiError.message });
+  } catch (aiError: unknown) {
+    logger.error('AI call failed in create-rule', { error: aiError instanceof Error ? aiError.message : String(aiError) });
     return NextResponse.json({
       reply:
         '⚠️ El modelo de IA no respondió a tiempo. Por favor, intenta de nuevo en unos segundos.',
@@ -959,7 +959,7 @@ EXAMPLE OF COMPLETED BIFURCATED RULE RESPONSE:
           '⚠️ No pude interpretar la respuesta. ¿Podrías reformular tu solicitud con más detalle?';
       }
     }
-  } catch (e: any) {
+  } catch (e: unknown) {
     logger.error('Error parsing rule JSON', { error: e, rawReply });
     // If the AI returned plain text instead of JSON, use it as the reply
     if (rawReply && rawReply.length > 10 && !rawReply.startsWith('{')) {

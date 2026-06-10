@@ -1,5 +1,6 @@
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
+import { logger } from '../logger';
 
 export function extractKeywords(text: string, locale: 'es' | 'en' = 'es'): string[] {
   const configPath = join(process.cwd(), 'rules/memory-config.json');
@@ -21,7 +22,7 @@ export function extractKeywords(text: string, locale: 'es' | 'en' = 'es'): strin
       )
       .slice(0, config.maxKeywordsToExtract || 10);
   } catch (err) {
-    console.error('[KEYWORD EXTRACTOR ERROR]', err);
+    logger.error('[KEYWORD EXTRACTOR ERROR]', { error: String(err) });
     return [];
   }
 }

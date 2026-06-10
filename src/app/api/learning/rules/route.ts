@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { apiHandler } from '@/lib/api-handler';
+import { apiHandler, type RouteContext } from '@/lib/api-handler';
 import { requireCompanyContext } from '@/lib/context-storage';
 import { createAuditLogWithRetry } from '@/lib/audit';
 import { createLearningRuleSchema } from '@/lib/validations/learning-rule';
+import { logger } from '@/lib/logger';
 
-export const POST = apiHandler(async (request: NextRequest, context: { params: any }) => {
+export const POST = apiHandler(async (request: NextRequest, context: RouteContext) => {
   const { userId, companyId } = requireCompanyContext();
 
   const body = await request.json();
@@ -64,25 +65,23 @@ export const POST = apiHandler(async (request: NextRequest, context: { params: a
       code: string;
       accountType: string;
       normalBalance: string;
+      name: string;
     } | null = null;
     if (glAccountCode) {
       parentAccount = await db.glAccount.findFirst({
         where: { companyId, code: glAccountCode, isActive: true },
       });
       if (!parentAccount) {
-        return NextResponse.json({ error: 'Parent GL Account not found' }, { status: 400 });
+        return NextResponse.json(
+          { error: `La cuenta contable ${glAccountCode} no existe en esta compañía. Seleccioná una cuenta válida o creala primero.`, code: 'GL_ACCOUNT_NOT_FOUND' },
+          { status: 400 },
+        );
       }
     }
 
-    // Pre-fetch siblings for sub-account code generation (read-only)
-    let siblings: { code: string }[] = [];
-    if (parentAccount && createSubAccount && subAccountName?.trim()) {
-      siblings = await db.glAccount.findMany({
-        where: { companyId, parentId: parentAccount.id },
-        orderBy: { code: 'desc' },
-        select: { code: true },
-      });
-    }
+    // Pre-fetch siblings for sub-account code generation is now done INSIDE
+    // the transaction to prevent race conditions (two partners created at the
+    // same time would both see 0 siblings and collide on 3040-01).
 
     // ─── Single atomic transaction ────────────────────────────────────
     const rule = await db.$transaction(async (tx) => {
@@ -92,6 +91,14 @@ export const POST = apiHandler(async (request: NextRequest, context: { params: a
         let finalGlAccountId = parentAccount.id;
 
         if (createSubAccount && subAccountName?.trim()) {
+          // Fetch siblings INSIDE the transaction so concurrent partner creation
+          // cannot produce duplicate codes. SQLite serializes writes per WAL.
+          const siblings = await tx.glAccount.findMany({
+            where: { companyId, parentId: parentAccount.id },
+            orderBy: { code: 'desc' },
+            select: { code: true },
+          });
+
           let nextCode = `${parentAccount.code}-01`;
           if (siblings.length > 0) {
             const lastCode = siblings[0].code;
@@ -155,7 +162,7 @@ export const POST = apiHandler(async (request: NextRequest, context: { params: a
           conditionValue: defaultConditionValue,
           transactionDirection: lockedDirection || 'any',
           glAccountId: legacyGlAccountId,
-          conditions: conditions || null,
+          conditions: conditions as any ?? null,
           debitGlAccountId: resolvedDebitGlAccountId,
           creditGlAccountId: resolvedCreditGlAccountId,
           priority: body.priority || 10,
@@ -214,8 +221,8 @@ export const POST = apiHandler(async (request: NextRequest, context: { params: a
     // ─────────────────────────────────────────────────────────────────
 
     return NextResponse.json({ success: true, data: rule });
-  } catch (error: any) {
-    console.error('[POST LEARNING RULE ERROR]', error);
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+  } catch (error: unknown) {
+    logger.error('[POST LEARNING RULE ERROR]', { error: String(error) });
+    return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { JournalService } from '@/services/journal.service';
+import { JournalService } from '@/lib/services/journal.service';
 import { createTestCompany, createTestGlAccount, clearDatabase } from '../helpers/factories';
 import { db } from '@/lib/db';
 

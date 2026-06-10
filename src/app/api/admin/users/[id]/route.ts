@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { apiHandler, RouteContext } from '@/lib/api-handler';
-import { requireCompanyContext } from '@/lib/context-storage';
+import { requireCurrentUserId } from '@/lib/context-storage';
 import { hashPassword } from '@/lib/auth';
 import { saveLogo, deleteLogo } from '@/lib/uploads/logo-service';
 import { updateUserSchema } from '@/lib/validations/admin';
@@ -9,7 +9,7 @@ import { parseAdminBody } from '@/lib/parse-admin-body';
 
 export const PATCH = apiHandler(
   async (request: NextRequest, context: RouteContext) => {
-    const { userId } = requireCompanyContext();
+    const userId = requireCurrentUserId();
     const { id } = await context.params;
 
     const contentType = request.headers.get('content-type') || '';
@@ -110,12 +110,12 @@ export const PATCH = apiHandler(
 
     return NextResponse.json({ user: updatedUser });
   },
-  { requireSuperAdmin: true },
+  { requireSuperAdmin: true, requireMembership: false },
 );
 
 export const DELETE = apiHandler(
   async (_request: NextRequest, context: RouteContext) => {
-    const { userId } = requireCompanyContext();
+    const userId = requireCurrentUserId();
     const { id } = await context.params;
 
     if (userId === id) {
@@ -141,5 +141,5 @@ export const DELETE = apiHandler(
 
     return NextResponse.json({ message: 'User deleted successfully' });
   },
-  { requireSuperAdmin: true },
+  { requireSuperAdmin: true, requireMembership: false },
 );

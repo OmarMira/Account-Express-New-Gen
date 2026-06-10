@@ -3,6 +3,7 @@
 import React, { Component, type ErrorInfo, type ReactNode } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { logger } from '@/lib/logger';
 
 interface Props {
   children: ReactNode;
@@ -22,7 +23,7 @@ export class FlowErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('FlowErrorBoundary caught an error:', error, errorInfo);
+    logger.error('FlowErrorBoundary caught an error:', { error: String(error), componentStack: String(errorInfo) });
   }
 
   public render() {

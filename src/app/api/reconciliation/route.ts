@@ -5,7 +5,7 @@ import { validateRequest } from '@/lib/validate-request';
 import { createAuditLogWithRetry } from '@/lib/audit';
 import { createReconciliationSchema } from '@/lib/validations/reconciliation';
 import { NotFoundError, ValidationError } from '@/lib/api-error';
-import { ReconciliationService } from '@/services/reconciliation.service';
+import { ReconciliationService } from '@/lib/services/reconciliation.service';
 import { requireCompanyContext } from '@/lib/context-storage';
 
 // ─── GET /api/reconciliation ───────────────────────────────────────
@@ -17,7 +17,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
   const bankAccountId = searchParams.get('bankAccountId');
   const startDate = searchParams.get('startDate');
   const endDate = searchParams.get('endDate');
-  const statusFilter = searchParams.get('status') || 'unreconciled'; // all | unreconciled | reconciled
+  const statusFilter = searchParams.get('status') || 'unreconciled'; // all | unreconciled | reconciled | pending_review
   const search = searchParams.get('search');
   const statementId = searchParams.get('statementId');
 
@@ -72,6 +72,10 @@ export const GET = apiHandler(async (request: NextRequest) => {
     txWhere.isReconciled = false;
   } else if (statusFilter === 'reconciled') {
     txWhere.isReconciled = true;
+    txWhere.status = 'posted';
+  } else if (statusFilter === 'pending_review') {
+    txWhere.isReconciled = true;
+    txWhere.status = 'pending_review';
   }
 
   // Statement filter
@@ -148,7 +152,10 @@ export const GET = apiHandler(async (request: NextRequest) => {
 
   // Get overall counts (all statements, no date/search filter)
   const reconciledCount = await db.bankTransaction.count({
-    where: { statementId: { in: statementIds }, isReconciled: true },
+    where: { statementId: { in: statementIds }, isReconciled: true, status: 'posted' },
+  });
+  const pendingReviewCount = await db.bankTransaction.count({
+    where: { statementId: { in: statementIds }, status: 'pending_review' },
   });
   const totalTransactions = await db.bankTransaction.count({
     where: { statementId: { in: statementIds } },
@@ -228,7 +235,8 @@ export const GET = apiHandler(async (request: NextRequest) => {
       difference,
       totalTransactions,
       reconciledCount,
-      unreconciledCount: totalTransactions - reconciledCount,
+      unreconciledCount: totalTransactions - reconciledCount - pendingReviewCount,
+      pendingReviewCount,
       depositsTotal,
       paymentsTotal,
       filteredCount: transactions.length,

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { apiHandler } from '@/lib/api-handler';
-import { executeYearClose } from '@/services/closing-engine';
+import { executeYearClose } from '@/lib/services/closing-engine';
 import { fiscalConfigSchema } from '@/lib/fiscal-period/types';
+import { logger } from '@/lib/logger';
 
 export const POST = apiHandler(async (req: NextRequest) => {
   const { companyId, year, config } = await req.json();
@@ -15,10 +16,10 @@ export const POST = apiHandler(async (req: NextRequest) => {
   try {
     const result = await executeYearClose(companyId, year, validatedConfig);
     return NextResponse.json(result);
-  } catch (error: any) {
-    console.error('[YEAR CLOSE API ERROR]', error);
+  } catch (error: unknown) {
+    logger.error('[YEAR CLOSE API ERROR]', { error: String(error) });
     return NextResponse.json(
-      { error: error.message || 'Error en el cierre de ejercicio' },
+      { error: error instanceof Error ? error.message : String(error) },
       { status: 500 },
     );
   }

@@ -11,7 +11,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { useTranslations, useLocale } from 'next-intl';
+import { useLanguageStore } from '@/store/language-store';
 import type { GlAccount } from './AccountFormClientDialog';
 
 interface Props {
@@ -29,8 +29,8 @@ export function AccountDeleteClientDialog({
   onOpenChange,
   onConfirm,
 }: Props) {
-  const t = useTranslations();
-  const language = useLocale();
+  const t = useLanguageStore((s) => s.t);
+  const language = useLanguageStore((s) => s.language);
 
   return (
     <AlertDialog open={!!target} onOpenChange={(open) => !open && onOpenChange(false)}>

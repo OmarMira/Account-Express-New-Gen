@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { logger } from '@/lib/logger';
 import type { Prisma } from '@prisma/client';
+import { readJsonConfig } from '@/lib/config-loader';
 
 export async function GET(request: NextRequest) {
   try {
@@ -289,7 +291,10 @@ export async function GET(request: NextRequest) {
     }));
 
     // Sort by type in logical GAAP order
-    const typeOrder = ['asset', 'liability', 'equity', 'revenue', 'expense'];
+    const accountTypeMeta = await readJsonConfig<Record<string, { order: number }>>('account-types.json');
+    const typeOrder = Object.entries(accountTypeMeta)
+      .sort(([, a], [, b]) => a.order - b.order)
+      .map(([key]) => key);
     const byType = Array.from(typeMap.values())
       .sort((a, b) => {
         const aIdx = typeOrder.indexOf(a.type);
@@ -315,8 +320,8 @@ export async function GET(request: NextRequest) {
       byType,
       recentMovements: filteredRecent,
     });
-  } catch (error) {
-    console.error('Movement summary error:', error);
+  } catch (error: unknown) {
+    logger.error('Movement summary error:', { error: String(error) });
     return NextResponse.json({ error: 'Failed to fetch movement summary' }, { status: 500 });
   }
 }

@@ -68,7 +68,8 @@ export class ReconciliationService {
         // Verify that the transaction date is in an active fiscal period
         await assertActiveFiscalPeriod(companyId, bankTx.date);
 
-        const updateData: Record<string, any> = {
+        const txnWarnings: string[] = [];
+        const updateData: Record<string, unknown> = {
           isReconciled: true,
           reconciledAt: new Date(),
         };
@@ -84,12 +85,12 @@ export class ReconciliationService {
             if (splitAccount) {
               const direction = bankTx.amount > 0 ? 'credit' : 'debit';
               const semanticWarning = validateSemanticDirection(
-                splitAccount.code,
+                splitAccount.accountType,
                 direction,
                 split.description || bankTx.description,
               );
               if (semanticWarning) {
-                warnings.push(semanticWarning);
+                txnWarnings.push(semanticWarning);
               }
             }
           }
@@ -100,14 +101,19 @@ export class ReconciliationService {
             updateData.glAccountId = mainGlId;
             const direction = bankTx.amount > 0 ? 'credit' : 'debit';
             const semanticWarning = validateSemanticDirection(
-              glAccount.code,
+              glAccount.accountType,
               direction,
               bankTx.description,
             );
             if (semanticWarning) {
-              warnings.push(semanticWarning);
+              txnWarnings.push(semanticWarning);
             }
           }
+        }
+
+        if (txnWarnings.length > 0) {
+          updateData.status = 'pending_review';
+          warnings.push(...txnWarnings);
         }
 
         if (periodId) {
@@ -124,6 +130,7 @@ export class ReconciliationService {
           const amount = Math.abs(bankTx.amount);
           const isDeposit = bankTx.amount > 0;
           const description = `Reconciliation: ${bankTx.description}`;
+          const entryStatus = txnWarnings.length > 0 ? 'pending_review' : 'posted';
 
           // Case 1: Splits provided
           if (txn.splits && txn.splits.length > 0) {
@@ -153,7 +160,7 @@ export class ReconciliationService {
                 companyId,
                 date: bankTx.date,
                 description,
-                status: 'posted',
+                status: entryStatus,
                 lines: { create: lines },
               },
             });
@@ -169,7 +176,7 @@ export class ReconciliationService {
                 companyId,
                 date: bankTx.date,
                 description,
-                status: 'posted',
+                status: entryStatus,
                 lines: {
                   create: [
                     { glAccountId: debitAccountId, description, debit: amount, credit: 0 },

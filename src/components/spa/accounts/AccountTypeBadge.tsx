@@ -2,6 +2,7 @@
 
 import { Badge } from '@/components/ui/badge';
 import { useLanguageStore } from '@/store/language-store';
+import { ACCOUNT_TYPES } from '@/lib/constants/account-types';
 
 const ACCOUNT_TYPE_STYLES: Record<string, string> = {
   asset:
@@ -16,13 +17,9 @@ const ACCOUNT_TYPE_STYLES: Record<string, string> = {
     'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300 border-rose-200 dark:border-rose-800',
 };
 
-const ACCOUNT_TYPE_KEYS: Record<string, string> = {
-  asset: 'accounts.asset',
-  liability: 'accounts.liability',
-  equity: 'accounts.equity',
-  revenue: 'accounts.revenue',
-  expense: 'accounts.expense',
-};
+const ACCOUNT_TYPE_KEYS: Record<string, string> = Object.fromEntries(
+  ACCOUNT_TYPES.map((t) => [t, `accounts.${t}`]),
+);
 
 interface AccountTypeBadgeProps {
   accountType: string;

@@ -33,14 +33,14 @@ export async function validateRequest<T>(
 
   try {
     const json = await req.json();
-    // Recursive XSS detection
-    const checkXss = (obj: any) => {
+    // Recursive XSS detection — traverse any shape, so we must widen to unknown and narrow
+    const checkXss = (obj: unknown) => {
       if (typeof obj === 'string' && hasXssPattern(obj)) {
         throw new Error('Potential XSS attack detected');
       }
       if (obj && typeof obj === 'object') {
         for (const key of Object.keys(obj)) {
-          checkXss(obj[key]);
+          checkXss((obj as Record<string, unknown>)[key]);
         }
       }
     };
@@ -53,8 +53,8 @@ export async function validateRequest<T>(
       );
     }
     return result.data;
-  } catch (err: any) {
-    if (err.message === 'Potential XSS attack detected') {
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message === 'Potential XSS attack detected') {
       throw err;
     }
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });

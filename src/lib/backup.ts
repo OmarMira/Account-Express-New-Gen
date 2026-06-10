@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
 import fs from 'fs';
 import path from 'path';
+import { logger } from './logger';
 
 /* ─── Types ───────────────────────────────────────────────────────── */
 
@@ -600,7 +601,7 @@ export async function restoreBackup(
       restoredCounts,
     };
   } catch (error) {
-    console.error('[BACKUP RESTORE ERROR]', error);
+    logger.error('[BACKUP RESTORE ERROR]', { error: String(error) });
     return {
       success: false,
       message: `Restore failed: ${error instanceof Error ? error.message : 'Unknown error'}`,

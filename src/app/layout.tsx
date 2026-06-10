@@ -1,10 +1,13 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
-import { ThemeProvider } from 'next-themes';
+import Script from 'next/script';
+import { ThemeProvider } from '@/components/providers/theme-provider';
 import { Toaster } from '@/components/ui/toaster';
 import { QueryProvider } from '@/components/providers/query-provider';
 import { LocaleProvider } from '@/providers/LocaleProvider';
 import './globals.css';
+
+const themeScript = `(function(){try{var t=localStorage.getItem('theme')||'system',r=t==='system'?(window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'):t;document.documentElement.classList.toggle('dark',r==='dark')}catch(e){}})()`;
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -37,12 +40,10 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} subpixel-antialiased`}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange={true}
-        >
+        <Script id="theme-init" strategy="beforeInteractive">
+          {themeScript}
+        </Script>
+        <ThemeProvider>
           <QueryProvider>
             <LocaleProvider>
               {children}

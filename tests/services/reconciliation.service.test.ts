@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { ReconciliationService } from '@/services/reconciliation.service';
+import { ReconciliationService } from '@/lib/services/reconciliation.service';
 import {
   createTestCompany,
   createTestBankAccount,
@@ -9,6 +9,18 @@ import {
   clearDatabase,
 } from '../helpers/factories';
 import { db } from '@/lib/db';
+
+async function createFiscalPeriod(companyId: string) {
+  await db.fiscalPeriod.create({
+    data: {
+      companyId,
+      name: 'March 2025',
+      startDate: new Date('2025-03-01T00:00:00.000Z'),
+      endDate: new Date('2025-03-31T23:59:59.999Z'),
+      isLocked: false,
+    },
+  });
+}
 
 describe('ReconciliationService', () => {
   beforeEach(async () => {
@@ -24,6 +36,7 @@ describe('ReconciliationService', () => {
     const cashGl = await createTestGlAccount({ companyId: company.id, code: '1010', name: 'Cash' });
     const bankAccount = await createTestBankAccount(company.id, cashGl.id);
     const statement = await createTestBankStatement(company.id, bankAccount.id);
+    await createFiscalPeriod(company.id);
 
     const bankTx = await createTestBankTransaction(company.id, statement.id, {
       date: '2025-03-03',
@@ -61,6 +74,7 @@ describe('ReconciliationService', () => {
     const cashGl = await createTestGlAccount({ companyId: company.id, code: '1010', name: 'Cash' });
     const bankAccount = await createTestBankAccount(company.id, cashGl.id);
     const statement = await createTestBankStatement(company.id, bankAccount.id);
+    await createFiscalPeriod(company.id);
 
     const bankTx = await createTestBankTransaction(company.id, statement.id, {
       date: '2025-03-03',
@@ -100,5 +114,93 @@ describe('ReconciliationService', () => {
 
     expect(debitLine?.glAccountId).toBe(cashGl.id); // Débito a Caja
     expect(creditLine?.glAccountId).toBe(incomeGl.id); // Crédito a Ingresos
+  });
+
+  describe('Semantic validation → pending_review', () => {
+    it('debe marcar status pending_review si hay warning semántico (débito a patrimonio sin keywords)', async () => {
+      const company = await createTestCompany();
+      const cashGl = await createTestGlAccount({ companyId: company.id, code: '1010', name: 'Cash' });
+      const bankAccount = await createTestBankAccount(company.id, cashGl.id);
+      const statement = await createTestBankStatement(company.id, bankAccount.id);
+      await createFiscalPeriod(company.id);
+
+      // Pago (amount < 0) → desde banco, debit del destino
+      const bankTx = await createTestBankTransaction(company.id, statement.id, {
+        date: '2025-03-15',
+        amount: -100,
+        description: 'Compra de muebles de oficina',
+      });
+
+      // Cuenta Clase 3 (Patrimonio) sin keywords de retiro → warning
+      const equityGl = await createTestGlAccount({
+        companyId: company.id,
+        code: '3010',
+        name: 'Owner Equity',
+        accountType: 'equity',
+        normalBalance: 'credit',
+      });
+
+      const result = await ReconciliationService.reconcile({
+        companyId: company.id,
+        bankAccountId: bankAccount.id,
+        transactions: [{ id: bankTx.id, glAccountId: equityGl.id }],
+        createJournalEntries: true,
+      });
+
+      expect(result.reconciledCount).toBe(1);
+      expect(result.warnings).toHaveLength(1);
+      expect(result.warnings[0]).toContain('Advertencia semántica: La cuenta de patrimonio registra un débito');
+
+      const updatedTx = await db.bankTransaction.findUnique({ where: { id: bankTx.id } });
+      expect(updatedTx?.status).toBe('pending_review');
+
+      const entries = await db.journalEntry.findMany({
+        where: { companyId: company.id },
+      });
+      expect(entries).toHaveLength(1);
+      expect(entries[0].status).toBe('pending_review');
+    });
+
+    it('debe dejar status posted si NO hay warning semántico (débito a gastos es normal)', async () => {
+      const company = await createTestCompany();
+      const cashGl = await createTestGlAccount({ companyId: company.id, code: '1010', name: 'Cash' });
+      const bankAccount = await createTestBankAccount(company.id, cashGl.id);
+      const statement = await createTestBankStatement(company.id, bankAccount.id);
+      await createFiscalPeriod(company.id);
+
+      // Pago (amount < 0) → al ser gasto normal, débito a 6010 es normal
+      const bankTx = await createTestBankTransaction(company.id, statement.id, {
+        date: '2025-03-15',
+        amount: -100,
+        description: 'Pago de alquiler oficina',
+      });
+
+      const expenseGl = await createTestGlAccount({
+        companyId: company.id,
+        code: '6010',
+        name: 'Rent Expense',
+        accountType: 'expense',
+        normalBalance: 'debit',
+      });
+
+      const result = await ReconciliationService.reconcile({
+        companyId: company.id,
+        bankAccountId: bankAccount.id,
+        transactions: [{ id: bankTx.id, glAccountId: expenseGl.id }],
+        createJournalEntries: true,
+      });
+
+      expect(result.warnings).toHaveLength(0);
+      expect(result.reconciledCount).toBe(1);
+
+      const updatedTx = await db.bankTransaction.findUnique({ where: { id: bankTx.id } });
+      expect(updatedTx?.status).toBe('posted');
+
+      const entries = await db.journalEntry.findMany({
+        where: { companyId: company.id },
+      });
+      expect(entries).toHaveLength(1);
+      expect(entries[0].status).toBe('posted');
+    });
   });
 });

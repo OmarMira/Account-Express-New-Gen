@@ -87,7 +87,7 @@ async function runTests() {
         confidence: 0.95,
       }),
     });
-    const res1 = await feedbackPatch(req1, { params: {} });
+    const res1 = await feedbackPatch(req1, { params: Promise.resolve({}) });
     if (res1.status === 200) {
       console.log('   ✅ APROBADO: Retornó 200 OK');
       passed++;
@@ -111,7 +111,7 @@ async function runTests() {
         confidence: 0.95,
       }),
     });
-    const res2 = await feedbackPatch(req2, { params: {} });
+    const res2 = await feedbackPatch(req2, { params: Promise.resolve({}) });
     if (res2.status === 403) {
       console.log('   ✅ APROBADO: Bloqueado con 403 Forbidden');
       passed++;
@@ -133,7 +133,7 @@ async function runTests() {
         companyId,
       }),
     });
-    const res3 = await assistantPost(req3);
+    const res3 = await assistantPost(req3, { params: Promise.resolve({}) });
     if (res3.status === 403) {
       console.log('   ✅ APROBADO: Bloqueado con 403 Forbidden');
       passed++;

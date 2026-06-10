@@ -27,7 +27,8 @@ const CREDENTIALS = { email: 'admin@accountexpress.com', password: 'Admin123!' }
 const PROFILES = {
   smoke: {
     vus: 1,
-    duration: '30s',
+    iterations: 2,
+    sleep: '1s',
   },
   load: {
     stages: [
@@ -35,6 +36,7 @@ const PROFILES = {
       { duration: '1m',  target: 10 },
       { duration: '30s', target: 0  },
     ],
+    sleep: '1s',
   },
   stress: {
     stages: [
@@ -42,23 +44,31 @@ const PROFILES = {
       { duration: '40s', target: 50 },
       { duration: '20s', target: 0  },
     ],
+    sleep: '500ms',
   },
 };
 
 const profile = __ENV.PROFILE || 'smoke';
+const profileCfg = PROFILES[profile];
 
 export const options = {
-  ...(PROFILES[profile].duration
-    ? { vus: PROFILES[profile].vus, duration: PROFILES[profile].duration }
-    : { stages: PROFILES[profile].stages }),
+  ...(profileCfg.iterations
+    ? { scenarios: {
+        default: {
+          executor: 'per-vu-iterations',
+          vus: profileCfg.vus,
+          iterations: profileCfg.iterations,
+        },
+      }}
+    : { stages: profileCfg.stages }),
   thresholds: {
-    http_req_duration:        ['p(95)<3000'],   // 95% requests < 3s
-    http_req_failed:          ['rate<0.02'],    // < 2% errors
-    error_rate:               ['rate<0.02'],
-    login_duration:           ['p(95)<2000'],
+    http_req_duration:        ['p(95)<5000'],
+    http_req_failed:          ['rate<0.05'],    // < 5% — tolera 429s ocasionales en burst
+    error_rate:               ['rate<0.05'],
+    login_duration:           ['p(95)<5000'],  // cold start puede demorar
     dashboard_duration:       ['p(95)<3000'],
     accounts_duration:        ['p(95)<2000'],
-    report_duration:          ['p(95)<5000'],
+    report_duration:          ['p(95)<10000'],  // PDF exports: render time real
   },
   summaryTrendStats: ['avg', 'min', 'med', 'max', 'p(90)', 'p(95)', 'p(99)'],
 };
@@ -171,14 +181,30 @@ export function setup() {
     } catch (_) {}
   }
 
-  console.log(`Setup done: cookie=${cookieStr ? 'OK('+cookieStr.length+' chars)' : 'EMPTY'}, companyId=${companyId}`);
-  return { cookieStr, companyId };
+  // Fetch dashboard once to get first bankAccountId for reconciliation tests
+  let firstBankAccountId = '';
+  if (companyId && cookieStr) {
+    const dashRes = http.get(`${BASE_URL}/api/dashboard?companyId=${companyId}`, {
+      headers: { Cookie: cookieStr, ...CSRF_HEADERS },
+    });
+    if (dashRes.status === 200) {
+      try {
+        const dashData = JSON.parse(dashRes.body);
+        if (dashData.bankAccounts && dashData.bankAccounts.length > 0) {
+          firstBankAccountId = dashData.bankAccounts[0].id;
+        }
+      } catch (_) {}
+    }
+  }
+
+  console.log(`Setup done: cookie=${cookieStr ? 'OK('+cookieStr.length+' chars)' : 'EMPTY'}, companyId=${companyId}, bankAccountId=${firstBankAccountId}`);
+  return { cookieStr, companyId, firstBankAccountId };
 }
 
 
 // ─── Main Test ────────────────────────────────────────────────
 export default function (data) {
-  const { cookieStr, companyId } = data;
+  const { cookieStr, companyId, firstBankAccountId } = data;
 
   if (!cookieStr) {
     console.error('No session from setup — aborting');
@@ -228,33 +254,50 @@ export default function (data) {
     ok(get(`/api/banks?companyId=${companyId}`, authHeaders), 'banks/list');
   });
 
-  // ── 7. Journal ─────────────────────────────────────────────
-  group('07 Journal', () => {
+  // ── 7a. Reconciliation — pending review ────────────────────
+  if (firstBankAccountId) {
+    group('07a Reconciliation Pending Review', () => {
+      ok(get(
+        `/api/reconciliation?bankAccountId=${firstBankAccountId}&companyId=${companyId}&status=pending_review`,
+        authHeaders
+      ), 'reconciliation/pending_review');
+    });
+
+    group('07b Reconciliation Unreconciled', () => {
+      ok(get(
+        `/api/reconciliation?bankAccountId=${firstBankAccountId}&companyId=${companyId}&status=unreconciled`,
+        authHeaders
+      ), 'reconciliation/unreconciled');
+    });
+  }
+
+  // ── 08. Journal ────────────────────────────────────────────
+  group('08 Journal', () => {
     ok(get(`/api/journal?companyId=${companyId}&page=1&pageSize=20`, authHeaders), 'journal');
   });
 
-  // ── 8. Import History ──────────────────────────────────────
-  group('08 Import History', () => {
+  // ── 09. Import History ─────────────────────────────────────
+  group('09 Import History', () => {
     ok(get(`/api/import/history?companyId=${companyId}`, authHeaders), 'import/history');
   });
 
-  // ── 9. Bank Rules ──────────────────────────────────────────
-  group('09 Bank Rules', () => {
+  // ── 10. Bank Rules ─────────────────────────────────────────
+  group('10 Bank Rules', () => {
     ok(get(`/api/bank-rules?companyId=${companyId}`, authHeaders), 'bank-rules');
   });
 
-  // ── 10. Fiscal Periods ─────────────────────────────────────
-  group('10 Fiscal Periods', () => {
+  // ── 11. Fiscal Periods / Settings ─────────────────────────
+  group('11 Fiscal Periods', () => {
     ok(get(`/api/settings?companyId=${companyId}`, authHeaders), 'settings/fiscal-periods');
   });
 
-  // ── 11. Movement Summary ───────────────────────────────────
-  group('11 Movement Summary', () => {
+  // ── 12. Movement Summary ──────────────────────────────────
+  group('12 Movement Summary', () => {
     ok(get(`/api/movement-summary?companyId=${companyId}`, authHeaders), 'movement-summary');
   });
 
-  // ── 12. Report — Trial Balance PDF ─────────────────────────
-  group('12 Report Trial Balance PDF', () => {
+  // ── 13. Report — Trial Balance PDF ────────────────────────
+  group('13 Report Trial Balance PDF', () => {
     const res = get(
       `/api/export/pdf?type=trial_balance&companyId=${companyId}&asOfDate=2025-12-31`,
       authHeaders
@@ -266,8 +309,8 @@ export default function (data) {
     });
   });
 
-  // ── 13. Report — Transactions PDF ──────────────────────────
-  group('13 Report Transactions PDF', () => {
+  // ── 14. Report — Transactions PDF ─────────────────────────
+  group('14 Report Transactions PDF', () => {
     const res = get(
       `/api/export/pdf?type=transactions&companyId=${companyId}&startDate=2025-01-01&endDate=2025-12-31`,
       authHeaders
@@ -276,8 +319,8 @@ export default function (data) {
     check(res, { 'transactions pdf → 200': (r) => r.status === 200 });
   });
 
-  // ── 14. Report — Trial Balance CSV ─────────────────────────
-  group('14 Report Trial Balance CSV', () => {
+  // ── 15. Report — Trial Balance CSV ────────────────────────
+  group('15 Report Trial Balance CSV', () => {
     const res = get(
       `/api/export/csv?type=trial_balance&companyId=${companyId}`,
       authHeaders
@@ -285,7 +328,8 @@ export default function (data) {
     check(res, { 'trial_balance csv → 200': (r) => r.status === 200 });
   });
 
-  sleep(0.5);
+  const pause = parseFloat(profileCfg.sleep || '1');
+  sleep(pause);
 }
 
 

@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { apiHandler } from '@/lib/api-handler';
-import { requireCompanyContext } from '@/lib/context-storage';
+import { apiHandler, type RouteContext } from '@/lib/api-handler';
+import { requireCurrentUserId } from '@/lib/context-storage';
 import { journalAccountsCache } from '@/lib/cache';
+import { readJsonConfig } from '@/lib/config-loader';
 
 // ─── GET /api/accounts/[id] ────────────────────────────────────────────
 export const GET = apiHandler(
-  async (_request: NextRequest, context: { params: any }) => {
-    const { userId } = requireCompanyContext();
+  async (_request: NextRequest, context: RouteContext) => {
+    const userId = requireCurrentUserId();
 
     const { id } = await context.params;
 
@@ -45,8 +46,8 @@ export const GET = apiHandler(
 
 // ─── PUT /api/accounts/[id] ────────────────────────────────────────────
 export const PUT = apiHandler(
-  async (request: NextRequest, context: { params: any }) => {
-    const { userId } = requireCompanyContext();
+  async (request: NextRequest, context: RouteContext) => {
+    const userId = requireCurrentUserId();
 
     const { id } = await context.params;
     const body = await request.json();
@@ -95,8 +96,9 @@ export const PUT = apiHandler(
     }
 
     if (accountType !== undefined) {
-      const validTypes = ['asset', 'liability', 'equity', 'revenue', 'expense'];
-      if (!validTypes.includes(accountType)) {
+      const accountTypeConfig = await readJsonConfig<Record<string, unknown>>('account-types.json');
+      if (!(accountType in accountTypeConfig)) {
+        const validTypes = Object.keys(accountTypeConfig);
         return NextResponse.json(
           { error: `Invalid accountType. Must be one of: ${validTypes.join(', ')}` },
           { status: 400 },
@@ -161,10 +163,25 @@ export const PUT = apiHandler(
   { requireMembership: false },
 );
 
+// ─── Recursively collect descendant account IDs ──────────────────────
+async function collectDescendantIds(parentId: string): Promise<string[]> {
+  const children = await db.glAccount.findMany({
+    where: { parentId },
+    select: { id: true },
+  });
+  const ids: string[] = [];
+  for (const child of children) {
+    ids.push(child.id);
+    const grandchildIds = await collectDescendantIds(child.id);
+    ids.push(...grandchildIds);
+  }
+  return ids;
+}
+
 // ─── DELETE /api/accounts/[id] (hard delete) ───────────────────────────
 export const DELETE = apiHandler(
-  async (request: NextRequest, context: { params: any }) => {
-    const { userId } = requireCompanyContext();
+  async (request: NextRequest, context: RouteContext) => {
+    const userId = requireCurrentUserId();
 
     const { id } = await context.params;
     const account = await db.glAccount.findUnique({
@@ -175,7 +192,6 @@ export const DELETE = apiHandler(
             children: true,
             journalLines: true,
             bankAccounts: true,
-            bankRules: true,
             transactions: true,
           },
         },
@@ -186,53 +202,55 @@ export const DELETE = apiHandler(
       return NextResponse.json({ error: 'Account not found' }, { status: 404 });
     }
 
+    console.log('[DELETE ACCOUNT] _count:', JSON.stringify(account._count), 'isSystem:', account.isSystem);
+
     // Cannot delete system accounts
     if (account.isSystem) {
-      return NextResponse.json({ error: 'System accounts cannot be deleted' }, { status: 403 });
+      const msg = `Las cuentas del sistema no se pueden eliminar.`;
+      return NextResponse.json({ error: msg }, { status: 403 });
     }
 
-    // Cannot delete accounts with children
-    if (account._count.children > 0) {
-      return NextResponse.json(
-        {
-          error:
-            'This account has sub-accounts and cannot be deleted. Delete or reassign sub-accounts first.',
-        },
-        { status: 409 },
-      );
-    }
-
-    // Cannot delete accounts with transactions
-    if (account._count.journalLines > 0) {
-      return NextResponse.json(
-        { error: 'This account has journal entries and cannot be deleted' },
-        { status: 409 },
-      );
+    // Check journal lines in THIS account OR any descendant
+    // (this is the only hard blocker — real financial data)
+    const descendantIds = await collectDescendantIds(id);
+    const allAffectedIds = [id, ...descendantIds];
+    const totalJournalLines = await db.journalLine.count({
+      where: { glAccountId: { in: allAffectedIds } },
+    });
+    if (totalJournalLines > 0) {
+      const msg = `No se puede eliminar "${account.name}" porque tiene ${totalJournalLines} asiento(s) contable(s) en esta cuenta o sus sub-cuentas.`;
+      console.warn('[DELETE ACCOUNT 409] journalLines in hierarchy', { id, name: account.name, totalJournalLines });
+      return NextResponse.json({ error: msg }, { status: 409 });
     }
 
     // Cannot delete accounts linked to bank accounts
+    // (FK is NOT nullable — would break the bank account)
     if (account._count.bankAccounts > 0) {
-      return NextResponse.json(
-        { error: 'This account is linked to a bank account and cannot be deleted' },
-        { status: 409 },
-      );
+      const msg = `No se puede eliminar "${account.name}" porque está vinculada a ${account._count.bankAccounts} cuenta(s) bancaria(s).`;
+      console.warn('[DELETE ACCOUNT 409] bankAccounts > 0', { id, name: account.name, bankAccounts: account._count.bankAccounts });
+      return NextResponse.json({ error: msg }, { status: 409 });
     }
 
-    // Cannot delete accounts linked to bank rules
-    if (account._count.bankRules > 0) {
-      return NextResponse.json(
-        { error: 'This account is linked to a bank rule and cannot be deleted' },
-        { status: 409 },
-      );
+    // ── Cleanup related records before delete ──
+
+    // 1. Orphan children (set parentId to null)
+    if (account._count.children > 0) {
+      await db.glAccount.updateMany({
+        where: { parentId: id },
+        data: { parentId: null },
+      });
     }
 
-    // Cannot delete accounts linked to bank transactions
+    // 2. Null out bank transactions referencing this account
+    // (FK is nullable, no cascade — manual cleanup needed)
     if (account._count.transactions > 0) {
-      return NextResponse.json(
-        { error: 'This account is linked to bank transactions and cannot be deleted' },
-        { status: 409 },
-      );
+      await db.bankTransaction.updateMany({
+        where: { glAccountId: id },
+        data: { glAccountId: null },
+      });
     }
+
+    // 3. BankRules, EntityContexts have onDelete: SetNull — DB handles them
 
     // Hard delete from database
     const deleted = await db.glAccount.delete({

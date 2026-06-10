@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { apiHandler } from '@/lib/api-handler';
+import { apiHandler, type RouteContext } from '@/lib/api-handler';
 import { requireCompanyContext } from '@/lib/context-storage';
 import { parseConversationalContext } from '@/lib/services/conversational-service';
 import { safeAuditLog } from '@/lib/services/audit-service';
 import { logger } from '@/lib/logger';
 import { readJsonConfig, fileExists } from '@/lib/config-loader';
+import { db } from '@/lib/db';
 import { conversationalParseSchema } from '@/lib/validations/conversational-parse';
 
 // ── POST /api/learning/conversational-parse ──────────────────────
-export const POST = apiHandler(async (request: NextRequest, context: { params: any }) => {
+export const POST = apiHandler(async (request: NextRequest, context: RouteContext) => {
   const { userId, companyId } = requireCompanyContext();
 
   try {
@@ -25,13 +26,31 @@ export const POST = apiHandler(async (request: NextRequest, context: { params: a
     const { pattern, directionProfile } = parsed.data;
     const userInput = (parsed.data.userInput || parsed.data.userAnswer)!.trim();
 
+    // Derive direction from profile for heuristic fallback
+    const threshold = 0.9;
+    const direction: 'debit' | 'credit' | undefined =
+      directionProfile.creditPct >= threshold
+        ? 'credit'
+        : directionProfile.debitPct >= threshold
+          ? 'debit'
+          : undefined;
+
     // Ejecutar el parser (con userId para auditoría de respuesta IA externa)
-    const result = await parseConversationalContext(companyId, pattern, userInput, userId);
+    const result = await parseConversationalContext(companyId, pattern, userInput, userId, undefined, undefined, direction);
 
     // ─── VALIDACIÓN CRÍTICA DE DIRECCIONALIDAD (EXTERNALIZADA) ───
     const creditPct = directionProfile.creditPct;
     const debitPct = directionProfile.debitPct;
-    const suggestedAccountType = result.glAccountCode?.charAt(0);
+
+    // Look up accountType from DB instead of inferring from code prefix
+    let suggestedAccountType: string | undefined;
+    if (result.glAccountCode) {
+      const accountRecord = await db.glAccount.findFirst({
+        where: { companyId, code: result.glAccountCode, isActive: true },
+        select: { accountType: true },
+      });
+      suggestedAccountType = accountRecord?.accountType ?? undefined;
+    }
 
     if (suggestedAccountType) {
       let directionProfiles: Record<
@@ -73,8 +92,8 @@ export const POST = apiHandler(async (request: NextRequest, context: { params: a
         }
       }
 
-      // Warn (structured) when a mixed entity maps to Equity (class 3)
-      if (isMixed && suggestedAccountType === '3') {
+      // Warn (structured) when a mixed entity maps to Equity
+      if (isMixed && suggestedAccountType === 'equity') {
         logger.warn('MIXED_ENTITY_CLASSIFIED_AS_EQUITY', { pattern, creditPct, debitPct });
       }
     }

@@ -23,15 +23,15 @@ export function useAuth() {
       store.setActiveCompany(null);
       store.setCurrentView('select-company');
       return data;
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
       throw err;
     } finally {
       setIsLoading(false);
     }
   };
 
-  const register = async (input: any) => {
+  const register = async (input: Record<string, unknown>) => {
     setIsLoading(true);
     setError(null);
     try {
@@ -50,8 +50,8 @@ export function useAuth() {
         store.setCurrentView('dashboard');
       }
       return data;
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
       throw err;
     } finally {
       setIsLoading(false);

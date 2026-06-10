@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { apiHandler } from '@/lib/api-handler';
+import { apiHandler, type RouteContext } from '@/lib/api-handler';
 import { requireCompanyContext } from '@/lib/context-storage';
+import { logger } from '@/lib/logger';
 
 // ─── GET /api/import/history?companyId=xxx ────────────────────────────
 // List all bank statements (import history) for a company
-export const GET = apiHandler(async (request: NextRequest, context: { params: any }) => {
+export const GET = apiHandler(async (request: NextRequest, context: RouteContext) => {
   const { userId, companyId } = requireCompanyContext();
 
   const { searchParams } = new URL(request.url);
@@ -64,7 +65,7 @@ export const GET = apiHandler(async (request: NextRequest, context: { params: an
 
     return NextResponse.json({ statements: statementsWithStats });
   } catch (error) {
-    console.error('[IMPORT HISTORY ERROR]', error);
+    logger.error('[IMPORT HISTORY ERROR]', { error: String(error) });
     return NextResponse.json({ error: 'Failed to fetch import history' }, { status: 500 });
   }
 });

@@ -48,6 +48,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { logger } from '@/lib/logger';
 
 /* ─── Animation Variants ──────────────────────────────────────── */
 
@@ -236,7 +237,7 @@ export function CompanyDataTab() {
     });
 
     if (!addressParse.success) {
-      console.error('[COMPANY PROFILE VALIDATION ERROR]', addressParse.error);
+      logger.error('[COMPANY PROFILE VALIDATION ERROR]', { error: String(addressParse.error) });
       const errorMsg = addressParse.error.issues[0]?.message || 'Datos de dirección inválidos';
       toast.error(errorMsg);
       return;
@@ -288,7 +289,7 @@ export function CompanyDataTab() {
         toast.error(err.error || 'Ocurrió un error al guardar.');
       }
     } catch (err) {
-      console.error(err);
+      logger.error(String(err));
       toast.error('Ocurrió un error al guardar.');
     }
     setSavingCompany(false);

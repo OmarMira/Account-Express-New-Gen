@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { parsePDF } from '@/lib/pdf-parser';
-import { ImportService } from '@/services/import.service';
+import { ImportService } from '@/lib/services/import.service';
 import { MathMismatchError } from '@/lib/api-error';
 import { db } from '@/lib/db';
 import { createTestCompany, createTestGlAccount, createTestUser, clearDatabase } from './helpers/factories';

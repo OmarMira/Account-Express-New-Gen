@@ -29,7 +29,7 @@ describe('Multi-Tenant Context and apiHandler Protection', () => {
       },
     });
 
-    const response = await handler(req, { params: {} });
+    const response = await handler(req, { params: Promise.resolve({}) });
     expect(response.status).toBe(400);
     const body = await response.json();
     expect(body.error).toContain('companyId is required');
@@ -51,7 +51,7 @@ describe('Multi-Tenant Context and apiHandler Protection', () => {
       },
     });
 
-    const response = await handler(req, { params: {} });
+    const response = await handler(req, { params: Promise.resolve({}) });
     expect(response.status).toBe(403);
     const body = await response.json();
     expect(body.error).toContain('Forbidden');
@@ -77,7 +77,7 @@ describe('Multi-Tenant Context and apiHandler Protection', () => {
       },
     });
 
-    const response = await handler(req, { params: {} });
+    const response = await handler(req, { params: Promise.resolve({}) });
     expect(response.status).toBe(200);
     expect(capturedContext).not.toBeNull();
     expect(capturedContext.companyId).toBe(company.id);
@@ -105,7 +105,7 @@ describe('Multi-Tenant Context and apiHandler Protection', () => {
       },
     });
 
-    const response = await handler(req, { params: {} });
+    const response = await handler(req, { params: Promise.resolve({}) });
     expect(response.status).toBe(200);
     expect(capturedContext?.companyId).toBe(company.id);
   });
@@ -132,7 +132,7 @@ describe('Multi-Tenant Context and apiHandler Protection', () => {
       body: JSON.stringify({ companyId: company.id }),
     });
 
-    const response = await handler(req, { params: {} });
+    const response = await handler(req, { params: Promise.resolve({}) });
     expect(response.status).toBe(200);
     expect(capturedContext?.companyId).toBe(company.id);
   });
@@ -161,7 +161,7 @@ describe('Multi-Tenant Context and apiHandler Protection', () => {
       body: formData,
     });
 
-    const response = await handler(req, { params: {} });
+    const response = await handler(req, { params: Promise.resolve({}) });
     expect(response.status).toBe(200);
     expect(capturedContext?.companyId).toBe(company.id);
   });

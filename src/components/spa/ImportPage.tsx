@@ -50,6 +50,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { AccountSelector, type GlAccountOption } from './journal/AccountSelector';
+import { logger } from '@/lib/logger';
 
 // ─── Types ────────────────────────────────────────────────────────────
 
@@ -83,6 +84,7 @@ interface ImportResult {
   duplicatesSkipped: number;
   newAccountCreated: boolean;
   bankAccountName: string;
+  skippedNote?: string;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────
@@ -254,7 +256,7 @@ export function ImportPage() {
         );
       }
     } catch (err) {
-      console.error('Failed to fetch bank accounts:', err);
+      logger.error('Failed to fetch bank accounts:', { error: String(err) });
     }
   }
 
@@ -271,7 +273,7 @@ export function ImportPage() {
         );
       }
     } catch (err) {
-      console.error('Failed to fetch GL accounts:', err);
+      logger.error('Failed to fetch GL accounts:', { error: String(err) });
     }
   }
 
@@ -285,7 +287,7 @@ export function ImportPage() {
         setHistory(data.statements || []);
       }
     } catch (err) {
-      console.error('Failed to fetch import history:', err);
+      logger.error('Failed to fetch import history:', { error: String(err) });
     } finally {
       setLoadingHistory(false);
     }
@@ -415,7 +417,7 @@ export function ImportPage() {
           }
         }
       } catch (err) {
-        console.error('Validation failed:', err);
+        logger.error('Validation failed:', { error: String(err) });
       } finally {
         setUploading(false);
         stopProcessing();
@@ -536,13 +538,13 @@ export function ImportPage() {
         newAccountCreated,
         bankAccountName,
         skippedNote,
-      } as any);
+      });
       setResultOpen(true);
       clearFiles();
       fetchBankAccounts();
       fetchHistory();
-    } catch (err: any) {
-      setUploadError(err.message || t('banks.importFailed'));
+    } catch (err: unknown) {
+      setUploadError(err instanceof Error ? err.message : String(err));
     } finally {
       setUploading(false);
       setUploadProgress(0);
@@ -644,8 +646,8 @@ export function ImportPage() {
         const err = await res.json();
         setFormError(err.error || 'No se pudo guardar la cuenta bancaria');
       }
-    } catch (err: any) {
-      setFormError(err.message || 'Error al guardar la cuenta bancaria');
+    } catch (err: unknown) {
+      setFormError(err instanceof Error ? err.message : String(err));
     } finally {
       setSavingBank(false);
     }
@@ -1003,11 +1005,11 @@ export function ImportPage() {
                     </span>
                   </div>
                 )}
-                {(importResult as any).skippedNote && (
+                {importResult.skippedNote && (
                   <div className="flex items-center gap-2 rounded-md bg-blue-50 dark:bg-blue-950/30 p-2 text-sm">
                     <AlertCircle className="size-4 text-blue-600 dark:text-blue-400" />
                     <span className="text-blue-700 dark:text-blue-300">
-                      {(importResult as any).skippedNote}
+                      {importResult.skippedNote}
                     </span>
                   </div>
                 )}

@@ -2,15 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { hashPassword } from '@/lib/auth';
 import { apiHandler, RouteContext } from '@/lib/api-handler';
-import { requireCompanyContext } from '@/lib/context-storage';
+import { requireCurrentUserId } from '@/lib/context-storage';
 import { saveLogo } from '@/lib/uploads/logo-service';
 import { createUserSchema } from '@/lib/validations/admin';
 import { parseAdminBody } from '@/lib/parse-admin-body';
 
 export const GET = apiHandler(
   async (_request: NextRequest, _context: RouteContext) => {
-    requireCompanyContext();
-
     const users = await db.user.findMany({
       select: {
         id: true,
@@ -33,12 +31,12 @@ export const GET = apiHandler(
 
     return NextResponse.json({ users });
   },
-  { requireSuperAdmin: true },
+  { requireSuperAdmin: true, requireMembership: false },
 );
 
 export const POST = apiHandler(
   async (request: NextRequest) => {
-    const { userId } = requireCompanyContext();
+    const userId = requireCurrentUserId();
 
     const parsed = await parseAdminBody(request, createUserSchema);
     if (!parsed.ok) return parsed.error;
@@ -118,5 +116,5 @@ export const POST = apiHandler(
 
     return NextResponse.json({ user: newUser }, { status: 201 });
   },
-  { requireSuperAdmin: true },
+  { requireSuperAdmin: true, requireMembership: false },
 );

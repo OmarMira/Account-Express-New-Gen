@@ -3,7 +3,7 @@ import { useState } from 'react';
 export function useImport() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successData, setSuccessData] = useState<any>(null);
+  const [successData, setSuccessData] = useState<Record<string, unknown> | null>(null);
 
   const importFile = async (file: File, companyId: string, bankAccountId: string | null) => {
     setIsLoading(true);
@@ -27,8 +27,8 @@ export function useImport() {
       }
       setSuccessData(data);
       return data;
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
       throw err;
     } finally {
       setIsLoading(false);

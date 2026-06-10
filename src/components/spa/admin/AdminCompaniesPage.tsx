@@ -35,6 +35,8 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { AddressAutocomplete } from '@/components/ui/address-autocomplete';
+import { logger } from '@/lib/logger';
+import { toast } from 'sonner';
 
 const US_STATES = [
   'AL',
@@ -226,7 +228,7 @@ export default function AdminCompaniesPage() {
         setCompanies(data.companies || []);
       }
     } catch (err) {
-      console.error(err);
+      logger.error(String(err));
     } finally {
       setLoading(false);
     }
@@ -313,10 +315,10 @@ export default function AdminCompaniesPage() {
         loadCompanies();
       } else {
         const err = await res.json();
-        alert(err.error || 'Error al guardar la empresa');
+        toast.error(err.error || 'Error al guardar la empresa');
       }
     } catch (err) {
-      console.error(err);
+      logger.error(String(err));
     } finally {
       setSubmitting(false);
     }
@@ -334,7 +336,7 @@ export default function AdminCompaniesPage() {
         loadCompanies();
       }
     } catch (err) {
-      console.error(err);
+      logger.error(String(err));
     } finally {
       setDeleting(false);
     }
@@ -543,7 +545,7 @@ export default function AdminCompaniesPage() {
                       const file = e.target.files?.[0];
                       if (file) {
                         if (file.size > 10 * 1024 * 1024) {
-                          alert('El archivo excede el límite de 10MB');
+                          toast.error('El archivo excede el límite de 10MB');
                           return;
                         }
                         setLogoFile(file);

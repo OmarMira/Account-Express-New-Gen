@@ -215,8 +215,8 @@ export function AIAssistantModal() {
       setWizardCode(String(nextCode));
       setWizardName('Banco Chase - Corriente 1234');
       setWizardOpen(true);
-    } catch (err: any) {
-      setError(err.message || 'Error al iniciar el asistente');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setIsLoading(false);
     }
@@ -254,8 +254,8 @@ export function AIAssistantModal() {
         timestamp: new Date(),
       };
       setChatMessages((prev) => [...prev, successMsg]);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setIsLoading(false);
     }

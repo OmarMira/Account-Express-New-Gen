@@ -177,6 +177,8 @@ const LOCAL_TRANSLATIONS: Record<string, Record<string, string>> = {
 };
 
 import { useLanguageStore } from '@/store/language-store';
+import { logger } from '@/lib/logger';
+import { toast } from 'sonner';
 
 export default function AdminUsersPage() {
   const language = useLanguageStore((s) => s.language) || 'es';
@@ -229,7 +231,7 @@ export default function AdminUsersPage() {
         setUsers(data.users || []);
       }
     } catch (err) {
-      console.error(err);
+      logger.error(String(err));
     } finally {
       setLoading(false);
     }
@@ -323,10 +325,10 @@ export default function AdminUsersPage() {
         loadUsers();
       } else {
         const err = await res.json();
-        alert(err.error || 'Ocurrió un error al guardar.');
+        toast.error(err.error || 'Ocurrió un error al guardar.');
       }
     } catch (err) {
-      console.error(err);
+      logger.error(String(err));
     } finally {
       setSubmitting(false);
     }
@@ -344,10 +346,10 @@ export default function AdminUsersPage() {
         loadUsers();
       } else {
         const data = await res.json();
-        alert(data.error || 'Error al eliminar usuario.');
+        toast.error(data.error || 'Error al eliminar usuario.');
       }
     } catch (err) {
-      console.error(err);
+      logger.error(String(err));
     } finally {
       setDeleting(false);
     }
@@ -543,7 +545,7 @@ export default function AdminUsersPage() {
                       const file = e.target.files?.[0];
                       if (file) {
                         if (file.size > 10 * 1024 * 1024) {
-                          alert('El archivo excede el límite de 10MB');
+                          toast.error('El archivo excede el límite de 10MB');
                           return;
                         }
                         setAvatarFile(file);

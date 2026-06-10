@@ -7,7 +7,7 @@ export type Insight = {
   type: string;
   severity: 'info' | 'warning' | 'critical';
   message: string;
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
 };
 
 export async function generateInsights(companyId: string, role: string): Promise<Insight[]> {

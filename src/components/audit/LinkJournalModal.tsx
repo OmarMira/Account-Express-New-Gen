@@ -15,6 +15,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useFuzzyMatchAudit } from '@/hooks/useFuzzyMatchAudit';
 import { formatCurrency, formatDate } from '@/lib/format';
 import { toast } from 'sonner';
+import { logger } from '@/lib/logger';
 
 interface LinkJournalModalProps {
   isOpen: boolean;
@@ -80,7 +81,7 @@ export function LinkJournalModal({
         setEntries(json.data || []);
       }
     } catch (error) {
-      console.error('Error fetching journal entries:', error);
+      logger.error('Error fetching journal entries:', { error: String(error) });
       toast.error('Error al cargar los asientos contables');
     } finally {
       setIsLoading(false);
@@ -117,8 +118,8 @@ export function LinkJournalModal({
       toast.success('Transacción contable vinculada exitosamente');
       onLinked?.();
       onClose();
-    } catch (error: any) {
-      toast.error(error.message || 'Error al vincular transacción');
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : String(error));
     }
   };
 
