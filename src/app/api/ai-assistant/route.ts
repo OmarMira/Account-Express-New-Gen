@@ -467,7 +467,9 @@ export const POST = apiHandler(
           logger.info('AI warmup call completed successfully');
           return NextResponse.json({ reply: 'Warmup completed successfully' });
         } catch (err: unknown) {
-          logger.error('Failed to warm up LLM connection', { error: err instanceof Error ? err.message : String(err) });
+          logger.error('Failed to warm up LLM connection', {
+            error: err instanceof Error ? err.message : String(err),
+          });
           return NextResponse.json({ error: 'Warmup failed' }, { status: 502 });
         }
       }
@@ -612,7 +614,10 @@ async function callAI(
       return parsed.data;
     } catch (err: unknown) {
       clearTimeout(timeout);
-      logger.error('AI model exception', { model: currentModel, error: err instanceof Error ? err.message : String(err) });
+      logger.error('AI model exception', {
+        model: currentModel,
+        error: err instanceof Error ? err.message : String(err),
+      });
       lastError = err;
       continue;
     }
@@ -879,10 +884,10 @@ RULES:
 7. If the user is responding to your previous clarification question, analyze the conversational history to resolve the missing fields.
 
 EXAMPLE OF INCOMPLETE RULE RESPONSE:
-{"name":"Laura Quijano Rule","isComplete":false,"clarificationQuestion":"Veo que querés crear una regla para Laura Quijano, pero no especificaste la cuenta contable. ¿Deberíamos registrar las transacciones en 'Préstamos de Socios' o en 'Capital Social'?","conditions":[{"field":"description","operator":"contains","value":"Laura Quijano"}],"transactionDirection":"any","priority":10}
+{"name":"Cliente Ejemplo Rule","isComplete":false,"clarificationQuestion":"Veo que querés crear una regla para Cliente Ejemplo, pero no especificaste la cuenta contable. ¿Deberíamos registrar las transacciones en una cuenta de ingreso o de gasto?","conditions":[{"field":"description","operator":"contains","value":"Cliente Ejemplo"}],"transactionDirection":"any","priority":10}
 
 EXAMPLE OF COMPLETED BIFURCATED RULE RESPONSE:
-{"name":"Laura Quijano - Zelle","isComplete":true,"conditions":[{"field":"description","operator":"contains","value":"Laura Quijano"},{"field":"description","operator":"contains","value":"Zelle"}],"debitGlAccountName":"Préstamos de Socios","creditGlAccountName":"Capital Social","transactionDirection":"any","priority":10}`;
+{"name":"Cliente Ejemplo - Zelle","isComplete":true,"conditions":[{"field":"description","operator":"contains","value":"Cliente Ejemplo"},{"field":"description","operator":"contains","value":"Zelle"}],"debitGlAccountName":"Cuenta de Gasto","creditGlAccountName":"Cuenta de Ingreso","transactionDirection":"any","priority":10}`;
 
   const isEnglish =
     /hello|hi|rule|amount|debit|credit|account|company|settings|reconcile|verify|archive|onboard/i.test(
@@ -915,7 +920,9 @@ EXAMPLE OF COMPLETED BIFURCATED RULE RESPONSE:
   try {
     aiData = await callAI(apiMessages, undefined, true);
   } catch (aiError: unknown) {
-    logger.error('AI call failed in create-rule', { error: aiError instanceof Error ? aiError.message : String(aiError) });
+    logger.error('AI call failed in create-rule', {
+      error: aiError instanceof Error ? aiError.message : String(aiError),
+    });
     return NextResponse.json({
       reply:
         '⚠️ El modelo de IA no respondió a tiempo. Por favor, intenta de nuevo en unos segundos.',

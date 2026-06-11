@@ -1304,7 +1304,7 @@ export function ConversationalRuleBuilder({
                     Código <span className="text-red-500">*</span>
                   </label>
                   <Input
-                    placeholder="3040"
+                    placeholder="Código de cuenta"
                     value={glAccountCodeInput}
                     onChange={(e) => setGlAccountCodeInput(e.target.value)}
                     className="font-mono"
@@ -1315,7 +1315,7 @@ export function ConversationalRuleBuilder({
                     Nombre <span className="text-red-500">*</span>
                   </label>
                   <Input
-                    placeholder="Owner's Draw / Retiros de Socio"
+                    placeholder="Nombre de la cuenta contable"
                     value={glAccountNameInput}
                     onChange={(e) => setGlAccountNameInput(e.target.value)}
                   />

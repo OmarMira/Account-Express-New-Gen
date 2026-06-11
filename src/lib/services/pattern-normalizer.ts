@@ -16,10 +16,7 @@ export function normalizePattern(desc: string): string {
   cleaned = cleaned.replace(/^withdrawal\s+(to|from)\s+/g, '');
   cleaned = cleaned.replace(/^deposit\s+(to|from)\s+/g, '');
 
-  // Raiser/Lyft/Online patterns
-  cleaned = cleaned.replace(/^raiser\s+\d*\s*des:edi\s+paymnt\s+id:[\w\d-]+\s+indn:/g, '');
-  cleaned = cleaned.replace(/^lyft\.com\s+des:lyft\s+[\d-]+\s+id:[\w\d-]+\s+indn:/g, '');
-  cleaned = cleaned.replace(/^lyft\.com\s+des:lyft\s+id:[\w\d-]+\s+indn:/g, '');
+  // Generic metadata patterns (DES:/ID:/INDN: from bank feeds)
   cleaned = cleaned.replace(/des:[\w\s\.-]+id:[\w\d-]+(indn:)?/g, '');
   cleaned = cleaned.replace(/indn:/g, '');
 

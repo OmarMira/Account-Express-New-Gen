@@ -158,8 +158,8 @@ Deposits and other credits 3,000.00
 Withdrawals and other debits -4,543.67
 Ending balance on March 31, 2025 $23,140.73
 Date Description Amount
-03/03/25 Zelle payment from RODRIGO OCHOA Conf# a1b2c3 1,100.00
-03/10/25 Zelle payment to LQ&OM INVESTMENT LLC Conf# c2b1a3 -1,000.00
+03/03/25 Zelle payment from CLIENTE A Conf# a1b2c3 1,100.00
+03/10/25 Zelle payment to PROVEEDOR B Conf# c2b1a3 -1,000.00
 Total deposits and other credits $3,000.00
 Total withdrawals and other debits -$4,543.67
 Daily ledger balances
@@ -248,12 +248,12 @@ RESULT:
 
 EXAMPLE 3: Statement with Page Cut / Split Transactions
 TEXT:
-"01/29/25 Zelle payment to laura quijano Conf# x3j4 -1,000.00
+"01/29/25 Zelle payment to CLIENTE C Conf# x3j4 -1,000.00
 continued on the next page
 ---PAGE_BREAK---
 Withdrawals and other debits- continued
 Date Description Amount
-01/29/25 AMERICAN EXPRESS DES:ACH PMT -3,543.67"
+01/29/25 TARJETA CORPORATIVA DES:ACH PMT -3,543.67"
 RESULT:
 {
   "bankName": "Bank of America Business",

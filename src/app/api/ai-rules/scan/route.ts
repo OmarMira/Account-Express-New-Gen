@@ -3,11 +3,7 @@ import { db } from '@/lib/db';
 import { apiHandler, type RouteContext } from '@/lib/api-handler';
 import { requireCompanyContext } from '@/lib/context-storage';
 import { findContext } from '@/lib/services/entity-context-service';
-import {
-  loadConfig,
-  sanitizeDescription,
-  extractName,
-} from '@/lib/services/entity-detector';
+import { loadConfig, sanitizeDescription, extractName } from '@/lib/services/entity-detector';
 
 /**
  * POST /api/ai-rules/scan
@@ -48,9 +44,9 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
 
   // ── 3. Normalize & count descriptions ─────────────────────────
   // Remove transaction IDs / confirmation codes / amounts from description
-  // so that "Zelle payment to omar mira Conf# abc123" and
-  //          "Zelle payment to omar mira Conf# xyz999"
-  // both normalize to "Zelle payment to omar mira"
+  // so that "Zelle payment to Cliente X Conf# abc123" and
+  //          "Zelle payment to Cliente X Conf# xyz999"
+  // both normalize to "Zelle payment to Cliente X"
   function normalize(raw: string): string {
     return raw
       .replace(/conf#?\s*\S+/gi, '') // remove Conf# codes
@@ -116,18 +112,10 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
     const desc = sample.toLowerCase();
     let matchedAcc: { id: string; name: string; code: string; accountType: string } | null = null;
 
-    // Basic heuristic keywords
+    // Basic heuristic keywords (generic financial terms only)
     const keywords = {
       zelle: isDebit ? 'gasto' : 'ingreso',
-      uber: 'ingreso',
-      raiser: 'ingreso',
-      lyft: 'ingreso',
-      turo: 'ingreso',
-      amazon: 'gasto',
       paypal: 'banco',
-      toyota: 'gasto',
-      kmf: 'gasto',
-      amex: 'gasto',
       fee: 'gasto',
       charge: 'gasto',
       comision: 'gasto',

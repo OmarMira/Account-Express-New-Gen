@@ -762,7 +762,8 @@ const es = {
     priority: 'Prioridad',
     direction: 'Dirección',
     configTitle: 'Configuración del Asistente de IA',
-    configDescription: 'Seguí estos sencillos pasos para activar la inteligencia artificial en tu sistema.',
+    configDescription:
+      'Seguí estos sencillos pasos para activar la inteligencia artificial en tu sistema.',
     assistantActivated: '¡Asistente Activado!',
     savedSuccessDesc:
       'La configuración se guardó correctamente. La inteligencia artificial ya está integrada en el sistema.',
@@ -777,8 +778,7 @@ const es = {
     hide: 'Ocultar',
     show: 'Mostrar',
     step3Title: 'Seleccioná el modelo de IA',
-    step3Desc:
-      'Elegí el modelo que mejor se adapte a tus necesidades. Te sugerimos Qwen 2.5 72B.',
+    step3Desc: 'Elegí el modelo que mejor se adapte a tus necesidades. Te sugerimos Qwen 2.5 72B.',
     step4Title: 'Probá y Activá',
     step4Desc:
       'Primero verifica si la clave funciona correctamente, luego guardala para activar el asistente.',
@@ -911,8 +911,7 @@ const es = {
     tabManual: 'Selección Manual',
     tabConversational: 'Asistente IA',
     promptLabel: 'Describe la relación en lenguaje natural',
-    promptPlaceholder:
-      'ej: Ignacio Plaza es nuestro inquilino que paga la renta del local comercial...',
+    promptPlaceholder: 'ej: Juan Pérez es el inquilino que paga la renta del local...',
     analyzeBtn: 'Analizar con IA',
     analyzing: 'Analizando...',
     roleLabel: '¿Cuál es su relación con el negocio?',

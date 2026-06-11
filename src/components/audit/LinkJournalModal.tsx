@@ -93,7 +93,7 @@ export function LinkJournalModal({
       setSelectedEntryId(null);
       // Búsqueda inicial automática basada en parte de la descripción del banco
       const initialSearch = bankTransaction.description
-        .replace(/Zelle payment to|Zelle payment from|AMERICAN EXPRESS|Conf#.*|ID:.*|DES:.*/gi, '')
+        .replace(/Zelle payment (to|from)|Conf#.*|ID:.*|DES:.*/gi, '')
         .trim();
       setSearchQuery(initialSearch);
       fetchEntries(initialSearch);

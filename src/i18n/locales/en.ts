@@ -752,26 +752,23 @@ const en = {
     priority: 'Priority',
     direction: 'Direction',
     configTitle: 'AI Assistant Configuration',
-    configDescription: 'Follow these simple steps to activate artificial intelligence in your system.',
+    configDescription:
+      'Follow these simple steps to activate artificial intelligence in your system.',
     assistantActivated: 'Assistant Activated!',
     savedSuccessDesc:
       'The configuration was saved successfully. Artificial intelligence is now integrated into the system.',
     editSettings: 'Edit Configuration',
     step1Title: 'Obtain your access key',
-    step1Desc:
-      'Register or log in to OpenRouter to generate a secure free or paid API key.',
+    step1Desc: 'Register or log in to OpenRouter to generate a secure free or paid API key.',
     createKeyOpenRouter: 'Create Key on OpenRouter ↗',
     step2Title: 'Enter the obtained key',
-    step2Desc:
-      'Copy the key generated in OpenRouter (starts with "sk-or-...") and paste it below.',
+    step2Desc: 'Copy the key generated in OpenRouter (starts with "sk-or-...") and paste it below.',
     hide: 'Hide',
     show: 'Show',
     step3Title: 'Select AI Model',
-    step3Desc:
-      'Choose the model that best fits your needs. We recommend Qwen 2.5 72B.',
+    step3Desc: 'Choose the model that best fits your needs. We recommend Qwen 2.5 72B.',
     step4Title: 'Test and Activate',
-    step4Desc:
-      'First verify if the key works correctly, then save it to activate the assistant.',
+    step4Desc: 'First verify if the key works correctly, then save it to activate the assistant.',
     verifyConnection: 'Verify Connection',
     saveAndActivate: 'Save and Activate',
     verificationFailed: 'Verification failed: ',
@@ -900,7 +897,7 @@ const en = {
     tabManual: 'Manual Selection',
     tabConversational: 'AI Assistant',
     promptLabel: 'Describe the relationship in natural language',
-    promptPlaceholder: 'e.g. Ignacio Plaza is our tenant paying rent for the commercial local...',
+    promptPlaceholder: 'e.g. John Doe is the tenant paying rent for the commercial local...',
     analyzeBtn: 'Analyze with AI',
     analyzing: 'Analyzing...',
     roleLabel: 'What is their relationship with the business?',
