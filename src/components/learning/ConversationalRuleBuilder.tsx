@@ -150,6 +150,7 @@ export function ConversationalRuleBuilder({
   // Live simulation & condition editor states
   const [editableConditions, setEditableConditions] = useState<RuleCondition[]>([]);
   const [localSuggestSubAccount, setLocalSuggestSubAccount] = useState(false);
+  const [showConditions, setShowConditions] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);
   const [simulationResult, setSimulationResult] = useState<{
     matchCount: number;
@@ -597,31 +598,31 @@ export function ConversationalRuleBuilder({
         : t('ruleBuilder.directionMixed');
 
   return (
-    <div className="space-y-4 w-full max-w-2xl mx-auto">
-      <Alert className="border-yellow-200/50 bg-yellow-500/5 dark:bg-yellow-500/10 dark:border-yellow-500/20 text-yellow-600 dark:text-yellow-400">
-        <AlertDescription className="text-xs font-medium">
+    <div className="space-y-1 w-full max-w-2xl mx-auto">
+      <Alert className="border-yellow-200/50 bg-yellow-500/5 dark:bg-yellow-500/10 dark:border-yellow-500/20 text-yellow-600 dark:text-yellow-400 py-2">
+        <AlertDescription className="text-[10px] font-medium leading-tight">
           {t('ruleBuilder.cpaDisclaimer') ||
             'Las sugerencias contables son borradores operacionales. La validación semántica final, ajustes de cierre y formularios fiscales son responsabilidad exclusiva de un CPA licenciado.'}
         </AlertDescription>
       </Alert>
 
       <Card className="w-full shadow-sm">
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
+        <CardHeader className="py-2">
+          <CardTitle className="flex items-center justify-between text-sm">
             {t('ruleBuilder.title')}
-            <Badge variant="outline" className="font-normal">
+            <Badge variant="outline" className="font-normal text-[10px]">
               {currentIndex + 1} / {candidates.length}
             </Badge>
           </CardTitle>
-          <CardDescription>{t('ruleBuilder.description')}</CardDescription>
+          <CardDescription className="text-[11px]">{t('ruleBuilder.description')}</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-1">
           {/* Info de la Entidad */}
-          <div className="rounded-lg bg-muted/50 p-4 space-y-3 border">
-            <h3 className="font-semibold text-lg tracking-tight">{current.canonicalName}</h3>
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="secondary">
-                {current.occurrences} {t('ruleBuilder.occurrences')}
+          <div className="rounded-lg bg-muted/50 p-2 space-y-0.5 border">
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold text-sm tracking-tight truncate">{current.canonicalName}</h3>
+              <Badge variant="secondary" className="text-[10px] h-4 px-1.5 shrink-0">
+                {current.occurrences}x
               </Badge>
               <Badge
                 variant={
@@ -631,29 +632,29 @@ export function ConversationalRuleBuilder({
                       ? 'destructive'
                       : 'outline'
                 }
+                className="text-[10px] h-4 px-1.5 shrink-0"
               >
                 {directionLabel}
               </Badge>
             </div>
-            <p className="text-xs text-muted-foreground italic">
+            <p className="text-[10px] text-muted-foreground italic truncate">
               "{current.sampleDescriptions[0]}"
             </p>
           </div>
 
           {/* Flujo Conversacional */}
           {!suggestion ? (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium leading-none">
-                  {current.hasContext
-                    ? t('ruleBuilder.questionContext')
-                        .replace('{entity}', current.canonicalName)
-                        .replace('{role}', current.contextRole || '')
-                    : t('ruleBuilder.question').replace('{entity}', current.canonicalName)}
-                </label>
+            <div className="space-y-1">
+              <label className="text-xs font-medium leading-tight">
+                {current.hasContext
+                  ? t('ruleBuilder.questionContext')
+                      .replace('{entity}', current.canonicalName)
+                      .replace('{role}', current.contextRole || '')
+                  : t('ruleBuilder.question').replace('{entity}', current.canonicalName)}
+              </label>
 
-                {/* Smart Chips / Respuestas Rápidas */}
-                <div className="flex flex-wrap gap-1.5 pt-1">
+              {/* Smart Chips / Respuestas Rápidas */}
+              <div className="flex flex-wrap gap-1">
                   {(topAccounts.length > 0
                     ? topAccounts.map((account) => {
                         const emojiMap: Record<string, string> = {
@@ -716,45 +717,44 @@ export function ConversationalRuleBuilder({
                       size="sm"
                       onClick={() => submitWithAnswer(chip.value)}
                       disabled={processingAnswer}
-                      className="text-xs h-7 px-2.5 rounded-full hover:bg-primary/10 hover:text-primary transition-all duration-200"
+                      className="text-[10px] h-6 px-2 rounded-full hover:bg-primary/10 hover:text-primary transition-all duration-200"
                     >
                       {chip.label}
                     </Button>
                   ))}
                 </div>
-              </div>
 
-              <div className="flex gap-2">
+              <div className="flex gap-1">
                 <Input
                   value={answer}
                   onChange={(e) => setAnswer(e.target.value)}
                   placeholder={t('ruleBuilder.answerPlaceholder')}
                   onKeyDown={(e) => e.key === 'Enter' && !processingAnswer && handleInterpret()}
                   disabled={processingAnswer}
-                  className="flex-1"
+                  className="flex-1 h-7 text-xs"
                 />
                 <Button
                   onClick={handleInterpret}
                   disabled={processingAnswer || !answer.trim()}
-                  size="icon"
+                  size="sm"
+                  className="h-7 w-7 p-0"
                 >
-                  {processingAnswer ? <Loader2 className="animate-spin" /> : <Send />}
+                  {processingAnswer ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground">{t('ruleBuilder.answerHint')}</p>
             </div>
           ) : (
-            <div className="space-y-4 border-t pt-4 animate-in fade-in slide-in-from-bottom-2">
-              <div className="flex items-start gap-2 text-green-600">
-                <CheckCircle2 className="mt-0.5 shrink-0" />
+            <div className="space-y-1 animate-in fade-in slide-in-from-bottom-2">
+              <div className="flex items-start gap-1 text-green-600 text-xs">
+                <CheckCircle2 className="mt-0.5 shrink-0 h-3 w-3" />
                 <div>
-                  <p className="font-medium">{t('ruleBuilder.aiUnderstood')}</p>
-                  <p className="text-sm text-muted-foreground">{suggestion.role}</p>
+                  <p className="font-medium text-xs">{t('ruleBuilder.aiUnderstood')}</p>
+                  <p className="text-[11px] text-muted-foreground">{suggestion.role}</p>
                 </div>
               </div>
 
-              <div className="rounded-md bg-primary/5 border border-primary/20 p-4 space-y-3">
-                <p className="text-sm font-medium text-foreground">
+              <div className="rounded-md bg-primary/5 border border-primary/20 p-2 space-y-1">
+                <p className="text-xs font-medium text-foreground">
                   {t('ruleBuilder.suggestedAccount')}
                 </p>
 
@@ -796,24 +796,23 @@ export function ConversationalRuleBuilder({
                 })()}
 
                 {/* Agrupar / Individual toggle */}
-                <div className="space-y-1">
-                  <label className="text-xs font-medium">Agrupación</label>
-                  <div className="grid grid-cols-2 gap-2 bg-slate-900/50 dark:bg-slate-900/80 p-1 rounded-lg border">
+                <div className="grid grid-cols-2 gap-1">
+                  <div className="flex items-center gap-1 bg-slate-900/50 dark:bg-slate-900/80 p-0.5 rounded-lg border">
                     <button
                       type="button"
                       onClick={() => handleToggleGrouping(true)}
-                      className={`py-1.5 text-xs font-semibold rounded-md transition-all ${
+                      className={`flex-1 py-1 text-[10px] font-semibold rounded-md transition-all ${
                         localSuggestSubAccount
                           ? 'bg-blue-600 text-white shadow-sm'
                           : 'text-slate-400 hover:text-slate-200'
                       }`}
                     >
-                      Agrupar bajo {suggestion.account.code}
+                      Agrupar
                     </button>
                     <button
                       type="button"
                       onClick={() => handleToggleGrouping(false)}
-                      className={`py-1.5 text-xs font-semibold rounded-md transition-all ${
+                      className={`flex-1 py-1 text-[10px] font-semibold rounded-md transition-all ${
                         !localSuggestSubAccount
                           ? 'bg-blue-600 text-white shadow-sm'
                           : 'text-slate-400 hover:text-slate-200'
@@ -822,58 +821,53 @@ export function ConversationalRuleBuilder({
                       Individual
                     </button>
                   </div>
-                </div>
-
-                {/* Toggle Crear / Vincular */}
-                <div className="space-y-1">
-                  <label className="text-xs font-medium">Cuenta Contable (Plan de Cuentas)</label>
-                  <div className="grid grid-cols-2 gap-2 bg-slate-900/50 dark:bg-slate-900/80 p-1 rounded-lg border">
+                  <div className="flex items-center gap-1 bg-slate-900/50 dark:bg-slate-900/80 p-0.5 rounded-lg border">
                     <button
                       type="button"
                       onClick={() => setGlAccountMode('create')}
-                      className={`py-1.5 text-xs font-semibold rounded-md transition-all ${
+                      className={`flex-1 py-1 text-[10px] font-semibold rounded-md transition-all ${
                         glAccountMode === 'create'
                           ? 'bg-blue-600 text-white shadow-sm'
                           : 'text-slate-400 hover:text-slate-200'
                       }`}
                     >
-                      Crear Nueva (Automático)
+                      Crear
                     </button>
                     <button
                       type="button"
                       onClick={() => setGlAccountMode('link')}
-                      className={`py-1.5 text-xs font-semibold rounded-md transition-all ${
+                      className={`flex-1 py-1 text-[10px] font-semibold rounded-md transition-all ${
                         glAccountMode === 'link'
                           ? 'bg-blue-600 text-white shadow-sm'
                           : 'text-slate-400 hover:text-slate-200'
                       }`}
                     >
-                      Vincular Existente
+                      Vincular
                     </button>
                   </div>
                 </div>
 
                 {glAccountMode === 'create' ? (
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-medium">Código</label>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <div>
+                      <label className="text-[10px] font-medium text-muted-foreground">Código</label>
                       <Input
                         value={glAccountCodeInput}
                         onChange={(e) => setGlAccountCodeInput(e.target.value)}
-                        className="h-7 text-xs font-mono"
+                        className="h-6 text-[11px] font-mono"
                       />
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-medium">Nombre</label>
+                    <div>
+                      <label className="text-[10px] font-medium text-muted-foreground">Nombre</label>
                       <Input
                         value={glAccountNameInput}
                         onChange={(e) => setGlAccountNameInput(e.target.value)}
-                        className="h-7 text-xs"
+                        className="h-6 text-[11px]"
                       />
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-1">
+                  <div>
                     <AccountSelector
                       accounts={allGlAccounts.filter(
                         (a) => !suggestion.account.accountType || a.accountType === suggestion.account.accountType,
@@ -893,251 +887,178 @@ export function ConversationalRuleBuilder({
                 )}
 
                 {localSuggestSubAccount && (
-                  <p className="text-xs text-muted-foreground border-t pt-2">
+                  <p className="text-[10px] text-muted-foreground leading-tight">
                     {t('ruleBuilder.subAccountHint').replace(
                       '{name}',
                       suggestion.subAccountName || current.canonicalName,
                     )}
                   </p>
                 )}
-                {/* Condition Editor */}
-                <div className="text-xs text-muted-foreground mt-2 border-t pt-2 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <p className="font-semibold text-foreground text-sm">
+                {/* Condition Editor — collapsible */}
+                <div className="pt-1 border-t border-muted/30">
+                  <button
+                    type="button"
+                    onClick={() => setShowConditions((v) => !v)}
+                    className="flex items-center gap-1 w-full py-1"
+                  >
+                    <ChevronRight
+                      className={`h-3 w-3 text-muted-foreground transition-transform ${showConditions ? 'rotate-90' : ''}`}
+                    />
+                    <span className="text-[10px] font-semibold text-foreground">
                       {t('ruleBuilder.conditionsTitle')}
-                    </p>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setEditableConditions((prev) => [
-                          ...prev,
-                          { field: 'description', operator: 'contains', value: '' },
-                        ]);
-                      }}
-                      className="h-7 px-2 text-[10px]"
-                    >
-                      <Plus className="h-3 w-3 mr-1" /> {t('ruleBuilder.addCondition')}
-                    </Button>
-                  </div>
-
-                  {editableConditions.length === 0 ? (
-                    <p className="text-xs italic text-muted-foreground">
-                      {t('ruleBuilder.noConditions')}
-                    </p>
-                  ) : (
-                    <div className="space-y-2">
-                      {editableConditions.map((cond, idx) => (
-                        <div key={idx} className="flex gap-1.5 items-center">
-                          {/* Field Select */}
-                          <select
-                            value={cond.field}
-                            onChange={(e) => {
-                              const newField = e.target.value as
-                                | 'description'
-                                | 'amount'
-                                | 'reference';
-                              setEditableConditions((prev) => {
-                                const copy = [...prev];
-                                copy[idx] = {
-                                  ...copy[idx],
-                                  field: newField,
-                                  operator: newField === 'amount' ? 'greater_than' : 'contains',
-                                };
-                                return copy;
-                              });
-                            }}
-                            className="h-8 rounded-md border border-input bg-transparent px-2 text-[11px] shadow-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                          >
-                            <option value="description" className="bg-background text-foreground">
-                              {t('ruleBuilder.fieldDescription')}
-                            </option>
-                            <option value="amount" className="bg-background text-foreground">
-                              {t('ruleBuilder.fieldAmount')}
-                            </option>
-                            <option value="reference" className="bg-background text-foreground">
-                              {t('ruleBuilder.fieldReference')}
-                            </option>
-                          </select>
-
-                          {/* Operator Select */}
-                          <select
-                            value={cond.operator}
-                            onChange={(e) => {
-                              const op = e.target.value as RuleCondition['operator'];
-                              setEditableConditions((prev) => {
-                                const copy = [...prev];
-                                copy[idx] = { ...copy[idx], operator: op };
-                                return copy;
-                              });
-                            }}
-                            className="h-8 rounded-md border border-input bg-transparent px-2 text-[11px] shadow-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                          >
-                            {cond.field === 'amount' ? (
-                              <>
-                                <option value="equals" className="bg-background text-foreground">
-                                  {t('ruleBuilder.opEquals')}
-                                </option>
-                                <option
-                                  value="greater_than"
-                                  className="bg-background text-foreground"
-                                >
-                                  {t('ruleBuilder.opGreaterThan')}
-                                </option>
-                                <option value="less_than" className="bg-background text-foreground">
-                                  {t('ruleBuilder.opLessThan')}
-                                </option>
-                              </>
-                            ) : (
-                              <>
-                                <option value="contains" className="bg-background text-foreground">
-                                  {t('ruleBuilder.opContains')}
-                                </option>
-                                <option value="equals" className="bg-background text-foreground">
-                                  {t('ruleBuilder.opEquals')}
-                                </option>
-                                <option
-                                  value="starts_with"
-                                  className="bg-background text-foreground"
-                                >
-                                  {t('ruleBuilder.opStartsWith')}
-                                </option>
-                                <option value="ends_with" className="bg-background text-foreground">
-                                  {t('ruleBuilder.opEndsWith')}
-                                </option>
-                              </>
+                      {editableConditions.length > 0 && ` (${editableConditions.length})`}
+                    </span>
+                    {editableConditions.length > 0 && simulationResult && !isSimulating && (
+                      <Badge variant="secondary" className="text-[9px] h-4 px-1 ml-auto">
+                        {simulationResult.matchCount === 1
+                          ? t('ruleBuilder.matchesSingle')
+                          : t('ruleBuilder.matchesPlural').replace(
+                              '{count}',
+                              String(simulationResult.matchCount),
                             )}
-                          </select>
-
-                          {/* Value Input */}
-                          <Input
-                            value={cond.value}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setEditableConditions((prev) => {
-                                const copy = [...prev];
-                                copy[idx] = { ...copy[idx], value: val };
-                                return copy;
-                              });
-                            }}
-                            placeholder={t('ruleBuilder.valuePlaceholder')}
-                            className="h-8 text-[11px] flex-1 min-w-[80px]"
-                          />
-
-                          {/* Remove Button */}
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              setEditableConditions((prev) => prev.filter((_, i) => i !== idx));
-                            }}
-                            className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive shrink-0"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Live Simulation Preview Badge and Details */}
-                  {editableConditions.length > 0 && (
-                    <div className="flex flex-col gap-2 pt-2 border-t mt-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[11px] font-medium text-foreground">
-                          {t('ruleBuilder.simulation')}
-                        </span>
-                        {isSimulating ? (
-                          <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                            <Loader2 className="h-3 w-3 animate-spin text-primary" />
-                            <span>{t('ruleBuilder.evaluating')}</span>
-                          </div>
-                        ) : simulationResult ? (
-                          <Dialog open={showSamplesModal} onOpenChange={setShowSamplesModal}>
-                            <DialogTrigger asChild>
-                              <Badge
-                                variant={simulationResult.matchCount > 0 ? 'secondary' : 'outline'}
-                                className="cursor-pointer text-[10px] h-5 hover:bg-primary/10 hover:text-primary transition-all flex items-center gap-1 select-none"
-                              >
-                                <Eye className="h-3.5 w-3.5" />
-                                {simulationResult.matchCount === 1
-                                  ? t('ruleBuilder.matchesSingle')
-                                  : t('ruleBuilder.matchesPlural').replace(
-                                      '{count}',
-                                      String(simulationResult.matchCount),
-                                    )}
-                              </Badge>
-                            </DialogTrigger>
-                            <DialogContent className="sm:max-w-[500px]">
-                              <DialogHeader>
-                                <DialogTitle>{t('ruleBuilder.simulationPreview')}</DialogTitle>
-                              </DialogHeader>
-                              <div className="space-y-4 pt-2">
-                                <p className="text-xs text-muted-foreground">
-                                  {t('ruleBuilder.simulationDescription')}
-                                </p>
-                                {simulationResult.samples.length === 0 ? (
-                                  <div className="text-center p-6 bg-muted/30 rounded-md text-xs italic text-muted-foreground">
-                                    {t('ruleBuilder.noMatchingTransactions')}
-                                  </div>
-                                ) : (
-                                  <div className="divide-y border rounded-md overflow-hidden bg-background">
-                                    {simulationResult.samples.map((sample, sIdx) => (
-                                      <div
-                                        key={sIdx}
-                                        className="p-3 text-xs flex justify-between gap-4 hover:bg-muted/30 transition-colors"
-                                      >
-                                        <div className="space-y-1">
-                                          <p className="font-semibold text-foreground line-clamp-1">
-                                            {sample.description}
-                                          </p>
-                                          <div className="flex items-center gap-2 text-muted-foreground text-[10px]">
-                                            <span>
-                                              {new Date(sample.date).toLocaleDateString()}
-                                            </span>
-                                            {sample.reference && (
-                                              <>
-                                                <span>•</span>
-                                                <span>
-                                                  {t('ruleBuilder.refLabel')} {sample.reference}
-                                                </span>
-                                              </>
-                                            )}
-                                          </div>
-                                        </div>
-                                        <span
-                                          className={`font-mono font-semibold ${sample.amount < 0 ? 'text-red-500' : 'text-green-500'}`}
-                                        >
-                                          {sample.amount < 0 ? '-' : ''}$
-                                          {Math.abs(sample.amount).toFixed(2)}
-                                        </span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            </DialogContent>
-                          </Dialog>
-                        ) : null}
+                      </Badge>
+                    )}
+                    {isSimulating && (
+                      <div className="ml-auto flex items-center gap-1 text-[9px] text-muted-foreground">
+                        <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                        <span>{t('ruleBuilder.evaluating')}</span>
                       </div>
+                    )}
+                  </button>
+
+                  {showConditions && (
+                    <div className="space-y-1 pt-1">
+                      <div className="flex justify-end">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setEditableConditions((prev) => [
+                              ...prev,
+                              { field: 'description', operator: 'contains', value: '' },
+                            ]);
+                          }}
+                          className="h-5 px-1.5 text-[9px]"
+                        >
+                          <Plus className="h-2.5 w-2.5 mr-0.5" /> {t('ruleBuilder.addCondition')}
+                        </Button>
+                      </div>
+
+                      {editableConditions.length === 0 ? (
+                        <p className="text-[10px] italic text-muted-foreground text-center py-1">
+                          {t('ruleBuilder.noConditions')}
+                        </p>
+                      ) : (
+                        <div className="space-y-1">
+                          {editableConditions.map((cond, idx) => (
+                            <div key={idx} className="flex gap-1 items-center">
+                              <select
+                                value={cond.field}
+                                onChange={(e) => {
+                                  const newField = e.target.value as
+                                    | 'description'
+                                    | 'amount'
+                                    | 'reference';
+                                  setEditableConditions((prev) => {
+                                    const copy = [...prev];
+                                    copy[idx] = {
+                                      ...copy[idx],
+                                      field: newField,
+                                      operator: newField === 'amount' ? 'greater_than' : 'contains',
+                                    };
+                                    return copy;
+                                  });
+                                }}
+                                className="h-6 rounded-md border border-input bg-transparent px-1 text-[10px] shadow-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                              >
+                                <option value="description">{t('ruleBuilder.fieldDescription')}</option>
+                                <option value="amount">{t('ruleBuilder.fieldAmount')}</option>
+                                <option value="reference">{t('ruleBuilder.fieldReference')}</option>
+                              </select>
+
+                              <select
+                                value={cond.operator}
+                                onChange={(e) => {
+                                  const op = e.target.value as RuleCondition['operator'];
+                                  setEditableConditions((prev) => {
+                                    const copy = [...prev];
+                                    copy[idx] = { ...copy[idx], operator: op };
+                                    return copy;
+                                  });
+                                }}
+                                className="h-6 rounded-md border border-input bg-transparent px-1 text-[10px] shadow-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                              >
+                                {cond.field === 'amount' ? (
+                                  <>
+                                    <option value="equals">{t('ruleBuilder.opEquals')}</option>
+                                    <option value="greater_than">{t('ruleBuilder.opGreaterThan')}</option>
+                                    <option value="less_than">{t('ruleBuilder.opLessThan')}</option>
+                                  </>
+                                ) : (
+                                  <>
+                                    <option value="contains">{t('ruleBuilder.opContains')}</option>
+                                    <option value="equals">{t('ruleBuilder.opEquals')}</option>
+                                    <option value="starts_with">{t('ruleBuilder.opStartsWith')}</option>
+                                    <option value="ends_with">{t('ruleBuilder.opEndsWith')}</option>
+                                  </>
+                                )}
+                              </select>
+
+                              <Input
+                                value={cond.value}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setEditableConditions((prev) => {
+                                    const copy = [...prev];
+                                    copy[idx] = { ...copy[idx], value: val };
+                                    return copy;
+                                  });
+                                }}
+                                placeholder={t('ruleBuilder.valuePlaceholder')}
+                                className="h-6 text-[10px] flex-1 min-w-[60px]"
+                              />
+
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  setEditableConditions((prev) => prev.filter((_, i) => i !== idx));
+                                }}
+                                className="h-6 w-6 text-destructive hover:bg-destructive/10 hover:text-destructive shrink-0"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Simulation badge inline (no modal preview inside collapsed section — it's already accessible via the badge in the header) */}
+                      {editableConditions.length > 0 && simulationResult && (
+                        <p className="text-[9px] text-muted-foreground text-center pt-0.5">
+                          {simulationResult.matchCount === 1
+                            ? '1 transacción coincide'
+                            : `${simulationResult.matchCount} transacciones coinciden`}
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex gap-1">
                 <Button
                   onDoubleClick={handleConfirm}
                   onClick={() => setClickCount((c) => c + 1)}
                   disabled={creatingRule}
-                  className="flex-1 select-none transition-all duration-200"
+                  className="flex-1 h-7 text-xs select-none transition-all duration-200"
                 >
                   {creatingRule ? (
-                    <Loader2 className="animate-spin mr-2" />
+                    <Loader2 className="h-3 w-3 animate-spin mr-1" />
                   ) : (
-                    <CheckCircle2 className="mr-2" />
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
                   )}
                   {clickCount === 1
                     ? t('ruleBuilder.doubleClickConfirm')
@@ -1147,6 +1068,7 @@ export function ConversationalRuleBuilder({
                   variant="outline"
                   onClick={() => setSuggestion(null)}
                   disabled={creatingRule}
+                  className="h-7 text-xs"
                 >
                   {t('ruleBuilder.editBtn')}
                 </Button>
@@ -1156,14 +1078,15 @@ export function ConversationalRuleBuilder({
 
           {/* Navegación */}
           {currentIndex < candidates.length - 1 && (
-            <div className="flex justify-end pt-2">
+            <div className="flex justify-end">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={handleSkip}
                 disabled={processingAnswer || creatingRule}
+                className="h-6 text-[10px]"
               >
-                {t('ruleBuilder.skipBtn')} <ArrowRight className="ml-2 h-4 w-4" />
+                {t('ruleBuilder.skipBtn')} <ArrowRight className="ml-1 h-3 w-3" />
               </Button>
             </div>
           )}
