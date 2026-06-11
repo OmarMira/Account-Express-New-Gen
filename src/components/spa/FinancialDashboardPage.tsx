@@ -410,83 +410,16 @@ export function FinancialDashboardPage() {
   };
 
   // --- CLASSIFICATION ENGINE ---
-  const classifyTransaction = useCallback(
-    (tx: Omit<Transaction, 'categoria'>, recurrent?: Map<string, string>): string => {
-      if (tx.glAccountName) {
-        return tx.glAccountName;
-      }
-      if (tx.matchedRuleGlAccountName) {
-        return tx.matchedRuleGlAccountName;
-      }
-      if (tx.cuenta_contable) {
-        const parts = tx.cuenta_contable.trim().split(' ');
-        if (parts.length > 1 && /^\d+$/.test(parts[0])) {
-          return parts.slice(1).join(' ');
-        }
-        return tx.cuenta_contable;
-      }
-
-      // Clasificación heurística inteligente basada en descripción de base de datos
-      const desc = (tx.descripcion || '').toLowerCase();
-      if (desc.includes('uber') || desc.includes('raiser')) {
-        return 'Uber / Raiser';
-      }
-      if (desc.includes('lyft')) {
-        return 'Lyft';
-      }
-      if (desc.includes('turo')) {
-        return 'Turo';
-      }
-      if (
-        desc.includes('american express') ||
-        desc.includes('amex') ||
-        desc.includes('americanexp')
-      ) {
-        return 'American Express';
-      }
-      if (desc.includes('toyota')) {
-        return 'Toyota / autos';
-      }
-      if (desc.includes('kmf')) {
-        return 'KMF';
-      }
-      if (desc.includes('rodrigo ochoa') || desc.includes('rentas') || desc.includes('ochoa')) {
-        return 'Rodrigo Ochoa (rentas)';
-      }
-      if (
-        desc.includes('comision') ||
-        desc.includes('comisión') ||
-        desc.includes('fee') ||
-        desc.includes('charge')
-      ) {
-        return 'Comisiones Bancarias';
-      }
-      if (
-        desc.includes('lqom') ||
-        desc.includes('lq&om') ||
-        desc.includes('lq & om') ||
-        desc.includes('lq') ||
-        desc.includes('om')
-      ) {
-        return 'Cuotas LQ&OM Inv.';
-      }
-
-      // Heurística dinámica por repetición (4 o más transacciones con descripción similar)
-      const activeRecurrentMap = recurrent || recurrentMapRef.current;
-      for (const [clean, prettyName] of activeRecurrentMap.entries()) {
-        const cleanWords = clean
-          .toLowerCase()
-          .split(' ')
-          .filter((w) => w.length > 2);
-        if (cleanWords.length > 0 && cleanWords.every((w) => desc.includes(w))) {
-          return prettyName;
-        }
-      }
-
-      return tx.tipo === 'credito' ? 'Otros ingresos' : 'Otros egresos';
-    },
-    [],
-  );
+  const classifyTransaction = useCallback((tx: Omit<Transaction, 'categoria'>): string => {
+    if (tx.glAccountName) return tx.glAccountName;
+    if (tx.matchedRuleGlAccountName) return tx.matchedRuleGlAccountName;
+    if (tx.cuenta_contable) {
+      const parts = tx.cuenta_contable.trim().split(' ');
+      if (parts.length > 1 && /^\d+$/.test(parts[0])) return parts.slice(1).join(' ');
+      return tx.cuenta_contable;
+    }
+    return '';
+  }, []);
 
   // --- DATA LOADING HUB ---
   const loadData = useCallback(async () => {
@@ -540,7 +473,7 @@ export function FinancialDashboardPage() {
           // 2. Clasificar las transacciones con las descripciones recurrentes identificadas
           const parsed = data.transactions.map((tx: any) => ({
             ...tx,
-            categoria: classifyTransaction(tx, localRecurrent),
+            categoria: classifyTransaction(tx),
           }));
           setDbTransactions(parsed);
           setIsDemoMode(false);
@@ -575,7 +508,7 @@ export function FinancialDashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [activeCompany?.id, classifyTransaction]);
+  }, [activeCompany]);
 
   useEffect(() => {
     loadData();
@@ -706,6 +639,7 @@ export function FinancialDashboardPage() {
         dailyBalances.push(runningBal);
       }
 
+      // eslint-disable-next-line react-hooks/immutability
       currentBal = runningBal;
       const avg = dailyBalances.reduce((s, x) => s + x, 0) / daysInMonth;
 
