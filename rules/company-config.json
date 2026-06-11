@@ -2381,6 +2381,12 @@
       "periodType": "WEEK_52_53",
       "taxModuleEnabled": false,
       "updatedAt": "2026-06-11T00:16:20.020Z"
+    },
+    "cmq8x66yn0002c7wkvmythlbm": {
+      "currency": "USD",
+      "periodType": "CUSTOM_MONTHS",
+      "taxModuleEnabled": false,
+      "updatedAt": "2026-06-11T03:10:14.911Z"
     }
   }
 }

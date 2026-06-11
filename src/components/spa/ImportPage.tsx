@@ -468,7 +468,7 @@ export function ImportPage() {
 
             // Check if bank account creation is required!
             if (err.code === 'BANK_CREATION_REQUIRED') {
-              const meta = err.details;
+              const meta = err.details || {};
               setFormAccountName(meta.bankName || 'Business Checking');
               setFormBankName(meta.bankName || '');
               setFormAccountNo(meta.accountNo || '');

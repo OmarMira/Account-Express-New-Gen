@@ -173,12 +173,17 @@ export function apiHandler(handler: ApiHandler, options: ApiHandlerOptions = {})
           {
             error: error.message,
             code: error.code,
-            ...(process.env.NODE_ENV === 'development' ? { details: error.details } : {}),
+            details: error.details,
           },
           { status: error.statusCode },
         );
       } else if (typeof error === 'object' && error !== null && 'statusCode' in error) {
-        const appErr = error as { message?: string; code?: string; details?: unknown; statusCode: number };
+        const appErr = error as {
+          message?: string;
+          code?: string;
+          details?: unknown;
+          statusCode: number;
+        };
         errResponse = NextResponse.json(
           {
             error: appErr.message || 'Error',
@@ -187,7 +192,12 @@ export function apiHandler(handler: ApiHandler, options: ApiHandlerOptions = {})
           },
           { status: appErr.statusCode },
         );
-      } else if (typeof error === 'object' && error !== null && 'code' in error && 'clientVersion' in error) {
+      } else if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        'clientVersion' in error
+      ) {
         logger.error('[PRISMA DB ERROR]', { error: String(error) });
         errResponse = NextResponse.json(
           { error: 'Database constraint violation or error occurred.', code: 'DATABASE_ERROR' },
