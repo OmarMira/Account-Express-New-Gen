@@ -1,3 +1,8 @@
+// Safeguard: Force DATABASE_URL to use a test database so we never wipe dev.db
+if (!process.env.DATABASE_URL || process.env.DATABASE_URL.includes('dev.db')) {
+  process.env.DATABASE_URL = 'file:./test.db';
+}
+
 import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
 import path from 'path';
 import { pathToFileURL } from 'url';
