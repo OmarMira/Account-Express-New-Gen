@@ -142,18 +142,15 @@ export const PUT = apiHandler(
       }
     }
 
-    // Update in a transaction
+    // Update in a transaction — atomic: deleteMany + create inside a single update
     const updated = await db.$transaction(async (tx) => {
-      // Delete existing lines
-      await tx.journalLine.deleteMany({ where: { entryId: id } });
-
-      // Update the entry
       const entry = await tx.journalEntry.update({
         where: { id },
         data: {
           ...updateData,
           ...(lines !== undefined && {
             lines: {
+              deleteMany: {},
               create: lines.map(
                 (l: {
                   glAccountId: string;

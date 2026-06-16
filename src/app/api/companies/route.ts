@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { apiHandler, type RouteContext } from '@/lib/api-handler';
 import { requireCurrentUserId } from '@/lib/context-storage';
+import { validateRequest } from '@/lib/validate-request';
+import { createAdminCompanySchema } from '@/lib/validations/admin';
 import { createAuditLogWithRetry } from '@/lib/audit';
 import { seedChartOfAccounts } from '@/lib/chart-of-accounts';
 
@@ -9,7 +11,8 @@ export const POST = apiHandler(
   async (request: NextRequest, context: RouteContext) => {
     const userId = requireCurrentUserId();
 
-    const body = await request.json();
+    const body = await validateRequest(request, createAdminCompanySchema);
+    if (body instanceof NextResponse) return body;
     const { legalName, taxId } = body;
 
     if (!legalName || !legalName.trim()) {

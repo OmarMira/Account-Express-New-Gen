@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { db } from '@/lib/db';
 import { apiHandler, type RouteContext } from '@/lib/api-handler';
 import { requireCompanyContext } from '@/lib/context-storage';
+import { validateRequest } from '@/lib/validate-request';
+
+const reconciliationPeriodSchema = z.object({
+  bankAccountId: z.string().min(1),
+  action: z.enum(['start', 'complete', 'cancel']),
+  periodId: z.string().optional(),
+  notes: z.string().optional().nullable(),
+});
 
 // ─── POST /api/reconciliation/periods ─────────────────────────────
 // Create, complete, or cancel a reconciliation period.
@@ -9,7 +18,8 @@ import { requireCompanyContext } from '@/lib/context-storage';
 export const POST = apiHandler(async (request: NextRequest, context: RouteContext) => {
   const { userId, companyId } = requireCompanyContext();
 
-  const body = await request.json();
+  const body = await validateRequest(request, reconciliationPeriodSchema);
+  if (body instanceof NextResponse) return body;
   const { bankAccountId, action, periodId, notes } = body;
 
   if (!companyId || !bankAccountId || !action) {

@@ -59,6 +59,9 @@ vi.mock('@/lib/db', () => {
     auditLog: {
       create: vi.fn().mockResolvedValue({}),
     },
+    rateLimit: {
+      upsert: vi.fn().mockResolvedValue({}),
+    },
     user: {
       findUnique: vi.fn().mockResolvedValue({ id: 'user-1', role: 'super_admin' }),
     },

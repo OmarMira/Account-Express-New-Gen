@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { db } from '@/lib/db';
 import { apiHandler, type RouteContext } from '@/lib/api-handler';
 import { requireCompanyContext } from '@/lib/context-storage';
+import { validateRequest } from '@/lib/validate-request';
 import { journalAccountsCache } from '@/lib/cache';
 import { readJsonConfig } from '@/lib/config-loader';
 
@@ -92,12 +94,21 @@ export const GET = apiHandler(
   { requireMembership: false },
 );
 
+const createAccountSchema = z.object({
+  code: z.string().min(1),
+  name: z.string().min(1),
+  accountType: z.string().min(1),
+  normalBalance: z.enum(['debit', 'credit']),
+  parentId: z.string().optional().nullable(),
+});
+
 // ─── POST /api/accounts ────────────────────────────────────────────────
 export const POST = apiHandler(
   async (request: NextRequest, context: RouteContext) => {
     const { userId, companyId } = requireCompanyContext();
 
-    const body = await request.json();
+    const body = await validateRequest(request, createAccountSchema);
+    if (body instanceof NextResponse) return body;
     const { code, name, accountType, normalBalance, parentId } = body;
 
     // Validate required fields

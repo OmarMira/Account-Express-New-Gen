@@ -1,3 +1,5 @@
+import { db } from '@/lib/db';
+
 interface HitInfo {
   count: number;
   resetTime: number;
@@ -13,6 +15,19 @@ export class RateLimiter {
     private emailLimit: number = 10,
     private emailWindowMs: number = 60 * 60 * 1000,
   ) {}
+
+  private persist(key: string, hits: number, windowMs: number, resetTime: number): void {
+    const resetAt = new Date(resetTime);
+    db.rateLimit
+      .upsert({
+        where: { key },
+        update: { hits, resetAt },
+        create: { key, hits, resetAt, windowMs },
+      })
+      .catch(() => {
+        // In-memory cache remains functional even if persistence fails
+      });
+  }
 
   public check(
     ip: string,
@@ -58,6 +73,7 @@ export class RateLimiter {
     }
     ipInfo.count++;
     this.ipHits.set(ip, ipInfo);
+    this.persist(`ip:${ip}`, ipInfo.count, this.ipWindowMs, ipInfo.resetTime);
 
     // Increment Email
     if (email) {
@@ -68,6 +84,7 @@ export class RateLimiter {
       }
       emailInfo.count++;
       this.emailHits.set(normalizedEmail, emailInfo);
+      this.persist(`email:${normalizedEmail}`, emailInfo.count, this.emailWindowMs, emailInfo.resetTime);
     }
   }
 

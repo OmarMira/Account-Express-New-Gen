@@ -142,6 +142,7 @@ export const POST = apiHandler(
 
       return NextResponse.json({ success: true });
     } catch (error) {
+      console.error('Error saving AI configuration:', error);
       return NextResponse.json(
         { error: 'Fallo al escribir en el archivo de configuración' },
         { status: 500 },

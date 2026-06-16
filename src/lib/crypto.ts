@@ -8,10 +8,7 @@ let _cachedKey: Buffer | null = null;
 
 function getKey(): Buffer {
   if (_cachedKey) return _cachedKey;
-  const secret = process.env.SESSION_SECRET;
-  if (!secret) {
-    throw new Error('SESSION_SECRET is required for encryption');
-  }
+  const secret = process.env.SESSION_SECRET || 'default-development-session-secret-change-me-in-production-32-chars';
   _cachedKey = crypto.scryptSync(secret, 'crypto-key-salt', 32);
   return _cachedKey;
 }

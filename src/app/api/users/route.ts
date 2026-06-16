@@ -3,6 +3,8 @@ import { db } from '@/lib/db';
 import { hashPassword } from '@/lib/auth';
 import { apiHandler, type RouteContext } from '@/lib/api-handler';
 import { requireCompanyContext } from '@/lib/context-storage';
+import { validateRequest } from '@/lib/validate-request';
+import { createUserSchema } from '@/lib/validations/admin';
 import { logger } from '@/lib/logger';
 
 /**
@@ -69,7 +71,8 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
   const { userId, companyId } = requireCompanyContext();
 
   try {
-    const body = await request.json();
+    const body = await validateRequest(request, createUserSchema);
+    if (body instanceof NextResponse) return body;
     const { email, firstName, lastName, password, role = 'company_admin' } = body;
 
     if (!email || !firstName || !lastName || !password) {

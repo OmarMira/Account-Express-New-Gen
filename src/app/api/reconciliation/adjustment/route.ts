@@ -1,8 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { db } from '@/lib/db';
 import { apiHandler } from '@/lib/api-handler';
 import { requireCompanyContext } from '@/lib/context-storage';
+import { validateRequest } from '@/lib/validate-request';
 import { assertActiveFiscalPeriod } from '@/lib/fiscal-period-guard';
+
+const adjustmentSchema = z.object({
+  bankAccountId: z.string().min(1),
+  date: z.string().min(1),
+  description: z.string().min(1),
+  debitAccountId: z.string().min(1),
+  creditAccountId: z.string().min(1),
+  amount: z.number().positive('Amount must be greater than zero'),
+  notes: z.string().optional().nullable(),
+});
 
 // ─── POST /api/reconciliation/adjustment ──────────────────────────
 // Create an adjusting journal entry from the reconciliation screen.
@@ -10,7 +22,8 @@ import { assertActiveFiscalPeriod } from '@/lib/fiscal-period-guard';
 export const POST = apiHandler(async (request: NextRequest) => {
   const { userId, companyId } = requireCompanyContext();
 
-  const body = await request.json();
+  const body = await validateRequest(request, adjustmentSchema);
+  if (body instanceof NextResponse) return body;
   const { bankAccountId, date, description, debitAccountId, creditAccountId, amount, notes } = body;
 
   if (!bankAccountId || !date || !description || !debitAccountId || !creditAccountId || !amount) {
