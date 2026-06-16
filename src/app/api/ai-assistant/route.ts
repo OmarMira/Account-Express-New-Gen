@@ -177,6 +177,107 @@ const TOOLS = [
   {
     type: 'function',
     function: {
+      name: 'get_entity_contexts',
+      description:
+        'Obtiene la lista de entidades clasificadas en el sistema (socios, proveedores, clientes, inquilinos) con sus respectivos roles y cuentas contables asociadas.',
+      parameters: {
+        type: 'object',
+        properties: {
+          search: { type: 'string', description: 'Buscar por patrón de nombre de la entidad.' },
+          role: {
+            type: 'string',
+            description:
+              'Filtrar por rol de la entidad (ej: "SOCIO", "PROVEEDOR", "INQUILINO", "CLIENTE").',
+          },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_journal_entries',
+      description:
+        'Busca y obtiene los asientos contables (Journal Entries) registrados en el libro diario de la empresa.',
+      parameters: {
+        type: 'object',
+        properties: {
+          startDate: { type: 'string', description: 'Fecha de inicio en formato ISO (YYYY-MM-DD).' },
+          endDate: { type: 'string', description: 'Fecha de fin en formato ISO (YYYY-MM-DD).' },
+          status: {
+            type: 'string',
+            enum: ['draft', 'posted'],
+            description: 'Filtrar por estado del asiento.',
+          },
+          limit: { type: 'number', description: 'Límite de asientos contables a retornar.' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_fiscal_periods',
+      description:
+        'Obtiene la lista de periodos fiscales configurados para la empresa actual y su estado de bloqueo (cerrado/abierto).',
+      parameters: {
+        type: 'object',
+        properties: {},
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_reconciliation_periods',
+      description:
+        'Obtiene los periodos de conciliación bancaria y sus saldos, diferencias y estado.',
+      parameters: {
+        type: 'object',
+        properties: {},
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_bank_statements',
+      description:
+        'Lista los estados de cuenta bancarios cargados en el sistema con sus fechas y saldos.',
+      parameters: {
+        type: 'object',
+        properties: {},
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_users',
+      description: 'Obtiene la lista de usuarios del sistema y sus roles/estados.',
+      parameters: {
+        type: 'object',
+        properties: {},
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_audit_logs',
+      description:
+        'Obtiene el registro de logs de auditoría de los cambios y acciones recientes en el sistema.',
+      parameters: {
+        type: 'object',
+        properties: {
+          limit: { type: 'number', description: 'Límite de registros a retornar.' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'save_system_memory',
       description:
         'Guarda un hecho importante, preferencia de usuario o decisión contable en la memoria a largo plazo del sistema para recordar en futuras sesiones.',
@@ -375,6 +476,197 @@ async function executeTool(
           minAmount: aggregations._min.amount || 0,
           maxAmount: aggregations._max.amount || 0,
         };
+      }
+
+      case 'get_entity_contexts': {
+        const search = args.search as string | undefined;
+        const role = args.role as string | undefined;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const where: any = { companyId };
+        if (search) {
+          where.pattern = { contains: search };
+        }
+        if (role) {
+          where.role = role;
+        }
+        const entities = await db.entityContext.findMany({
+          where,
+          include: {
+            glAccount: {
+              select: { name: true, code: true },
+            },
+          },
+          orderBy: { pattern: 'asc' },
+        });
+        return entities.map((e) => ({
+          id: e.id,
+          pattern: e.pattern,
+          role: e.role,
+          glAccount: e.glAccount ? `${e.glAccount.code} - ${e.glAccount.name}` : 'Ninguna',
+          source: e.source,
+          createdAt: e.createdAt.toISOString().split('T')[0],
+        }));
+      }
+
+      case 'get_journal_entries': {
+        const startDate = args.startDate as string | undefined;
+        const endDate = args.endDate as string | undefined;
+        const status = args.status as string | undefined;
+        const limit = args.limit as number | undefined;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const where: any = { companyId };
+        if (status) {
+          where.status = status;
+        }
+        if (startDate || endDate) {
+          where.date = {};
+          if (startDate) where.date.gte = new Date(startDate);
+          if (endDate) where.date.lte = new Date(endDate);
+        }
+        const limitVal = Math.min(limit || 50, 100);
+        const entries = await db.journalEntry.findMany({
+          where,
+          take: limitVal,
+          orderBy: { date: 'desc' },
+          include: {
+            lines: {
+              include: {
+                glAccount: {
+                  select: { name: true, code: true },
+                },
+              },
+            },
+          },
+        });
+        return entries.map((e) => ({
+          id: e.id,
+          date: e.date.toISOString().split('T')[0],
+          description: e.description,
+          reference: e.reference,
+          status: e.status,
+          lines: e.lines.map((l) => ({
+            id: l.id,
+            account: `${l.glAccount.code} - ${l.glAccount.name}`,
+            debit: l.debit,
+            credit: l.credit,
+            description: l.description,
+          })),
+        }));
+      }
+
+      case 'get_fiscal_periods': {
+        const periods = await db.fiscalPeriod.findMany({
+          where: { companyId },
+          orderBy: { startDate: 'asc' },
+        });
+        return periods.map((p) => ({
+          id: p.id,
+          name: p.name,
+          startDate: p.startDate.toISOString().split('T')[0],
+          endDate: p.endDate.toISOString().split('T')[0],
+          isLocked: p.isLocked,
+        }));
+      }
+
+      case 'get_reconciliation_periods': {
+        const periods = await db.reconciliationPeriod.findMany({
+          where: { companyId },
+          include: {
+            bankAccount: {
+              select: { accountName: true, bankName: true },
+            },
+            user: {
+              select: { firstName: true, lastName: true, email: true },
+            },
+          },
+          orderBy: { startedAt: 'desc' },
+        });
+        return periods.map((p) => ({
+          id: p.id,
+          bankAccount: `${p.bankAccount.bankName} - ${p.bankAccount.accountName}`,
+          user: `${p.user.firstName} ${p.user.lastName} (${p.user.email})`,
+          statementBalance: p.statementBalance,
+          bookBalance: p.bookBalance,
+          difference: p.difference,
+          status: p.status,
+          startedAt: p.startedAt.toISOString().split('T')[0],
+          completedAt: p.completedAt ? p.completedAt.toISOString().split('T')[0] : null,
+          transactionCount: p.transactionCount,
+        }));
+      }
+
+      case 'get_bank_statements': {
+        const statements = await db.bankStatement.findMany({
+          where: { companyId },
+          include: {
+            bankAccount: {
+              select: { accountName: true, bankName: true },
+            },
+          },
+          orderBy: { endDate: 'desc' },
+        });
+        return statements.map((s) => ({
+          id: s.id,
+          bankAccount: `${s.bankAccount.bankName} - ${s.bankAccount.accountName}`,
+          startDate: s.startDate.toISOString().split('T')[0],
+          endDate: s.endDate.toISOString().split('T')[0],
+          openingBalance: s.openingBalance,
+          closingBalance: s.closingBalance,
+          totalCredits: s.totalCredits,
+          totalDebits: s.totalDebits,
+          format: s.format,
+          fileName: s.fileName,
+        }));
+      }
+
+      case 'get_users': {
+        const members = await db.companyMember.findMany({
+          where: { companyId },
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                role: true,
+                isActive: true,
+              },
+            },
+          },
+        });
+        return members.map((m) => ({
+          id: m.user.id,
+          name: `${m.user.firstName} ${m.user.lastName}`,
+          email: m.user.email,
+          role: m.user.role,
+          companyRole: m.role,
+          isActive: m.user.isActive,
+        }));
+      }
+
+      case 'get_audit_logs': {
+        const limit = args.limit as number | undefined;
+        const limitVal = Math.min(limit || 50, 100);
+        const logs = await db.auditLog.findMany({
+          where: { companyId },
+          take: limitVal,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            user: {
+              select: { firstName: true, lastName: true, email: true },
+            },
+          },
+        });
+        return logs.map((l) => ({
+          id: l.id,
+          action: l.action,
+          entity: l.entity,
+          entityId: l.entityId,
+          details: l.details,
+          user: l.user ? `${l.user.firstName} ${l.user.lastName} (${l.user.email})` : 'Sistema',
+          createdAt: l.createdAt.toISOString(),
+        }));
       }
 
       case 'save_system_memory': {
@@ -750,15 +1042,15 @@ YOUR CAPABILITIES:
 - Explain reconciliation procedures
 - Help with bank rule creation guidance
 - Explain accounting concepts in simple terms
-- Answer real-time specific questions about the company's accounts, rules, and bank transactions using the available tools.
+- Answer real-time specific questions about the company's accounts, rules, bank transactions, entities (partners/socios, clients, vendors), journal entries, fiscal periods, reconciliation periods, bank statements, users, and audit logs using the available tools.
 
 ASSISTANT ACTIONS:
 - Cuando sugieras crear una cuenta de banco específica en el Plan de Cuentas (por ejemplo, como subcuenta de Cash & Cash Equivalents 1010), al final de tu respuesta de sugerencia debes agregar de manera exacta e invariable la etiqueta: [Te ayudo a crearla](action:create-account)
 - No agregues explicaciones adicionales después de esa etiqueta.
 
 DATABASE ACCESS GUIDELINES:
-- When the user asks about system-specific counts, balances, rules, accounts, or transactions, ALWAYS call the appropriate tool.
-- Do NOT guess or hallucinate any numbers; use the tools to get exact and true information.
+- When the user asks about system-specific counts, balances, rules, accounts, transactions, entities, journal entries, fiscal/reconciliation periods, statements, users, or audit logs, ALWAYS call the appropriate tool.
+- Do NOT guess or hallucinate any numbers or data; use the tools to get exact and true information.
 - Format all numeric values (currency balances, transaction counts) clearly and beautifully (e.g. $1,250.00).
 - If no companyId or active company is linked, explain that you need a selected company to view details.
 
