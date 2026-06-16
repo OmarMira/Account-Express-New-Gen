@@ -8,9 +8,17 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 // Configuración correcta para poder emitir eventos 'query'
+const isTest = process.env.NODE_ENV === 'test' || process.env.VITEST === 'true';
+const dbUrl = isTest ? 'file:./test.db' : undefined;
+
 export const db =
   globalForPrisma.prisma ??
   new PrismaClient({
+    datasources: dbUrl ? {
+      db: {
+        url: dbUrl,
+      },
+    } : undefined,
     log: [
       { level: 'query', emit: 'event' },
       { level: 'warn', emit: 'stdout' },
