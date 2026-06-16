@@ -16,6 +16,17 @@ export const GET = apiHandler(async (request: NextRequest, context: RouteContext
     return NextResponse.json({ error: 'Filename is required' }, { status: 400 });
   }
 
+  // Path traversal prevention: reject path separators, .., and enforce companyId prefix
+  if (
+    filename.includes('/') ||
+    filename.includes('\\') ||
+    filename.includes('..') ||
+    !filename.startsWith(`${companyId}_`) ||
+    !filename.endsWith('.json')
+  ) {
+    return NextResponse.json({ error: 'Invalid filename' }, { status: 400 });
+  }
+
   const result = getBackupFile(filename);
 
   if (!result) {

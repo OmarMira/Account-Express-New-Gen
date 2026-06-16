@@ -46,6 +46,14 @@ export const GET = apiHandler(async (request: NextRequest) => {
     select: { id: true, endDate: true, closingBalance: true },
   });
 
+  // If a specific statement is requested, use its date and balance instead of the latest
+  const activeStatement = statementId
+    ? await db.bankStatement.findFirst({
+        where: { id: statementId, bankAccount: { companyId } },
+        select: { id: true, endDate: true, closingBalance: true },
+      })
+    : latestStatement;
+
   // Get all statements for this bank account
   const statements = await db.bankStatement.findMany({
     where: { bankAccountId },
@@ -162,10 +170,22 @@ export const GET = apiHandler(async (request: NextRequest) => {
   });
 
   // Calculate book balance from GL account journal lines
+  // Scope to active statement's end date (or explicit endDate filter) so book balance
+  // reflects only entries up to the period being reconciled — not future transactions.
+  const bookBalanceDateLimit: Date | undefined = (() => {
+    if (endDate) return new Date(endDate + 'T23:59:59.999Z');
+    if (activeStatement?.endDate) return activeStatement.endDate;
+    return undefined;
+  })();
+
   const journalLines = await db.journalLine.findMany({
     where: {
       glAccountId: bankAccount.glAccountId,
-      entry: { companyId, status: 'posted' },
+      entry: {
+        companyId,
+        status: 'posted',
+        ...(bookBalanceDateLimit ? { date: { lte: bookBalanceDateLimit } } : {}),
+      },
     },
     include: { entry: { select: { date: true } } },
   });
@@ -181,7 +201,7 @@ export const GET = apiHandler(async (request: NextRequest) => {
   }
 
   // Statement balance
-  const statementBalance = latestStatement?.closingBalance ?? bankAccount.balance;
+  const statementBalance = activeStatement?.closingBalance ?? bankAccount.balance;
   const difference = statementBalance - bookBalance;
 
   // Categorize transactions

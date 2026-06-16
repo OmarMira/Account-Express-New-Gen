@@ -1,9 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { apiHandler } from '@/lib/api-handler';
+import { apiHandler, type RouteContext } from '@/lib/api-handler';
 import { requireCompanyContext } from '@/lib/context-storage';
+import { Prisma } from '@prisma/client';
 
-export const GET = apiHandler(async (request: NextRequest, context: { params: any }) => {
+interface TransactionLine {
+  id: string;
+  glAccountId: string;
+  accountCode: string;
+  accountName: string;
+  accountType: string;
+  description: string;
+  debit: number;
+  credit: number;
+}
+
+interface CombinedEntry {
+  id: string;
+  date: Date;
+  description: string;
+  reference: string | null;
+  status: string;
+  lines: TransactionLine[];
+}
+
+export const GET = apiHandler(async (request: NextRequest, context: RouteContext) => {
   const { userId, companyId } = requireCompanyContext();
 
   const { searchParams } = new URL(request.url);
@@ -59,7 +80,7 @@ export const GET = apiHandler(async (request: NextRequest, context: { params: an
   const realDescSet = new Set(realEntries.map((e) => e.description));
 
   // Fetch virtual entries from reconciled bank transactions
-  const bankTxWhere: any = {
+  const bankTxWhere: Prisma.BankTransactionWhereInput = {
     statement: { bankAccount: { companyId } },
     isReconciled: true,
     glAccountId: { not: null },
@@ -103,7 +124,7 @@ export const GET = apiHandler(async (request: NextRequest, context: { params: an
   });
 
   // Convert real entries to standardized format
-  const combinedEntries: any[] = realEntries.map((entry) => ({
+  const combinedEntries: CombinedEntry[] = realEntries.map((entry) => ({
     id: entry.id,
     date: entry.date,
     description: entry.description,
@@ -115,7 +136,7 @@ export const GET = apiHandler(async (request: NextRequest, context: { params: an
       accountCode: l.glAccount.code,
       accountName: l.glAccount.name,
       accountType: l.glAccount.accountType,
-      description: l.description,
+      description: l.description ?? '',
       debit: l.debit || 0,
       credit: l.credit || 0,
     })),
@@ -130,7 +151,7 @@ export const GET = apiHandler(async (request: NextRequest, context: { params: an
     const absAmount = Math.abs(tx.amount);
     const bankGlAccount = tx.statement.bankAccount.glAccount;
 
-    const lines: any[] = [];
+    const lines: TransactionLine[] = [];
 
     // The assigned GL Account line
     lines.push({
@@ -173,7 +194,7 @@ export const GET = apiHandler(async (request: NextRequest, context: { params: an
 
   // Apply GL Account filter if provided
   const filteredEntries = glAccountId
-    ? combinedEntries.filter((e) => e.lines.some((l: any) => l.glAccountId === glAccountId))
+    ? combinedEntries.filter((e) => e.lines.some((l: TransactionLine) => l.glAccountId === glAccountId))
     : combinedEntries;
 
   const totalCount = filteredEntries.length;
@@ -182,8 +203,8 @@ export const GET = apiHandler(async (request: NextRequest, context: { params: an
   const paginatedEntries = filteredEntries.slice((page - 1) * limit, page * limit);
 
   const result = paginatedEntries.map((entry) => {
-    const totalDebit = entry.lines.reduce((sum: number, l: any) => sum + l.debit, 0);
-    const totalCredit = entry.lines.reduce((sum: number, l: any) => sum + l.credit, 0);
+    const totalDebit = entry.lines.reduce((sum: number, l: TransactionLine) => sum + l.debit, 0);
+    const totalCredit = entry.lines.reduce((sum: number, l: TransactionLine) => sum + l.credit, 0);
     return {
       ...entry,
       date: entry.date.toISOString(),

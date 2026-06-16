@@ -32,6 +32,8 @@ interface AccountSelectorProps {
   onChange: (accountId: string | null) => void;
   placeholder?: string;
   disabled?: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 const accountTypeColors: Record<string, string> = {
@@ -56,8 +58,12 @@ export function AccountSelector({
   onChange,
   placeholder,
   disabled = false,
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
 }: AccountSelectorProps) {
-  const [open, setOpen] = React.useState(false);
+  const [internalOpen, setInternalOpen] = React.useState(false);
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setOpen = controlledOnOpenChange ?? setInternalOpen;
   const t = useLanguageStore((s) => s.t);
 
   const selectedAccount = accounts.find((a) => a.id === value);

@@ -186,6 +186,7 @@ export function SelectCompanyPage() {
                   {companies.map((company, i) => (
                     <motion.button
                       key={company.id}
+                      autoFocus={i === 0}
                       initial={{ opacity: 0, x: -12 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: i * 0.08, duration: 0.3 }}

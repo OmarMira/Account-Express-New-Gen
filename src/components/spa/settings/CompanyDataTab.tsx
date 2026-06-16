@@ -22,6 +22,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import { AddressAutocomplete } from '@/components/ui/address-autocomplete';
 import { usAddressClientSchema } from '@/lib/validations/us-address-client';
 import {
@@ -145,12 +146,14 @@ export function CompanyDataTab() {
     phone: '',
     email: '',
     logo: '',
+    entityFirstMode: false,
   });
   const [logoPreview, setLogoPreview] = useState('');
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [editingCompany, setEditingCompany] = useState(false);
   const [savingCompany, setSavingCompany] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   // Companies list (super_admin only)
   const [companies, setCompanies] = useState<CompanyRow[]>([]);
@@ -188,6 +191,7 @@ export function CompanyDataTab() {
               phone: data.company.phone || '',
               email: data.company.email || '',
               logo: data.company.logo || '',
+              entityFirstMode: data.company.entityFirstMode ?? false,
             });
             setLogoPreview(data.company.logo || '');
           }
@@ -225,6 +229,7 @@ export function CompanyDataTab() {
 
   async function handleSaveCompany() {
     if (!companyId) return;
+    setFormErrors({});
 
     // Zod validation on submit
     const addressParse = usAddressClientSchema.safeParse({
@@ -238,8 +243,38 @@ export function CompanyDataTab() {
 
     if (!addressParse.success) {
       logger.error('[COMPANY PROFILE VALIDATION ERROR]', { error: String(addressParse.error) });
-      const errorMsg = addressParse.error.issues[0]?.message || 'Datos de dirección inválidos';
+
+      const errors: Record<string, string> = {};
+      let firstInvalidField: string | null = null;
+
+      addressParse.error.issues.forEach((issue) => {
+        const path = issue.path[0] as string;
+        if (!errors[path]) {
+          errors[path] = t(`settings.companyProfile.errors.${path as any}`) || issue.message;
+        }
+        if (!firstInvalidField) {
+          firstInvalidField = path;
+        }
+      });
+
+      setFormErrors(errors);
+
+      const firstIssue = addressParse.error.issues[0];
+      const errorMsg = firstIssue
+        ? t(`settings.companyProfile.errors.${firstIssue.path[0] as any}`) || firstIssue.message
+        : t('settings.companyProfile.invalidAddress');
+
       toast.error(errorMsg);
+
+      if (firstInvalidField) {
+        setTimeout(() => {
+          const element = document.getElementById(firstInvalidField!);
+          if (element) {
+            element.focus();
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 50);
+      }
       return;
     }
 
@@ -249,6 +284,7 @@ export function CompanyDataTab() {
       formData.append('companyId', companyId);
       formData.append('email', companyData.email);
       formData.append('phone', companyData.phone);
+      formData.append('entityFirstMode', String(companyData.entityFirstMode));
 
       formData.append('address', JSON.stringify(addressParse.data));
 
@@ -337,7 +373,14 @@ export function CompanyDataTab() {
                 <CardDescription className="mt-1">{t('settings.companyInfo')}</CardDescription>
               </div>
               {!editingCompany && (
-                <Button variant="outline" size="sm" onClick={() => setEditingCompany(true)}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setEditingCompany(true);
+                    setFormErrors({});
+                  }}
+                >
                   <Pencil className="size-3.5 mr-1" />
                   {t('common.edit')}
                 </Button>
@@ -433,14 +476,34 @@ export function CompanyDataTab() {
                   <Input
                     id="phone"
                     value={companyData.phone}
+                    aria-invalid={!!formErrors.phone}
                     onChange={(e) => setCompanyData((prev) => ({ ...prev, phone: e.target.value }))}
                   />
+                  {formErrors.phone && (
+                    <p className="text-xs text-destructive font-medium mt-1">{formErrors.phone}</p>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-3 sm:col-span-2 py-1">
+                  <Switch
+                    id="entityFirstMode"
+                    checked={companyData.entityFirstMode}
+                    onCheckedChange={(checked) =>
+                      setCompanyData((prev) => ({ ...prev, entityFirstMode: checked }))
+                    }
+                  />
+                  <Label htmlFor="entityFirstMode" className="cursor-pointer">
+                    <div className="font-medium text-sm">{t('settings.entityFirstMode')}</div>
+                    <p className="text-xs text-muted-foreground">{t('settings.entityFirstDesc')}</p>
+                  </Label>
                 </div>
 
                 {/* Localized US Address fields */}
                 <div className="space-y-1.5 sm:col-span-2">
-                  <Label htmlFor="streetLine1">Dirección (Calle y Número)</Label>
+                  <Label htmlFor="streetLine1">{t('settings.companyProfile.streetAddress')}</Label>
                   <AddressAutocomplete
+                    id="streetLine1"
+                    aria-invalid={!!formErrors.streetLine1}
                     defaultValue={companyData.streetLine1}
                     onSelect={(addr) => {
                       setCompanyData((prev) => {
@@ -470,53 +533,78 @@ export function CompanyDataTab() {
                     }}
                     placeholder="Buscar dirección en EE.UU..."
                   />
+                  {formErrors.streetLine1 && (
+                    <p className="text-xs text-destructive font-medium mt-1">
+                      {formErrors.streetLine1}
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">
-                  <Label htmlFor="streetLine2">Suite / Oficina / Unidad (Opcional)</Label>
+                  <Label htmlFor="streetLine2">{t('settings.companyProfile.suiteUnit')}</Label>
                   <Input
                     id="streetLine2"
                     value={companyData.streetLine2}
+                    aria-invalid={!!formErrors.streetLine2}
                     onChange={(e) =>
                       setCompanyData((prev) => ({ ...prev, streetLine2: e.target.value }))
                     }
-                    placeholder="Apt 2B"
+                    placeholder={t('settings.companyProfile.suitePlaceholder')}
                   />
+                  {formErrors.streetLine2 && (
+                    <p className="text-xs text-destructive font-medium mt-1">
+                      {formErrors.streetLine2}
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="city">Ciudad / Localidad</Label>
+                  <Label htmlFor="city">{t('settings.companyProfile.city')}</Label>
                   <Input
                     id="city"
                     value={companyData.city}
+                    aria-invalid={!!formErrors.city}
                     onChange={(e) => setCompanyData((prev) => ({ ...prev, city: e.target.value }))}
-                    placeholder="Miami"
+                    placeholder={t('settings.companyProfile.cityPlaceholder')}
                   />
+                  {formErrors.city && (
+                    <p className="text-xs text-destructive font-medium mt-1">{formErrors.city}</p>
+                  )}
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="state">Estado</Label>
+                  <Label htmlFor="state">{t('settings.companyProfile.state')}</Label>
                   <select
                     id="state"
                     value={companyData.state}
+                    aria-invalid={!!formErrors.state}
                     onChange={(e) => setCompanyData((prev) => ({ ...prev, state: e.target.value }))}
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-950"
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-950 aria-invalid:border-destructive aria-invalid:ring-destructive"
                   >
-                    <option value="">Seleccione Estado</option>
+                    <option value="">{t('settings.companyProfile.selectState')}</option>
                     {US_STATES.map((st) => (
                       <option key={st} value={st}>
                         {st}
                       </option>
                     ))}
                   </select>
+                  {formErrors.state && (
+                    <p className="text-xs text-destructive font-medium mt-1">{formErrors.state}</p>
+                  )}
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="zipCode">Código Postal (ZIP Code)</Label>
+                  <Label htmlFor="zipCode">{t('settings.companyProfile.zipCode')}</Label>
                   <Input
                     id="zipCode"
                     value={companyData.zipCode}
+                    aria-invalid={!!formErrors.zipCode}
                     onChange={(e) =>
                       setCompanyData((prev) => ({ ...prev, zipCode: e.target.value }))
                     }
-                    placeholder="33101"
+                    placeholder={t('settings.companyProfile.zipPlaceholder')}
                   />
+                  {formErrors.zipCode && (
+                    <p className="text-xs text-destructive font-medium mt-1">
+                      {formErrors.zipCode}
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex gap-2 sm:col-span-2 pt-2">
@@ -531,7 +619,13 @@ export function CompanyDataTab() {
                       </>
                     )}
                   </Button>
-                  <Button variant="outline" onClick={() => setEditingCompany(false)}>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setEditingCompany(false);
+                      setFormErrors({});
+                    }}
+                  >
                     {t('common.cancel')}
                   </Button>
                 </div>

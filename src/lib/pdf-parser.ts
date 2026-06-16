@@ -76,7 +76,7 @@ interface ColumnCluster {
 const CLUSTER_TOLERANCE_PX = 15; // Grouping horizontal coordinate deviation
 const CURRENCY_REGEX = /(?:^|\s)(-?\$?\s*\(?\d+(?:,\d{3})*(?:\.\d{2})?\)?-?)\s*$/;
 const DATE_REGEX =
-  /\b(\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4}|\d{4}-\d{1,2}-\d{1,2}|\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{2,4}|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2}|\d{1,2}[/\-]\d{1,2})\b/i;
+  /\b(\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4}|\d{4}-\d{1,2}-\d{1,2}|\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{2,4}|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2}|\d{1,2}[/-]\d{1,2})\b/i;
 
 // Agnostic keywords to detect transaction sections
 const COLUMN_KEYWORDS = {
@@ -269,7 +269,7 @@ function parseAmountWithProfileFormat(
     cleaned = cleaned.replace(new RegExp(decimalSeparator, 'g'), '.');
   }
 
-  let num = parseFloat(cleaned);
+  const num = parseFloat(cleaned);
   if (isNaN(num)) return 0;
   return isNegative ? -num : num;
 }
@@ -464,7 +464,7 @@ function parsePDFWithProfile(
       .map((el) => el.text)
       .join(' ')
       .trim()
-      .replace(/^[-_\s\:\.\,]+|[-_\s\:\.\,]+$/g, '')
+      .replace(/^[-_\s:.]+|[-_\s:.]+$/g, '')
       .trim();
 
     if (description.length > 1) {
@@ -715,10 +715,10 @@ export async function parsePDF(buffer: Buffer, options?: ParseOptions): Promise<
   } else {
     // Fallback statement boundary matching
     const startBalMatch = fullText.match(
-      /(?:Beginning|Starting|Opening|Previous|Saldo inicial|Saldo anterior)\s+balance\s+on\s+([A-Za-z]+\s+\d{1,2},?\s+\d{4}|\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4})/i,
+      /(?:Beginning|Starting|Opening|Previous|Saldo inicial|Saldo anterior)\s+balance\s+on\s+([A-Za-z]+\s+\d{1,2},?\s+\d{4}|\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})/i,
     );
     const endBalMatch = fullText.match(
-      /(?:Ending|Closing|New|Saldo final)\s+balance\s+on\s+([A-Za-z]+\s+\d{1,2},?\s+\d{4}|\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4})/i,
+      /(?:Ending|Closing|New|Saldo final)\s+balance\s+on\s+([A-Za-z]+\s+\d{1,2},?\s+\d{4}|\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})/i,
     );
     if (startBalMatch) {
       const s = parseDateString(startBalMatch[1]);
@@ -730,23 +730,8 @@ export async function parsePDF(buffer: Buffer, options?: ParseOptions): Promise<
     }
   }
 
-  // 2. Try to match active profile by fingerprints (using some to support partial/test statement fingerprints)
+  // 2. Try to match active profile by fingerprints — collect ALL matches and try them in priority order
   let matchedProfile: BankProfileTyped | null = null;
-  try {
-    const activeProfiles = await getAllActiveProfiles();
-    for (const p of activeProfiles) {
-      const anyMatch = p.fingerprints.some((fp) =>
-        fullText.toLowerCase().includes(fp.toLowerCase().trim()),
-      );
-      if (anyMatch) {
-        matchedProfile = p;
-        break;
-      }
-    }
-  } catch (err) {
-    logger.error('Error fetching active profiles', { error: err });
-  }
-
   let transactions: ParsedTransaction[] = [];
   let accountNo: string | undefined;
   let openingBalance = 0;
@@ -756,11 +741,40 @@ export async function parsePDF(buffer: Buffer, options?: ParseOptions): Promise<
   const warnings: string[] = [];
   let accountHolder: string | undefined;
 
-  if (matchedProfile) {
-    let parseResult = runParseWithProfile(linesOfElements, pageWidth, fullText, matchedProfile);
+  try {
+    const activeProfiles = await getAllActiveProfiles();
+    // Sort: profiles that DON'T require review (official/verified) first
+    const sorted = [...activeProfiles].sort((a, b) => {
+      if (a.requiresReview === b.requiresReview) return 0;
+      return a.requiresReview ? 1 : -1;
+    });
 
-    // Self-healing: if profile finds 0 transactions and allows it, try to re-onboard via LLM
-    if (!matchedProfile.requiresReview && parseResult.transactions.length === 0) {
+    const matchingProfiles: BankProfileTyped[] = [];
+    for (const p of sorted) {
+      const anyMatch = p.fingerprints.some((fp) =>
+        fullText.toLowerCase().includes(fp.toLowerCase().trim()),
+      );
+      if (anyMatch) matchingProfiles.push(p);
+    }
+
+    // Try each matching profile — first one that extracts transactions wins
+    for (const p of matchingProfiles) {
+      const result = runParseWithProfile(linesOfElements, pageWidth, fullText, p);
+      if (result.transactions.length > 0) {
+        matchedProfile = p;
+        transactions = result.transactions;
+        accountNo = result.accountNo;
+        openingBalance = result.openingBalance;
+        closingBalance = result.closingBalance;
+        mathValid = result.mathValid;
+        mismatch = result.mismatch;
+        warnings.push(...result.warnings);
+        break;
+      }
+    }
+
+    // If no profile extracted transactions, try LLM self-healing on the first matching one
+    if (!matchedProfile && matchingProfiles.length > 0) {
       try {
         const { createProfileFromPdf } = await import('./bank-profile-onboarding');
         const healedProfile = await createProfileFromPdf({
@@ -777,24 +791,74 @@ export async function parsePDF(buffer: Buffer, options?: ParseOptions): Promise<
         });
 
         if (healedProfile) {
-          parseResult = runParseWithProfile(linesOfElements, pageWidth, fullText, healedProfile);
-          if (parseResult.mathValid) {
-            await updateRequiresReviewStatus(healedProfile.bankId, false);
+          const parseResult = runParseWithProfile(
+            linesOfElements,
+            pageWidth,
+            fullText,
+            healedProfile,
+          );
+          if (parseResult.transactions.length > 0) {
+            matchedProfile = healedProfile;
+            transactions = parseResult.transactions;
+            accountNo = parseResult.accountNo;
+            openingBalance = parseResult.openingBalance;
+            closingBalance = parseResult.closingBalance;
+            mathValid = parseResult.mathValid;
+            mismatch = parseResult.mismatch;
+            warnings.push(...parseResult.warnings);
+            if (parseResult.mathValid) {
+              await updateRequiresReviewStatus(healedProfile.bankId, false);
+            }
           }
         }
       } catch {
-        // self-healing failed silently, keep original parse result
+        // self-healing failed silently
       }
     }
 
-    transactions = parseResult.transactions;
-    accountNo = parseResult.accountNo;
-    openingBalance = parseResult.openingBalance;
-    closingBalance = parseResult.closingBalance;
-    mathValid = parseResult.mathValid;
-    mismatch = parseResult.mismatch;
-    warnings.push(...parseResult.warnings);
+    // If still no profile found, try invisible onboarding (LLM from scratch)
+    if (!matchedProfile && matchingProfiles.length === 0) {
+      try {
+        const { createProfileFromPdf } = await import('./bank-profile-onboarding');
+        const newProfile = await createProfileFromPdf({
+          fullText,
+          pageWidth,
+          blocksWithCoordinates: allElements.map((el) => ({
+            text: el.text,
+            x: el.x,
+            y: el.y,
+            width: el.width,
+            page: 1,
+          })),
+          firstPageSample: fullText.slice(0, 2000),
+        });
 
+        if (newProfile) {
+          const parseResult = runParseWithProfile(linesOfElements, pageWidth, fullText, newProfile);
+          matchedProfile = newProfile;
+          transactions = parseResult.transactions;
+          accountNo = parseResult.accountNo;
+          openingBalance = parseResult.openingBalance;
+          closingBalance = parseResult.closingBalance;
+          mathValid = parseResult.mathValid;
+          mismatch = parseResult.mismatch;
+          warnings.push(...parseResult.warnings);
+          if (parseResult.mathValid) {
+            await updateRequiresReviewStatus(newProfile.bankId, false);
+          }
+        }
+      } catch (onboardErr) {
+        warnings.push(
+          `No se encontró un perfil bancario. El extracto requiere alineación manual — el sistema no pudo determinar el layout automáticamente.`,
+        );
+      }
+    }
+  } catch (err) {
+    logger.error('Error fetching active profiles', { error: err });
+  }
+
+  // Post-processing: reconstruct dates and warn on math mismatch
+  if (transactions.length > 0) {
     transactions = reconstructTransactionDates(
       transactions.map((t) => ({
         dateStr: t.originalDateStr || t.date.toISOString(),
@@ -809,57 +873,6 @@ export async function parsePDF(buffer: Buffer, options?: ParseOptions): Promise<
     if (!mathValid) {
       warnings.push(
         'La reconciliación matemática falló. Las transacciones se importaron igual para revisión manual.',
-      );
-    }
-  } else {
-    // Invisible onboarding: try to create profile via LLM inference
-    try {
-      const { createProfileFromPdf } = await import('./bank-profile-onboarding');
-      const newProfile = await createProfileFromPdf({
-        fullText,
-        pageWidth,
-        blocksWithCoordinates: allElements.map((el) => ({
-          text: el.text,
-          x: el.x,
-          y: el.y,
-          width: el.width,
-          page: 1,
-        })),
-        firstPageSample: fullText.slice(0, 2000),
-      });
-
-      matchedProfile = newProfile;
-      const parseResult = runParseWithProfile(linesOfElements, pageWidth, fullText, matchedProfile);
-      if (parseResult.mathValid && newProfile) {
-        await updateRequiresReviewStatus(newProfile.bankId, false);
-      }
-      transactions = parseResult.transactions;
-      accountNo = parseResult.accountNo;
-      openingBalance = parseResult.openingBalance;
-      closingBalance = parseResult.closingBalance;
-      mathValid = parseResult.mathValid;
-      mismatch = parseResult.mismatch;
-      warnings.push(...parseResult.warnings);
-
-      transactions = reconstructTransactionDates(
-        transactions.map((t) => ({
-          dateStr: t.originalDateStr || t.date.toISOString(),
-          description: t.description,
-          amount: t.amount,
-          reference: t.reference,
-        })),
-        startDate,
-        endDate,
-      );
-
-      if (!mathValid) {
-        warnings.push(
-          'La reconciliación matemática falló. Las transacciones se importaron igual para revisión manual.',
-        );
-      }
-    } catch (onboardErr) {
-      warnings.push(
-        `No se encontró un perfil bancario. El extracto requiere alineación manual — el sistema no pudo determinar el layout automáticamente.`,
       );
     }
   }

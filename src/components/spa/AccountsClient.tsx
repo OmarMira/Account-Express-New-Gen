@@ -373,7 +373,7 @@ export function AccountsClient({ initialAccounts }: { initialAccounts?: GlAccoun
         parentId: formData.parentId === 'none' || !formData.parentId ? null : formData.parentId,
       };
 
-      console.log('[ACCOUNTS CLIENT] handleSubmit', { method: editingAccount ? 'PUT' : 'POST', body });
+      logger.info('[ACCOUNTS CLIENT] handleSubmit', { method: editingAccount ? 'PUT' : 'POST', body });
 
       let res: Response;
       if (editingAccount) {

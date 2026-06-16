@@ -41,6 +41,7 @@ export const GET = apiHandler(
     });
 
     // 1. Calculate direct balances for all accounts and build a map
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const accountMap = new Map<string, any>();
     rawAccounts.forEach((acc) => {
       let balance = 0;
@@ -63,7 +64,7 @@ export const GET = apiHandler(
       const acc = accountMap.get(accId);
       if (!acc) return 0;
 
-      let total = acc.directBalance;
+      let total = acc.directBalance as number;
       // Get all child accounts of this parent
       const children = rawAccounts.filter((a) => a.parentId === accId);
       for (const child of children) {
@@ -98,8 +99,6 @@ export const POST = apiHandler(
 
     const body = await request.json();
     const { code, name, accountType, normalBalance, parentId } = body;
-
-    console.log('[POST /api/accounts]', { code, name, accountType, normalBalance, parentId: parentId ?? null });
 
     // Validate required fields
     if (!companyId || !code || !name || !accountType || !normalBalance) {

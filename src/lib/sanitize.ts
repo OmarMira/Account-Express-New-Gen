@@ -1,20 +1,20 @@
+import sanitizeHtml from 'sanitize-html';
+
 /**
- * Detecta si una cadena contiene patrones sospechosos de XSS.
- * No altera ni transforma el contenido original para preservar comillas, apóstrofes u otros
- * caracteres financieros válidos (como las descripciones de Bank of America).
+ * Sanitiza una cadena eliminando cualquier tag HTML o atributo peligroso.
+ * Permite texto plano completo, manteniendo comillas y caracteres especiales.
  */
-export function hasXssPattern(value: string): boolean {
-  const xssPatterns = [
-    /<script/i,
-    /javascript:/i,
-    /onerror\s*=/i,
-    /onload\s*=/i,
-    /onclick\s*=/i,
-    /onmouseover\s*=/i,
-    /<iframe/i,
-    /<object/i,
-    /<embed/i,
-    /<\/script>/i,
-  ];
-  return xssPatterns.some((pattern) => pattern.test(value));
+export function sanitizeInput(value: string): string {
+  if (!value) return value;
+  
+  return sanitizeHtml(value, {
+    allowedTags: [], // No HTML allowed at all
+    allowedAttributes: {},
+    disallowedTagsMode: 'discard',
+    textFilter: function(text) {
+      // sanitize-html will unescape HTML entities by default in textFilter if we aren't careful, 
+      // but if allowedTags is empty, it just strips tags.
+      return text;
+    }
+  });
 }

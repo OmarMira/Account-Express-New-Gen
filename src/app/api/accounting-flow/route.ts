@@ -4,6 +4,7 @@ import { apiHandler } from '@/lib/api-handler';
 import { requireCompanyContext } from '@/lib/context-storage';
 import { ValidationError } from '@/lib/api-error';
 import { aggregateAccountingFlow } from '@/lib/accounting/flow-aggregator';
+import { serverT } from '@/lib/server-i18n';
 
 /**
  * GET /api/accounting-flow
@@ -17,6 +18,7 @@ import { aggregateAccountingFlow } from '@/lib/accounting/flow-aggregator';
  *   - endDate: string (ISO YYYY-MM-DD, requerido)
  */
 export const GET = apiHandler(async (request: NextRequest) => {
+  const locale = request.headers.get('x-locale') || 'es';
   const { companyId } = requireCompanyContext();
 
   const { searchParams } = new URL(request.url);
@@ -24,16 +26,14 @@ export const GET = apiHandler(async (request: NextRequest) => {
   const endDateStr = searchParams.get('endDate');
 
   if (!startDateStr || !endDateStr) {
-    throw new ValidationError(
-      'Los parámetros startDate y endDate son requeridos en formato YYYY-MM-DD',
-    );
+    throw new ValidationError(serverT(locale, 'apiErrors.accountingFlow.datesRequired'));
   }
 
   const startDate = new Date(startDateStr);
   const endDate = new Date(`${endDateStr}T23:59:59.999Z`);
 
   if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-    throw new ValidationError('Fechas inválidas. Use el formato YYYY-MM-DD');
+    throw new ValidationError(serverT(locale, 'apiErrors.accountingFlow.invalidDates'));
   }
 
   const result = await aggregateAccountingFlow(db, {

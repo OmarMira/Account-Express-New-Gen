@@ -40,8 +40,8 @@
     "strategies": [
       {
         "priority": 1,
-        "pattern": "\\bINDN:\\s*([A-ZÀ-ÿ0-9\\s\\.&\\-']+?)(?=\\s+(?:CO ID:|ID:|CCD|WEB|$))",
-        "description": "Busca nombre tras 'INDN:' hasta marcador técnico (CO ID:, ID:, CCD, WEB)."
+        "pattern": "^(RAISER\\s*\\d*|LYFT[\\*\\.]?COM|TURO\\s*\\d*|AMERICAN\\s*EXPRESS|SETOYOTA\\s*FIN[\\/\\w]*|HOME\\s*DEPOT|KMF[\\w\\.]*|UBER\\s*USA\\s*\\d*|RIDELYFT)\\b",
+        "description": "Captura nombres de empresas con variantes numéricas y de formato al inicio de la descripción."
       },
       {
         "priority": 2,
@@ -50,11 +50,11 @@
       },
       {
         "priority": 3,
-        "pattern": "^(RAISER\\s*\\d*|LYFT[\\*\\.]?COM|TURO\\s*\\d*|AMERICAN\\s*EXPRESS|SETOYOTA\\s*FIN[\\/\\w]*|HOME\\s*DEPOT|KMF[\\w\\.]*|UBER\\s*USA\\s*\\d*|RIDELYFT)\\b",
-        "description": "Captura nombres de empresas con variantes numéricas y de formato al inicio de la descripción."
+        "pattern": "\\bINDN:\\s*([A-ZÀ-ÿ0-9\\s\\.&\\-']+?)(?=\\s+(?:CO ID:|ID:|CCD|WEB)|$)",
+        "description": "Busca nombre tras 'INDN:' hasta marcador técnico (CO ID:, ID:, CCD, WEB)."
       },
       {
-        "priority": 4,
+        "priority": 1,
         "pattern": "^([A-ZÀ-ÿ0-9\\s\\.\\,&\\-']{2,40})(?=\\s+(DES:|ID:|\\d{2}\\/))",
         "description": "Fallback: Primera secuencia de texto largo antes de un descriptor técnico."
       }

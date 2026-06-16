@@ -4,7 +4,7 @@ import { db } from '@/lib/db';
 import { requireCompanyContext } from '@/lib/context-storage';
 import { toUTCRange } from '@/lib/reports/date-filter';
 import { aggregateFinancialData } from '@/lib/reports/aggregation';
-import { exportToCSVContent } from '@/lib/reports/export-csv';
+import { exportToCSVContent, type TrialBalanceData, type IncomeStatementData, type BalanceSheetData } from '@/lib/reports/export-csv';
 import { generateHash } from '@/lib/reports/integrity';
 
 export const GET = apiHandler(async (req: NextRequest) => {
@@ -58,7 +58,7 @@ export const GET = apiHandler(async (req: NextRequest) => {
     });
 
     if (format === 'csv') {
-      const csvContent = exportToCSVContent(data, companyId, type, hash);
+      const csvContent = exportToCSVContent(data as TrialBalanceData | IncomeStatementData | BalanceSheetData, companyId, type, hash);
       const response = new NextResponse(csvContent);
       response.headers.set('Content-Type', 'text/csv; charset=utf-8');
       response.headers.set(

@@ -46,6 +46,7 @@ model Company {
   zipCode               String                 @default("")
   isActive              Boolean                @default(true)
   isOnboardingComplete  Boolean                @default(false)
+  entityFirstMode       Boolean                @default(false)
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
   auditLogs             AuditLog[]
@@ -171,6 +172,7 @@ model BankTransaction {
   @@index([statementId])
   @@index([glAccountId])
   @@index([isReconciled])
+  @@index([status])
   @@index([statementId, isReconciled, date])
   @@index([reference])
   @@index([statementId, date])
@@ -303,6 +305,7 @@ model EntityContext {
   companyId   String
   pattern     String
   role        String
+  roles       String?
   glAccountId String?
   source      String     @default("user")
   createdAt   DateTime   @default(now())

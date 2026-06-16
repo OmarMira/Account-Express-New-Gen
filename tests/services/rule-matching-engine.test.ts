@@ -140,7 +140,7 @@ describe('transactionMatchesRule', () => {
         conditionType: 'contains',
         conditionValue: 'paypal',
         conditions: [{ field: 'description', operator: 'contains', value: 'zelle' }],
-      };
+      } as Rule;
       expect(transactionMatchesRule(tx(), r)).toBe(true);
     });
   });

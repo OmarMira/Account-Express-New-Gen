@@ -221,6 +221,14 @@ async function generateReconciliationCSV(
     };
   }
 
+  const bankAccount = await db.bankAccount.findFirst({
+    where: { id: bankAccountId, companyId },
+    select: { id: true },
+  });
+  if (!bankAccount) {
+    return { csvContent: 'Error: Bank account not found', filename: 'error.csv' };
+  }
+
   const transactions = await db.bankTransaction.findMany({
     where: { statement: { bankAccountId } },
     include: { glAccount: { select: { code: true, name: true } } },

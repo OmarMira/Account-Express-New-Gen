@@ -7,10 +7,12 @@ import { logger } from '@/lib/logger';
 import { readJsonConfig, fileExists } from '@/lib/config-loader';
 import { db } from '@/lib/db';
 import { conversationalParseSchema } from '@/lib/validations/conversational-parse';
+import { serverT } from '@/lib/server-i18n';
 
 // ── POST /api/learning/conversational-parse ──────────────────────
 export const POST = apiHandler(async (request: NextRequest, context: RouteContext) => {
   const { userId, companyId } = requireCompanyContext();
+  const locale = request.headers.get('x-locale') ?? 'es';
 
   try {
     const raw = await request.json();
@@ -36,7 +38,16 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
           : undefined;
 
     // Ejecutar el parser (con userId para auditoría de respuesta IA externa)
-    const result = await parseConversationalContext(companyId, pattern, userInput, userId, undefined, undefined, direction);
+    const result = await parseConversationalContext(
+      companyId,
+      pattern,
+      userInput,
+      userId,
+      undefined,
+      undefined,
+      direction,
+      locale,
+    );
 
     // ─── VALIDACIÓN CRÍTICA DE DIRECCIONALIDAD (EXTERNALIZADA) ───
     const creditPct = directionProfile.creditPct;
@@ -74,8 +85,7 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
         if (creditPct >= threshold && profile?.normalBalance === 'debit') {
           return NextResponse.json(
             {
-              error:
-                'La cuenta sugerida no es válida para transacciones de INGRESO. Ajuste el rol o seleccione una cuenta de tipo Ingreso/Pasivo.',
+              error: serverT(locale, 'learning.directionCreditError'),
             },
             { status: 400 },
           );
@@ -84,8 +94,7 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
         if (debitPct >= threshold && profile?.normalBalance === 'credit') {
           return NextResponse.json(
             {
-              error:
-                'La cuenta sugerida no es válida para transacciones de GASTO. Ajuste el rol o seleccione una cuenta de tipo Gasto/Activo.',
+              error: serverT(locale, 'learning.directionDebitError'),
             },
             { status: 400 },
           );
@@ -120,7 +129,7 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
 
     return NextResponse.json({ success: true, data: result });
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : 'Internal server error';
+    const msg = error instanceof Error ? error.message : serverT(locale, 'learning.serverError');
     logger.error('CONVERSATIONAL_PARSE_ROUTE_ERROR', { error: msg });
     return NextResponse.json({ error: msg }, { status: 500 });
   }

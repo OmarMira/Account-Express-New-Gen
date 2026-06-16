@@ -15,7 +15,7 @@ let allActiveProfilesCache: BankProfileTyped[] | null = null;
 /**
  * Transforms a raw database BankProfile model into the strictly typed BankProfileTyped interface.
  */
-function mapToTypedProfile(raw: Prisma.BankProfileGetPayload<{}>): BankProfileTyped {
+function mapToTypedProfile(raw: Prisma.BankProfileGetPayload<object>): BankProfileTyped {
   let parsedFingerprints: string[] = [];
   try {
     parsedFingerprints =

@@ -109,13 +109,12 @@ export function checkRateLimit(
 
     return { allowed, limit: maxAllowed, remaining, resetAt: Math.ceil(window.resetAt / 1000) };
   } catch (error) {
-    logger.error('[RATE LIMIT ERROR] Fail-safe active, allowing request:', { error: String(error) });
-    // Fail-safe: Si hay algún error, permitimos la petición para no bloquear el sistema contable
+    logger.error('[RATE LIMIT ERROR] Fail-safe active, denying request:', { error: String(error) });
     return {
-      allowed: true,
-      limit: 60,
-      remaining: 59,
-      resetAt: Math.ceil((Date.now() + 60000) / 1000),
+      allowed: false,
+      limit: 0,
+      remaining: 0,
+      resetAt: Math.ceil((Date.now() + 30000) / 1000),
     };
   }
 }

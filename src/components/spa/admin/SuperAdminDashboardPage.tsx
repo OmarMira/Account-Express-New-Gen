@@ -15,7 +15,7 @@ import {
   Moon,
   Sun,
 } from 'lucide-react';
-import { useAuthStore } from '@/store/auth-store';
+import { useAuthStore, type ViewName } from '@/store/auth-store';
 import { useLanguageStore } from '@/store/language-store';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -33,9 +33,9 @@ import { logger } from '@/lib/logger';
 
 // Nav menu item component
 interface NavBtnProps {
-  viewName: any;
-  currentView: any;
-  setCurrentView: (view: any) => void;
+  viewName: ViewName;
+  currentView: string;
+  setCurrentView: (view: ViewName) => void;
   icon: React.ComponentType<{ className?: string }>;
   label: string;
 }
@@ -58,87 +58,10 @@ const NavBtn = ({ viewName, currentView, setCurrentView, icon: Icon, label }: Na
   );
 };
 
-const LOCAL_TRANSLATIONS: Record<string, Record<string, string>> = {
-  en: {
-    superAdmin: 'Super Admin',
-    dashboard: 'Control Panel',
-    companies: 'Global Companies',
-    users: 'Global Users',
-    logs: 'Audit Logs',
-    selectCompany: 'Select Company',
-    mainDashboardTitle: 'Main Control Panel',
-    manageCompaniesTitle: 'Company Management',
-    companyDetailTitle: 'Company Details',
-    manageUsersTitle: 'User Management',
-    logsTitle: 'System Audit Logs',
-    roleSuperAdmin: 'Super Administrator',
-    authorizedAccess: 'Authorized Access',
-    welcomeBack: 'Welcome back, {name}!',
-    heroDesc:
-      'This is your global control center. From here you can securely monitor all registered companies, manage user accounts, and review system audit logs.',
-    totalCompanies: 'Total Companies',
-    totalCompaniesDesc: 'Registered in the system',
-    globalUsers: 'Global Users',
-    globalUsersDesc: 'Administrators and operators',
-    auditLogs: 'Audit Logs',
-    auditLogsDesc: 'Activity logs',
-    serverLoad: 'Server Load',
-    serverLoadDesc: 'Consumed resources',
-    companiesCardTitle: 'Companies',
-    companiesCardDesc: 'Create, edit, deactivate, or delete companies permanently.',
-    usersCardTitle: 'Users',
-    usersCardDesc: 'Manage access and roles for super admins and company operators.',
-    logsCardTitle: 'Audit Log',
-    logsCardDesc: 'Review the detailed history of system actions and operations.',
-    manageBtn: 'Manage',
-  },
-  es: {
-    superAdmin: 'Super Admin',
-    dashboard: 'Panel de Control',
-    companies: 'Empresas Globales',
-    users: 'Usuarios Globales',
-    logs: 'Bitácora de Logs',
-    selectCompany: 'Seleccionar Empresa',
-    mainDashboardTitle: 'Panel de Control Principal',
-    manageCompaniesTitle: 'Gestión de Empresas',
-    companyDetailTitle: 'Detalle de la Empresa',
-    manageUsersTitle: 'Gestión de Usuarios',
-    logsTitle: 'Bitácora de Logs',
-    roleSuperAdmin: 'Super Administrador',
-    authorizedAccess: 'Acceso Autorizado',
-    welcomeBack: '¡Bienvenido de vuelta, {name}!',
-    heroDesc:
-      'Este es tu centro de control global. Desde aquí puedes supervisar todas las empresas registradas, administrar las cuentas de usuario y revisar la auditoría de logs del sistema de forma segura.',
-    totalCompanies: 'Total de Empresas',
-    totalCompaniesDesc: 'Registradas en el sistema',
-    globalUsers: 'Usuarios Globales',
-    globalUsersDesc: 'Administradores y operadores',
-    auditLogs: 'Bitácora de Logs',
-    auditLogsDesc: 'Registros de actividad',
-    serverLoad: 'Carga del Servidor',
-    serverLoadDesc: 'Recursos consumidos',
-    companiesCardTitle: 'Empresas',
-    companiesCardDesc: 'Crea, edita, desactiva o elimina empresas de forma permanente.',
-    usersCardTitle: 'Usuarios',
-    usersCardDesc: 'Administra los accesos y roles de super admin y operadores de empresas.',
-    logsCardTitle: 'Bitácora',
-    logsCardDesc: 'Revisa el historial de acciones y operaciones detalladas del sistema.',
-    manageBtn: 'Gestionar',
-  },
-};
-
 export default function SuperAdminDashboardPage() {
   const t = useLanguageStore((s) => s.t);
-  const language = useLanguageStore((s) => s.language) || 'es';
-  const [mounted, setMounted] = useState(false);
   const { user, currentView, setCurrentView, logout } = useAuthStore();
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const activeLang = mounted ? language : 'es';
-  const dt = LOCAL_TRANSLATIONS[activeLang] || LOCAL_TRANSLATIONS.es;
   const [stats, setStats] = useState({
     companiesCount: 0,
     usersCount: 0,
@@ -201,28 +124,28 @@ export default function SuperAdminDashboardPage() {
               currentView={currentView}
               setCurrentView={setCurrentView}
               icon={Cpu}
-              label={dt.dashboard}
+              label={t('superAdmin.dashboard')}
             />
             <NavBtn
               viewName="admin-companies"
               currentView={currentView}
               setCurrentView={setCurrentView}
               icon={Building2}
-              label={dt.companies}
+              label={t('superAdmin.companies')}
             />
             <NavBtn
               viewName="admin-users"
               currentView={currentView}
               setCurrentView={setCurrentView}
               icon={Users}
-              label={dt.users}
+              label={t('superAdmin.users')}
             />
             <NavBtn
               viewName="admin-audit-logs"
               currentView={currentView}
               setCurrentView={setCurrentView}
               icon={Activity}
-              label={dt.logs}
+              label={t('superAdmin.logs')}
             />
           </div>
         </div>
@@ -236,7 +159,7 @@ export default function SuperAdminDashboardPage() {
             className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 transition-colors"
           >
             <ArrowLeft className="size-4 shrink-0" />
-            {dt.selectCompany}
+            {t('superAdmin.selectCompany')}
           </button>
 
           <button
@@ -255,11 +178,11 @@ export default function SuperAdminDashboardPage() {
         <header className="flex h-16 shrink-0 items-center justify-between border-b bg-background px-6">
           <div className="flex items-center gap-2">
             <h2 className="text-lg font-bold text-foreground capitalize tracking-tight">
-              {currentView === 'admin-dashboard' && dt.mainDashboardTitle}
-              {currentView === 'admin-companies' && dt.manageCompaniesTitle}
-              {currentView === 'admin-company-detail' && dt.companyDetailTitle}
-              {currentView === 'admin-users' && dt.manageUsersTitle}
-              {currentView === 'admin-audit-logs' && dt.logsTitle}
+              {currentView === 'admin-dashboard' && t('superAdmin.mainDashboardTitle')}
+              {currentView === 'admin-companies' && t('superAdmin.manageCompaniesTitle')}
+              {currentView === 'admin-company-detail' && t('superAdmin.companyDetailTitle')}
+              {currentView === 'admin-users' && t('superAdmin.manageUsersTitle')}
+              {currentView === 'admin-audit-logs' && t('superAdmin.logsTitle')}
             </h2>
           </div>
 
@@ -277,7 +200,7 @@ export default function SuperAdminDashboardPage() {
                   {user ? `${user.firstName} ${user.lastName}` : 'Administrador'}
                 </p>
                 <p className="text-[10px] text-muted-foreground mt-0.5 leading-none">
-                  {dt.roleSuperAdmin}
+                  {t('superAdmin.roleSuperAdmin')}
                 </p>
               </div>
             </div>
@@ -294,12 +217,12 @@ export default function SuperAdminDashboardPage() {
                   <div className="relative z-10 max-w-xl space-y-3">
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-500/30 px-3 py-1 text-xs font-semibold text-indigo-200">
                       <ShieldAlert className="size-3.5" />
-                      {dt.authorizedAccess}
+                      {t('superAdmin.authorizedAccess')}
                     </span>
                     <h3 className="text-3xl font-extrabold tracking-tight">
-                      {dt.welcomeBack.replace('{name}', user?.firstName || '')}
+                      {t('superAdmin.welcomeBack').replace('{name}', user?.firstName || '')}
                     </h3>
-                    <p className="text-sm text-indigo-200/90 leading-relaxed">{dt.heroDesc}</p>
+                    <p className="text-sm text-indigo-200/90 leading-relaxed">{t('superAdmin.heroDesc')}</p>
                   </div>
                   <div className="absolute right-0 top-0 h-full w-1/3 bg-gradient-to-l from-indigo-500/10 to-transparent pointer-events-none" />
                 </div>
@@ -312,7 +235,7 @@ export default function SuperAdminDashboardPage() {
                   >
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                       <CardTitle className="text-sm font-semibold text-muted-foreground">
-                        {dt.totalCompanies}
+                        {t('superAdmin.totalCompanies')}
                       </CardTitle>
                       <div className="rounded-xl bg-indigo-500/10 p-2 text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform">
                         <Building2 className="size-5" />
@@ -326,7 +249,7 @@ export default function SuperAdminDashboardPage() {
                           {stats.companiesCount}
                         </span>
                       )}
-                      <p className="text-xs text-muted-foreground mt-1">{dt.totalCompaniesDesc}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{t('superAdmin.totalCompaniesDesc')}</p>
                     </CardContent>
                   </Card>
 
@@ -336,7 +259,7 @@ export default function SuperAdminDashboardPage() {
                   >
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                       <CardTitle className="text-sm font-semibold text-muted-foreground">
-                        {dt.globalUsers}
+                        {t('superAdmin.globalUsers')}
                       </CardTitle>
                       <div className="rounded-xl bg-violet-500/10 p-2 text-violet-600 dark:text-violet-400 group-hover:scale-110 transition-transform">
                         <Users className="size-5" />
@@ -350,7 +273,7 @@ export default function SuperAdminDashboardPage() {
                           {stats.usersCount}
                         </span>
                       )}
-                      <p className="text-xs text-muted-foreground mt-1">{dt.globalUsersDesc}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{t('superAdmin.globalUsersDesc')}</p>
                     </CardContent>
                   </Card>
 
@@ -360,7 +283,7 @@ export default function SuperAdminDashboardPage() {
                   >
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                       <CardTitle className="text-sm font-semibold text-muted-foreground">
-                        {dt.auditLogs}
+                        {t('superAdmin.auditLogs')}
                       </CardTitle>
                       <div className="rounded-xl bg-emerald-500/10 p-2 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform">
                         <Activity className="size-5" />
@@ -374,14 +297,14 @@ export default function SuperAdminDashboardPage() {
                           {stats.logsCount}
                         </span>
                       )}
-                      <p className="text-xs text-muted-foreground mt-1">{dt.auditLogsDesc}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{t('superAdmin.auditLogsDesc')}</p>
                     </CardContent>
                   </Card>
 
                   <Card className="group">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                       <CardTitle className="text-sm font-semibold text-muted-foreground">
-                        {dt.serverLoad}
+                        {t('superAdmin.serverLoad')}
                       </CardTitle>
                       <div className="rounded-xl bg-amber-500/10 p-2 text-amber-600 dark:text-amber-400 group-hover:scale-110 transition-transform">
                         <Database className="size-5" />
@@ -395,7 +318,7 @@ export default function SuperAdminDashboardPage() {
                           {stats.systemLoad}
                         </span>
                       )}
-                      <p className="text-xs text-muted-foreground mt-1">{dt.serverLoadDesc}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{t('superAdmin.serverLoadDesc')}</p>
                     </CardContent>
                   </Card>
                 </div>
@@ -406,9 +329,9 @@ export default function SuperAdminDashboardPage() {
                     <CardHeader>
                       <CardTitle className="text-base font-bold flex items-center gap-2">
                         <Building2 className="size-5 text-indigo-600" />
-                        {dt.companiesCardTitle}
+                        {t('superAdmin.companiesCardTitle')}
                       </CardTitle>
-                      <CardDescription>{dt.companiesCardDesc}</CardDescription>
+                      <CardDescription>{t('superAdmin.companiesCardDesc')}</CardDescription>
                     </CardHeader>
                     <CardContent className="pt-2">
                       <Button
@@ -416,7 +339,7 @@ export default function SuperAdminDashboardPage() {
                         className="w-full justify-between"
                         onClick={() => setCurrentView('admin-companies')}
                       >
-                        {dt.manageBtn}
+                        {t('superAdmin.manageBtn')}
                         <ArrowLeft className="size-4 rotate-180" />
                       </Button>
                     </CardContent>
@@ -426,9 +349,9 @@ export default function SuperAdminDashboardPage() {
                     <CardHeader>
                       <CardTitle className="text-base font-bold flex items-center gap-2">
                         <Users className="size-5 text-violet-600" />
-                        {dt.usersCardTitle}
+                        {t('superAdmin.usersCardTitle')}
                       </CardTitle>
-                      <CardDescription>{dt.usersCardDesc}</CardDescription>
+                      <CardDescription>{t('superAdmin.usersCardDesc')}</CardDescription>
                     </CardHeader>
                     <CardContent className="pt-2">
                       <Button
@@ -436,7 +359,7 @@ export default function SuperAdminDashboardPage() {
                         className="w-full justify-between"
                         onClick={() => setCurrentView('admin-users')}
                       >
-                        {dt.manageBtn}
+                        {t('superAdmin.manageBtn')}
                         <ArrowLeft className="size-4 rotate-180" />
                       </Button>
                     </CardContent>
@@ -446,9 +369,9 @@ export default function SuperAdminDashboardPage() {
                     <CardHeader>
                       <CardTitle className="text-base font-bold flex items-center gap-2">
                         <Activity className="size-5 text-emerald-600" />
-                        {dt.logsCardTitle}
+                        {t('superAdmin.logsCardTitle')}
                       </CardTitle>
-                      <CardDescription>{dt.logsCardDesc}</CardDescription>
+                      <CardDescription>{t('superAdmin.logsCardDesc')}</CardDescription>
                     </CardHeader>
                     <CardContent className="pt-2">
                       <Button
@@ -456,7 +379,7 @@ export default function SuperAdminDashboardPage() {
                         className="w-full justify-between"
                         onClick={() => setCurrentView('admin-audit-logs')}
                       >
-                        {dt.manageBtn}
+                        {t('superAdmin.manageBtn')}
                         <ArrowLeft className="size-4 rotate-180" />
                       </Button>
                     </CardContent>

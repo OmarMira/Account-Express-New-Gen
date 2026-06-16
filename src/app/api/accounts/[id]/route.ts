@@ -1,19 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { apiHandler, type RouteContext } from '@/lib/api-handler';
-import { requireCurrentUserId } from '@/lib/context-storage';
+import { requireCompanyContext } from '@/lib/context-storage';
 import { journalAccountsCache } from '@/lib/cache';
 import { readJsonConfig } from '@/lib/config-loader';
+import { logger } from '@/lib/logger';
 
 // ─── GET /api/accounts/[id] ────────────────────────────────────────────
 export const GET = apiHandler(
   async (_request: NextRequest, context: RouteContext) => {
-    const userId = requireCurrentUserId();
+    const { userId, companyId } = requireCompanyContext();
 
     const { id } = await context.params;
 
-    const account = await db.glAccount.findUnique({
-      where: { id },
+    const account = await db.glAccount.findFirst({
+      where: { id, companyId },
       include: {
         parent: {
           select: { id: true, code: true, name: true },
@@ -47,14 +48,14 @@ export const GET = apiHandler(
 // ─── PUT /api/accounts/[id] ────────────────────────────────────────────
 export const PUT = apiHandler(
   async (request: NextRequest, context: RouteContext) => {
-    const userId = requireCurrentUserId();
+    const { userId, companyId } = requireCompanyContext();
 
     const { id } = await context.params;
     const body = await request.json();
     const { name, isActive, code, accountType, normalBalance, parentId } = body;
 
-    // Check account exists
-    const existing = await db.glAccount.findUnique({ where: { id } });
+    // Check account exists and belongs to user's company
+    const existing = await db.glAccount.findFirst({ where: { id, companyId } });
     if (!existing) {
       return NextResponse.json({ error: 'Account not found' }, { status: 404 });
     }
@@ -181,11 +182,11 @@ async function collectDescendantIds(parentId: string): Promise<string[]> {
 // ─── DELETE /api/accounts/[id] (hard delete) ───────────────────────────
 export const DELETE = apiHandler(
   async (request: NextRequest, context: RouteContext) => {
-    const userId = requireCurrentUserId();
+    const { userId, companyId } = requireCompanyContext();
 
     const { id } = await context.params;
-    const account = await db.glAccount.findUnique({
-      where: { id },
+    const account = await db.glAccount.findFirst({
+      where: { id, companyId },
       include: {
         _count: {
           select: {
@@ -202,8 +203,6 @@ export const DELETE = apiHandler(
       return NextResponse.json({ error: 'Account not found' }, { status: 404 });
     }
 
-    console.log('[DELETE ACCOUNT] _count:', JSON.stringify(account._count), 'isSystem:', account.isSystem);
-
     // Cannot delete system accounts
     if (account.isSystem) {
       const msg = `Las cuentas del sistema no se pueden eliminar.`;
@@ -219,7 +218,11 @@ export const DELETE = apiHandler(
     });
     if (totalJournalLines > 0) {
       const msg = `No se puede eliminar "${account.name}" porque tiene ${totalJournalLines} asiento(s) contable(s) en esta cuenta o sus sub-cuentas.`;
-      console.warn('[DELETE ACCOUNT 409] journalLines in hierarchy', { id, name: account.name, totalJournalLines });
+      logger.warn('[DELETE ACCOUNT 409] journalLines in hierarchy', {
+        id,
+        name: account.name,
+        totalJournalLines,
+      });
       return NextResponse.json({ error: msg }, { status: 409 });
     }
 
@@ -227,7 +230,11 @@ export const DELETE = apiHandler(
     // (FK is NOT nullable — would break the bank account)
     if (account._count.bankAccounts > 0) {
       const msg = `No se puede eliminar "${account.name}" porque está vinculada a ${account._count.bankAccounts} cuenta(s) bancaria(s).`;
-      console.warn('[DELETE ACCOUNT 409] bankAccounts > 0', { id, name: account.name, bankAccounts: account._count.bankAccounts });
+      logger.warn('[DELETE ACCOUNT 409] bankAccounts > 0', {
+        id,
+        name: account.name,
+        bankAccounts: account._count.bankAccounts,
+      });
       return NextResponse.json({ error: msg }, { status: 409 });
     }
 

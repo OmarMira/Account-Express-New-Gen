@@ -56,6 +56,8 @@ export interface EntityCandidate {
   sampleDescriptions: string[];
   hasContext?: boolean;
   contextRole?: string;
+  suggestedAccountCode?: string;
+  suggestedAccountId?: string;
 }
 
 // ========== CACHE DE CONFIGURACIÓN ==========
@@ -128,6 +130,40 @@ export function sanitizeDescription(desc: string, config: EntityDetectionConfig)
   return sanitizeDescriptionForDetection(desc, config);
 }
 
+// ========== COMPONENTES DE EXTRACCIÓN (TODAS LAS ESTRATEGIAS) ==========
+export interface ExtractedComponents {
+  merchant: string | null; // P1: merchant at line start
+  transferName: string | null; // P2: from/to transfer name
+  indnName: string | null; // P3: INDN: ACH individual
+}
+
+export function extractComponents(
+  desc: string,
+  config: EntityDetectionConfig,
+): ExtractedComponents {
+  const result: ExtractedComponents = { merchant: null, transferName: null, indnName: null };
+  const strategies = [...config.extraction.strategies].sort((a, b) => a.priority - b.priority);
+
+  for (const strategy of strategies) {
+    try {
+      const rx = new RegExp(strategy.pattern, 'i');
+      const match = desc.match(rx);
+      if (match) {
+        const extracted = (match[1] || match[0]).trim();
+        if (extracted.length >= config.clustering.minLength) {
+          if (strategy.priority === 1) result.merchant = extracted;
+          else if (strategy.priority === 2) result.transferName = extracted;
+          else if (strategy.priority === 3) result.indnName = extracted;
+        }
+      }
+    } catch (err) {
+      logger.warn('EXTRACT_COMPONENTS_INVALID_STRATEGY', { error: String(err) });
+    }
+  }
+
+  return result;
+}
+
 // ========== EXTRACCIÓN CON ESTRATEGIAS PRIORIZADAS ==========
 export function extractName(desc: string, config: EntityDetectionConfig): string | null {
   const strategies = [...config.extraction.strategies].sort((a, b) => a.priority - b.priority);
@@ -169,9 +205,7 @@ export function clusterCandidates(
   const { minOccurrences, ignorePatterns } = config.validation;
 
   for (const tx of transactions) {
-    // Apply centralized normalization BEFORE extraction
-    const normalized = normalizePattern(tx.description);
-    const cleaned = sanitizeDescription(normalized, config);
+    const cleaned = sanitizeDescription(tx.description, config);
     const name = extractName(cleaned, config);
     if (!name) continue;
 

@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
+import { logger } from '@/lib/logger';
 
-let config: any = {
+let config: { zipCodeRegex: string; phoneRegex: string; validStates: string[] } = {
   zipCodeRegex: '^\\d{5}(-\\d{4})?$',
   phoneRegex: '^\\+?1?[-.\\s]?\\(?[2-9]\\d{2}\\)?[-.\\s]?\\d{3}[-.\\s]?\\d{4}$',
   validStates: [
@@ -62,10 +63,10 @@ let config: any = {
 try {
   const configPath = join(process.cwd(), 'rules/us-address-config.json');
   if (existsSync(configPath)) {
-    config = JSON.parse(readFileSync(configPath, 'utf-8'));
+    config = JSON.parse(readFileSync(configPath, 'utf-8')) as typeof config;
   }
 } catch (err) {
-  // ignore, use fallback
+  logger.warn('[US-ADDRESS] Config load failed, using defaults', { error: String(err) });
 }
 
 export const usAddressSchema = z.object({

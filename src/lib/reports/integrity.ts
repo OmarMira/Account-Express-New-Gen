@@ -1,6 +1,6 @@
 import { createHash } from 'crypto';
 
-export function generateHash(payload: any): string {
+export function generateHash(payload: string | Record<string, unknown>): string {
   const content = typeof payload === 'string' ? payload : JSON.stringify(payload);
   return createHash('sha256').update(content).digest('hex');
 }

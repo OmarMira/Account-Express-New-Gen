@@ -1,6 +1,9 @@
-// src/lib/services/rule-matching-engine.ts
-// Centralized rule‑matching engine (DRY implementation)
-// Supports legacy V1 format and new V2 format with a conditions array.
+import { readFileSync } from 'fs';
+import { join } from 'path';
+import { loadConfig, extractComponents } from '@/lib/services/entity-detector';
+import { getKnownSocioPatterns } from '@/lib/services/entity-classifier';
+import { db } from '@/lib/db';
+import type { RuleCondition } from '@/lib/types/shared';
 
 export type Transaction = { description: string; amount: number };
 
@@ -8,8 +11,8 @@ export type Rule = {
   // V1 fields (optional, kept for backward compatibility)
   conditionType?: string | null; // e.g. "contains", "starts_with", "amount_greater"
   conditionValue?: string | number | null;
-  // V2 field – array of condition objects (typed as any to prevent Prisma JsonValue type compilation errors)
-  conditions?: any;
+  // V2 field – array of condition objects
+  conditions?: RuleCondition[] | null;
   // Direction of transaction
   transactionDirection?: string | null;
 };
@@ -18,7 +21,7 @@ export type Rule = {
  * Evaluate a single condition against a transaction.
  * Ensures consistent whitespace normalization: lowercase, trim, collapse multiple spaces.
  */
-function evaluateCondition(tx: Transaction, cond: any): boolean {
+function evaluateCondition(tx: Transaction, cond: RuleCondition): boolean {
   if (!cond || typeof cond !== 'object') return false;
   const field = cond.field;
   const operator = cond.operator;
@@ -59,9 +62,85 @@ function evaluateCondition(tx: Transaction, cond: any): boolean {
 }
 
 /**
- * Main exported helper – returns true if a transaction satisfies a rule.
+ * Preload entity-first context for a company (known SOCIO patterns + entityFirstMode flag).
+ * Call once per request to avoid repeated DB queries on every transaction.
  */
-export function transactionMatchesRule(tx: Transaction, rule: Rule): boolean {
+export async function loadEntityFirstContext(companyId: string): Promise<{
+  knownSocioPatterns: string[];
+  entityFirstMode: boolean;
+}> {
+  const company = await db.company.findUnique({
+    where: { id: companyId },
+    select: { entityFirstMode: true },
+  });
+  const entityFirstMode = company?.entityFirstMode ?? false;
+  const knownSocioPatterns = entityFirstMode ? await getKnownSocioPatterns(companyId) : [];
+  return { knownSocioPatterns, entityFirstMode };
+}
+
+/**
+ * Entity-first pre-filter: checks if a transaction should be excluded from SOCIO rule matching
+ * due to entity conflict (merchant at P1 + SOCIO name at P3/INDN).
+ */
+export function entityFirstCheck(
+  tx: Transaction,
+  knownSocioPatterns: string[],
+  entityFirstMode: boolean,
+): { skipSocioRules: boolean; reason?: string } {
+  if (!entityFirstMode || knownSocioPatterns.length === 0) {
+    return { skipSocioRules: false };
+  }
+
+  const config = loadConfig();
+  const components = extractComponents(tx.description, config);
+
+  if (components.merchant && components.indnName) {
+    const isSocioInIndn = knownSocioPatterns.some((p) =>
+      components.indnName!.toLowerCase().includes(p.toLowerCase()),
+    );
+    if (isSocioInIndn) {
+      return {
+        skipSocioRules: true,
+        reason: `Merchant "${components.merchant}" detected at P1 with SOCIO name "${components.indnName}" in INDN: — excluding SOCIO rule match`,
+      };
+    }
+  }
+
+  return { skipSocioRules: false };
+}
+
+/**
+ * Main exported helper – returns true if a transaction satisfies a rule.
+ * Supports optional entity-first conflict pre-filter via knownSocioPatterns.
+ */
+export function transactionMatchesRule(
+  tx: Transaction,
+  rule: Rule,
+  knownSocioPatterns?: string[],
+  entityFirstMode?: boolean,
+): boolean {
+  // Entity-first pre-filter: skip SOCIO rules when merchant + SOCIO INDN conflict detected
+  if (entityFirstMode && knownSocioPatterns?.length) {
+    const check = entityFirstCheck(tx, knownSocioPatterns, entityFirstMode);
+    if (check.skipSocioRules) {
+      const ruleConditions = Array.isArray(rule.conditions) ? rule.conditions : [];
+      const isSocioRule = ruleConditions.some(
+        (c: RuleCondition) =>
+          c.field === 'description' &&
+          knownSocioPatterns.some((p: string) => String(c.value).toLowerCase().includes(p)),
+      );
+      // Legacy V1 fallback: check conditionValue against known patterns when conditions array is absent
+      if (!isSocioRule && (!rule.conditions || rule.conditions.length === 0)) {
+        const legacyMatch = knownSocioPatterns.some(p =>
+          String(rule.conditionValue || '').toLowerCase().includes(p.toLowerCase()) ||
+          (rule.conditionType || '').toLowerCase().includes(p.toLowerCase())
+        );
+        if (legacyMatch) return false;
+      }
+      if (isSocioRule) return false;
+    }
+  }
+
   // Direction validation
   if (rule.transactionDirection === 'debit' && tx.amount >= 0) return false;
   if (rule.transactionDirection === 'credit' && tx.amount < 0) return false;
@@ -78,11 +157,91 @@ export function transactionMatchesRule(tx: Transaction, rule: Rule): boolean {
         ? 'amount'
         : 'description';
     return evaluateCondition(tx, {
-      field,
-      operator: rule.conditionType,
+      field: field as 'description' | 'amount',
+      operator: rule.conditionType as RuleCondition['operator'],
       value: rule.conditionValue,
     });
   }
 
   return false;
+}
+
+let cachedRolePriorities: Record<string, number> | null = null;
+
+export function loadRolePriorities(): Record<string, number> {
+  if (cachedRolePriorities) return cachedRolePriorities;
+  try {
+    const path = join(process.cwd(), 'rules/entity-roles.json');
+    const roles = JSON.parse(readFileSync(path, 'utf-8')) as string[];
+    const map: Record<string, number> = {};
+    roles.forEach((role, index) => {
+      map[role.toUpperCase()] = index + 1;
+    });
+    cachedRolePriorities = map;
+    return map;
+  } catch {
+    return {};
+  }
+}
+
+export interface MatchingRule {
+  id: string;
+  name: string;
+  priority: number;
+  conditionType?: string | null;
+  conditionValue?: string | number | null;
+  conditions?: RuleCondition[] | null;
+  transactionDirection?: string | null;
+  glAccountId?: string | null;
+  debitGlAccountId?: string | null;
+  creditGlAccountId?: string | null;
+}
+
+export function evaluateWinningRule(
+  matchingRules: MatchingRule[],
+  tx: Transaction,
+  companyId: string,
+  rolePriorities: Record<string, number> = loadRolePriorities(),
+  contexts?: Array<{ pattern: string; role: string }>,
+): MatchingRule {
+  if (matchingRules.length <= 1) return matchingRules[0];
+
+  const rolePrios = rolePriorities;
+  const descLower = tx.description.toLowerCase();
+
+  const scored = matchingRules.map((rule) => {
+    let highestRolePriority = 999;
+
+    const conditions: RuleCondition[] =
+      Array.isArray(rule.conditions) && rule.conditions.length > 0
+        ? rule.conditions
+        : rule.conditionValue
+          ? [{ field: 'description' as const, operator: (rule.conditionType || 'contains') as RuleCondition['operator'], value: rule.conditionValue }]
+          : [];
+
+    for (const cond of conditions) {
+      if (cond.field === 'description') {
+        const condValue = String(cond.value).toLowerCase();
+        if (descLower.includes(condValue) && contexts) {
+          for (const ctx of contexts) {
+            if (condValue.includes(ctx.pattern.toLowerCase())) {
+              const prio = rolePrios[ctx.role.toUpperCase()] ?? 99;
+              if (prio < highestRolePriority) {
+                highestRolePriority = prio;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return { rule, rolePriority: highestRolePriority, dbPriority: rule.priority ?? 99 };
+  });
+
+  scored.sort((a, b) => {
+    if (a.rolePriority !== b.rolePriority) return a.rolePriority - b.rolePriority;
+    return a.dbPriority - b.dbPriority;
+  });
+
+  return scored[0].rule;
 }

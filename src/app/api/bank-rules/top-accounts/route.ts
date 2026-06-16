@@ -7,46 +7,44 @@ import { requireCompanyContext } from '@/lib/context-storage';
 // Returns up to 8 most-used GL accounts across bank rules for this company.
 // Response: { data: [{ code, name, accountType, useCount }] }
 export const GET = apiHandler(async (request: NextRequest, context: RouteContext) => {
-  const { userId, companyId } = requireCompanyContext();
+  const { companyId } = requireCompanyContext();
   const { searchParams } = new URL(request.url);
 
-  // Aggregate rule counts per glAccountId (use the legacy glAccountId field as canonical reference)
-  const grouped = await db.bankRule.groupBy({
-    by: ['glAccountId'],
-    where: {
-      companyId,
-      glAccountId: { not: null },
-    },
-    _count: { glAccountId: true },
-    orderBy: { _count: { glAccountId: 'desc' } },
-    take: 8,
+  // Query all accounts used in any of the 3 account fields, count manually
+  const rules = await db.bankRule.findMany({
+    where: { companyId },
+    select: { glAccountId: true, debitGlAccountId: true, creditGlAccountId: true },
   });
 
-  if (grouped.length === 0) {
-    return NextResponse.json({ data: [] });
+  const accountCount = new Map<string, number>();
+  for (const r of rules) {
+    for (const id of [r.glAccountId, r.debitGlAccountId, r.creditGlAccountId]) {
+      if (id) accountCount.set(id, (accountCount.get(id) || 0) + 1);
+    }
   }
 
-  // Fetch account details for the top IDs
-  const accountIds = grouped.map((g) => g.glAccountId as string);
+  const topIds = [...accountCount.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
+    .map(([id]) => id);
+
+  if (topIds.length === 0) return NextResponse.json({ data: [] });
+
   const accounts = await db.glAccount.findMany({
-    where: { id: { in: accountIds }, companyId, parentId: null },
+    where: { id: { in: topIds }, companyId },
     select: { id: true, code: true, name: true, accountType: true },
   });
 
-  // Build a lookup map and merge with counts, preserving rank order
   const accountMap = new Map(accounts.map((a) => [a.id, a]));
 
-  const data = grouped
-    .filter((g) => accountMap.has(g.glAccountId as string))
-    .map((g) => {
-      const acc = accountMap.get(g.glAccountId as string)!;
-      return {
-        code: acc.code,
-        name: acc.name,
-        accountType: acc.accountType,
-        useCount: g._count.glAccountId,
-      };
-    });
+  const data = topIds
+    .filter((id) => accountMap.has(id))
+    .map((id) => ({
+      code: accountMap.get(id)!.code,
+      name: accountMap.get(id)!.name,
+      accountType: accountMap.get(id)!.accountType,
+      useCount: accountCount.get(id)!,
+    }));
 
   return NextResponse.json({ data });
 });

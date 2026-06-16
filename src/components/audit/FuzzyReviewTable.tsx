@@ -27,6 +27,7 @@ import { LinkJournalModal } from './LinkJournalModal';
 import { formatCurrency, formatDate } from '@/lib/format';
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
+import { useLanguageStore } from '@/store/language-store';
 
 interface FuzzyCandidate {
   id: string;
@@ -57,6 +58,7 @@ export function FuzzyReviewTable({
   isLoading = false,
   onRefresh,
 }: FuzzyReviewTableProps) {
+  const t = useLanguageStore((s) => s.t);
   const { getFuzzyMatches, linkTransaction, isLinking } = useFuzzyMatchAudit();
 
   const [activeFuzzyTxId, setActiveFuzzyTxId] = useState<string | null>(null);
@@ -81,7 +83,7 @@ export function FuzzyReviewTable({
       setActiveFuzzyTxId(tx.id);
     } catch (error) {
       logger.error('Error fetching matches:', { error: String(error) });
-      toast.error('No se pudieron buscar coincidencias para esta transacción');
+      toast.error(t('audit.loadMatchesFailed'));
     } finally {
       setIsSearchingMatches((prev) => ({ ...prev, [tx.id]: false }));
     }
@@ -93,7 +95,7 @@ export function FuzzyReviewTable({
         bankTransactionId: bankTxId,
         journalLineId,
       });
-      toast.success('Transacción contable vinculada exitosamente');
+      toast.success(t('audit.linkSuccess'));
       onRefresh?.();
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : String(error));

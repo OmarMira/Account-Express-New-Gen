@@ -73,7 +73,7 @@ export function FinancialAssistantPanel({ companyId }: { companyId: string }) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        {data.insights.map((insight: any) => {
+        {data.insights.map((insight: { id: string; severity: string; message: string; context?: string }) => {
           const cfg =
             severityConfig[insight.severity as keyof typeof severityConfig] || severityConfig.info;
           return (

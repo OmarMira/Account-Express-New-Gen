@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { hasXssPattern } from './sanitize';
+import { sanitizeInput } from './sanitize';
 
 /**
  * Valida el cuerpo de una petición entrante contra un schema de Zod.
@@ -18,8 +18,8 @@ export async function validateRequest<T>(
   req: Request,
   schema: z.ZodSchema<T>,
 ): Promise<T | NextResponse> {
-  // Endpoints that do NOT require body validation (e.g., logout, backup upload)
-  const skipValidationPaths = ['/api/auth/logout', '/api/backup/upload'];
+  // Endpoints that do NOT require body validation (e.g., logout)
+  const skipValidationPaths = ['/api/auth/logout'];
 
   const url = new URL(req.url);
   if (skipValidationPaths.includes(url.pathname)) {
@@ -33,19 +33,26 @@ export async function validateRequest<T>(
 
   try {
     const json = await req.json();
-    // Recursive XSS detection — traverse any shape, so we must widen to unknown and narrow
-    const checkXss = (obj: unknown) => {
-      if (typeof obj === 'string' && hasXssPattern(obj)) {
-        throw new Error('Potential XSS attack detected');
+    // Recursive XSS sanitization in-place
+    const sanitizeObj = (obj: unknown): unknown => {
+      if (typeof obj === 'string') {
+        return sanitizeInput(obj);
+      }
+      if (Array.isArray(obj)) {
+        return obj.map(sanitizeObj);
       }
       if (obj && typeof obj === 'object') {
-        for (const key of Object.keys(obj)) {
-          checkXss((obj as Record<string, unknown>)[key]);
+        const cleaned: Record<string, unknown> = {};
+        for (const [key, val] of Object.entries(obj)) {
+          cleaned[key] = sanitizeObj(val);
         }
+        return cleaned;
       }
+      return obj;
     };
-    checkXss(json);
-    const result = schema.safeParse(json);
+    
+    const sanitizedJson = sanitizeObj(json);
+    const result = schema.safeParse(sanitizedJson);
     if (!result.success) {
       return NextResponse.json(
         { error: 'Validation failed', details: result.error.flatten() },
@@ -54,9 +61,6 @@ export async function validateRequest<T>(
     }
     return result.data;
   } catch (err: unknown) {
-    if (err instanceof Error && err.message === 'Potential XSS attack detected') {
-      throw err;
-    }
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 }

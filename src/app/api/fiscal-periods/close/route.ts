@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { apiHandler } from '@/lib/api-handler';
+import { requireCompanyContext } from '@/lib/context-storage';
 import { executeYearClose } from '@/lib/services/closing-engine';
 import { fiscalConfigSchema } from '@/lib/fiscal-period/types';
 import { logger } from '@/lib/logger';
 
 export const POST = apiHandler(async (req: NextRequest) => {
-  const { companyId, year, config } = await req.json();
+  const { companyId } = requireCompanyContext();
+  const { year, config } = await req.json();
 
-  if (!companyId || !year || !config) {
+  if (!year || !config) {
     return NextResponse.json({ error: 'Faltan parámetros requeridos' }, { status: 400 });
   }
 

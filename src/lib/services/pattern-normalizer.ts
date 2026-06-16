@@ -15,14 +15,19 @@ export function normalizePattern(desc: string): string {
   cleaned = cleaned.replace(/^transfer\s+(to|from)\s+/g, '');
   cleaned = cleaned.replace(/^withdrawal\s+(to|from)\s+/g, '');
   cleaned = cleaned.replace(/^deposit\s+(to|from)\s+/g, '');
+  cleaned = cleaned.replace(/^(pago\s+)?zelle\s+(to|from)\s+/g, '');
+  cleaned = cleaned.replace(/^transferencia\s+(a|de)\s+/g, '');
+  cleaned = cleaned.replace(/^cheque\s+(a|de)\s+/g, '');
+  cleaned = cleaned.replace(/^retiro\s+(a|de)\s+/g, '');
+  cleaned = cleaned.replace(/^depósito\s+(a|de)\s+/g, '');
 
   // Generic metadata patterns (DES:/ID:/INDN: from bank feeds)
-  cleaned = cleaned.replace(/des:[\w\s\.-]+id:[\w\d-]+(indn:)?/g, '');
+  cleaned = cleaned.replace(/des:[\w\s.-]+id:[\w-]+(indn:)?/g, '');
   cleaned = cleaned.replace(/indn:/g, '');
 
   // Remove common suffixes
   cleaned = cleaned.replace(/(;\s*|\s+)conf#\s*[\w\d]+/g, '');
-  cleaned = cleaned.replace(/\s+for\s+\"[^\"]+\"/g, '');
+  cleaned = cleaned.replace(/\s+for\s+"[^"]+"/g, '');
 
   // Final normalization: trim and collapse multiple spaces to single space
   return cleaned.trim().replace(/\s+/g, ' ');
@@ -31,7 +36,7 @@ export function normalizePattern(desc: string): string {
 /**
  * Sanitizes description for entity detection.
  */
-export function sanitizeDescriptionForDetection(desc: string, config: any): string {
+export function sanitizeDescriptionForDetection(desc: string, config: { sanitization: { stripPatterns: { name: string; regex: string; flags?: string; replacement?: string }[] } }): string {
   let cleaned = desc;
   for (const pattern of config.sanitization.stripPatterns) {
     try {
@@ -48,7 +53,7 @@ export function sanitizeDescriptionForDetection(desc: string, config: any): stri
 /**
  * Sanitizes description for adaptive learning engine.
  */
-export function sanitizeDescriptionForAdaptive(desc: string, config: any): string {
+export function sanitizeDescriptionForAdaptive(desc: string, config: { sanitizeNoise: Record<string, string>; patternGeneration: { ignoreStopWords: string[] } }): string {
   let cleaned = desc.toLowerCase().trim();
 
   // Apply configured noise sanitizers

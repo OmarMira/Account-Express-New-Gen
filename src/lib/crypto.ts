@@ -4,12 +4,16 @@ const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16;
 const TAG_LENGTH = 16;
 
+let _cachedKey: Buffer | null = null;
+
 function getKey(): Buffer {
+  if (_cachedKey) return _cachedKey;
   const secret = process.env.SESSION_SECRET;
   if (!secret) {
     throw new Error('SESSION_SECRET is required for encryption');
   }
-  return crypto.scryptSync(secret, 'crypto-key-salt', 32);
+  _cachedKey = crypto.scryptSync(secret, 'crypto-key-salt', 32);
+  return _cachedKey;
 }
 
 export function encrypt(plaintext: string): string {

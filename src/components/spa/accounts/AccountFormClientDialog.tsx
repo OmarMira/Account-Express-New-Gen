@@ -62,8 +62,8 @@ export interface GlAccount {
   parentId: string | null;
   isActive: boolean;
   isSystem: boolean;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: Date | string;
+  updatedAt: Date | string;
   companyId: string;
   parent?: { id: string; code: string; name: string } | null;
   _count?: { children: number; journalLines: number };

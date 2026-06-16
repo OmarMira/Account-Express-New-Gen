@@ -3,8 +3,20 @@ import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { apiHandler, type RouteContext } from '@/lib/api-handler';
 import { requireCurrentUserId } from '@/lib/context-storage';
+import { logger } from '@/lib/logger';
 
-let config: any = {
+interface AddressConfig {
+  version: string;
+  provider: string;
+  baseUrl: string;
+  userAgent: string;
+  debounceMs: number;
+  cacheTtlMs: number;
+  maxResults: number;
+  usOnly: boolean;
+}
+
+let config: AddressConfig = {
   version: '1.0',
   provider: 'nominatim',
   baseUrl: 'https://nominatim.openstreetmap.org/search',
@@ -18,10 +30,10 @@ let config: any = {
 try {
   const configPath = join(process.cwd(), 'rules/address-autocomplete.json');
   if (existsSync(configPath)) {
-    config = JSON.parse(readFileSync(configPath, 'utf-8'));
+    config = JSON.parse(readFileSync(configPath, 'utf-8')) as AddressConfig;
   }
 } catch (err) {
-  // ignore, use fallback
+  logger.warn('[ADDRESS] Config load failed, using defaults', { error: String(err) });
 }
 
 interface AddressData {

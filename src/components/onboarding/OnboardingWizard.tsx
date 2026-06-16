@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Card,
@@ -119,6 +119,55 @@ export function OnboardingWizard() {
     }
   };
 
+  // Dynamic Focus Management when transitioning steps
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (isSuccess) return;
+      
+      switch (step) {
+        case 1:
+          if (formData.legalName.trim() !== '') {
+            document.getElementById('onboarding-next-btn')?.focus();
+          } else {
+            document.getElementById('onboarding-legalName')?.focus();
+          }
+          break;
+        case 2:
+          document.getElementById('onboarding-fiscalStartYear')?.focus();
+          break;
+        case 3:
+        case 4:
+          document.getElementById('onboarding-next-btn')?.focus();
+          break;
+        case 5:
+          const initialCashBalanceInput = document.getElementById('onboarding-initialCashBalance') as HTMLInputElement;
+          if (initialCashBalanceInput) {
+            initialCashBalanceInput.focus();
+            initialCashBalanceInput.select();
+          }
+          break;
+        case 6:
+          document.getElementById('onboarding-complete-btn')?.focus();
+          break;
+        default:
+          break;
+      }
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [step, isSuccess, formData.legalName]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (step < STEPS.length) {
+        handleNext();
+      } else {
+        handleComplete();
+      }
+    }
+  };
+
   // Renderizado condicional por paso
   const renderStep = () => {
     switch (step) {
@@ -128,10 +177,12 @@ export function OnboardingWizard() {
             <div>
               <Label>{t('onboarding.step1.legalName')}</Label>
               <Input
+                id="onboarding-legalName"
                 value={formData.legalName}
                 onChange={(e) => setFormData({ ...formData, legalName: e.target.value })}
                 placeholder="Ej: LQ & OM LLC"
                 className="mt-1"
+                onKeyDown={handleKeyDown}
               />
             </div>
             <div>
@@ -161,10 +212,12 @@ export function OnboardingWizard() {
               <div>
                 <Label>{t('onboarding.step2.startYear')}</Label>
                 <Input
+                  id="onboarding-fiscalStartYear"
                   type="number"
                   value={formData.fiscalStartYear}
                   onChange={(e) => setFormData({ ...formData, fiscalStartYear: e.target.value })}
                   className="mt-1"
+                  onKeyDown={handleKeyDown}
                 />
               </div>
               <div>
@@ -225,11 +278,13 @@ export function OnboardingWizard() {
           <div className="space-y-4">
             <Label>{t('onboarding.step5.initialBalance')}</Label>
             <Input
+              id="onboarding-initialCashBalance"
               type="number"
               value={formData.initialCashBalance}
               onChange={(e) => setFormData({ ...formData, initialCashBalance: e.target.value })}
               placeholder="0.00"
               className="mt-1"
+              onKeyDown={handleKeyDown}
             />
             <p className="text-xs text-muted-foreground leading-relaxed">
               {t('onboarding.step5.help')}
@@ -327,6 +382,7 @@ export function OnboardingWizard() {
         {!isSuccess && (
           <CardFooter className="flex justify-between pt-4 border-t bg-muted/20">
             <Button
+              id="onboarding-back-btn"
               variant="ghost"
               onClick={handleBack}
               disabled={step === 1 || isLoading}
@@ -337,6 +393,7 @@ export function OnboardingWizard() {
 
             {step < STEPS.length ? (
               <Button
+                id="onboarding-next-btn"
                 onClick={handleNext}
                 disabled={isLoading}
                 className="bg-teal-600 hover:bg-teal-700 text-white"
@@ -345,6 +402,7 @@ export function OnboardingWizard() {
               </Button>
             ) : (
               <Button
+                id="onboarding-complete-btn"
                 onClick={handleComplete}
                 disabled={isLoading}
                 className="bg-teal-600 hover:bg-teal-700 text-white"

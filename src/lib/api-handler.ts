@@ -33,45 +33,45 @@ export interface ApiHandlerOptions {
  * 4. Datos de formulario Multipart (multipart/form-data)
  */
 async function extractCompanyId(request: NextRequest): Promise<string | null> {
-  // 1. Query string (GET requests)
   const { searchParams } = new URL(request.url);
   const queryCompanyId = searchParams.get('companyId');
-  if (queryCompanyId) {
-    return queryCompanyId;
-  }
-
-  // 2. Headers
   const headerCompanyId = request.headers.get('x-company-id');
-  if (headerCompanyId) {
-    return headerCompanyId;
-  }
 
-  // 3. Body (POST/PUT/PATCH/DELETE) - clone request to avoid consuming stream
+  // URL/Header takes precedence for determining the "declared" company
+  const declaredCompanyId = queryCompanyId || headerCompanyId || null;
+
+  let bodyCompanyId: string | null = null;
+
   if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)) {
     const contentType = request.headers.get('content-type') || '';
     if (contentType.includes('application/json')) {
       try {
         const body = await request.clone().json();
         if (body?.companyId && typeof body.companyId === 'string') {
-          return body.companyId;
+          bodyCompanyId = body.companyId;
         }
       } catch {
-        // Ignorar errores de parseo JSON
+        // Ignorar errores
       }
     } else if (contentType.includes('multipart/form-data')) {
       try {
         const formData = await request.clone().formData();
-        const companyId = formData.get('companyId');
-        if (companyId && typeof companyId === 'string') {
-          return companyId;
+        const cid = formData.get('companyId');
+        if (cid && typeof cid === 'string') {
+          bodyCompanyId = cid;
         }
       } catch {
-        // Ignorar errores de parseo FormData
+        // Ignorar errores
       }
     }
   }
 
-  return null;
+  // Anti-Parameter-Pollution: If both are provided, they MUST match
+  if (declaredCompanyId && bodyCompanyId && declaredCompanyId !== bodyCompanyId) {
+    throw new ValidationError('Parameter pollution detected: companyId mismatch between URL/Header and Body');
+  }
+
+  return declaredCompanyId || bodyCompanyId || null;
 }
 
 export function apiHandler(handler: ApiHandler, options: ApiHandlerOptions = {}) {

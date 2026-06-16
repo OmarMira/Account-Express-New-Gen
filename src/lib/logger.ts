@@ -20,6 +20,7 @@ function log(level: LogLevel, message: string, meta?: Record<string, unknown>) {
   };
 
   // JSON structured output — machine-parseable for log aggregators
+  // eslint-disable-next-line no-console
   const output = level === 'error' ? console.error : level === 'warn' ? console.warn : console.log;
   output(JSON.stringify(entry));
 }

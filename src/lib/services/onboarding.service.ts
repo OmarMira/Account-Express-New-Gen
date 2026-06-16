@@ -13,10 +13,10 @@ function saveCompanyConfig(companyId: string, currency: string, periodType: stri
     fs.mkdirSync(rulesDir, { recursive: true });
   }
   const configPath = path.join(rulesDir, 'company-config.json');
-  let configData: any = { companies: {} };
+  let configData: { companies: Record<string, unknown> } = { companies: {} };
   try {
     if (fs.existsSync(configPath)) {
-      configData = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      configData = JSON.parse(fs.readFileSync(configPath, 'utf8')) as typeof configData;
     }
   } catch (err) {
     logger.error('Error reading company-config.json, creating new', { error: err });

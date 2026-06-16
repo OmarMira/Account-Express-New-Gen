@@ -130,7 +130,7 @@ export function UserProfileTab() {
 
   async function handleSaveUser() {
     if (!userData.firstName.trim() || !userData.lastName.trim()) {
-      toast.error('Nombre y Apellido son requeridos.');
+      toast.error(t('settings.nameRequired'));
       return;
     }
 
@@ -146,7 +146,7 @@ export function UserProfileTab() {
 
     if (!addressParse.success) {
       logger.error('[USER PROFILE VALIDATION ERROR]', { error: String(addressParse.error) });
-      const errorMsg = addressParse.error.issues[0]?.message || 'Datos de dirección inválidos';
+      const errorMsg = addressParse.error.issues[0]?.message || t('userProfile.invalidAddress');
       toast.error(errorMsg);
       return;
     }
@@ -193,14 +193,14 @@ export function UserProfileTab() {
         setAvatarFile(null);
 
         setEditingUser(false);
-        toast.success('Perfil de usuario actualizado.');
+        toast.success(t('settings.profileUpdated'));
       } else {
         const err = await res.json();
-        toast.error(err.error || 'Ocurrió un error al guardar.');
+        toast.error(err.error || t('settings.saveError'));
       }
     } catch (err) {
       logger.error(String(err));
-      toast.error('Ocurrió un error al guardar.');
+      toast.error(t('settings.saveError'));
     }
     setSavingUser(false);
   }
@@ -216,10 +216,10 @@ export function UserProfileTab() {
           <div>
             <CardTitle className="text-base flex items-center gap-2">
               <User className="size-4" />
-              Perfil de Usuario
+              {t('userProfile.title')}
             </CardTitle>
             <CardDescription className="mt-1">
-              Administre sus datos personales, información de contacto y domicilio fiscal en EE.UU.
+              {t('userProfile.description')}
             </CardDescription>
           </div>
           {!editingUser && !loading && (
@@ -241,7 +241,7 @@ export function UserProfileTab() {
           <div className="grid gap-4 sm:grid-cols-2">
             {/* Avatar upload */}
             <div className="flex flex-col items-center justify-center gap-2 sm:col-span-2 py-4 border border-dashed rounded-lg bg-muted/20">
-              <Label className="text-sm font-semibold">Foto de Perfil</Label>
+              <Label className="text-sm font-semibold">{t('userProfile.profilePhoto')}</Label>
               <div className="relative group size-20 rounded-full overflow-hidden border bg-background flex items-center justify-center">
                 {avatarPreview ? (
                   <img src={avatarPreview} alt="Avatar" className="size-full object-cover" />
@@ -251,7 +251,7 @@ export function UserProfileTab() {
                   </span>
                 )}
                 <label className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-white text-xs font-semibold">
-                  Cambiar
+                  {t('userProfile.changePhoto')}
                   <input
                     type="file"
                     accept="image/png, image/jpeg, image/svg+xml"
@@ -277,14 +277,14 @@ export function UserProfileTab() {
                     setAvatarPreview('');
                   }}
                 >
-                  Eliminar foto
+                  {t('userProfile.deletePhoto')}
                 </Button>
               )}
-              <p className="text-[10px] text-muted-foreground">PNG, JPG o SVG. Máximo 1MB.</p>
+              <p className="text-[10px] text-muted-foreground">{t('userProfile.photoFormats')}</p>
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="firstName">Nombre</Label>
+              <Label htmlFor="firstName">{t('userProfile.firstName')}</Label>
               <Input
                 id="firstName"
                 value={userData.firstName}
@@ -292,7 +292,7 @@ export function UserProfileTab() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="lastName">Apellido</Label>
+              <Label htmlFor="lastName">{t('userProfile.lastName')}</Label>
               <Input
                 id="lastName"
                 value={userData.lastName}
@@ -300,7 +300,7 @@ export function UserProfileTab() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="userEmail">Correo Electrónico (No modificable)</Label>
+              <Label htmlFor="userEmail">{t('userProfile.emailNotEditable')}</Label>
               <Input
                 id="userEmail"
                 type="email"
@@ -310,7 +310,7 @@ export function UserProfileTab() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="userPhone">Teléfono</Label>
+              <Label htmlFor="userPhone">{t('userProfile.phone')}</Label>
               <Input
                 id="userPhone"
                 value={userData.phone}
@@ -321,7 +321,7 @@ export function UserProfileTab() {
 
             {/* Localized US Address fields */}
             <div className="space-y-1.5 sm:col-span-2">
-              <Label htmlFor="userStreetLine1">Domicilio (Calle y Número)</Label>
+              <Label htmlFor="userStreetLine1">{t('userProfile.addressStreet')}</Label>
               <AddressAutocomplete
                 defaultValue={userData.streetLine1}
                 onSelect={(addr) => {
@@ -350,11 +350,11 @@ export function UserProfileTab() {
                     };
                   });
                 }}
-                placeholder="Buscar domicilio en EE.UU..."
+                placeholder={t('userProfile.addressSearchPlaceholder')}
               />
             </div>
             <div className="space-y-1.5 sm:col-span-2">
-              <Label htmlFor="userStreetLine2">Suite / Depto / Unidad (Opcional)</Label>
+              <Label htmlFor="userStreetLine2">{t('userProfile.addressSuite')}</Label>
               <Input
                 id="userStreetLine2"
                 value={userData.streetLine2}
@@ -363,7 +363,7 @@ export function UserProfileTab() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="userCity">Ciudad</Label>
+              <Label htmlFor="userCity">{t('userProfile.city')}</Label>
               <Input
                 id="userCity"
                 value={userData.city}
@@ -372,14 +372,14 @@ export function UserProfileTab() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="userState">Estado</Label>
+              <Label htmlFor="userState">{t('userProfile.state')}</Label>
               <select
                 id="userState"
                 value={userData.state}
                 onChange={(e) => setUserData((prev) => ({ ...prev, state: e.target.value }))}
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-950"
               >
-                <option value="">Seleccione Estado</option>
+                <option value="">{t('userProfile.selectState')}</option>
                 {US_STATES.map((st) => (
                   <option key={st} value={st}>
                     {st}
@@ -388,7 +388,7 @@ export function UserProfileTab() {
               </select>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="userZipCode">Código Postal (ZIP Code)</Label>
+              <Label htmlFor="userZipCode">{t('userProfile.zipCode')}</Label>
               <Input
                 id="userZipCode"
                 value={userData.zipCode}
@@ -430,16 +430,16 @@ export function UserProfileTab() {
             {/* Profile Info */}
             <div className="grid gap-3 sm:grid-cols-2 flex-1 w-full">
               <InfoRow
-                label="Nombre Completo"
+                label={t('userProfile.fullName')}
                 value={`${userData.firstName} ${userData.lastName}`}
               />
-              <InfoRow label="Correo Electrónico" value={userData.email} />
-              <InfoRow label="Teléfono" value={userData.phone || '—'} />
+              <InfoRow label={t('userProfile.email')} value={userData.email} />
+              <InfoRow label={t('userProfile.phone')} value={userData.phone || '—'} />
 
               {/* Detailed US Address Display */}
               <div className="sm:col-span-2 pt-2 border-t mt-1">
                 <p className="text-xs font-semibold text-primary mb-1">
-                  Domicilio Fiscal Registrado (EE.UU.)
+                  {t('userProfile.registeredTaxAddress')}
                 </p>
                 {userData.streetLine1 ? (
                   <div className="space-y-0.5 text-sm font-medium">
@@ -452,7 +452,7 @@ export function UserProfileTab() {
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground italic">
-                    Ningún domicilio registrado
+                    {t('userProfile.noAddressRegistered')}
                   </p>
                 )}
               </div>

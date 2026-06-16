@@ -5,11 +5,13 @@ import { ImportService } from '@/lib/services/import.service';
 import { trackAPIResponseTime } from '@/lib/metrics';
 import { requireCompanyContext } from '@/lib/context-storage';
 import { validateFile } from '@/lib/file-validation';
+import { serverT } from '@/lib/server-i18n';
 
 // ─── POST /api/import ─────────────────────────────────────────────────
 // Accepts multipart/form-data with a file field.
 // Supports CSV, OFX, QFX, PDF formats.
 export const POST = apiHandler(async (request: NextRequest) => {
+  const locale = request.headers.get('x-locale') || 'es';
   const { userId, companyId } = requireCompanyContext();
 
   const formData = await request.formData();
@@ -18,13 +20,12 @@ export const POST = apiHandler(async (request: NextRequest) => {
   const bypassHolderValidation = formData.get('bypassHolderValidation') === 'true';
 
   if (!file) {
-    throw new ValidationError('No se subió ningún archivo. Proporcione un campo "file".');
+    throw new ValidationError(serverT(locale, 'apiErrors.import.noFile'));
   }
 
-  // Validate file size (max 10 MB)
   const MAX_SIZE = 10 * 1024 * 1024;
   if (file.size > MAX_SIZE) {
-    throw new ValidationError('El archivo es demasiado grande. El tamaño máximo es 10 MB.');
+    throw new ValidationError(serverT(locale, 'apiErrors.import.tooLarge'));
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());

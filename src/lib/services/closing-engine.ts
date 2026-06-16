@@ -37,19 +37,16 @@ export async function executeYearClose(companyId: string, year: number, config: 
   );
   const netBalances = accounts.map((acc) => {
     const { debit, credit } = balanceMap.get(acc.id) ?? { debit: 0, credit: 0 };
-    return {
-      id: acc.id,
-      net: acc.normalBalance === 'credit' ? credit - debit : debit - credit,
-    };
+    return { id: acc.id, diff: debit - credit };
   });
 
   const lines = netBalances
-    .filter((b) => Math.abs(b.net) > 0.01)
+    .filter((b) => Math.abs(b.diff) > 0.01)
     .map((b) => ({
       glAccountId: b.id,
       description: `Cierre ${year}`,
-      debit: b.net > 0 ? b.net : 0,
-      credit: b.net < 0 ? Math.abs(b.net) : 0,
+      debit: b.diff < 0 ? Math.abs(b.diff) : 0,
+      credit: b.diff > 0 ? b.diff : 0,
     }));
 
   const closingAcc = await db.glAccount.findFirst({

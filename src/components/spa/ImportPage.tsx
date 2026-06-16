@@ -16,6 +16,7 @@ import {
   ArrowLeftRight,
   RefreshCcw,
   FileUp,
+  Sparkles,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -50,6 +51,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { AccountSelector, type GlAccountOption } from './journal/AccountSelector';
+import { EntityOnboardingModal } from '@/components/learning/EntityOnboardingModal';
 import { logger } from '@/lib/logger';
 
 // ─── Types ────────────────────────────────────────────────────────────
@@ -85,6 +87,21 @@ interface ImportResult {
   newAccountCreated: boolean;
   bankAccountName: string;
   skippedNote?: string;
+}
+
+interface ValidationResult {
+  requiresApproval: boolean;
+  fileName: string;
+  extractedHolder: string;
+  score: number;
+}
+
+interface GlAccountData {
+  id: string;
+  code: string;
+  name: string;
+  accountType: string;
+  parentId?: string | null;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────
@@ -214,6 +231,7 @@ export function ImportPage() {
 
   // Result dialog
   const [resultOpen, setResultOpen] = useState(false);
+  const [entityOnboardingOpen, setEntityOnboardingOpen] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
 
   // Mismatch warning dialog states
@@ -239,7 +257,7 @@ export function ImportPage() {
 
   // ─── Fetch data ───────────────────────────────────────────────────
 
-  async function fetchBankAccounts() {
+  const fetchBankAccounts = useCallback(async () => {
     if (!activeCompany) return;
     try {
       const res = await fetch(`/api/banks?companyId=${activeCompany.id}`);
@@ -258,9 +276,9 @@ export function ImportPage() {
     } catch (err) {
       logger.error('Failed to fetch bank accounts:', { error: String(err) });
     }
-  }
+  }, [activeCompany]);
 
-  async function fetchAssetAccounts() {
+  const fetchAssetAccounts = useCallback(async () => {
     if (!activeCompany) return;
     try {
       const res = await fetch(`/api/journal/accounts?companyId=${activeCompany.id}`);
@@ -275,9 +293,9 @@ export function ImportPage() {
     } catch (err) {
       logger.error('Failed to fetch GL accounts:', { error: String(err) });
     }
-  }
+  }, [activeCompany]);
 
-  async function fetchHistory() {
+  const fetchHistory = useCallback(async () => {
     if (!activeCompany) return;
     setLoadingHistory(true);
     try {
@@ -291,13 +309,13 @@ export function ImportPage() {
     } finally {
       setLoadingHistory(false);
     }
-  }
+  }, [activeCompany]);
 
   useEffect(() => {
     fetchBankAccounts();
     fetchHistory();
     fetchAssetAccounts();
-  }, [activeCompany]);
+  }, [fetchBankAccounts, fetchHistory, fetchAssetAccounts]);
 
   // ─── Drag & Drop ─────────────────────────────────────────────────
 
@@ -386,7 +404,7 @@ export function ImportPage() {
     const pdfFiles = selectedFiles.filter((f) => f.name.toLowerCase().endsWith('.pdf'));
     if (pdfFiles.length > 0 && !forceBypass) {
       setUploading(true);
-      startProcessing('Validando titular de cuenta...');
+      startProcessing(t('bankRules.processing.validatingHolder'));
       try {
         const valData = new FormData();
         valData.append('companyId', activeCompany.id);
@@ -399,12 +417,12 @@ export function ImportPage() {
 
         if (valRes.ok) {
           const valResult = await valRes.json();
-          const mismatches = valResult.results.filter((r: any) => r.requiresApproval);
+          const mismatches = valResult.results.filter((r: ValidationResult) => r.requiresApproval);
 
           if (mismatches.length > 0) {
             setIsStrict(valResult.strictMode || false);
             setMismatchFiles(
-              mismatches.map((m: any) => ({
+              mismatches.map((m: ValidationResult) => ({
                 fileName: m.fileName,
                 extractedHolder: m.extractedHolder,
                 score: Math.round(m.score * 100),
@@ -427,7 +445,7 @@ export function ImportPage() {
     setUploading(true);
     setUploadProgress(5);
     setUploadError('');
-    startProcessing('Importando y procesando estado de cuenta...');
+    startProcessing(t('bankRules.processing.importingStatement'));
 
     try {
       let totalTransactions = 0;
@@ -469,7 +487,7 @@ export function ImportPage() {
             // Check if bank account creation is required!
             if (err.code === 'BANK_CREATION_REQUIRED') {
               const meta = err.details || {};
-              setFormAccountName(meta.bankName || 'Business Checking');
+              setFormAccountName(meta.bankName || t('importPage.defaultAccountName'));
               setFormBankName(meta.bankName || '');
               setFormAccountNo(meta.accountNo || '');
               setFormRoutingNo('');
@@ -500,7 +518,7 @@ export function ImportPage() {
 
             throw new Error(err.error || `${file.name}: ${t('banks.importFailed')}`);
           } else {
-            throw new Error(`${file.name}: Error del servidor (${res.status})`);
+            throw new Error(t('importPage.serverError').replace('{file}', file.name).replace('{status}', String(res.status)));
           }
         }
 
@@ -518,7 +536,7 @@ export function ImportPage() {
       // If ALL files were skipped, show a clear message
       if (skippedMonths.length > 0 && totalTransactions === 0) {
         setUploadError(
-          `Los meses ${skippedMonths.join(', ')} ya estaban importados. No hay nuevos datos.`,
+          t('importPage.allMonthsSkipped').replace('{months}', skippedMonths.join(', ')),
         );
         clearFiles();
         setUploading(false);
@@ -528,7 +546,7 @@ export function ImportPage() {
       }
 
       const skippedNote =
-        skippedMonths.length > 0 ? ` (${skippedMonths.join(', ')} ya estaban importados)` : '';
+        skippedMonths.length > 0 ? ` ${t('importPage.skippedMonthsNote').replace('{months}', skippedMonths.join(', '))}` : '';
 
       setImportResult({
         statementId,
@@ -554,15 +572,15 @@ export function ImportPage() {
 
   async function handleSaveBank() {
     if (!formAccountName.trim()) {
-      setFormError('El nombre de la cuenta es requerido');
+      setFormError(t('importPage.accountNameRequired'));
       return;
     }
     if (!formBankName.trim()) {
-      setFormError('El nombre del banco es requerido');
+      setFormError(t('importPage.bankNameRequired'));
       return;
     }
     if (formGlOption === 'link' && !formGlAccountId) {
-      setFormError('La cuenta contable vinculada es requerida');
+      setFormError(t('importPage.linkedAccountRequired'));
       return;
     }
 
@@ -574,22 +592,22 @@ export function ImportPage() {
       if (formGlOption === 'create') {
         // Fetch all accounts to find parent "1010" and next code
         const accountsRes = await fetch(`/api/accounts?companyId=${activeCompany!.id}`);
-        if (!accountsRes.ok) throw new Error('No se pudo obtener el plan de cuentas');
+        if (!accountsRes.ok) throw new Error(t('importPage.fetchAccountsFailed'));
         const data = await accountsRes.json();
         const accounts = data.accounts ?? [];
 
-        const parentAcc = accounts.find((a: any) => a.code === '1010');
+        const parentAcc = accounts.find((a: GlAccountData) => a.code === '1010');
         if (!parentAcc)
-          throw new Error('No se encontró la cuenta base "1010 - Cash & Cash Equivalents"');
+          throw new Error(t('importPage.parentAccountNotFound'));
 
         const subAccounts = accounts.filter(
-          (a: any) =>
+          (a: GlAccountData) =>
             a.parentId === parentAcc.id || (a.code.startsWith('101') && a.code !== '1010'),
         );
         let nextCode = 1011;
         const codes = subAccounts
-          .map((a: any) => parseInt(a.code, 10))
-          .filter((c: any) => !isNaN(c));
+          .map((a: GlAccountData) => parseInt(a.code, 10))
+          .filter((c: number) => !isNaN(c));
         if (codes.length > 0) {
           nextCode = Math.max(...codes) + 1;
         }
@@ -610,7 +628,7 @@ export function ImportPage() {
 
         if (!newAccRes.ok) {
           const errData = await newAccRes.json();
-          throw new Error(errData.error || 'No se pudo crear la cuenta en el plan de cuentas');
+          throw new Error(errData.error || t('importPage.createAccountFailed'));
         }
 
         const newAccData = await newAccRes.json();
@@ -644,7 +662,7 @@ export function ImportPage() {
         }, 100);
       } else {
         const err = await res.json();
-        setFormError(err.error || 'No se pudo guardar la cuenta bancaria');
+        setFormError(err.error || t('importPage.saveBankFailed'));
       }
     } catch (err: unknown) {
       setFormError(err instanceof Error ? err.message : String(err));
@@ -759,7 +777,7 @@ export function ImportPage() {
                       }}
                     >
                       <X className="size-3.5 mr-1" />
-                      {t('common.delete')} Todo
+                      {t('importPage.clearAll')}
                     </Button>
                   )}
                 </div>
@@ -941,9 +959,9 @@ export function ImportPage() {
 
       {/* ─── Import Result Dialog ───────────────────────────────────── */}
       <Dialog open={resultOpen} onOpenChange={setResultOpen}>
-        <DialogContent className="sm:max-w-[440px]">
+        <DialogContent className="sm:max-w-[520px]">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+            <DialogTitle className="flex items-center gap-2 leading-normal">
               <div className="flex size-8 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/40">
                 <CheckCircle2 className="size-5 text-emerald-600 dark:text-emerald-400" />
               </div>
@@ -981,13 +999,15 @@ export function ImportPage() {
               <div className="rounded-lg border p-3 space-y-2">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">{t('banks.autoCategorized')}</span>
-                  <span className="font-medium">
+                  <span className="font-medium shrink-0">
                     {importResult.autoCategorizedCount} / {importResult.transactionCount}
                   </span>
                 </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">{t('banks.title')}</span>
-                  <span className="font-medium">{importResult.bankAccountName}</span>
+                <div className="flex items-center justify-between text-sm gap-2">
+                  <span className="text-muted-foreground shrink-0">{t('banks.title')}</span>
+                  <span className="font-medium truncate text-right max-w-[280px]">
+                    {importResult.bankAccountName}
+                  </span>
                 </div>
                 {importResult.newAccountCreated && (
                   <div className="flex items-center gap-2 rounded-md bg-teal-50 dark:bg-teal-950/30 p-2 text-sm">
@@ -1045,13 +1065,24 @@ export function ImportPage() {
             </div>
           )}
 
-          <DialogFooter className="flex-col sm:flex-row gap-2">
+          <DialogFooter className="flex-col sm:flex-row flex-wrap gap-2">
             <Button
               variant="outline"
               onClick={() => setResultOpen(false)}
-              className="w-full sm:w-auto"
+              className="w-full sm:flex-1"
             >
               {t('common.cancel')}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setResultOpen(false);
+                setEntityOnboardingOpen(true);
+              }}
+              className="w-full sm:flex-1"
+            >
+              <Sparkles className="size-4 mr-1 shrink-0" />
+              <span className="truncate">{t('learning.classifyEntities')}</span>
             </Button>
             <Button
               onClick={() => {
@@ -1066,6 +1097,13 @@ export function ImportPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ─── Entity Onboarding Modal ───────────────── */}
+      <EntityOnboardingModal
+        isOpen={entityOnboardingOpen}
+        onClose={() => setEntityOnboardingOpen(false)}
+        companyId={activeCompany?.id || ''}
+      />
 
       {/* ─── Pre-filled Bank Account Creation Dialog ───────────────── */}
       <Dialog
@@ -1087,7 +1125,7 @@ export function ImportPage() {
                 {t('common.name')} <span className="text-red-500">*</span>
               </label>
               <Input
-                placeholder="e.g. Business Checking"
+                placeholder={t('importPage.accountNamePlaceholder')}
                 value={formAccountName}
                 onChange={(e) => setFormAccountName(e.target.value)}
               />
@@ -1099,7 +1137,7 @@ export function ImportPage() {
                 {t('banks.bankName')} <span className="text-red-500">*</span>
               </label>
               <Input
-                placeholder="e.g. Chase Bank"
+                placeholder={t('importPage.bankNamePlaceholder')}
                 value={formBankName}
                 onChange={(e) => setFormBankName(e.target.value)}
               />
@@ -1110,7 +1148,7 @@ export function ImportPage() {
               <div className="space-y-1.5">
                 <label className="text-sm font-medium">{t('banks.accountNumber')}</label>
                 <Input
-                  placeholder="e.g. 123456789"
+                  placeholder={t('importPage.accountNumberPlaceholder')}
                   value={formAccountNo}
                   onChange={(e) => setFormAccountNo(e.target.value)}
                 />
@@ -1118,7 +1156,7 @@ export function ImportPage() {
               <div className="space-y-1.5">
                 <label className="text-sm font-medium">{t('banks.routingNumber')}</label>
                 <Input
-                  placeholder="e.g. 021000021"
+                  placeholder={t('importPage.routingNumberPlaceholder')}
                   value={formRoutingNo}
                   onChange={(e) => setFormRoutingNo(e.target.value)}
                 />
@@ -1127,7 +1165,7 @@ export function ImportPage() {
 
             {/* GL Account Option Selection */}
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Cuenta Contable (Plan de Cuentas)</label>
+              <label className="text-sm font-medium">{t('importPage.glAccountLabel')}</label>
               <div className="grid grid-cols-2 gap-2 bg-slate-900/50 dark:bg-slate-900/80 p-1 rounded-lg border">
                 <button
                   type="button"
@@ -1139,7 +1177,7 @@ export function ImportPage() {
                       : 'text-slate-400 hover:text-slate-200',
                   )}
                 >
-                  Crear Nueva (Automático)
+                  {t('importPage.createNewAuto')}
                 </button>
                 <button
                   type="button"
@@ -1151,30 +1189,30 @@ export function ImportPage() {
                       : 'text-slate-400 hover:text-slate-200',
                   )}
                 >
-                  Vincular Existente
+                  {t('importPage.linkExisting')}
                 </button>
               </div>
             </div>
 
             {formGlOption === 'create' ? (
               <div className="rounded-lg bg-blue-500/10 border border-blue-500/20 p-3 text-xs leading-relaxed text-blue-300 space-y-2">
-                <p className="font-semibold text-blue-400">✨ Autoconfiguración Contable:</p>
-                <p>El sistema creará automáticamente la subcuenta de activos:</p>
+                <p className="font-semibold text-blue-400">✨ {t('importPage.autoConfigTitle')}</p>
+                <p>{t('importPage.autoConfigDesc')}</p>
                 <div className="mt-1 bg-slate-950/80 p-2.5 rounded border border-white/5 font-mono text-[11px] text-white space-y-1">
                   <div>
-                    <span className="text-slate-400">Código GL:</span>{' '}
+                    <span className="text-slate-400">{t('importPage.glCodeLabel')}</span>{' '}
                     <span className="text-blue-400 font-bold">{getSuggestedCode()}</span>
                   </div>
                   <div>
-                    <span className="text-slate-400">Nombre GL:</span>{' '}
+                    <span className="text-slate-400">{t('importPage.glNameLabel')}</span>{' '}
                     <span className="text-emerald-400 font-bold">
                       {formBankName
-                        ? `${formBankName} - ${formAccountName || 'Cuenta'}`
-                        : 'Banco - Cuenta'}
+                        ? `${formBankName} - ${formAccountName || t('importPage.defaultAccountName')}`
+                        : t('importPage.defaultBankAccountName')}
                     </span>
                   </div>
                   <div>
-                    <span className="text-slate-400">Cuenta Padre:</span> 1010 - Cash & Cash
+                    <span className="text-slate-400">{t('importPage.parentAccountLabel')}</span> 1010 - Cash & Cash
                     Equivalents
                   </div>
                 </div>
@@ -1188,7 +1226,7 @@ export function ImportPage() {
                   accounts={assetAccounts}
                   value={formGlAccountId}
                   onChange={setFormGlAccountId}
-                  placeholder="Select asset account"
+                  placeholder={t('importPage.selectAssetAccount')}
                 />
                 <p className="text-xs text-muted-foreground">{t('banks.linkedAccountHelp')}</p>
               </div>
@@ -1249,14 +1287,14 @@ export function ImportPage() {
               <AlertCircle className="size-5 shrink-0" />
               <span>
                 {isStrict
-                  ? 'Validación Bloqueada (Modo Estricto)'
-                  : 'Titular de Cuenta no Coincide'}
+                  ? t('importPage.strictValidationTitle')
+                  : t('importPage.holderMismatchTitle')}
               </span>
             </DialogTitle>
             <DialogDescription>
               {isStrict
-                ? 'Se han bloqueado los siguientes archivos debido a discrepancia estricta en el titular:'
-                : 'Se detectaron diferencias en el titular de la cuenta de los siguientes archivos:'}
+                ? t('importPage.strictBlockedDesc')
+                : t('importPage.holderMismatchDesc')}
             </DialogDescription>
           </DialogHeader>
 
@@ -1265,9 +1303,9 @@ export function ImportPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Archivo</TableHead>
-                    <TableHead>Titular PDF</TableHead>
-                    <TableHead className="text-right">Similitud</TableHead>
+                    <TableHead>{t('importPage.tableFile')}</TableHead>
+                    <TableHead>{t('importPage.tablePdfHolder')}</TableHead>
+                    <TableHead className="text-right">{t('importPage.tableSimilarity')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1290,45 +1328,32 @@ export function ImportPage() {
 
             {isStrict ? (
               <div className="rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 p-3 text-xs text-red-800 dark:text-red-300 leading-relaxed space-y-2">
-                <p className="font-semibold">🚫 Error de Cumplimiento Estricto:</p>
+                <p className="font-semibold">🚫 {t('importPage.strictErrorTitle')}</p>
                 <p>
-                  El sistema está configurado en <strong>Modo Estricto</strong>. No se permite
-                  importar extractos bancarios que pertenezcan a un titular diferente de{' '}
-                  <strong>{activeCompany?.legalName}</strong> (Se detectó{' '}
-                  <strong>
-                    "
-                    {mismatchFiles
+                  {t('importPage.strictErrorDesc')
+                    .replace('{company}', activeCompany?.legalName || '')
+                    .replace('{holders}', mismatchFiles
                       .map((f) => f.extractedHolder)
                       .filter((v, i, a) => a.indexOf(v) === i)
-                      .join(', ')}
-                    "
-                  </strong>{' '}
-                  en el documento).
+                      .join(', '))}
                 </p>
                 <p className="font-medium">
-                  Para continuar, cargue los archivos correctos o cambie la configuración en
-                  rules/import-config.json.
+                  {t('importPage.strictErrorAction')}
                 </p>
               </div>
             ) : (
               <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 p-3 text-xs text-amber-800 dark:text-amber-300 leading-relaxed space-y-2">
-                <p className="font-semibold">⚠️ Advertencia de integridad contable:</p>
+                <p className="font-semibold">⚠️ {t('importPage.integrityWarningTitle')}</p>
                 <p>
-                  Los documentos no corresponden plenamente a{' '}
-                  <strong>{activeCompany?.legalName}</strong> (Se detectó{' '}
-                  <strong>
-                    "
-                    {mismatchFiles
+                  {t('importPage.integrityWarningDesc')
+                    .replace('{company}', activeCompany?.legalName || '')
+                    .replace('{holders}', mismatchFiles
                       .map((f) => f.extractedHolder)
                       .filter((v, i, a) => a.indexOf(v) === i)
-                      .join(', ')}
-                    "
-                  </strong>{' '}
-                  en el documento). Esto puede deberse a abreviaciones o cambios de nombre en el
-                  banco, pero si corresponden a la empresa puedes aceptarlos.
+                      .join(', '))}
                 </p>
                 <p className="font-medium">
-                  ¿Deseas aceptar los archivos e iniciar la importación?
+                  {t('importPage.integrityWarningAction')}
                 </p>
               </div>
             )}
@@ -1337,12 +1362,12 @@ export function ImportPage() {
           <DialogFooter className="flex gap-2">
             {isStrict ? (
               <Button className="w-full" variant="outline" onClick={handleRejectMismatches}>
-                Cerrar
+                {t('importPage.close')}
               </Button>
             ) : (
               <>
                 <Button variant="outline" onClick={handleRejectMismatches}>
-                  Rechazar y Cancelar
+                  {t('importPage.rejectAndCancel')}
                 </Button>
                 <Button
                   onClick={() => {
@@ -1351,7 +1376,7 @@ export function ImportPage() {
                   }}
                   className="bg-amber-600 hover:bg-amber-700 text-white"
                 >
-                  Aceptar e Importar
+                  {t('importPage.acceptAndImport')}
                 </Button>
               </>
             )}

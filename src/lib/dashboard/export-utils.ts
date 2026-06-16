@@ -1,11 +1,12 @@
 import { createHash } from 'crypto';
 import { logger } from '../logger';
+import type { DashboardKPI, DashboardAlert, DashboardTrendPoint } from '@/lib/types/shared';
 
-function generateHash(payload: any) {
+function generateHash(payload: Record<string, unknown>) {
   return createHash('sha256').update(JSON.stringify(payload)).digest('hex').slice(0, 16);
 }
 
-export function exportToCSV(kpi: any, trend: any[], companyId: string) {
+export function exportToCSV(kpi: DashboardKPI, trend: DashboardTrendPoint[], companyId: string) {
   const header = 'Concepto,Valor\n';
   const rows = `Activos,${kpi.assets}\nPasivos,${kpi.liabilities}\nPatrimonio,${kpi.equity}\nIngresos,${kpi.revenue}\nGastos,${kpi.expenses}\n`;
   const hash = generateHash({ kpi, companyId, exportedAt: new Date().toISOString() });
@@ -19,7 +20,7 @@ export function exportToCSV(kpi: any, trend: any[], companyId: string) {
   a.click();
 }
 
-export function exportToPDF(kpi: any, alerts: any, trend: any[], companyId: string) {
+export function exportToPDF(kpi: DashboardKPI, alerts: DashboardAlert[], trend: DashboardTrendPoint[], companyId: string) {
   const payload = { kpi, alerts, trend, companyId, exportedAt: new Date().toISOString() };
   const hash = generateHash(payload);
   logger.info(

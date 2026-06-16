@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { apiHandler, type RouteContext } from '@/lib/api-handler';
 import { requireCompanyContext } from '@/lib/context-storage';
-import { findContext } from '@/lib/services/entity-context-service';
+import { normalizePattern } from '@/lib/services/pattern-normalizer';
 import { loadConfig, sanitizeDescription, extractName } from '@/lib/services/entity-detector';
+import { ROLE_ACCOUNT_MAP } from '@/lib/constants/role-account-map';
+import { loadRolePriorities, entityFirstCheck } from '@/lib/services/rule-matching-engine';
 
 /**
  * POST /api/ai-rules/scan
@@ -50,14 +52,14 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
   function normalize(raw: string): string {
     return raw
       .replace(/conf#?\s*\S+/gi, '') // remove Conf# codes
-      .replace(/\b[a-z0-9]{8,}\b/gi, '') // remove long alphanumeric tokens
-      .replace(/\b\d[\d.,/\-]*\b/g, '') // remove numbers / amounts
+      .replace(/\b\d[\d.,/-]*\b/g, '') // remove numbers / amounts
       .replace(/\s{2,}/g, ' ')
       .trim()
       .toLowerCase();
   }
 
   interface Entry {
+    entityName: string;
     count: number;
     sample: string; // original description sample
     totalAmount: number;
@@ -72,7 +74,19 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
     const key = normalize(tx.description ?? '');
     if (key.length < 4) continue; // too short to be meaningful
 
-    const existing = map.get(key);
+    const sanitized = sanitizeDescription(tx.description ?? '', entityConfig);
+    const rawName = extractName(sanitized, entityConfig);
+    if (!rawName) continue; // Skip if no identifiable entity
+
+    // Strip numbers and clean up spaces to get a clean entity name
+    const entityName = rawName
+      .replace(/\b\d[\d.,\/-]*\b/g, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+    if (entityName.length < 2) continue; // Skip if it becomes too short after stripping numbers
+
+    const entityKey = entityName.toLowerCase();
+    const existing = map.get(entityKey);
     const isDebit = tx.amount < 0;
     if (existing) {
       existing.count++;
@@ -80,7 +94,8 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
       if (isDebit) existing.debitCount++;
       else existing.creditCount++;
     } else {
-      map.set(key, {
+      map.set(entityKey, {
+        entityName,
         count: 1,
         sample: tx.description ?? '',
         totalAmount: Math.abs(tx.amount),
@@ -152,49 +167,135 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
     return null;
   }
 
-  const patterns: any[] = [];
+  const contexts = await db.entityContext.findMany({
+    where: { companyId },
+    include: { glAccount: true },
+  });
 
-  for (const [key, entry] of map.entries()) {
-    if (entry.count < MIN_OCCURRENCES) continue;
+  interface ScanPattern {
+    id: string;
+    description: string;
+    rawDescription: string;
+    occurrences: number;
+    direction: string;
+    averageAmount: number;
+    suggestedAccount: string;
+    suggestedAccountCode: string;
+    suggestedAccountId: string;
+    hasContext: boolean;
+    contextRole: string;
+  }
+
+  const patterns: ScanPattern[] = [];
+
+  for (const [entityKey, entry] of map.entries()) {
+    const entityName = entry.entityName;
+
+    // Look up entity context in memory
+    const normalized = normalizePattern(entry.sample);
+    const entityNameLower = entityName.toLowerCase();
+    let matchingContexts = contexts.filter((ctx) =>
+      normalized.includes(ctx.pattern.toLowerCase()) ||
+      entityNameLower.includes(ctx.pattern.toLowerCase()) ||
+      ctx.pattern.toLowerCase().includes(entityNameLower)
+    );
+
+    // Conflict detection: Merchant vs Socio
+    const knownSocioPatterns = contexts
+      .filter((ctx) => ctx.role.toUpperCase() === 'SOCIO')
+      .map((ctx) => ctx.pattern.toLowerCase());
+
+    if (knownSocioPatterns.length > 0) {
+      const check = entityFirstCheck({ description: entry.sample, amount: 0 }, knownSocioPatterns, true);
+      if (check.skipSocioRules) {
+        // Exclude SOCIO contexts from matchingContexts
+        matchingContexts = matchingContexts.filter((ctx) => ctx.role.toUpperCase() !== 'SOCIO');
+      }
+    }
+
+    let context = null;
+    if (matchingContexts.length === 1) {
+      context = matchingContexts[0];
+    } else if (matchingContexts.length > 1) {
+      const rolePriorities = loadRolePriorities();
+      const sorted = [...matchingContexts].sort((a, b) => {
+        const prioA = rolePriorities[a.role.toUpperCase()] ?? 99;
+        const prioB = rolePriorities[b.role.toUpperCase()] ?? 99;
+        return prioA - prioB; // Higher priority (lower index value) wins
+      });
+      context = sorted[0];
+    }
+
+    // Smart frequency logic:
+    // If a transaction matches an existing EntityContext, the minimum occurrences required is 1.
+    // If it does not, the minimum occurrences required is 2.
+    const requiredOccurrences = context ? 1 : 2;
+    if (entry.count < requiredOccurrences) continue;
+
+    // OPCION A ESTRICTA: Si no tiene un rol asignado, lo ignoramos para el Generador IA
+    if (!context) continue;
 
     // Skip if an existing rule covers this pattern
     const alreadyHasRule = existingRules.some((r) => {
       const cond = r.conditionValue.toLowerCase().trim();
-      const k = key.toLowerCase().trim();
-      if (r.conditionType === 'contains') return k.includes(cond) || cond.includes(k);
-      if (r.conditionType === 'equals') return k === cond;
-      if (r.conditionType === 'starts_with') return k.startsWith(cond) || cond.startsWith(k);
-      return false;
+      const entName = entityName.toLowerCase().trim();
+      const rawSample = entry.sample.toLowerCase().trim();
+      
+      const nameMatch = entName.includes(cond) || cond.includes(entName);
+      const rawMatch = r.conditionType === 'contains'
+        ? rawSample.includes(cond) || cond.includes(rawSample)
+        : r.conditionType === 'equals'
+        ? rawSample === cond
+        : r.conditionType === 'starts_with'
+        ? rawSample.startsWith(cond) || cond.startsWith(rawSample)
+        : false;
+
+      return nameMatch || rawMatch;
     });
     if (alreadyHasRule) continue;
 
     const isDebit = entry.debitCount >= entry.creditCount;
 
-    // Extract entity name from the raw sample — skip if no identifiable entity
-    const sanitized = sanitizeDescription(entry.sample, entityConfig);
-    const entityName = extractName(sanitized, entityConfig);
-    if (!entityName) continue;
-
-    // Look up entity context
-    const context = await findContext(companyId, entry.sample);
     let suggested: { name: string; code: string; id: string } | null = null;
     let hasContext = false;
     let contextRole = '';
 
-    if (context && context.glAccount) {
-      suggested = {
-        name: context.glAccount.name,
-        code: context.glAccount.code,
-        id: context.glAccount.id,
-      };
+    if (context) {
       hasContext = true;
       contextRole = context.role;
+      if (context.glAccount) {
+        suggested = {
+          name: context.glAccount.name,
+          code: context.glAccount.code,
+          id: context.glAccount.id,
+        };
+      } else {
+        // Resolve default GL account dynamically based on the assigned role
+        const mapping = ROLE_ACCOUNT_MAP[context.role.toUpperCase()];
+        if (mapping) {
+          const defaultCode = isDebit ? mapping.debit : mapping.credit;
+          let account = glAccounts.find((a) => a.code === defaultCode);
+          if (!account && defaultCode !== mapping.fallback) {
+            account = glAccounts.find((a) => a.code === mapping.fallback);
+          }
+          if (account) {
+            suggested = {
+              name: account.name,
+              code: account.code,
+              id: account.id,
+            };
+          }
+        }
+        if (!suggested) {
+          suggested = suggestAccount(entry.sample, isDebit);
+        }
+      }
     } else {
       suggested = suggestAccount(entry.sample, isDebit);
     }
 
     patterns.push({
-      id: Buffer.from(key).toString('base64').replace(/=/g, ''),
+      id: Buffer.from(entityKey).toString('base64').replace(/=/g, ''),
       description: entityName,
       rawDescription: entry.sample,
       occurrences: entry.count,

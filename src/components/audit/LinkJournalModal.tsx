@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, Loader2, ArrowRight, CalendarDays, FileText, CheckCircle2 } from 'lucide-react';
 import {
   Dialog,
@@ -16,6 +16,7 @@ import { useFuzzyMatchAudit } from '@/hooks/useFuzzyMatchAudit';
 import { formatCurrency, formatDate } from '@/lib/format';
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
+import { useLanguageStore } from '@/store/language-store';
 
 interface LinkJournalModalProps {
   isOpen: boolean;
@@ -55,6 +56,7 @@ export function LinkJournalModal({
   bankTransaction,
   onLinked,
 }: LinkJournalModalProps) {
+  const t = useLanguageStore((s) => s.t);
   const { linkTransaction, isLinking } = useFuzzyMatchAudit();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -64,7 +66,7 @@ export function LinkJournalModal({
 
   const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  const fetchEntries = async (query: string) => {
+  const fetchEntries = useCallback(async (query: string) => {
     if (!bankTransaction) return;
     setIsLoading(true);
     try {
@@ -82,11 +84,11 @@ export function LinkJournalModal({
       }
     } catch (error) {
       logger.error('Error fetching journal entries:', { error: String(error) });
-      toast.error('Error al cargar los asientos contables');
+      toast.error(t('audit.loadJournalFailed'));
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [bankTransaction, t]);
 
   useEffect(() => {
     if (isOpen && bankTransaction) {
@@ -98,7 +100,7 @@ export function LinkJournalModal({
       setSearchQuery(initialSearch);
       fetchEntries(initialSearch);
     }
-  }, [isOpen, bankTransaction]);
+  }, [isOpen, bankTransaction, fetchEntries]);
 
   const handleSearchChange = (val: string) => {
     setSearchQuery(val);
@@ -115,7 +117,7 @@ export function LinkJournalModal({
         bankTransactionId: bankTransaction.id,
         journalLineId,
       });
-      toast.success('Transacción contable vinculada exitosamente');
+      toast.success(t('audit.linkSuccess'));
       onLinked?.();
       onClose();
     } catch (error: unknown) {

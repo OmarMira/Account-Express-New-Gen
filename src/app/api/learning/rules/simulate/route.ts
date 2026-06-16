@@ -7,7 +7,7 @@ import { logger } from '@/lib/logger';
 
 // Condition schema validation
 const conditionSchema = z.object({
-  field: z.enum(['description', 'amount', 'reference']),
+  field: z.enum(['description', 'amount']),
   operator: z.enum([
     'contains',
     'equals',
@@ -46,24 +46,9 @@ function matchCondition(
     if (operator === 'greater_than' || operator === 'amount_greater') return absAmount > valNum;
     if (operator === 'less_than' || operator === 'amount_less') return absAmount < valNum;
     return false;
-  } else if (field === 'reference') {
-    const ref = (tx.reference || '').toUpperCase();
-    const val = value.toUpperCase();
-    switch (operator) {
-      case 'contains':
-        return ref.includes(val);
-      case 'starts_with':
-        return ref.startsWith(val);
-      case 'ends_with':
-        return ref.endsWith(val);
-      case 'equals':
-        return ref === val;
-      default:
-        return false;
-    }
   } else {
-    const desc = tx.description.toUpperCase();
-    const val = value.toUpperCase();
+    const desc = tx.description.toLowerCase();
+    const val = value.toLowerCase();
     switch (operator) {
       case 'contains':
         return desc.includes(val);
@@ -133,6 +118,9 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
     });
   } catch (error: unknown) {
     logger.error('[POST RULE SIMULATION ERROR]', { error: String(error) });
-    return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : String(error) },
+      { status: 500 },
+    );
   }
 });

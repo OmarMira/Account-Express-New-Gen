@@ -11,6 +11,7 @@ import {
   ArrowDown,
   Zap,
   Loader2,
+  Sparkles,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -56,7 +57,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useLanguageStore } from '@/store/language-store';
 import { useAuthStore } from '@/store/auth-store';
+import { toast } from 'sonner';
 import { AccountSelector, type GlAccountOption } from '@/components/spa/journal/AccountSelector';
+import { EntityOnboardingModal } from '@/components/learning/EntityOnboardingModal';
 import { AIRulesGeneratorTab } from './settings/AIRulesGeneratorTab';
 
 /* ─── Types ─── */
@@ -218,6 +221,9 @@ export function BankRulesPage() {
   // AI Rule Generator Modal state
   const [aiModalOpen, setAiModalOpen] = useState(false);
 
+  // Entity onboarding modal
+  const [entityOnboardingOpen, setEntityOnboardingOpen] = useState(false);
+
   // Fetch accounts for dropdown
   const fetchAccounts = useCallback(async () => {
     if (!activeCompany?.id) return;
@@ -228,9 +234,9 @@ export function BankRulesPage() {
         setAccounts(data.data ?? data);
       }
     } catch {
-      // Silently fail — accounts dropdown will be empty
+      toast.error(t('bankRules.errors.loadAccountsFailed'));
     }
-  }, [activeCompany]);
+  }, [activeCompany, t]);
 
   // Fetch rules
   const fetchRules = useCallback(async () => {
@@ -244,11 +250,11 @@ export function BankRulesPage() {
         setSelectedIds([]);
       }
     } catch {
-      // Silently fail
+      toast.error(t('bankRules.errors.loadFailed'));
     } finally {
       setLoading(false);
     }
-  }, [activeCompany]);
+  }, [activeCompany, t]);
 
   useEffect(() => {
     fetchAccounts();
@@ -299,9 +305,11 @@ export function BankRulesPage() {
       if (res.ok) {
         setBulkDeleteDialogOpen(false);
         fetchRules();
+      } else {
+        toast.error(t('bankRules.errors.bulkDeleteFailed'));
       }
     } catch {
-      // Silently fail
+      toast.error(t('bankRules.errors.bulkDeleteFailed'));
     } finally {
       setBulkDeleting(false);
     }
@@ -337,7 +345,9 @@ export function BankRulesPage() {
     try {
       const url = editingRule ? `/api/bank-rules/${editingRule.id}` : '/api/bank-rules';
       const method = editingRule ? 'PUT' : 'POST';
-      const body = editingRule ? { ...form, companyId: activeCompany.id } : { companyId: activeCompany.id, ...form };
+      const body = editingRule
+        ? { ...form, companyId: activeCompany.id }
+        : { companyId: activeCompany.id, ...form };
 
       const res = await fetch(url, {
         method,
@@ -348,9 +358,12 @@ export function BankRulesPage() {
       if (res.ok) {
         setModalOpen(false);
         fetchRules();
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        toast.error(errData.error || (editingRule ? t('bankRules.errors.updateFailed') : t('bankRules.errors.createFailed')));
       }
     } catch {
-      // Silently fail
+      toast.error(editingRule ? t('bankRules.errors.updateFailed') : t('bankRules.errors.createFailed'));
     } finally {
       setSaving(false);
     }
@@ -360,14 +373,15 @@ export function BankRulesPage() {
   const handleToggleActive = async (rule: BankRule) => {
     if (!activeCompany?.id) return;
     try {
-      await fetch(`/api/bank-rules/${rule.id}`, {
+      const res = await fetch(`/api/bank-rules/${rule.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isActive: !rule.isActive }),
+        body: JSON.stringify({ isActive: !rule.isActive, companyId: activeCompany.id }),
       });
+      if (!res.ok) toast.error(t('bankRules.errors.toggleFailed'));
       fetchRules();
     } catch {
-      // Silently fail
+      toast.error(t('bankRules.errors.toggleFailed'));
     }
   };
 
@@ -376,18 +390,19 @@ export function BankRulesPage() {
     if (!deletingRule || !activeCompany?.id) return;
     setDeleting(true);
     try {
-      const res = await fetch(`/api/bank-rules/${deletingRule.id}`, {
+      const res = await fetch(`/api/bank-rules/${deletingRule.id}?companyId=${activeCompany.id}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companyId: activeCompany.id }),
       });
       if (res.ok) {
         setDeleteDialogOpen(false);
         setDeletingRule(null);
         fetchRules();
+      } else {
+        toast.error(t('bankRules.errors.deleteFailed'));
       }
     } catch {
-      // Silently fail
+      toast.error(t('bankRules.errors.deleteFailed'));
     } finally {
       setDeleting(false);
     }
@@ -408,9 +423,11 @@ export function BankRulesPage() {
         const data = await res.json();
         setApplyResult(data);
         fetchRules();
+      } else {
+        toast.error(t('bankRules.errors.applyAllFailed'));
       }
     } catch {
-      // Silently fail
+      toast.error(t('bankRules.errors.applyAllFailed'));
     } finally {
       setApplying(false);
     }
@@ -437,6 +454,15 @@ export function BankRulesPage() {
               {t('bankRules.deleteSelected')} ({selectedIds.length})
             </Button>
           )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setEntityOnboardingOpen(true)}
+            className="gap-2"
+          >
+            <Sparkles className="size-4" />
+            <span className="hidden sm:inline">{t('learning.classifyEntities')}</span>
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -487,48 +513,54 @@ export function BankRulesPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <Table>
+              <Table className="min-w-max">
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[4%] pr-0">
+                    <TableHead className="w-10 pr-0">
                       <Checkbox
                         checked={isAllSelected ? true : isSomeSelected ? 'indeterminate' : false}
                         onCheckedChange={handleSelectAll}
-                        aria-label="Select all rules"
+                        aria-label={t('bankRules.selectAllAria')}
                       />
                     </TableHead>
-                    <TableHead className="w-[23%]">{t('bankRules.ruleName')}</TableHead>
-                    <TableHead className="w-[33%]">{t('bankRules.condition')}</TableHead>
-                    <TableHead className="w-[25%]">{t('bankRules.assignToAccount')}</TableHead>
-                    <TableHead className="w-[10%] text-center">
+                    <TableHead className="min-w-[320px] whitespace-normal">
+                      {t('bankRules.ruleName')}
+                    </TableHead>
+                    <TableHead className="min-w-[280px] whitespace-normal">
+                      {t('bankRules.condition')}
+                    </TableHead>
+                    <TableHead className="min-w-[280px] whitespace-normal">
+                      {t('bankRules.assignToAccount')}
+                    </TableHead>
+                    <TableHead className="text-center whitespace-nowrap min-w-[130px]">
                       {t('bankRules.autoMatches')}
                     </TableHead>
-                    <TableHead className="w-[5%] text-right">{t('common.actions')}</TableHead>
+                    <TableHead className="text-right whitespace-nowrap min-w-[100px]">
+                      {t('common.actions')}
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {sortedRules.map((rule) => (
-                    <TableRow key={rule.id} className={!rule.isActive ? 'opacity-60' : ''}>
+                    <TableRow
+                      key={rule.id}
+                      className={`${!rule.isActive ? 'opacity-60' : ''} cursor-pointer`}
+                      onDoubleClick={() => handleEdit(rule)}
+                    >
                       <TableCell className="pr-0">
                         <Checkbox
                           checked={selectedIds.includes(rule.id)}
                           onCheckedChange={(checked) => handleSelectRule(rule.id, checked)}
-                          aria-label={`Select rule ${rule.name}`}
+                          aria-label={t('bankRules.selectRuleAria').replace('{name}', rule.name)}
                         />
                       </TableCell>
-                      <TableCell className="font-medium max-w-[200px] truncate" title={rule.name}>
+                      <TableCell className="font-medium min-w-[320px] whitespace-normal">
                         {rule.name}
                       </TableCell>
-                      <TableCell
-                        className="max-w-[250px] truncate text-sm text-muted-foreground"
-                        title={getConditionDisplay(rule, t)}
-                      >
+                      <TableCell className="text-sm text-muted-foreground min-w-[280px] whitespace-normal">
                         {getConditionDisplay(rule, t)}
                       </TableCell>
-                      <TableCell
-                        className="max-w-[200px] truncate"
-                        title={rule.glAccount ? `${rule.glAccount.code} ${rule.glAccount.name}` : '—'}
-                      >
+                      <TableCell className="min-w-[280px] whitespace-normal">
                         <span className="flex items-center gap-2">
                           {rule.glAccount ? (
                             <>
@@ -818,6 +850,13 @@ export function BankRulesPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Entity Onboarding Modal */}
+      <EntityOnboardingModal
+        isOpen={entityOnboardingOpen}
+        onClose={() => setEntityOnboardingOpen(false)}
+        companyId={activeCompany?.id || ''}
+      />
+
       {/* AI Rule Generator Modal */}
       <Dialog
         open={aiModalOpen}
@@ -828,8 +867,8 @@ export function BankRulesPage() {
       >
         <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
           <DialogHeader className="sr-only">
-            <DialogTitle>Generador de Reglas IA</DialogTitle>
-            <DialogDescription>Generador de reglas automáticas usando IA local</DialogDescription>
+            <DialogTitle>{t('settings.aiRules.title')}</DialogTitle>
+            <DialogDescription>{t('settings.aiRules.subtitle')}</DialogDescription>
           </DialogHeader>
           <AIRulesGeneratorTab />
         </DialogContent>

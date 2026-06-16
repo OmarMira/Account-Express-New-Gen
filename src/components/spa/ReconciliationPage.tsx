@@ -235,6 +235,7 @@ export function ReconciliationPage() {
 
   // Refs & Virtualizers for table virtualization
   const depositsParentRef = useRef<HTMLDivElement>(null);
+  // eslint-disable-next-line react-hooks/incompatible-library
   const depositsVirtualizer = useVirtualizer({
     count: deposits.length,
     getScrollElement: () => depositsParentRef.current,
@@ -387,7 +388,7 @@ export function ReconciliationPage() {
     return () => {
       isMounted = false;
     };
-  }, [activeCompany?.id, selectedAccountId, summary?.unreconciledCount]);
+  }, [activeCompany?.id, selectedAccountId, summary]);
 
   // Toggle transaction selection
   const toggleTx = (id: string) => {
@@ -455,9 +456,14 @@ export function ReconciliationPage() {
         const data = await res.json();
         setAutoMatchResult(data);
         fetchReconciliation();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error || err.message || 'Error al emparejar automáticamente');
+        console.error('AutoMatch error:', err);
       }
-    } catch {
-      /* ignore */
+    } catch (err) {
+      console.error('Network error during autoMatch:', err);
+      toast.error('Error de red al emparejar');
     } finally {
       setAutoMatching(false);
       stopProcessing();
@@ -545,14 +551,14 @@ export function ReconciliationPage() {
         }),
       });
       if (res.ok) {
-        toast.success('Transaction approved');
+        toast.success(t('reconciliation.approveSuccess'));
         fetchReconciliation();
       } else {
         const err = await res.json();
-        toast.error(err.error || 'Failed to approve');
+        toast.error(err.error || t('reconciliation.approveError'));
       }
     } catch {
-      toast.error('Failed to approve transaction');
+      toast.error(t('reconciliation.approveError'));
     }
   };
 
@@ -569,14 +575,14 @@ export function ReconciliationPage() {
         }),
       });
       if (res.ok) {
-        toast.success('Transaction rejected and moved to suspense');
+        toast.success(t('reconciliation.rejectSuccess'));
         fetchReconciliation();
       } else {
         const err = await res.json();
-        toast.error(err.error || 'Failed to reject');
+        toast.error(err.error || t('reconciliation.rejectError'));
       }
     } catch {
-      toast.error('Failed to reject transaction');
+      toast.error(t('reconciliation.rejectError'));
     }
   };
 

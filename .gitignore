@@ -1,14 +1,6 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
 # dependencies
-node_modules
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
+/node_modules
+/.pnpm-store
 
 # testing
 /coverage
@@ -28,71 +20,24 @@ node_modules
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
-!.env.example
+# local env files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.staging
+.env.staging.local
 
 # vercel
 .vercel
 
-
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-local-*
-.claude
-.z-ai-config
-*.log
-dev.log
-dev.out.log
-test
-prompt
 
-server.log
-# Agent run artifacts
-/skills/
-/.atl/
-
-# Local model system files
-brain/
-scratch/
-prisma/dev.db
-AccountExpress.zip
-public/index.html
-backups/
-test.db
-test.db-wal
-prisma/dev.db-wal
-prisma/dev.db-shm
-
-# Build artifacts
-dist/
-dist-installer/
-node_modules_old/
-
-# Reports
-reports/
-
-# Local agent/Pi runtime state
-.atl/
-.pi/
-
-# Generated docs
-IMPLEMENTATION_SUMMARY.md
-
-# Installer artifacts
-installer/
-
-# Staging database files
-prisma/staging.db*
-
-# npm lockfile (Bun is the official package manager)
-package-lock.json
-
-# Runtime state (rate limiter, etc.)
-data/
-
-# SDD change artifacts
-sdd/
+# prisma / sqlite
+/prisma/test.db
+/prisma/dev.db-shm
+/prisma/dev.db-wal

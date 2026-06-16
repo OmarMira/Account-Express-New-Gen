@@ -1,34 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { apiHandler } from '@/lib/api-handler';
 import { db } from '@/lib/db';
+import { requireCompanyContext } from '@/lib/context-storage';
 import { companySettingsCache } from '@/lib/cache';
+import { serverT } from '@/lib/server-i18n';
 
 export const POST = apiHandler(async (req: NextRequest) => {
-  const { companyId, name, startDate, endDate } = await req.json();
+  const locale = req.headers.get('x-locale') || 'es';
+  const { companyId } = requireCompanyContext();
+  const { name, startDate, endDate } = await req.json();
 
-  if (!companyId || !name || !startDate || !endDate) {
-    return NextResponse.json({ error: 'Faltan campos obligatorios' }, { status: 400 });
+  if (!name || !startDate || !endDate) {
+    return NextResponse.json(
+      { error: serverT(locale, 'apiErrors.fiscalPeriods.missingFields') },
+      { status: 400 },
+    );
   }
 
   const start = new Date(startDate);
   const end = new Date(endDate);
 
-  // Validar solapamientos
-  const existing = await db.fiscalPeriod.findMany({ where: { companyId } });
+  const existing = await db.fiscalPeriod.findMany({ where: { companyId: companyId } });
   const overlap = existing.some((e) => !(end < e.startDate || start > e.endDate));
   if (overlap) {
-    return NextResponse.json({ error: 'Solapamiento con períodos existentes' }, { status: 409 });
+    return NextResponse.json(
+      { error: serverT(locale, 'apiErrors.fiscalPeriods.overlap') },
+      { status: 409 },
+    );
   }
 
-  // Validar nombre único
   const nameExists = existing.some((e) => e.name === name);
   if (nameExists) {
-    return NextResponse.json({ error: 'Nombre de período duplicado' }, { status: 409 });
+    return NextResponse.json(
+      { error: serverT(locale, 'apiErrors.fiscalPeriods.duplicateName') },
+      { status: 409 },
+    );
   }
 
   const period = await db.fiscalPeriod.create({
     data: {
-      companyId,
+      companyId: companyId,
       name,
       startDate: start,
       endDate: end,
@@ -41,7 +52,7 @@ export const POST = apiHandler(async (req: NextRequest) => {
 
   await db.auditLog.create({
     data: {
-      companyId,
+      companyId: companyId,
       action: 'PERIOD_CREATED',
       entity: 'FiscalPeriod',
       entityId: period.id,

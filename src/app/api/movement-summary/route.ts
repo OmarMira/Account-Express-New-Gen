@@ -1,19 +1,59 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { apiHandler } from '@/lib/api-handler';
+import { requireCompanyContext } from '@/lib/context-storage';
 import { db } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import type { Prisma } from '@prisma/client';
 import { readJsonConfig } from '@/lib/config-loader';
 
-export async function GET(request: NextRequest) {
+export const GET = apiHandler(async (request: NextRequest) => {
   try {
+    const { companyId } = requireCompanyContext();
     const { searchParams } = new URL(request.url);
-    const companyId = searchParams.get('companyId');
     const fromDate = searchParams.get('fromDate');
     const toDate = searchParams.get('toDate');
     const accountId = searchParams.get('accountId');
 
-    if (!companyId) {
-      return NextResponse.json({ error: 'companyId is required' }, { status: 400 });
+    const rangeOnly = searchParams.get('rangeOnly') === 'true';
+    if (rangeOnly) {
+      const earliestEntry = await db.journalEntry.findFirst({
+        where: { companyId, status: 'posted' },
+        orderBy: { date: 'asc' },
+        select: { date: true },
+      });
+      const latestEntry = await db.journalEntry.findFirst({
+        where: { companyId, status: 'posted' },
+        orderBy: { date: 'desc' },
+        select: { date: true },
+      });
+
+      const earliestBankTx = await db.bankTransaction.findFirst({
+        where: { statement: { bankAccount: { companyId } }, isReconciled: true, glAccountId: { not: null } },
+        orderBy: { date: 'asc' },
+        select: { date: true },
+      });
+      const latestBankTx = await db.bankTransaction.findFirst({
+        where: { statement: { bankAccount: { companyId } }, isReconciled: true, glAccountId: { not: null } },
+        orderBy: { date: 'desc' },
+        select: { date: true },
+      });
+
+      let minDate: string | null = null;
+      let maxDate: string | null = null;
+
+      const dates: Date[] = [];
+      if (earliestEntry) dates.push(earliestEntry.date);
+      if (latestEntry) dates.push(latestEntry.date);
+      if (earliestBankTx) dates.push(earliestBankTx.date);
+      if (latestBankTx) dates.push(latestBankTx.date);
+
+      if (dates.length > 0) {
+        const sortedDates = dates.sort((a, b) => a.getTime() - b.getTime());
+        minDate = sortedDates[0].toISOString().split('T')[0];
+        maxDate = sortedDates[sortedDates.length - 1].toISOString().split('T')[0];
+      }
+
+      return NextResponse.json({ minDate, maxDate });
     }
 
     // Build where clause
@@ -216,7 +256,17 @@ export async function GET(request: NextRequest) {
       const absAmount = Math.abs(tx.amount);
 
       // Function to process a "virtual" line
-      const processVirtualLine = (glAcct: any, debit: number, credit: number) => {
+      const processVirtualLine = (
+        glAcct: {
+          id: string;
+          code: string;
+          name: string;
+          accountType: string;
+          normalBalance: string;
+        },
+        debit: number,
+        credit: number,
+      ) => {
         if (!glAcct) return;
         totalDebits += debit;
         totalCredits += credit;
@@ -291,7 +341,8 @@ export async function GET(request: NextRequest) {
     }));
 
     // Sort by type in logical GAAP order
-    const accountTypeMeta = await readJsonConfig<Record<string, { order: number }>>('account-types.json');
+    const accountTypeMeta =
+      await readJsonConfig<Record<string, { order: number }>>('account-types.json');
     const typeOrder = Object.entries(accountTypeMeta)
       .sort(([, a], [, b]) => a.order - b.order)
       .map(([key]) => key);
@@ -324,4 +375,4 @@ export async function GET(request: NextRequest) {
     logger.error('Movement summary error:', { error: String(error) });
     return NextResponse.json({ error: 'Failed to fetch movement summary' }, { status: 500 });
   }
-}
+});

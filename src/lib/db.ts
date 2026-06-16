@@ -71,7 +71,5 @@ if (!isEdge && db && !globalForPrisma.isListenerRegistered) {
     }
   });
 
-  if (process.env.NODE_ENV !== 'production') {
-    globalForPrisma.isListenerRegistered = true;
-  }
+  globalForPrisma.isListenerRegistered = true;
 }

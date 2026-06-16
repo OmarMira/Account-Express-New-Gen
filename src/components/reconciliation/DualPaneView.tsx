@@ -9,6 +9,32 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { useEffect, useRef, useCallback } from 'react';
 
+interface DualPaneItem {
+  id: string;
+  amount: number;
+  confidenceScore?: number;
+  [key: string]: string | number | boolean | undefined;
+}
+
+interface DualPaneConfig {
+  layout: {
+    visibleColumns: string[];
+  };
+}
+
+interface DualPaneViewProps {
+  data: {
+    transactions?: { unreconciled: DualPaneItem[] };
+    postedJournalEntries?: DualPaneItem[];
+  };
+  config: DualPaneConfig;
+  selectedBankTx: string[];
+  setSelectedBankTx: React.Dispatch<React.SetStateAction<string[]>>;
+  selectedJournalEntry: string | null;
+  setSelectedJournalEntry: (id: string | null) => void;
+  splitWidth: string;
+}
+
 export function DualPaneView({
   data,
   config,
@@ -17,7 +43,7 @@ export function DualPaneView({
   selectedJournalEntry,
   setSelectedJournalEntry,
   splitWidth,
-}: any) {
+}: DualPaneViewProps) {
   const bankRef = useRef<HTMLDivElement>(null);
   const journalRef = useRef<HTMLDivElement>(null);
 
@@ -43,7 +69,7 @@ export function DualPaneView({
     };
   }, [handleSyncScroll]);
 
-  const renderList = (items: any[], isBank: boolean) => (
+  const renderList = (items: DualPaneItem[], isBank: boolean) => (
     <div ref={isBank ? bankRef : journalRef} className="overflow-auto max-h-[500px]">
       <Table>
         <TableHeader>
@@ -55,7 +81,7 @@ export function DualPaneView({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {items.map((item: any) => {
+          {items.map((item: DualPaneItem) => {
             const isSelected = isBank
               ? selectedBankTx.includes(item.id)
               : selectedJournalEntry === item.id;

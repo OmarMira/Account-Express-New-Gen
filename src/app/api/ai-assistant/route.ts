@@ -10,6 +10,8 @@ import { extractKeywords } from '@/lib/memory/keyword-extractor';
 import { checkPromptInjection, addSystemDelimiter } from '@/lib/guardrails';
 import { join } from 'path';
 import { readFileSync, existsSync } from 'fs';
+import type { AiChatMessage, AiToolCall, ParsedRuleFromAI } from '@/lib/types/shared';
+import { Prisma } from '@prisma/client';
 
 // ─── Request schema ─────────────────────────────────────────────────
 const RequestBodySchema = z.object({
@@ -201,7 +203,12 @@ const TOOLS = [
 ];
 
 // Local execution of DB queries using Prisma
-async function executeTool(name: string, args: any, companyId: string, userId?: string) {
+async function executeTool(
+  name: string,
+  args: Record<string, unknown>,
+  companyId: string,
+  userId?: string,
+) {
   try {
     switch (name) {
       case 'get_company_summary': {
@@ -277,7 +284,14 @@ async function executeTool(name: string, args: any, companyId: string, userId?: 
       }
 
       case 'get_bank_transactions': {
-        const { description, minAmount, maxAmount, startDate, endDate, isReconciled, limit } = args;
+        const description = args.description as string | undefined;
+        const minAmount = args.minAmount as number | undefined;
+        const maxAmount = args.maxAmount as number | undefined;
+        const startDate = args.startDate as string | undefined;
+        const endDate = args.endDate as string | undefined;
+        const isReconciled = args.isReconciled as boolean | undefined;
+        const limit = args.limit as number | undefined;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const where: any = {
           statement: { companyId },
         };
@@ -285,7 +299,7 @@ async function executeTool(name: string, args: any, companyId: string, userId?: 
         if (description) {
           where.description = { contains: description };
         }
-        if (isReconciled !== undefined) {
+        if (isReconciled !== undefined && isReconciled !== null) {
           where.isReconciled = isReconciled;
         }
         if (minAmount !== undefined || maxAmount !== undefined) {
@@ -364,7 +378,10 @@ async function executeTool(name: string, args: any, companyId: string, userId?: 
       }
 
       case 'save_system_memory': {
-        const { title, content, type, keywords } = args;
+        const title = args.title as string;
+        const content = args.content as string;
+        const type = args.type as string;
+        const keywords = (args.keywords ?? []) as string[];
         const cleanKeywordsList = keywords.map((k: string) => k.toLowerCase().trim());
         const cleanKeywordsCsv = cleanKeywordsList.join(',');
 
@@ -506,8 +523,11 @@ export const POST = apiHandler(
 
 // Helper to call the LLM via fetch with timeout, tool definition and error handling
 async function callAI(
-  messages: { role: string; content: string }[],
-  tools?: any[],
+  messages: AiChatMessage[],
+  tools?: Array<{
+    type: string;
+    function: { name: string; description: string; parameters: Record<string, unknown> };
+  }>,
   requireJson?: boolean,
 ) {
   const apiKey = process.env.AI_API_KEY;
@@ -544,7 +564,7 @@ async function callAI(
     }
   }
 
-  let lastError: any = null;
+  let lastError: Error | null = null;
 
   for (let m = 0; m < modelsToTry.length; m++) {
     const currentModel = modelsToTry[m];
@@ -552,7 +572,7 @@ async function callAI(
     const timeout = setTimeout(() => controller.abort(), 12000); // 12s timeout por intento
 
     try {
-      const body: any = { model: currentModel, messages };
+      const body: Record<string, unknown> = { model: currentModel, messages };
       if (tools && tools.length > 0) {
         body.tools = tools;
       }
@@ -618,7 +638,7 @@ async function callAI(
         model: currentModel,
         error: err instanceof Error ? err.message : String(err),
       });
-      lastError = err;
+      lastError = err instanceof Error ? err : new Error(String(err));
       continue;
     }
   }
@@ -702,7 +722,12 @@ async function retrieveMemories(
 }
 
 // ─── Chat Mode ─────────────────────────────────────────────────────
-async function handleChat(message: string, history?: any[], companyId?: string, userId?: string) {
+async function handleChat(
+  message: string,
+  history?: AiChatMessage[],
+  companyId?: string,
+  userId?: string,
+) {
   const guardrail = checkPromptInjection(message);
   if (!guardrail.passed) {
     return NextResponse.json({
@@ -753,7 +778,7 @@ YOUR STYLE:
   const memoriesContext = companyId ? await retrieveMemories(message, companyId, locale) : '';
   const finalSystemPrompt = systemPrompt + memoriesContext;
 
-  const messages: any[] = [{ role: 'system', content: finalSystemPrompt }];
+  const messages: AiChatMessage[] = [{ role: 'system', content: finalSystemPrompt }];
 
   if (history && Array.isArray(history)) {
     for (const h of history) {
@@ -775,7 +800,8 @@ YOUR STYLE:
       throw new Error('No choice in AI response');
     }
 
-    const aiMessage = choice.message;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const aiMessage = choice.message as any;
     messages.push(aiMessage);
 
     if (aiMessage.tool_calls && aiMessage.tool_calls.length > 0) {
@@ -819,7 +845,7 @@ YOUR STYLE:
 // ─── Create Rule Mode ──────────────────────────────────────────────
 async function handleCreateRule(
   message: string,
-  history?: any[],
+  history?: AiChatMessage[],
   companyId?: string,
   userId?: string,
 ) {
@@ -898,9 +924,7 @@ EXAMPLE OF COMPLETED BIFURCATED RULE RESPONSE:
   const finalSystemPrompt = systemPrompt + memoriesContext;
 
   // Construir historial de mensajes para callAI
-  const apiMessages: { role: string; content: string }[] = [
-    { role: 'system', content: finalSystemPrompt },
-  ];
+  const apiMessages: AiChatMessage[] = [{ role: 'system', content: finalSystemPrompt }];
 
   if (history && Array.isArray(history)) {
     for (const h of history) {
@@ -932,7 +956,7 @@ EXAMPLE OF COMPLETED BIFURCATED RULE RESPONSE:
 
   const rawReply = aiData.choices?.[0]?.message?.content ?? '';
 
-  let parsedRule: any = null;
+  let parsedRule: ParsedRuleFromAI | null = null;
   let reply = '';
   let isComplete = false;
   let clarificationQuestion = '';

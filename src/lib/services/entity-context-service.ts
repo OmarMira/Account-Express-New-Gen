@@ -4,28 +4,18 @@ import { normalizePattern } from '@/lib/services/pattern-normalizer';
 
 export async function findContext(companyId: string, description: string) {
   const normalized = normalizePattern(description);
-
-  // Find a match where the stored pattern is a substring of the normalized description
-  // or they are identical.
-  const context = await db.entityContext.findFirst({
-    where: {
-      companyId,
-      pattern: {
-        equals: normalized,
-      },
-    },
-    include: {
-      glAccount: true,
-    },
+  const contexts = await db.entityContext.findMany({
+    where: { companyId },
+    include: { glAccount: true },
   });
-
-  return context;
+  return contexts.find((ctx) => normalized.includes(ctx.pattern.toLowerCase())) || null;
 }
 
 export async function saveContext(data: {
   companyId: string;
   pattern: string;
   role: string;
+  roles?: string[];
   glAccountId?: string | null;
   source?: 'user' | 'ai';
   userId?: string;
@@ -38,6 +28,10 @@ export async function saveContext(data: {
     glAccountId: data.glAccountId,
   });
 
+  const rolesJson = data.roles?.length
+    ? JSON.stringify(data.roles.map((r) => r.toUpperCase()))
+    : null;
+
   const context = await db.entityContext.upsert({
     where: {
       companyId_pattern: {
@@ -47,6 +41,7 @@ export async function saveContext(data: {
     },
     update: {
       role: validated.role,
+      roles: rolesJson,
       glAccountId: validated.glAccountId,
       source: data.source ?? 'user',
     },
@@ -54,6 +49,7 @@ export async function saveContext(data: {
       companyId: validated.companyId,
       pattern: validated.pattern,
       role: validated.role,
+      roles: rolesJson,
       glAccountId: validated.glAccountId,
       source: data.source ?? 'user',
     },
@@ -71,6 +67,7 @@ export async function saveContext(data: {
         details: JSON.stringify({
           pattern: validated.pattern,
           role: validated.role,
+          roles: data.roles,
           glAccountId: validated.glAccountId,
           source: data.source ?? 'user',
         }),

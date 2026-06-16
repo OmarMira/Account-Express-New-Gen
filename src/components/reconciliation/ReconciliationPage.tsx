@@ -7,6 +7,7 @@ import { ShieldAlert, Link2 } from 'lucide-react';
 import { useReconciliationUI } from '@/hooks/use-reconciliation-ui';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DualPaneView } from './DualPaneView';
+import { useLanguageStore } from '@/store/language-store';
 
 export function ReconciliationPage({
   companyId,
@@ -15,6 +16,7 @@ export function ReconciliationPage({
   companyId: string;
   bankAccountId: string;
 }) {
+  const t = useLanguageStore((s) => s.t);
   const {
     config,
     data,
@@ -34,7 +36,7 @@ export function ReconciliationPage({
       </div>
     );
   if (!config || !data)
-    return <div className="p-6 text-destructive">Error cargando configuración o datos.</div>;
+    return <div className="p-6 text-destructive">{t('reconciliation.errorLoadingData')}</div>;
 
   const { layout, ui } = config;
   const splitWidth = `${layout.splitViewRatio * 100}%`;
@@ -51,14 +53,16 @@ export function ReconciliationPage({
         <CardHeader className="pb-2">
           <div className="flex justify-between items-center">
             <div>
-              <CardTitle>Conciliación Bancaria</CardTitle>
+              <CardTitle>{t('reconciliation.title')}</CardTitle>
               <CardDescription>
-                {data.bankAccount?.accountName} — Saldo Banco: $
-                {data.summary?.statementBalance.toFixed(2)}
+                {t('reconciliation.bankBalance', {
+                  name: data.bankAccount?.accountName ?? '',
+                  balance: data.summary?.statementBalance.toFixed(2) ?? '0.00',
+                })}
               </CardDescription>
             </div>
             <Badge variant={data.openPeriod ? 'default' : 'secondary'}>
-              {data.openPeriod ? 'Período Abierto' : 'Período Cerrado / Bloqueado'}
+              {data.openPeriod ? t('reconciliation.openPeriod') : t('reconciliation.closedPeriod')}
             </Badge>
           </div>
         </CardHeader>
@@ -78,8 +82,10 @@ export function ReconciliationPage({
       {/* Toolbar de Acciones */}
       <div className="flex justify-between items-center p-2 bg-muted/30 rounded-md">
         <span className="text-sm text-muted-foreground">
-          Seleccionados: {selectedBankTx.length} transacciones | {selectedJournalEntry ? '1' : '0'}{' '}
-          asiento contable
+          {t('reconciliation.selectedStatus', {
+            txCount: selectedBankTx.length,
+            jeCount: selectedJournalEntry ? '1' : '0',
+          })}
         </span>
         <div className="flex gap-2">
           <Button
@@ -93,7 +99,7 @@ export function ReconciliationPage({
             }
           >
             <Link2 className="size-4 mr-2" />{' '}
-            {linkMutation.isPending ? 'Vinculando...' : 'Vincular'}
+            {linkMutation.isPending ? t('reconciliation.linking') : t('reconciliation.linkButton')}
           </Button>
         </div>
       </div>

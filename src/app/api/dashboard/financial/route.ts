@@ -7,7 +7,12 @@ import { readJsonConfig } from '@/lib/config-loader';
 export const GET = apiHandler(async (req: NextRequest) => {
   const { userId, companyId } = requireCompanyContext();
 
-  const config = await readJsonConfig<any>('dashboard-config.json');
+  interface DashboardConfig {
+    alertThresholds: { balanceMismatchTolerance: number };
+    version: string;
+  }
+
+  const config = await readJsonConfig<DashboardConfig>('dashboard-config.json');
   const now = new Date();
 
   // Descubrir el año fiscal activo prioritariamente en base a las transacciones bancarias importadas

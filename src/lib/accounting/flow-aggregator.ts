@@ -95,7 +95,7 @@ export async function aggregateAccountingFlow(
 
         if (debit > 0) {
           aggregatedTransactions.push({
-            id: `jl-${cashLine.id}`,
+            id: `jl-${cashLine.id}-debit`,
             date: entry.date.toISOString().substring(0, 10),
             description: entry.description || 'Asiento Contable',
             account: primaryOffset.name,
@@ -108,7 +108,7 @@ export async function aggregateAccountingFlow(
 
         if (credit > 0) {
           aggregatedTransactions.push({
-            id: `jl-${cashLine.id}`,
+            id: `jl-${cashLine.id}-credit`,
             date: entry.date.toISOString().substring(0, 10),
             description: entry.description || 'Asiento Contable',
             account: primaryOffset.name,

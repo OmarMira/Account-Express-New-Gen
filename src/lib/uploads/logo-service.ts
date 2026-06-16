@@ -2,8 +2,9 @@ import { promises as fs } from 'fs';
 import { join } from 'path';
 import { readFileSync, existsSync } from 'fs';
 import { randomUUID } from 'crypto';
+import { logger } from '@/lib/logger';
 
-let config: any = {
+let config: { logo: { maxSizeMB: number; allowedFormats: string[]; path: string } } = {
   logo: {
     maxSizeMB: 1,
     allowedFormats: ['image/png', 'image/jpeg', 'image/svg+xml'],
@@ -14,10 +15,10 @@ let config: any = {
 try {
   const configPath = join(process.cwd(), 'rules/upload-config.json');
   if (existsSync(configPath)) {
-    config = JSON.parse(readFileSync(configPath, 'utf-8'));
+    config = JSON.parse(readFileSync(configPath, 'utf-8')) as typeof config;
   }
 } catch (err) {
-  // ignore, use defaults
+  logger.warn('[LOGO] Config load failed, using defaults', { error: String(err) });
 }
 
 export async function saveLogo(file: File): Promise<string> {
@@ -48,6 +49,8 @@ export async function deleteLogo(relativePath: string): Promise<void> {
   try {
     await fs.unlink(fullPath);
   } catch (err) {
-    // ignore if doesn't exist
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+      logger.warn('[LOGO] Delete failed', { path: relativePath, error: String(err) });
+    }
   }
 }

@@ -103,93 +103,12 @@ interface User {
   createdAt: string;
 }
 
-const LOCAL_TRANSLATIONS: Record<string, Record<string, string>> = {
-  en: {
-    title: 'Global Users',
-    subtitle: 'Complete administration and access control of the AccountExpress system.',
-    createBtn: 'Create User',
-    searchPlaceholder: 'Search users by name or email...',
-    loading: 'Loading users directory...',
-    noUsers: 'No users found.',
-    roleSuperAdmin: 'Super Admin',
-    roleCompanyAdmin: 'Company Admin',
-    statusActive: 'Active',
-    statusSuspended: 'Suspended',
-    registeredDate: 'Registered:',
-    editTitle: 'Edit User',
-    newTitle: 'New User',
-    labelFirstName: 'First Name *',
-    labelLastName: 'Last Name *',
-    labelEmail: 'Contact Email *',
-    labelPassword: 'Password',
-    passwordHint: '(leave blank to keep current)',
-    labelRole: 'System Role',
-    labelActive: 'Active User',
-    cancelBtn: 'Cancel',
-    saveBtn: 'Save User',
-    savingBtn: 'Saving...',
-    deleteTitle: 'Warning: Delete User',
-    deleteConfirm: 'Are you sure you want to permanently delete the user "{name}"?',
-    deleteWarning:
-      'This action will revoke all their company accesses. This operation is irreversible.',
-    deleteBtn: 'Yes, Delete User',
-    deletingBtn: 'Deleting...',
-    placeholderFirstName: 'First name',
-    placeholderLastName: 'Last name',
-    placeholderEmail: 'email@example.com',
-    placeholderPassword: 'Password',
-  },
-  es: {
-    title: 'Usuarios Globales',
-    subtitle: 'Administración completa y control de accesos del sistema AccountExpress.',
-    createBtn: 'Crear Usuario',
-    searchPlaceholder: 'Buscar usuarios por nombre o correo electrónico...',
-    loading: 'Cargando directorio de usuarios...',
-    noUsers: 'No se encontraron usuarios.',
-    roleSuperAdmin: 'Super Admin',
-    roleCompanyAdmin: 'Admin de Empresa',
-    statusActive: 'Activo',
-    statusSuspended: 'Suspendido',
-    registeredDate: 'Registrado:',
-    editTitle: 'Editar Usuario',
-    newTitle: 'Nuevo Usuario',
-    labelFirstName: 'Nombre *',
-    labelLastName: 'Apellido *',
-    labelEmail: 'Email de Contacto *',
-    labelPassword: 'Contraseña',
-    passwordHint: '(dejar en blanco para mantener actual)',
-    labelRole: 'Rol de Sistema',
-    labelActive: 'Usuario Activo',
-    cancelBtn: 'Cancelar',
-    saveBtn: 'Guardar Usuario',
-    savingBtn: 'Guardando...',
-    deleteTitle: 'Advertencia: Eliminar Usuario',
-    deleteConfirm: '¿Estás seguro de que deseas eliminar permanentemente el usuario "{name}"?',
-    deleteWarning:
-      'Esta acción revocará todos sus accesos a empresas. Esta operación es irreversible.',
-    deleteBtn: 'Sí, Eliminar Usuario',
-    deletingBtn: 'Eliminando...',
-    placeholderFirstName: 'Nombre',
-    placeholderLastName: 'Apellido',
-    placeholderEmail: 'ejemplo@correo.com',
-    placeholderPassword: 'Contraseña',
-  },
-};
-
 import { useLanguageStore } from '@/store/language-store';
 import { logger } from '@/lib/logger';
 import { toast } from 'sonner';
 
 export default function AdminUsersPage() {
-  const language = useLanguageStore((s) => s.language) || 'es';
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const activeLang = mounted ? language : 'es';
-  const dt = LOCAL_TRANSLATIONS[activeLang] || LOCAL_TRANSLATIONS.es;
+  const t = useLanguageStore((s) => s.t);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -368,16 +287,16 @@ export default function AdminUsersPage() {
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-foreground flex items-center gap-3">
             <Users className="size-8 text-indigo-600 animate-pulse" />
-            {dt.title}
+            {t('adminUsers.title')}
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">{dt.subtitle}</p>
+          <p className="text-sm text-muted-foreground mt-1">{t('adminUsers.subtitle')}</p>
         </div>
         <Button
           onClick={handleOpenCreate}
           className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-lg shadow-indigo-500/20 transition-all gap-2 self-start sm:self-center"
         >
           <UserPlus className="size-5" />
-          {dt.createBtn}
+          {t('adminUsers.createBtn')}
         </Button>
       </div>
 
@@ -385,7 +304,7 @@ export default function AdminUsersPage() {
       <div className="relative">
         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-5 text-muted-foreground" />
         <Input
-          placeholder={dt.searchPlaceholder}
+          placeholder={t('adminUsers.searchPlaceholder')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="pl-11 rounded-xl bg-card border-input text-foreground placeholder-muted-foreground focus:ring-2 focus:ring-indigo-500"
@@ -396,7 +315,7 @@ export default function AdminUsersPage() {
       {loading ? (
         <div className="flex flex-col items-center justify-center py-20 gap-4">
           <Loader2 className="size-10 text-indigo-500 animate-spin" />
-          <p className="text-muted-foreground text-sm">{dt.loading}</p>
+          <p className="text-muted-foreground text-sm">{t('adminUsers.loading')}</p>
         </div>
       ) : filteredUsers.length > 0 ? (
         <motion.div
@@ -435,7 +354,7 @@ export default function AdminUsersPage() {
                               : 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-400 border border-indigo-500/20 mt-1'
                           }
                         >
-                          {u.role === 'super_admin' ? dt.roleSuperAdmin : dt.roleCompanyAdmin}
+                          {u.role === 'super_admin' ? t('adminUsers.roleSuperAdmin') : t('adminUsers.roleCompanyAdmin')}
                         </Badge>
                       </div>
                     </div>
@@ -446,7 +365,7 @@ export default function AdminUsersPage() {
                           : 'bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/20'
                       }
                     >
-                      {u.isActive ? dt.statusActive : dt.statusSuspended}
+                      {u.isActive ? t('adminUsers.statusActive') : t('adminUsers.statusSuspended')}
                     </Badge>
                   </div>
 
@@ -472,7 +391,7 @@ export default function AdminUsersPage() {
                     <div className="flex items-center gap-2 text-foreground/80">
                       <Calendar className="size-4 text-muted-foreground" />
                       <span>
-                        {dt.registeredDate} {new Date(u.createdAt).toLocaleDateString()}
+                        {t('adminUsers.registeredDate')} {new Date(u.createdAt).toLocaleDateString()}
                       </span>
                     </div>
                   </div>
@@ -510,7 +429,7 @@ export default function AdminUsersPage() {
       ) : (
         <div className="flex flex-col items-center justify-center py-20 bg-slate-900/20 rounded-2xl border border-white/5">
           <Users className="size-16 text-slate-600 mb-4" />
-          <p className="text-slate-400">{dt.noUsers}</p>
+          <p className="text-slate-400">{t('adminUsers.noUsers')}</p>
         </div>
       )}
 
@@ -520,7 +439,7 @@ export default function AdminUsersPage() {
           <DialogHeader>
             <DialogTitle className="text-xl font-bold flex items-center gap-2 text-indigo-400">
               <UserPlus className="size-6" />
-              {editingUser ? dt.editTitle : dt.newTitle}
+              {editingUser ? t('adminUsers.editTitle') : t('adminUsers.newTitle')}
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4 py-2">
@@ -575,44 +494,44 @@ export default function AdminUsersPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
-                  {dt.labelFirstName}
+                  {t('adminUsers.labelFirstName')}
                 </Label>
                 <Input
                   required
                   value={formData.firstName}
                   onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                  placeholder={dt.placeholderFirstName}
+                  placeholder={t('adminUsers.placeholderFirstName')}
                   className="bg-slate-950 border-white/10 text-white rounded-xl focus:ring-indigo-500"
                 />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
-                  {dt.labelLastName}
+                  {t('adminUsers.labelLastName')}
                 </Label>
                 <Input
                   required
                   value={formData.lastName}
                   onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                  placeholder={dt.placeholderLastName}
+                  placeholder={t('adminUsers.placeholderLastName')}
                   className="bg-slate-950 border-white/10 text-white rounded-xl focus:ring-indigo-500"
                 />
               </div>
               <div className="space-y-1.5 md:col-span-2">
                 <Label className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
-                  {dt.labelEmail}
+                  {t('adminUsers.labelEmail')}
                 </Label>
                 <Input
                   type="email"
                   required
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder={dt.placeholderEmail}
+                  placeholder={t('adminUsers.placeholderEmail')}
                   className="bg-slate-950 border-white/10 text-white rounded-xl focus:ring-indigo-500"
                 />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
-                  {dt.labelPassword} {editingUser && dt.passwordHint}
+                  {t('adminUsers.labelPassword')} {editingUser && t('adminUsers.passwordHint')}
                 </Label>
                 <div className="relative">
                   <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-500" />
@@ -621,14 +540,14 @@ export default function AdminUsersPage() {
                     required={!editingUser}
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    placeholder={editingUser ? '••••••••' : dt.placeholderPassword}
+                    placeholder={editingUser ? '••••••••' : t('adminUsers.placeholderPassword')}
                     className="pl-11 bg-slate-950 border-white/10 text-white rounded-xl focus:ring-indigo-500"
                   />
                 </div>
               </div>
               <div className="space-y-1.5">
                 <Label className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
-                  {dt.labelRole}
+                  {t('adminUsers.labelRole')}
                 </Label>
                 <select
                   required
@@ -636,8 +555,8 @@ export default function AdminUsersPage() {
                   onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                   className="block w-full rounded-xl border border-white/10 bg-slate-950 text-white px-4 py-2 text-sm focus:ring-indigo-500 outline-none h-[38px]"
                 >
-                  <option value="company_admin">{dt.roleCompanyAdmin}</option>
-                  <option value="super_admin">{dt.roleSuperAdmin}</option>
+                  <option value="company_admin">{t('adminUsers.roleCompanyAdmin')}</option>
+                  <option value="super_admin">{t('adminUsers.roleSuperAdmin')}</option>
                 </select>
               </div>
 
@@ -753,7 +672,7 @@ export default function AdminUsersPage() {
                   htmlFor="isActiveUserCheck"
                   className="text-slate-300 text-sm font-semibold select-none cursor-pointer"
                 >
-                  {dt.labelActive}
+                  {t('adminUsers.labelActive')}
                 </Label>
               </div>
             )}
@@ -764,14 +683,14 @@ export default function AdminUsersPage() {
                 onClick={() => setModalOpen(false)}
                 className="text-slate-400 hover:text-white rounded-xl"
               >
-                {dt.cancelBtn}
+                {t('adminUsers.cancelBtn')}
               </Button>
               <Button
                 type="submit"
                 disabled={submitting}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl shadow-lg shadow-indigo-500/20"
               >
-                {submitting ? dt.savingBtn : dt.saveBtn}
+                {submitting ? t('adminUsers.savingBtn') : t('adminUsers.saveBtn')}
               </Button>
             </DialogFooter>
           </form>
@@ -784,17 +703,17 @@ export default function AdminUsersPage() {
           <DialogHeader>
             <DialogTitle className="text-xl font-bold flex items-center gap-2 text-rose-500">
               <ShieldAlert className="size-6 text-rose-500 animate-bounce" />
-              {dt.deleteTitle}
+              {t('adminUsers.deleteTitle')}
             </DialogTitle>
           </DialogHeader>
           <div className="py-2 text-sm text-slate-300">
-            {dt.deleteConfirm.replace(
+            {t('adminUsers.deleteConfirm').replace(
               '{name}',
               `${deleteTarget?.firstName || ''} ${deleteTarget?.lastName || ''}`.trim(),
             )}
             <br />
             <br />
-            {dt.deleteWarning}
+            {t('adminUsers.deleteWarning')}
           </div>
           <DialogFooter className="pt-4 border-t border-white/5">
             <Button
@@ -803,7 +722,7 @@ export default function AdminUsersPage() {
               onClick={() => setDeleteTarget(null)}
               className="text-slate-400 hover:text-white rounded-xl"
             >
-              {dt.cancelBtn}
+              {t('adminUsers.cancelBtn')}
             </Button>
             <Button
               type="button"
@@ -811,7 +730,7 @@ export default function AdminUsersPage() {
               onClick={executeDelete}
               className="bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-xl shadow-lg shadow-rose-500/20"
             >
-              {deleting ? dt.deletingBtn : dt.deleteBtn}
+              {deleting ? t('adminUsers.deletingBtn') : t('adminUsers.deleteBtn')}
             </Button>
           </DialogFooter>
         </DialogContent>

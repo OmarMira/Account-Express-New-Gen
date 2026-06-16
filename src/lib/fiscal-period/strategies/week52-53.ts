@@ -26,7 +26,7 @@ export class Week52_53Strategy extends PeriodStrategy {
     const monthIndex = this.getMonthIndex(monthName);
     const dayIndex = this.getDayIndex(dayName);
 
-    let date = new Date(Date.UTC(year, monthIndex + 1, 0)); // Último día del mes
+    const date = new Date(Date.UTC(year, monthIndex + 1, 0)); // Último día del mes
     while (date.getUTCDay() !== dayIndex) {
       date.setUTCDate(date.getUTCDate() - 1);
     }

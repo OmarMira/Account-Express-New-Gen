@@ -43,7 +43,8 @@ export type ViewName =
   | 'admin-users'
   | 'admin-audit-logs'
   | 'admin-dashboard'
-  | 'workflow';
+  | 'workflow'
+  | 'entity-management';
 
 interface AuthState {
   user: User | null;
@@ -150,7 +151,10 @@ export const useAuthStore = create<AuthState>()(
                   (c: Company) => c.id === currentStore.activeCompany?.id,
                 );
                 if (freshCompany) {
-                  set({ activeCompany: freshCompany });
+                  set({
+                    activeCompany: freshCompany,
+                    currentView: 'dashboard',
+                  });
                 } else {
                   set({
                     activeCompany: data.companies?.[0] || null,
@@ -169,7 +173,6 @@ export const useAuthStore = create<AuthState>()(
       name: 'accountexpress-auth',
       partialize: (state) => ({
         activeCompany: state.activeCompany,
-        currentView: state.currentView,
         sidebarOpen: state.sidebarOpen,
         adminSelectedCompanyId: state.adminSelectedCompanyId,
       }),

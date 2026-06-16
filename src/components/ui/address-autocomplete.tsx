@@ -12,12 +12,16 @@ interface AddressAutocompleteProps {
   onSelect: (addr: AddressData) => void;
   defaultValue?: string;
   placeholder?: string;
+  id?: string;
+  'aria-invalid'?: boolean;
 }
 
 export function AddressAutocomplete({
   onSelect,
   defaultValue = '',
   placeholder = 'Buscar dirección en EE.UU...',
+  id,
+  'aria-invalid': ariaInvalid,
 }: AddressAutocompleteProps) {
   const {
     query,
@@ -43,6 +47,8 @@ export function AddressAutocomplete({
       <PopoverAnchor asChild>
         <div className="relative w-full">
           <Input
+            id={id}
+            aria-invalid={ariaInvalid}
             value={query}
             onChange={(e) => {
               const val = e.target.value;

@@ -11,6 +11,7 @@ import {
 import { join, dirname } from 'path';
 import { createHash } from 'crypto';
 import { sanitizeDescriptionForAdaptive as sanitizeDescription } from '@/lib/services/pattern-normalizer';
+import { logger } from '@/lib/logger';
 
 export type FeedbackEvent = {
   timestamp: string;
@@ -43,7 +44,7 @@ export async function recordFeedback(event: FeedbackEvent) {
         writeFileSync(logPath, '', 'utf-8');
       }
     } catch (err) {
-      // Ignore rotation errors to avoid failing the record
+      logger.info('[ADAPTIVE] Log rotation skipped', { error: String(err) });
     }
   }
 
@@ -64,7 +65,7 @@ export function generateCandidateRules(companyId: string) {
       try {
         allEvents.push(JSON.parse(line));
       } catch (e) {
-        // Ignore parse error on single line
+        logger.info('[ADAPTIVE] Skipping malformed log line', { line: line.slice(0, 100) });
       }
     }
   }
@@ -93,17 +94,17 @@ export function generateCandidateRules(companyId: string) {
                 try {
                   allEvents.push(JSON.parse(line));
                 } catch (e) {
-                  // Ignore parse error
+                  logger.info('[ADAPTIVE] Skipping malformed archive line', { file, line: line.slice(0, 100) });
                 }
               }
             }
           } catch (err) {
-            // Ignore stats/read issues
+            logger.info('[ADAPTIVE] Skipping unreadable archive file', { file, error: String(err) });
           }
         }
       }
     } catch (err) {
-      // Ignore readdir issues
+      logger.info('[ADAPTIVE] Archive directory scan failed', { error: String(err) });
     }
   }
 
@@ -123,7 +124,18 @@ export function generateCandidateRules(companyId: string) {
     patternGroups[patternKey].count++;
   }
 
-  const candidates: any[] = [];
+  interface AdaptiveCandidate {
+    id: string;
+    pattern: string;
+    glAccountCode: string;
+    confidence: number;
+    occurrences: number;
+    direction: 'debit' | 'credit' | 'any';
+    priority: number;
+    status: string;
+  }
+
+  const candidates: AdaptiveCandidate[] = [];
 
   for (const [pattern, data] of Object.entries(patternGroups)) {
     if (data.count < config.minOccurrencesToGenerateRule) continue;

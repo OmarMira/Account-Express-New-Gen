@@ -1,25 +1,48 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Download, AlertTriangle, CheckCircle, TrendingUp, Wallet } from 'lucide-react';
 import { exportToCSV, exportToPDF } from '@/lib/dashboard/export-utils';
+import type { DashboardAlert, DashboardTrendPoint } from '@/lib/types/shared';
+
+interface FinancialKPI {
+  assets: number;
+  liabilities: number;
+  equity: number;
+  revenue: number;
+  expenses: number;
+  accountingEquationCheck: string;
+}
+
+interface FinancialAlerts {
+  pendingReconciliation: number;
+  unlockedPastPeriods: number;
+  draftsInLockedPeriods: number;
+  status: string;
+}
+
+interface FinancialData {
+  kpi: FinancialKPI;
+  alerts: FinancialAlerts;
+  monthlyTrend: DashboardTrendPoint[];
+}
 
 export function FinancialDashboard({ companyId }: { companyId: string }) {
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<FinancialData | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     const res = await fetch(`/api/dashboard/financial?companyId=${companyId}`);
     if (res.ok) setData(await res.json());
     setLoading(false);
-  };
+  }, [companyId]);
 
   useEffect(() => {
     fetchData();
-  }, [companyId]);
+  }, [fetchData]);
 
   if (loading) return <div className="p-6">Cargando panel financiero...</div>;
   if (!data) return <div className="p-6 text-red-500">Error cargando datos</div>;
@@ -36,7 +59,7 @@ export function FinancialDashboard({ companyId }: { companyId: string }) {
           </Button>
           <Button
             variant="outline"
-            onClick={() => exportToPDF(kpi, alerts, monthlyTrend, companyId)}
+            onClick={() => exportToPDF(kpi, alerts as unknown as DashboardAlert[], monthlyTrend, companyId)}
           >
             <Download className="w-4 h-4 mr-2" /> PDF
           </Button>

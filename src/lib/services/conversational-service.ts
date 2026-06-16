@@ -4,6 +4,10 @@ import { db } from '@/lib/db';
 import { safeAuditLog } from './audit-service';
 import { logger } from '@/lib/logger';
 import { checkPromptInjection, addSystemDelimiter } from '@/lib/guardrails';
+import { findContext } from '@/lib/services/entity-context-service';
+import { ROLE_ACCOUNT_MAP } from '@/lib/constants/role-account-map';
+import { serverT } from '@/lib/server-i18n';
+import type { RuleCondition, AssistantConfig, HeuristicRule } from '@/lib/types/shared';
 
 export interface ConversationalParseResult {
   role: string;
@@ -17,11 +21,11 @@ export interface ConversationalParseResult {
     accountType?: string;
     normalBalance?: string;
   };
-  conditions?: any[] | null;
+  conditions?: RuleCondition[] | null;
 }
 
 // ── Internal: read assistant config from disk ──
-function readAssistantConfigSync(): any {
+function readAssistantConfigSync(): AssistantConfig {
   try {
     const configPath = join(process.cwd(), 'rules/assistant-config.json');
     return JSON.parse(readFileSync(configPath, 'utf-8'));
@@ -46,13 +50,7 @@ export function localHeuristicParse(
     'INGRESO',
   ];
   let fallback = { role: 'PROVEEDOR', glAccountCode: '6070' };
-  let rules: Array<{
-    role: string;
-    glAccountCode: string;
-    debitGlAccountCode?: string;
-    creditGlAccountCode?: string;
-    keywords: { es: string[]; en: string[] };
-  }> = [];
+  let rules: HeuristicRule[] = [];
 
   try {
     const configPath = join(process.cwd(), 'rules/assistant-config.json');
@@ -69,7 +67,9 @@ export function localHeuristicParse(
       }
     }
   } catch (err) {
-    logger.warn('[CONVERSATIONAL PARSE LOAD CONFIG FAIL, FALLING BACK TO DEFAULTS]', { error: String(err) });
+    logger.warn('[CONVERSATIONAL PARSE LOAD CONFIG FAIL, FALLING BACK TO DEFAULTS]', {
+      error: String(err),
+    });
   }
 
   // Detectar idioma usando las palabras clave configuradas dinámicamente
@@ -83,7 +83,7 @@ export function localHeuristicParse(
   const isEnglish =
     enKeywordsList.length > 0
       ? new RegExp(
-          `\\b(${enKeywordsList.map((k) => k.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')).join('|')})\\b`,
+          `\\b(${enKeywordsList.map((k) => k.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')).join('|')})\\b`,
           'i',
         ).test(text)
       : false;
@@ -97,9 +97,9 @@ export function localHeuristicParse(
     if (Array.isArray(keywords) && keywords.some((k) => text.includes(k.toLowerCase()))) {
       const code =
         direction === 'debit'
-          ? (rule as any).debitGlAccountCode || rule.glAccountCode
+          ? (rule as HeuristicRule).debitGlAccountCode || rule.glAccountCode
           : direction === 'credit'
-            ? (rule as any).creditGlAccountCode || rule.glAccountCode
+            ? (rule as HeuristicRule).creditGlAccountCode || rule.glAccountCode
             : rule.glAccountCode;
       return { role: rule.role, glAccountCode: code };
     }
@@ -120,12 +120,12 @@ export async function parseWithAI(
     baseUrl: string;
     model: string;
     fetch?: typeof globalThis.fetch;
-    readAssistantConfig?: () => any;
+    readAssistantConfig?: () => AssistantConfig;
   },
 ): Promise<{
   role: string;
   glAccountCode: string;
-  conditions?: any[];
+  conditions?: RuleCondition[];
   suggestSubAccount: boolean;
   subAccountName: string | null;
 }> {
@@ -141,13 +141,13 @@ export async function parseWithAI(
   const patternCheck = checkPromptInjection(pattern);
   if (!patternCheck.passed) {
     logger.warn('PROMPT_INJECTION_BLOCKED', { reason: patternCheck.reason, pattern });
-    throw new Error('Contenido no permitido detectado en la entrada del usuario.');
+    throw new Error('Disallowed content detected in user input.');
   }
 
   const inputCheck = checkPromptInjection(userInput);
   if (!inputCheck.passed) {
     logger.warn('PROMPT_INJECTION_BLOCKED', { reason: inputCheck.reason, pattern });
-    throw new Error('Contenido no permitido detectado en la entrada del usuario.');
+    throw new Error('Disallowed content detected in user input.');
   }
 
   // Build model fallback list (preserving existing openrouter/free behavior)
@@ -181,7 +181,7 @@ export async function parseWithAI(
             { role: 'system', content: systemInstruction },
             {
               role: 'user',
-              content: `Entidad: "${pattern}"\nDescripción del usuario: "${userInput}"\nRetorna solo el objeto JSON.`,
+              content: `Entity: "${pattern}"\nUser description: "${userInput}"\nReturn only the JSON object.`,
             },
           ],
         }),
@@ -243,14 +243,16 @@ export async function resolveGLAccount(
   deps?: {
     db?: typeof db;
   },
+  locale?: string,
 ): Promise<{
   glAccountId: string | null;
   account: { code: string; name: string; accountType?: string; normalBalance?: string };
 }> {
   const dbClient = deps?.db ?? db;
+  const unclassifiedName = serverT(locale, 'accounts.unclassified');
 
   if (!glAccountCode) {
-    return { glAccountId: null, account: { code: '', name: 'Cuenta No Clasificada' } };
+    return { glAccountId: null, account: { code: '', name: unclassifiedName } };
   }
 
   try {
@@ -261,7 +263,12 @@ export async function resolveGLAccount(
     if (acc) {
       return {
         glAccountId: acc.id,
-        account: { code: acc.code, name: acc.name, accountType: acc.accountType, normalBalance: acc.normalBalance },
+        account: {
+          code: acc.code,
+          name: acc.name,
+          accountType: acc.accountType,
+          normalBalance: acc.normalBalance,
+        },
       };
     }
 
@@ -280,11 +287,16 @@ export async function resolveGLAccount(
     }
     return {
       glAccountId: null,
-      account: { code: glAccountCode, name: 'Cuenta No Clasificada', accountType: hintType, normalBalance: hintBalance },
+      account: {
+        code: glAccountCode,
+        name: unclassifiedName,
+        accountType: hintType,
+        normalBalance: hintBalance,
+      },
     };
   } catch (dbErr) {
     logger.warn('GL_ACCOUNT_QUERY_FAIL', { companyId, glAccountCode, error: String(dbErr) });
-    return { glAccountId: null, account: { code: glAccountCode, name: 'Cuenta No Clasificada' } };
+    return { glAccountId: null, account: { code: glAccountCode, name: unclassifiedName } };
   }
 }
 
@@ -300,7 +312,100 @@ export async function parseConversationalContext(
   fetchFn?: typeof globalThis.fetch,
   prismaClient?: typeof db,
   direction?: 'debit' | 'credit',
+  locale?: string,
 ): Promise<ConversationalParseResult> {
+  // Early return: si ya existe EntityContext, usarlo directamente sin re-clasificar
+  const existingContext = await findContext(companyId, pattern).catch(() => null);
+  if (existingContext) {
+    const ctxRole = existingContext.role;
+    let ctxGlAccountId = existingContext.glAccountId ?? null;
+    let ctxAccount: {
+      code: string;
+      name: string;
+      accountType: string | null;
+      normalBalance: string | null;
+    } | null = existingContext.glAccount
+      ? {
+          code: existingContext.glAccount.code,
+          name: existingContext.glAccount.name,
+          accountType: existingContext.glAccount.accountType,
+          normalBalance: existingContext.glAccount.normalBalance,
+        }
+      : null;
+
+    // Resolve default account for role if unassigned
+    if (!ctxGlAccountId && !ctxAccount) {
+      const mapping = ROLE_ACCOUNT_MAP[ctxRole];
+      if (mapping) {
+        const defaultCode =
+          direction === 'debit'
+            ? mapping.debit
+            : direction === 'credit'
+              ? mapping.credit
+              : mapping.fallback;
+        let resolved = await resolveGLAccount(
+          companyId,
+          defaultCode,
+          { db: prismaClient ?? db },
+          locale,
+        );
+        if (!resolved.glAccountId && defaultCode !== mapping.fallback) {
+          const fallbackResolved = await resolveGLAccount(
+            companyId,
+            mapping.fallback,
+            { db: prismaClient ?? db },
+            locale,
+          );
+          if (fallbackResolved.glAccountId) {
+            resolved = fallbackResolved;
+          }
+        }
+        ctxGlAccountId = resolved.glAccountId;
+        ctxAccount = {
+          code: resolved.account.code || defaultCode,
+          name: resolved.account.name || serverT(locale, 'accounts.unclassified'),
+          accountType: resolved.account.accountType ?? null,
+          normalBalance: resolved.account.normalBalance ?? null,
+        };
+      }
+    }
+
+    const finalAccount = ctxAccount || {
+      code: '',
+      name: serverT(locale, 'accounts.unclassified'),
+      accountType: null,
+      normalBalance: null,
+    };
+
+    const suggestSubAccount = ctxRole === 'SOCIO';
+    const subAccountName = suggestSubAccount
+      ? pattern
+          .trim()
+          .split(/\s+/)
+          .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+          .join(' ')
+      : null;
+
+    const conditions: RuleCondition[] = [
+      { field: 'description', operator: 'contains', value: pattern },
+    ];
+
+    return {
+      role: ctxRole,
+      glAccountCode: finalAccount.code,
+      glAccountId: ctxGlAccountId,
+      suggestSubAccount,
+      subAccountName,
+      account: {
+        code: finalAccount.code,
+        name: finalAccount.name,
+        accountType: finalAccount.accountType ?? undefined,
+        normalBalance: finalAccount.normalBalance ?? undefined,
+      },
+      conditions,
+    };
+  }
+
   const apiKey = process.env.AI_API_KEY;
   const baseUrl = process.env.AI_BASE_URL;
   const model = process.env.AI_MODEL;
@@ -308,7 +413,7 @@ export async function parseConversationalContext(
   let parsed: {
     role: string;
     glAccountCode: string;
-    conditions?: any[];
+    conditions?: RuleCondition[];
     suggestSubAccount: boolean;
     subAccountName: string | null;
   } | null = null;
@@ -378,11 +483,21 @@ export async function parseConversationalContext(
   // even if the AI-suggested code was rejected (non-existent in DB).
   if (!parsed) {
     const local = localHeuristicParse(userInput, direction);
+    let suggestSubAccount = false;
+    let subAccountName: string | null = null;
+    if (local.role === 'SOCIO') {
+      suggestSubAccount = true;
+      subAccountName = pattern
+        .trim()
+        .split(/\s+/)
+        .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+        .join(' ');
+    }
     parsed = {
       role: local.role,
       glAccountCode: local.glAccountCode,
-      suggestSubAccount: false,
-      subAccountName: null,
+      suggestSubAccount,
+      subAccountName,
     };
   }
 
@@ -396,8 +511,22 @@ export async function parseConversationalContext(
 
   // Auto-create known system accounts if missing (e.g. Owner's Draw 3040)
   if (!glAccountId) {
-    const SYSTEM_ACCOUNTS: Record<string, { name: string; type: string; normalBalance: string; parentCode: string }> = {
-      '3040': { name: "Owner's Draw / Retiros de Socio", type: 'equity', normalBalance: 'debit', parentCode: '3000' },
+    const SYSTEM_ACCOUNTS: Record<
+      string,
+      { name: string; type: string; normalBalance: string; parentCode: string }
+    > = {
+      '3010': {
+        name: "Partner Contributions / Capital",
+        type: 'equity',
+        normalBalance: 'credit',
+        parentCode: '3000',
+      },
+      '3040': {
+        name: "Owner's Draw / Partner Withdrawals",
+        type: 'equity',
+        normalBalance: 'debit',
+        parentCode: '3000',
+      },
     };
 
     const def = SYSTEM_ACCOUNTS[glAccountCode];
@@ -419,15 +548,26 @@ export async function parseConversationalContext(
           },
         });
         glAccountId = created.id;
-        account = { code: created.code, name: created.name, accountType: created.accountType, normalBalance: created.normalBalance };
-        logger.info('[AUTO-CREATED SYSTEM ACCOUNT]', { code: glAccountCode, companyId, accountId: created.id });
+        account = {
+          code: created.code,
+          name: created.name,
+          accountType: created.accountType,
+          normalBalance: created.normalBalance,
+        };
+        logger.info('[AUTO-CREATED SYSTEM ACCOUNT]', {
+          code: glAccountCode,
+          companyId,
+          accountId: created.id,
+        });
       } catch (createErr) {
-        logger.warn('[FAILED TO AUTO-CREATE SYSTEM ACCOUNT]', { code: glAccountCode, companyId, error: String(createErr) });
+        logger.warn('[FAILED TO AUTO-CREATE SYSTEM ACCOUNT]', {
+          code: glAccountCode,
+          companyId,
+          error: String(createErr),
+        });
       }
     }
   }
-
-
 
   let conditions = parsed.conditions;
   if (!conditions || !Array.isArray(conditions) || conditions.length === 0) {

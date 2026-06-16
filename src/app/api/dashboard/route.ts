@@ -108,9 +108,9 @@ export const GET = apiHandler(async (request: NextRequest, context: RouteContext
     const absAmount = Math.abs(tx.amount);
 
     // We affect the assigned account
-    let netDebit = isDeposit ? 0 : absAmount;
-    let netCredit = isDeposit ? absAmount : 0;
-    let net = netDebit - netCredit;
+    const netDebit = isDeposit ? 0 : absAmount;
+    const netCredit = isDeposit ? absAmount : 0;
+    const net = netDebit - netCredit;
 
     if (tx.glAccount.normalBalance === 'debit') {
       typeBalances[aType] += net;

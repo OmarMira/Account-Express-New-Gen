@@ -33,6 +33,7 @@ export const GET = apiHandler(async (request: NextRequest, context: RouteContext
           phone: true,
           email: true,
           logo: true,
+          entityFirstMode: true,
           isActive: true,
           createdAt: true,
         },

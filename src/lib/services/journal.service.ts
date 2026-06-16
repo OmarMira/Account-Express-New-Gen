@@ -16,7 +16,8 @@ export class JournalService {
     const totalDebits = lines.reduce((sum, l) => sum + l.debit, 0);
     const totalCredits = lines.reduce((sum, l) => sum + l.credit, 0);
 
-    if (Math.abs(totalDebits - totalCredits) > 0.01) {
+    // Round to nearest cent to prevent floating-point drift, but enforce exact equality
+    if (Math.round(totalDebits * 100) !== Math.round(totalCredits * 100)) {
       throw new ValidationError('Unbalanced journal entry. Debits must equal Credits.');
     }
 

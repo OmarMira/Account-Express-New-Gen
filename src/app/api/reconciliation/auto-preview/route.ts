@@ -3,7 +3,12 @@ import { db } from '@/lib/db';
 import { apiHandler, type RouteContext } from '@/lib/api-handler';
 import { requireCompanyContext } from '@/lib/context-storage';
 
-import { transactionMatchesRule } from '@/lib/services/rule-matching-engine';
+import {
+  transactionMatchesRule,
+  loadEntityFirstContext,
+  type Transaction,
+  type Rule,
+} from '@/lib/services/rule-matching-engine';
 
 // ─── POST /api/reconciliation/auto-preview ─────────────────────────────────
 // Preview auto-reconcile using bank rules + amount matching without making changes.
@@ -23,6 +28,9 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
   if (!bankAccount) {
     return NextResponse.json({ error: 'Bank account not found' }, { status: 404 });
   }
+
+  // Load entity-first context for SOCIO conflict detection
+  const efCtx = await loadEntityFirstContext(companyId);
 
   // Get active rules sorted by priority
   const rules = await db.bankRule.findMany({
@@ -59,13 +67,20 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
   for (const rule of rules) {
     for (const tx of unreconciledTransactions) {
       if (matchedTxIds.has(tx.id)) continue;
-      if (transactionMatchesRule(tx, rule)) {
+      if (
+        transactionMatchesRule(
+          tx as Transaction,
+          rule as Rule,
+          efCtx.knownSocioPatterns,
+          efCtx.entityFirstMode,
+        )
+      ) {
         matchedTxIds.add(tx.id);
       }
     }
   }
 
-  let matchedByRule = matchedTxIds.size;
+  const matchedByRule = matchedTxIds.size;
   let matchedByAmount = 0;
 
   // ── Step 2: Match by amount with journal entries ──

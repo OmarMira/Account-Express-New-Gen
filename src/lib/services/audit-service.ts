@@ -7,7 +7,7 @@ export async function safeAuditLog(data: {
   action: string;
   entity: string;
   entityId?: string;
-  details?: any;
+  details?: Record<string, unknown>;
 }) {
   let entity = data.entity;
   if (!entity) {

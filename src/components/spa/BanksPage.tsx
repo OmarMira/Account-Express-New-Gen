@@ -1,13 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
-import {
-  Plus,
-  Landmark,
-  Loader2,
-  DollarSign,
-  Upload,
-} from 'lucide-react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Plus, Landmark, Loader2, DollarSign, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/auth-store';
 import { useLanguageStore } from '@/store/language-store';
@@ -89,7 +83,7 @@ export function BanksPage() {
 
   const [assetAccounts, setAssetAccounts] = useState<GlAccountOption[]>([]);
 
-  async function fetchAccounts() {
+  const fetchAccounts = useCallback(async () => {
     if (!activeCompany) return;
     setLoading(true);
     try {
@@ -103,25 +97,27 @@ export function BanksPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [activeCompany]);
 
-  async function fetchAssetAccounts() {
+  const fetchAssetAccounts = useCallback(async () => {
     if (!activeCompany) return;
     try {
       const res = await fetch(`/api/journal/accounts?companyId=${activeCompany.id}`);
       if (res.ok) {
         const data = await res.json();
-        setAssetAccounts((data.data || []).filter((a: GlAccountOption) => a.accountType === 'asset'));
+        setAssetAccounts(
+          (data.data || []).filter((a: GlAccountOption) => a.accountType === 'asset'),
+        );
       }
     } catch (err) {
       logger.error('Failed to fetch asset accounts:', { error: String(err) });
     }
-  }
+  }, [activeCompany]);
 
   useEffect(() => {
     fetchAccounts();
     fetchAssetAccounts();
-  }, [activeCompany]);
+  }, [fetchAccounts, fetchAssetAccounts]);
 
   function openCreateModal() {
     setEditingAccount(null);
@@ -395,6 +391,7 @@ export function BanksPage() {
                     account={account}
                     variant="inactive"
                     onEdit={openEditModal}
+                    onDelete={requestDelete}
                     onSelect={openDetail}
                   />
                 ))}

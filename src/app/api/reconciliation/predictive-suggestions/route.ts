@@ -15,7 +15,20 @@ export const GET = apiHandler(async (req: NextRequest) => {
     return NextResponse.json({ error: 'bankAccountId es requerido' }, { status: 400 });
   }
 
-  const config = await readJsonConfig<any>('predictive-recon.json');
+  const bankAccount = await db.bankAccount.findFirst({
+    where: { id: bankAccountId, companyId },
+    select: { id: true },
+  });
+  if (!bankAccount) {
+    return NextResponse.json({ error: 'Bank account not found' }, { status: 404 });
+  }
+
+  interface PredictiveConfig {
+    auditActions: { shown: string };
+    confidenceThreshold: number;
+  }
+
+  const config = await readJsonConfig<PredictiveConfig>('predictive-recon.json');
   const suggestions = await generateSuggestions(companyId, bankAccountId);
 
   // Auditoría de sugerencias mostradas

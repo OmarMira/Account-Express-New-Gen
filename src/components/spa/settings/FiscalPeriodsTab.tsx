@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Calendar,
   Plus,
@@ -172,7 +172,7 @@ export function FiscalPeriodsTab() {
   const [toggling, setToggling] = useState(false);
 
   // Fetch periods function
-  const fetchPeriods = async () => {
+  const fetchPeriods = useCallback(async () => {
     if (!companyId) return;
     try {
       const res = await fetch(`/api/settings?companyId=${companyId}`);
@@ -185,11 +185,11 @@ export function FiscalPeriodsTab() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [companyId]);
 
   useEffect(() => {
     fetchPeriods();
-  }, [companyId]);
+  }, [fetchPeriods]);
 
   async function handleAddPeriod() {
     if (!companyId || !newPeriod.name || !newPeriod.startDate || !newPeriod.endDate) return;
@@ -289,17 +289,17 @@ export function FiscalPeriodsTab() {
     }
   }
 
-  async function handleToggleLock(period: FiscalPeriod) {
+  async function handleLockPeriod(period: FiscalPeriod) {
     if (!companyId) return;
     setToggling(true);
     try {
-      const res = await fetch(`/api/fiscal-periods/${period.id}`, {
-        method: 'PATCH',
+      const res = await fetch(`/api/fiscal-periods/${period.id}/lock`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companyId, isLocked: !period.isLocked }),
+        body: JSON.stringify({ companyId }),
       });
       if (res.ok) {
-        toast.success(period.isLocked ? dt.periodUnlocked : dt.periodLocked);
+        toast.success(dt.periodLocked);
         await fetchPeriods();
       } else {
         const data = await res.json();
@@ -373,7 +373,7 @@ export function FiscalPeriodsTab() {
                       </div>
                       <div className="space-y-1.5">
                         <Label>{dt.calculationStrategy}</Label>
-                        <Select value={genType} onValueChange={(v: any) => setGenType(v)}>
+                        <Select value={genType} onValueChange={(v) => setGenType(v as 'CALENDAR' | 'CUSTOM_MONTHS' | 'WEEK_52_53')}>
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
@@ -587,29 +587,23 @@ export function FiscalPeriodsTab() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right px-6">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setLockTarget(period)}
-                          disabled={toggling}
-                          className={`text-xs ${
-                            period.isLocked
-                              ? 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50/50'
-                              : 'text-amber-600 hover:text-amber-700 hover:bg-amber-50/50'
-                          }`}
-                        >
-                          {period.isLocked ? (
-                            <>
-                              <Unlock className="size-3.5 mr-1.5" />
-                              {dt.unlock}
-                            </>
-                          ) : (
-                            <>
-                              <Lock className="size-3.5 mr-1.5" />
-                              {dt.lock}
-                            </>
-                          )}
-                        </Button>
+                        {!period.isLocked ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setLockTarget(period)}
+                            disabled={toggling}
+                            className="text-xs text-amber-600 hover:text-amber-700 hover:bg-amber-50/50"
+                          >
+                            <Lock className="size-3.5 mr-1.5" />
+                            {dt.lock}
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground italic flex items-center justify-end gap-1 select-none py-1.5 px-3">
+                            <Lock className="size-3.5 text-muted-foreground" />
+                            {isEn ? 'Locked' : 'Bloqueado'}
+                          </span>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -620,37 +614,33 @@ export function FiscalPeriodsTab() {
         </Card>
       </motion.div>
 
-      {/* Lock/Unlock confirmation */}
+      {/* Lock confirmation */}
       <AlertDialog open={!!lockTarget} onOpenChange={() => setLockTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              {lockTarget?.isLocked ? (
-                <Unlock className="size-5 text-emerald-500" />
-              ) : (
-                <Lock className="size-5 text-amber-500" />
-              )}
-              {lockTarget?.isLocked
-                ? t('settings.periods.unlockPeriod')
-                : t('settings.periods.confirmLock')}
+              <Lock className="size-5 text-amber-500" />
+              {t('settings.periods.confirmLock')}
             </AlertDialogTitle>
-            <AlertDialogDescription>
-              {lockTarget?.isLocked
-                ? dt.unlockPeriodDesc(lockTarget.name)
-                : t('settings.periods.confirmLockDesc')}
+            <AlertDialogDescription className="space-y-3">
+              <span>
+                {t('settings.periods.confirmLockDesc')}
+              </span>
+              <span className="block mt-2 font-semibold text-destructive flex items-center gap-1.5">
+                <AlertTriangle className="size-4 text-destructive" />
+                {isEn
+                  ? 'WARNING: This action is irreversible. You will not be able to unlock this period.'
+                  : 'ADVERTENCIA: Esta acción es irreversible. No se podrá volver a abrir este período.'}
+              </span>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => lockTarget && handleToggleLock(lockTarget)}
-              className={
-                lockTarget?.isLocked
-                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                  : 'bg-amber-600 hover:bg-amber-700 text-white'
-              }
+              onClick={() => lockTarget && handleLockPeriod(lockTarget)}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
             >
-              {lockTarget?.isLocked ? dt.confirmUnlock : dt.confirmLock}
+              {dt.confirmLock}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -32,6 +32,7 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
       creditGlAccountId,
       debitGlAccountCode,
       creditGlAccountCode,
+      priority,
     } = parsed.data;
 
     if (!pattern && (!conditions || !Array.isArray(conditions))) {
@@ -66,14 +67,26 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
       accountType: string;
       normalBalance: string;
       name: string;
+      parentId: string | null;
     } | null = null;
     if (glAccountCode) {
       parentAccount = await db.glAccount.findFirst({
         where: { companyId, code: glAccountCode, isActive: true },
+        select: {
+          id: true,
+          code: true,
+          accountType: true,
+          normalBalance: true,
+          name: true,
+          parentId: true,
+        },
       });
       if (!parentAccount) {
         return NextResponse.json(
-          { error: `La cuenta contable ${glAccountCode} no existe en esta compañía. Seleccioná una cuenta válida o creala primero.`, code: 'GL_ACCOUNT_NOT_FOUND' },
+          {
+            error: `GL account ${glAccountCode} not found in this company. Select a valid account or create one first.`,
+            code: 'GL_ACCOUNT_NOT_FOUND',
+          },
           { status: 400 },
         );
       }
@@ -120,11 +133,16 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
             const suffixNum = parseInt(parts[parts.length - 1], 10) + 1;
             nextCode = `${parentAccount.code}-${suffixNum.toString().padStart(2, '0')}`;
           }
+          const capitalizedSubName = subAccountName
+            .trim()
+            .split(/\s+/)
+            .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+            .join(' ');
           const subAccount = await tx.glAccount.create({
             data: {
               companyId,
               code: nextCode,
-              name: subAccountName.trim(),
+              name: `${parentAccount.name} - ${capitalizedSubName}`,
               accountType: parentAccount.accountType,
               normalBalance: parentAccount.normalBalance,
               parentId: parentAccount.id,
@@ -153,30 +171,59 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
       const defaultConditionType = pattern ? 'contains' : conditions?.[0]?.operator || 'contains';
       const defaultConditionValue = pattern || conditions?.[0]?.value || '';
 
+      const capitalizedPattern = pattern
+        ? pattern
+            .trim()
+            .split(/\s+/)
+            .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+            .join(' ')
+        : 'V2 Composite';
+
+      // Determine the parent account's name dynamically. If it is already a sub-account (parentId exists and code contains a hyphen), use its parent's name.
+      let ruleParentName = parentAccount?.name || '';
+      if (parentAccount && !createSubAccount && parentAccount.parentId) {
+        if (parentAccount.code.includes('-')) {
+          const gp = await tx.glAccount.findUnique({
+            where: { id: parentAccount.parentId },
+            select: { name: true },
+          });
+          if (gp) {
+            ruleParentName = gp.name;
+          }
+        }
+      }
+
       // Create Bank Matching Rule inside transaction
       const newRule = await tx.bankRule.create({
         data: {
           companyId,
-          name: body.name || `Regla Autogenerada: ${pattern || 'V2 Composite'}`,
+          name:
+            parsed.data.name ||
+            (parentAccount
+              ? `${parentAccount.code} / ${ruleParentName} - ${capitalizedPattern}`
+              : `Rule: ${capitalizedPattern}`),
           conditionType: defaultConditionType,
           conditionValue: defaultConditionValue,
           transactionDirection: lockedDirection || 'any',
           glAccountId: legacyGlAccountId,
-          conditions: conditions as any ?? null,
+          conditions:
+            (conditions as Array<{ field: string; operator: string; value: string | number }>) ??
+            null,
           debitGlAccountId: resolvedDebitGlAccountId,
           creditGlAccountId: resolvedCreditGlAccountId,
-          priority: body.priority || 10,
+          priority: parsed.data.priority ?? 10,
           isActive: true,
         },
       });
 
       // Upsert Entity Context inside transaction
       if (pattern && role && legacyGlAccountId) {
+        const normalizedPattern = pattern.toLowerCase();
         await tx.entityContext.upsert({
           where: {
             companyId_pattern: {
               companyId,
-              pattern,
+              pattern: normalizedPattern,
             },
           },
           update: {
@@ -186,7 +233,7 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
           },
           create: {
             companyId,
-            pattern,
+            pattern: normalizedPattern,
             role,
             glAccountId: legacyGlAccountId,
             source: 'user',
@@ -223,6 +270,9 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
     return NextResponse.json({ success: true, data: rule });
   } catch (error: unknown) {
     logger.error('[POST LEARNING RULE ERROR]', { error: String(error) });
-    return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : String(error) },
+      { status: 500 },
+    );
   }
 });

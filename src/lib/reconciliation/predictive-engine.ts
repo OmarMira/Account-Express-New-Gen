@@ -62,7 +62,7 @@ export async function generateSuggestions(
   const suggestions: PredictiveSuggestion[] = [];
 
   for (const tx of unreconciled) {
-    let txSuggestions: { entryId: string; score: number; reasons: string[] }[] = [];
+    const txSuggestions: { entryId: string; score: number; reasons: string[] }[] = [];
 
     for (const entry of candidates) {
       // a) Score Monto (1.0 si exacto, decae linealmente hasta 5%)

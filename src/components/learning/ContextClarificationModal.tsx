@@ -26,16 +26,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { useLanguageStore } from '@/store/language-store';
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
+import entityRoles from '../../../rules/entity-roles.json';
+import { ROLE_ACCOUNT_MAP } from '@/lib/constants/role-account-map';
 
-const DEFAULT_ROLES = ['INQUILINO', 'PROVEEDOR', 'SOCIO', 'CLIENTE', 'EMPLEADO'];
-
-const ROLE_TO_CODE: Record<string, string> = {
-  INQUILINO: '6010',
-  PROVEEDOR: '6070',
-  SOCIO: '3010',
-  CLIENTE: '4010',
-  EMPLEADO: '6030',
-};
+const DEFAULT_ROLES = entityRoles;
 
 interface ContextClarificationModalProps {
   isOpen: boolean;
@@ -80,7 +74,7 @@ export function ContextClarificationModal({
           setAccounts(accs);
 
           // Pre-select GL Account based on default role mapping
-          const defaultCode = ROLE_TO_CODE[role];
+          const defaultCode = ROLE_ACCOUNT_MAP[role]?.fallback;
           if (defaultCode) {
             const matched = accs.find((a) => a.code === defaultCode);
             if (matched) {
@@ -96,12 +90,12 @@ export function ContextClarificationModal({
     }
 
     fetchAccounts();
-  }, [companyId, isOpen]);
+  }, [companyId, isOpen, role]);
 
   // Update selected account when role changes
   useEffect(() => {
     if (!accounts.length) return;
-    const defaultCode = ROLE_TO_CODE[role];
+    const defaultCode = ROLE_ACCOUNT_MAP[role]?.fallback;
     if (defaultCode) {
       const matched = accounts.find((a) => a.code === defaultCode);
       if (matched) {
@@ -261,7 +255,7 @@ export function ContextClarificationModal({
                 <Label htmlFor="role-select">{t('learning.roleLabel')}</Label>
                 <Select value={role} onValueChange={setRole}>
                   <SelectTrigger id="role-select">
-                    <SelectValue placeholder="Selecciona un rol..." />
+                    <SelectValue placeholder={t('learning.rolePlaceholder')} />
                   </SelectTrigger>
                   <SelectContent>
                     {DEFAULT_ROLES.map((r) => (
@@ -308,7 +302,7 @@ export function ContextClarificationModal({
                     accounts={accounts}
                     value={selectedAccountId}
                     onChange={setSelectedAccountId}
-                    placeholder="Selecciona una cuenta contable..."
+                    placeholder={t('learning.accountPlaceholder')}
                   />
                 )}
                 <p className="text-xs text-muted-foreground">{t('learning.accountDesc')}</p>

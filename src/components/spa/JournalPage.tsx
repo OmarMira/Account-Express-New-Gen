@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   Plus,
   Loader2,
@@ -92,9 +92,9 @@ export function JournalPage() {
 
   // Accounts
   const [accounts, setAccounts] = useState<GlAccountOption[]>([]);
-  const [fiscalPeriods, setFiscalPeriods] = useState<any[]>([]);
+  const [fiscalPeriods, setFiscalPeriods] = useState<{ id: string; name: string; startDate: string; endDate: string; isLocked: boolean }[]>([]);
 
-  async function fetchFiscalPeriods() {
+  const fetchFiscalPeriods = useCallback(async () => {
     if (!activeCompany) return;
     try {
       const res = await fetch(`/api/settings?companyId=${activeCompany.id}`);
@@ -105,14 +105,14 @@ export function JournalPage() {
     } catch (err) {
       logger.error('Failed to fetch fiscal periods:', { error: String(err) });
     }
-  }
+  }, [activeCompany]);
 
   // Confirmation dialog
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState<'post' | 'void' | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<string | null>(null);
 
-  async function fetchEntries() {
+  const fetchEntries = useCallback(async () => {
     if (!activeCompany) return;
     setLoading(true);
     try {
@@ -132,9 +132,9 @@ export function JournalPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [activeCompany, statusFilter, searchQuery, startDate, endDate]);
 
-  async function fetchAccounts() {
+  const fetchAccounts = useCallback(async () => {
     if (!activeCompany) return;
     try {
       const res = await fetch(`/api/journal/accounts?companyId=${activeCompany.id}`);
@@ -145,16 +145,16 @@ export function JournalPage() {
     } catch (err) {
       logger.error('Failed to fetch accounts:', { error: String(err) });
     }
-  }
+  }, [activeCompany]);
 
   useEffect(() => {
     fetchAccounts();
     fetchFiscalPeriods();
-  }, [activeCompany]);
+  }, [fetchAccounts, fetchFiscalPeriods]);
 
   useEffect(() => {
     fetchEntries();
-  }, [activeCompany, statusFilter, startDate, endDate]);
+  }, [fetchEntries]);
 
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   function handleSearchChange(val: string) {

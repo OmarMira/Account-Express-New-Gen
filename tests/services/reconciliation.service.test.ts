@@ -22,6 +22,112 @@ async function createFiscalPeriod(companyId: string) {
   });
 }
 
+describe('ReconciliationService split validation', () => {
+  it('creates balanced entry when splits sum matches transaction amount', async () => {
+    const company = await createTestCompany();
+    const cashGl = await createTestGlAccount({ companyId: company.id, code: '1010', name: 'Cash' });
+    const bankAccount = await createTestBankAccount(company.id, cashGl.id);
+    const statement = await createTestBankStatement(company.id, bankAccount.id);
+    await createFiscalPeriod(company.id);
+
+    const bankTx = await createTestBankTransaction(company.id, statement.id, {
+      date: '2025-03-15',
+      amount: 500.0,
+      description: 'Ingreso dividido',
+    });
+
+    const revenueGl = await createTestGlAccount({ companyId: company.id, code: '4010', name: 'Sales', accountType: 'revenue', normalBalance: 'credit' });
+    const taxGl = await createTestGlAccount({ companyId: company.id, code: '2010', name: 'Tax Payable', accountType: 'liability', normalBalance: 'credit' });
+
+    const result = await ReconciliationService.reconcile({
+      companyId: company.id,
+      bankAccountId: bankAccount.id,
+      transactions: [{
+        id: bankTx.id,
+        glAccountId: revenueGl.id,
+        splits: [
+          { glAccountId: revenueGl.id, amount: 400, description: 'Revenue portion' },
+          { glAccountId: taxGl.id, amount: 100, description: 'Tax portion' },
+        ],
+      }],
+      createJournalEntries: true,
+    });
+
+    expect(result.reconciledCount).toBe(1);
+    expect(result.journalEntriesCreated).toBe(1);
+
+    const entries = await db.journalEntry.findMany({
+      where: { companyId: company.id },
+      include: { lines: true },
+    });
+    expect(entries).toHaveLength(1);
+    expect(entries[0].lines).toHaveLength(3); // bank + 2 splits
+    // Entry must be balanced
+    const totalDebit = entries[0].lines.reduce((s, l) => s + l.debit, 0);
+    const totalCredit = entries[0].lines.reduce((s, l) => s + l.credit, 0);
+    expect(Math.abs(totalDebit - totalCredit)).toBeLessThan(0.01);
+  });
+
+  it('throws ValidationError when split sum does not match transaction amount', async () => {
+    const company = await createTestCompany();
+    const cashGl = await createTestGlAccount({ companyId: company.id, code: '1010', name: 'Cash' });
+    const bankAccount = await createTestBankAccount(company.id, cashGl.id);
+    const statement = await createTestBankStatement(company.id, bankAccount.id);
+    await createFiscalPeriod(company.id);
+
+    const bankTx = await createTestBankTransaction(company.id, statement.id, {
+      date: '2025-03-15',
+      amount: 500.0,
+      description: 'Split descuadrado',
+    });
+
+    const revenueGl = await createTestGlAccount({ companyId: company.id, code: '4010', name: 'Sales', accountType: 'revenue', normalBalance: 'credit' });
+
+    await expect(ReconciliationService.reconcile({
+      companyId: company.id,
+      bankAccountId: bankAccount.id,
+      transactions: [{
+        id: bankTx.id,
+        glAccountId: revenueGl.id,
+        splits: [
+          { glAccountId: revenueGl.id, amount: 300, description: 'Suma incorrecta' },
+        ],
+      }],
+      createJournalEntries: true,
+    })).rejects.toThrow('Split amounts sum to 300.00 but transaction amount is 500.00');
+  });
+
+  it('throws ValidationError when split has zero amount', async () => {
+    const company = await createTestCompany();
+    const cashGl = await createTestGlAccount({ companyId: company.id, code: '1010', name: 'Cash' });
+    const bankAccount = await createTestBankAccount(company.id, cashGl.id);
+    const statement = await createTestBankStatement(company.id, bankAccount.id);
+    await createFiscalPeriod(company.id);
+
+    const bankTx = await createTestBankTransaction(company.id, statement.id, {
+      date: '2025-03-15',
+      amount: 500.0,
+      description: 'Split con cero',
+    });
+
+    const revenueGl = await createTestGlAccount({ companyId: company.id, code: '4010', name: 'Sales', accountType: 'revenue', normalBalance: 'credit' });
+
+    await expect(ReconciliationService.reconcile({
+      companyId: company.id,
+      bankAccountId: bankAccount.id,
+      transactions: [{
+        id: bankTx.id,
+        glAccountId: revenueGl.id,
+        splits: [
+          { glAccountId: revenueGl.id, amount: 500, description: 'OK' },
+          { glAccountId: revenueGl.id, amount: 0, description: 'Zero' },
+        ],
+      }],
+      createJournalEntries: true,
+    })).rejects.toThrow('Split amounts must be greater than zero');
+  });
+});
+
 describe('ReconciliationService', () => {
   beforeEach(async () => {
     await clearDatabase();

@@ -134,7 +134,19 @@ export class ReconciliationService {
 
           // Case 1: Splits provided
           if (txn.splits && txn.splits.length > 0) {
-            const lines: any[] = [];
+            // Validate splits before creating the entry
+            const absBankAmount = Math.abs(bankTx.amount);
+            const splitSum = txn.splits.reduce((s, sp) => s + Math.abs(sp.amount), 0);
+            if (Math.abs(splitSum - absBankAmount) > 0.01) {
+              throw new ValidationError(
+                `Split amounts sum to ${splitSum.toFixed(2)} but transaction amount is ${absBankAmount.toFixed(2)}`,
+              );
+            }
+            if (txn.splits.some((sp) => Math.abs(sp.amount) === 0)) {
+              throw new ValidationError('Split amounts must be greater than zero');
+            }
+
+            const lines: Array<{ glAccountId: string; description: string; debit: number; credit: number }> = [];
 
             // The bank side line
             lines.push({
@@ -198,7 +210,7 @@ export class ReconciliationService {
           where: { reconciliationPeriodId: periodId },
         });
         await tx.reconciliationPeriod.update({
-          where: { id: periodId },
+          where: { id: periodId, companyId },
           data: { transactionCount: periodTxCount },
         });
       }

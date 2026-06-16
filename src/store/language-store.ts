@@ -6,16 +6,22 @@ import { getTranslation } from '@/lib/i18n';
 interface LanguageState {
   language: Locale;
   setLanguage: (lang: Locale) => void;
-  t: (key: string) => string;
+  t: (key: string, params?: Record<string, string | number>) => string;
   _hasHydrated: boolean;
   setHasHydrated: (state: boolean) => void;
 }
 
 const createTranslator =
   (lang: Locale) =>
-  (key: string): string => {
+  (key: string, params?: Record<string, string | number>): string => {
     const localeTranslations = translations[lang] as Record<string, unknown>;
-    return getTranslation(localeTranslations, key, key);
+    let result = getTranslation(localeTranslations, key, key);
+    if (params) {
+      for (const [k, v] of Object.entries(params)) {
+        result = result.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v));
+      }
+    }
+    return result;
   };
 
 export const useLanguageStore = create<LanguageState>()(

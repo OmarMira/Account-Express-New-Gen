@@ -37,6 +37,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ThemeToggle } from '@/components/spa/ThemeToggle';
 import { LanguageSelector } from '@/components/spa/LanguageSelector';
 import { DashboardPage } from '@/components/spa/DashboardPage';
@@ -54,6 +55,7 @@ import { UsersPage } from '@/components/spa/UsersPage';
 import { SelectCompanyPage } from '@/components/spa/SelectCompanyPage';
 import { AIAssistantModal } from '@/components/spa/AIAssistantModal';
 import { FinancialDashboardPage } from '@/components/spa/FinancialDashboardPage';
+import { EntityManagementPage } from '@/components/spa/EntityManagementPage';
 import { useLanguageStore } from '@/store/language-store';
 import { useAuthStore, type ViewName } from '@/store/auth-store';
 import { WorkflowPanel } from '@/components/workflow/WorkflowPanel';
@@ -63,22 +65,84 @@ interface NavItem {
   view: ViewName;
   icon: React.ComponentType<{ className?: string }>;
   labelKey: string;
+  tooltipKey: string;
 }
 
 const navItems: NavItem[] = [
-  { view: 'dashboard', icon: LayoutDashboard, labelKey: 'dashboard.title' },
-  { view: 'financial-dashboard', icon: TrendingUp, labelKey: 'financialDashboard.title' },
-  { view: 'accounts', icon: BookOpen, labelKey: 'accounts.title' },
-  { view: 'journal', icon: FileText, labelKey: 'journal.title' },
-  { view: 'banks', icon: Landmark, labelKey: 'banks.title' },
-  { view: 'bank-rules', icon: Scale, labelKey: 'bankRules.title' },
-  { view: 'reconciliation', icon: ArrowLeftRight, labelKey: 'reconciliation.title' },
-  { view: 'movement-summary', icon: Activity, labelKey: 'movementSummary.title' },
-  { view: 'reports', icon: BarChart3, labelKey: 'reports.title' },
-  { view: 'export', icon: Download, labelKey: 'exportData.title' },
+  {
+    view: 'dashboard',
+    icon: LayoutDashboard,
+    labelKey: 'dashboard.title',
+    tooltipKey: 'sidebar.dashboard',
+  },
+  {
+    view: 'financial-dashboard',
+    icon: TrendingUp,
+    labelKey: 'financialDashboard.title',
+    tooltipKey: 'sidebar.financialDashboard',
+  },
+  {
+    view: 'accounts',
+    icon: BookOpen,
+    labelKey: 'accounts.title',
+    tooltipKey: 'sidebar.accounts',
+  },
+  {
+    view: 'journal',
+    icon: FileText,
+    labelKey: 'journal.title',
+    tooltipKey: 'sidebar.journal',
+  },
+  {
+    view: 'banks',
+    icon: Landmark,
+    labelKey: 'banks.title',
+    tooltipKey: 'sidebar.banks',
+  },
+  {
+    view: 'bank-rules',
+    icon: Scale,
+    labelKey: 'bankRules.title',
+    tooltipKey: 'sidebar.bankRules',
+  },
+  {
+    view: 'reconciliation',
+    icon: ArrowLeftRight,
+    labelKey: 'reconciliation.title',
+    tooltipKey: 'sidebar.reconciliation',
+  },
+  {
+    view: 'movement-summary',
+    icon: Activity,
+    labelKey: 'movementSummary.title',
+    tooltipKey: 'sidebar.movementSummary',
+  },
+  {
+    view: 'reports',
+    icon: BarChart3,
+    labelKey: 'reports.title',
+    tooltipKey: 'sidebar.reports',
+  },
+  {
+    view: 'export',
+    icon: Download,
+    labelKey: 'exportData.title',
+    tooltipKey: 'sidebar.export',
+  },
+  {
+    view: 'entity-management',
+    icon: Sparkles,
+    labelKey: 'entityManagement.title',
+    tooltipKey: 'sidebar.entityManagement',
+  },
 ];
 
-const settingsItem: NavItem = { view: 'settings', icon: Settings, labelKey: 'settings.title' };
+const settingsItem: NavItem = {
+  view: 'settings',
+  icon: Settings,
+  labelKey: 'settings.title',
+  tooltipKey: 'sidebar.settings',
+};
 
 /* ─── Sidebar Content (shared between desktop + mobile) ─── */
 function SidebarNav({
@@ -109,79 +173,117 @@ function SidebarNav({
   return (
     <div className="flex h-full flex-col">
       {/* Logo */}
-      <button
-        onClick={onOpenWorkflow}
-        className="flex h-14 w-full items-center gap-2 px-4 hover:bg-accent/50 transition-colors text-left focus:outline-hidden cursor-pointer"
-      >
-        <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm">
-          AE
-        </div>
-        <span className="text-lg font-semibold tracking-tight">{t('common.appName')}</span>
-      </button>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={onOpenWorkflow}
+              className="flex h-14 w-full items-center gap-2 px-4 hover:bg-accent/50 transition-colors text-left focus:outline-hidden cursor-pointer"
+            >
+              <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm">
+                AE
+              </div>
+              <span className="text-lg font-semibold tracking-tight">{t('common.appName')}</span>
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right">
+            <p>{t('sidebar.logoTooltip')}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
 
       <Separator />
 
       {/* Nav links */}
-      <ScrollArea className="flex-1 py-2">
-        <nav className="space-y-1 px-3">
-          {navItems.map((item) => {
-            const isActive =
-              item.view === 'accounts'
-                ? pathname === '/accounts'
-                : pathname === '/' && currentView === item.view;
-            return (
+      <TooltipProvider delayDuration={400}>
+        <ScrollArea className="flex-1 py-2">
+          <nav className="space-y-1 px-3">
+            {navItems.map((item) => {
+              const isActive =
+                item.view === 'accounts'
+                  ? pathname === '/accounts'
+                  : pathname === '/' && currentView === item.view;
+              return (
+                <Tooltip key={item.view}>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => handleNav(item.view)}
+                      className={cn(
+                        'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                        isActive
+                          ? 'bg-primary/10 text-primary'
+                          : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                      )}
+                    >
+                      <item.icon className="size-4 shrink-0" />
+                      {t(item.labelKey)}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    <p>{t(item.tooltipKey)}</p>
+                  </TooltipContent>
+                </Tooltip>
+              );
+            })}
+          </nav>
+        </ScrollArea>
+
+        <Separator />
+
+        {/* AI Assistant + Settings + Logout */}
+        <div className="p-3 space-y-1">
+          <Tooltip>
+            <TooltipTrigger asChild>
               <button
-                key={item.view}
-                onClick={() => handleNav(item.view)}
+                onClick={() => useAuthStore.getState().setAiAssistantOpen(true)}
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-purple-500/10 hover:text-purple-500 transition-colors"
+              >
+                <Sparkles className="size-4 shrink-0" />
+                {t('aiAssistant.title')}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              <p>{t('sidebar.aiAssistantTooltip')}</p>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => handleNav('settings')}
                 className={cn(
                   'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-                  isActive
+                  pathname === '/' && currentView === 'settings'
                     ? 'bg-primary/10 text-primary'
                     : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
                 )}
               >
-                <item.icon className="size-4 shrink-0" />
-                {t(item.labelKey)}
+                <settingsItem.icon className="size-4 shrink-0" />
+                {t(settingsItem.labelKey)}
               </button>
-            );
-          })}
-        </nav>
-      </ScrollArea>
-
-      <Separator />
-
-      {/* AI Assistant + Settings + Logout */}
-      <div className="p-3 space-y-1">
-        <button
-          onClick={() => useAuthStore.getState().setAiAssistantOpen(true)}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-purple-500/10 hover:text-purple-500 transition-colors"
-        >
-          <Sparkles className="size-4 shrink-0" />
-          {t('aiAssistant.title')}
-        </button>
-        <button
-          onClick={() => handleNav('settings')}
-          className={cn(
-            'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-            pathname === '/' && currentView === 'settings'
-              ? 'bg-primary/10 text-primary'
-              : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-          )}
-        >
-          <settingsItem.icon className="size-4 shrink-0" />
-          {t(settingsItem.labelKey)}
-        </button>
-        <button
-          onClick={() => {
-            fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
-            useAuthStore.getState().logout();
-          }}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-rose-500/10 hover:text-rose-500 transition-colors"
-        >
-          <LogOut className="size-4 shrink-0" />
-          {t('auth.logout')}
-        </button>
-      </div>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              <p>{t(settingsItem.tooltipKey)}</p>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => {
+                  fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+                  useAuthStore.getState().logout();
+                }}
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-rose-500/10 hover:text-rose-500 transition-colors"
+              >
+                <LogOut className="size-4 shrink-0" />
+                {t('auth.logout')}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              <p>{t('sidebar.logoutTooltip')}</p>
+            </TooltipContent>
+          </Tooltip>
+        </div>
+      </TooltipProvider>
     </div>
   );
 }
@@ -196,6 +298,7 @@ function DesktopSidebar({
   onToggle: () => void;
   onOpenWorkflow?: () => void;
 }) {
+  const t = useLanguageStore((s) => s.t);
   return (
     <aside
       className={cn(
@@ -203,20 +306,31 @@ function DesktopSidebar({
         collapsed ? 'w-16' : 'w-64',
       )}
     >
-      <button
-        onClick={onOpenWorkflow}
-        className={cn(
-          'flex h-14 items-center hover:bg-accent/50 transition-colors text-left focus:outline-hidden cursor-pointer',
-          collapsed ? 'justify-center px-2' : 'gap-2 px-4 w-full',
-        )}
-      >
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm">
-          AE
-        </div>
-        {!collapsed && (
-          <span className="text-lg font-semibold tracking-tight truncate">AccountExpress</span>
-        )}
-      </button>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={onOpenWorkflow}
+              className={cn(
+                'flex h-14 items-center hover:bg-accent/50 transition-colors text-left focus:outline-hidden cursor-pointer',
+                collapsed ? 'justify-center px-2' : 'gap-2 px-4 w-full',
+              )}
+            >
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm">
+                AE
+              </div>
+              {!collapsed && (
+                <span className="text-lg font-semibold tracking-tight truncate">
+                  AccountExpress
+                </span>
+              )}
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right">
+            <p>{t('sidebar.logoTooltip')}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
 
       <Separator />
 
@@ -263,43 +377,54 @@ function DesktopNavItems({ collapsed }: { collapsed: boolean }) {
   }
 
   return (
-    <>
+    <TooltipProvider delayDuration={400}>
       {allItems.map((item) => {
         const isActive =
           item.view === 'accounts'
             ? pathname === '/accounts'
             : pathname === '/' && currentView === item.view;
         return (
-          <button
-            key={item.view}
-            onClick={() => handleNav(item.view)}
-            title={collapsed ? t(item.labelKey) : undefined}
-            className={cn(
-              'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-              collapsed ? 'justify-center' : 'w-full',
-              isActive
-                ? 'bg-primary/10 text-primary'
-                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-            )}
-          >
-            <item.icon className="size-4 shrink-0" />
-            {!collapsed && t(item.labelKey)}
-          </button>
+          <Tooltip key={item.view}>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => handleNav(item.view)}
+                className={cn(
+                  'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                  collapsed ? 'justify-center' : 'w-full',
+                  isActive
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                )}
+              >
+                <item.icon className="size-4 shrink-0" />
+                {!collapsed && t(item.labelKey)}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              <p>{t(item.tooltipKey)}</p>
+            </TooltipContent>
+          </Tooltip>
         );
       })}
       {/* AI Assistant Button */}
-      <button
-        onClick={() => setAiAssistantOpen(true)}
-        title={t('aiAssistant.title')}
-        className={cn(
-          'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-purple-500/10 hover:text-purple-500 transition-colors',
-          collapsed ? 'justify-center' : 'w-full',
-        )}
-      >
-        <Sparkles className="size-4 shrink-0" />
-        {!collapsed && t('aiAssistant.title')}
-      </button>
-    </>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            onClick={() => setAiAssistantOpen(true)}
+            className={cn(
+              'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-purple-500/10 hover:text-purple-500 transition-colors',
+              collapsed ? 'justify-center' : 'w-full',
+            )}
+          >
+            <Sparkles className="size-4 shrink-0" />
+            {!collapsed && t('aiAssistant.title')}
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="right">
+          <p>{t('sidebar.aiAssistantTooltip')}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 
@@ -360,9 +485,9 @@ export function AppShell({ children }: { children?: React.ReactNode }) {
             </div>
             <div className="space-y-1">
               <h3 className="font-semibold text-sm tracking-tight text-foreground">
-                {processingMessage || 'Procesando...'}
+                {processingMessage === 'Procesando...' ? t('common.processing') : processingMessage}
               </h3>
-              <p className="text-xs text-muted-foreground">Por favor, espera un momento.</p>
+              <p className="text-xs text-muted-foreground">{t('common.pleaseWait')}</p>
             </div>
           </div>
         </div>
@@ -543,6 +668,9 @@ function PlaceholderView({ view }: { view: ViewName }) {
   if (view === 'workflow') {
     return <WorkflowPanel />;
   }
+  if (view === 'entity-management') {
+    return <EntityManagementPage />;
+  }
 
   // Map views to their title keys
   const viewKeyMap: Partial<Record<ViewName, string>> = {
@@ -560,6 +688,7 @@ function PlaceholderView({ view }: { view: ViewName }) {
     settings: 'settings.title',
     users: 'users.title',
     onboarding: 'onboarding.title',
+    'entity-management': 'entityManagement.title',
   };
 
   const title = t(viewKeyMap[view] ?? 'dashboard.title');

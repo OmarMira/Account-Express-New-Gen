@@ -307,10 +307,15 @@ CRITICAL: Do NOT invent or fabricate data. Only use patterns you can clearly ide
   try {
     const response = await Promise.race([
       zai.chat.completions.create({
+        model:
+          process.env.AI_MODEL && process.env.AI_MODEL !== 'openrouter/free'
+            ? process.env.AI_MODEL
+            : 'google/gemini-2.5-flash',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
         ],
+        max_tokens: 1500,
         temperature: 0,
       }),
       new Promise<never>((_, reject) =>

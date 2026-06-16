@@ -54,7 +54,12 @@ export const PATCH = apiHandler(async (request: NextRequest) => {
     shouldUpdateLogo = true;
   }
 
-  // 3. Update profile and audit in database transaction
+  // 3. Handle entityFirstMode toggle
+  const entityFirstModeRaw = formData.get('entityFirstMode');
+  const entityFirstMode =
+    entityFirstModeRaw === 'true' ? true : entityFirstModeRaw === 'false' ? false : undefined;
+
+  // 4. Update profile and audit in database transaction
   await db.$transaction(async (tx) => {
     await tx.company.update({
       where: { id: companyId },
@@ -67,6 +72,7 @@ export const PATCH = apiHandler(async (request: NextRequest) => {
         phone: addressData.phone || '',
         email: (formData.get('email') as string) || '',
         ...(shouldUpdateLogo && { logo: newLogoPath }),
+        ...(entityFirstMode !== undefined && { entityFirstMode }),
       },
     });
 

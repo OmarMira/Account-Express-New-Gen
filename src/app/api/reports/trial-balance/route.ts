@@ -1,9 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { apiHandler } from '@/lib/api-handler';
+import { apiHandler, type RouteContext } from '@/lib/api-handler';
 import { requireCompanyContext } from '@/lib/context-storage';
+import { Prisma } from '@prisma/client';
 
-export const GET = apiHandler(async (request: NextRequest, context: { params: any }) => {
+interface AccountBalance {
+  code: string;
+  name: string;
+  accountType: string;
+  debitTotal: number;
+  creditTotal: number;
+  normalBalance: string;
+}
+
+interface GlAccountInfo {
+  code: string;
+  name: string;
+  accountType: string;
+  normalBalance: string;
+  isActive: boolean;
+}
+
+export const GET = apiHandler(async (request: NextRequest, context: RouteContext) => {
   const { userId, companyId } = requireCompanyContext();
 
   const { searchParams } = new URL(request.url);
@@ -44,7 +62,7 @@ export const GET = apiHandler(async (request: NextRequest, context: { params: an
   });
 
   // Fetch virtual entries from reconciled bank transactions
-  const bankTxWhere: any = {
+  const bankTxWhere: Prisma.BankTransactionWhereInput = {
     statement: { bankAccount: { companyId } },
     isReconciled: true,
     glAccountId: { not: null },
@@ -99,7 +117,7 @@ export const GET = apiHandler(async (request: NextRequest, context: { params: an
     }
   >();
 
-  const addBalance = (acc: any, debit: number, credit: number) => {
+  const addBalance = (acc: GlAccountInfo, debit: number, credit: number) => {
     if (!acc || !acc.isActive) return;
     const key = acc.code;
     if (!accountBalances.has(key)) {

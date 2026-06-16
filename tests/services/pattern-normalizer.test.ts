@@ -26,9 +26,13 @@ describe('Pattern Normalizer Service', () => {
       expect(normalizePattern('Vendor E; conf# abc987')).toBe('vendor e');
     });
 
-    it('should normalize complex patterns like Raiser/Lyft', () => {
-      expect(normalizePattern('raiser 12345 des:edi paymnt id:999-888 indn:some')).toBe('some');
-      expect(normalizePattern('lyft.com des:lyft 12-34 id:abc-123 indn:driver')).toBe('driver');
+    it('should normalize patterns with generic metadata (DES:/ID:/INDN:)', () => {
+      expect(normalizePattern('raiser 12345 des:edi paymnt id:999-888 indn:some')).toBe(
+        'raiser 12345 some',
+      );
+      expect(normalizePattern('lyft.com des:lyft 12-34 id:abc-123 indn:driver')).toBe(
+        'lyft.com driver',
+      );
     });
   });
 

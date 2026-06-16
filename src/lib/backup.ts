@@ -102,11 +102,18 @@ function writeManifest(manifest: ManifestFile): void {
   fs.writeFileSync(MANIFEST_PATH, JSON.stringify(manifest, null, 2), 'utf-8');
 }
 
+const RESTORE_EXCLUDED_KEYS = new Set([
+  'createdAt',
+  'updatedAt',
+  'passwordHash',
+]);
+
 function sanitizeForRestore(obj: Record<string, unknown>): Record<string, unknown> {
   const cleaned: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(obj)) {
-    // Keep all fields except Prisma-generated timestamps we don't control
-    cleaned[key] = value;
+    if (!RESTORE_EXCLUDED_KEYS.has(key)) {
+      cleaned[key] = value;
+    }
   }
   return cleaned;
 }
@@ -244,7 +251,10 @@ export async function createBackup(companyId: string): Promise<{
       journalLines: companyJournalLines.map((l) => JSON.parse(JSON.stringify(l))),
       fiscalPeriods: fiscalPeriods.map((p) => JSON.parse(JSON.stringify(p))),
       companyMembers: companyMembers.map((m) => JSON.parse(JSON.stringify(m))),
-      users: users.map((u) => JSON.parse(JSON.stringify(u))),
+      users: users.map((u) => {
+        const { passwordHash, ...safe } = u;
+        return JSON.parse(JSON.stringify(safe));
+      }),
     },
   };
 
@@ -398,11 +408,34 @@ export function validateBackup(backupData: BackupData): { valid: boolean; errors
   }
 
   // Check company data
-  if (backupData.data.company.length === 0) {
+  if (backupData.data.company?.length === 0) {
     errors.push('No company data found');
   }
 
   return { valid: errors.length === 0, errors };
+}
+
+/**
+ * Compute hierarchical depth for each GL account in O(n) using memoization.
+ */
+function computeDepths(accounts: Record<string, unknown>[]): Map<string, number> {
+  const map = new Map(accounts.map((a) => [a.id, a]));
+  const depths = new Map<string, number>();
+
+  function getDepth(id: string): number {
+    if (depths.has(id)) return depths.get(id)!;
+    const acc = map.get(id);
+    if (!acc || !acc.parentId) {
+      depths.set(id, 0);
+      return 0;
+    }
+    const d = 1 + getDepth(acc.parentId as string);
+    depths.set(id, d);
+    return d;
+  }
+
+  for (const a of accounts) getDepth(a.id as string);
+  return depths;
 }
 
 /**
@@ -481,6 +514,27 @@ export async function restoreBackup(
 
       // Step 2: Re-insert data
 
+      // 2a. Upsert company so FK references work on clean DB
+      const companyData = backupData.data.company[0];
+      if (companyData) {
+        const cleanCompany = sanitizeForRestore(companyData as Record<string, unknown>);
+        await tx.company.upsert({
+          where: { id: companyId },
+          create: cleanCompany as never,
+          update: cleanCompany as never,
+        });
+      }
+
+      // 2b. Upsert users (create if missing, preserve existing data)
+      for (const user of backupData.data.users) {
+        const clean = sanitizeForRestore(user as Record<string, unknown>);
+        await tx.user.upsert({
+          where: { id: user.id as string },
+          create: clean as never,
+          update: {},
+        });
+      }
+
       // Insert company members
       for (const member of backupData.data.companyMembers) {
         const clean = sanitizeForRestore(member as Record<string, unknown>);
@@ -488,26 +542,19 @@ export async function restoreBackup(
       }
       restoredCounts.companyMembers = backupData.data.companyMembers.length;
 
-      // Insert GL accounts (handle parentId references)
+      // Insert GL accounts (sorted by depth for multilevel hierarchy)
+      const accountDepths = computeDepths(backupData.data.glAccounts);
+      const sortedAccounts = [...backupData.data.glAccounts].sort(
+        (a, b) =>
+          (accountDepths.get(a.id as string) || 0) - (accountDepths.get(b.id as string) || 0),
+      );
       const glAccountIdMap = new Map<string, string>();
-      // First pass: accounts without parent
-      const topLevelAccounts = backupData.data.glAccounts.filter(
-        (a) => !(a as Record<string, unknown>).parentId,
-      );
-      for (const account of topLevelAccounts) {
+      for (const account of sortedAccounts) {
         const clean = sanitizeForRestore(account as Record<string, unknown>);
-        const created = await tx.glAccount.create({ data: clean as never });
-        glAccountIdMap.set(account.id as string, created.id);
-      }
-      // Second pass: accounts with parent
-      const childAccounts = backupData.data.glAccounts.filter(
-        (a) => (a as Record<string, unknown>).parentId,
-      );
-      for (const account of childAccounts) {
-        const clean = sanitizeForRestore(account as Record<string, unknown>);
-        const oldParentId = clean.parentId as string;
-        const newParentId = glAccountIdMap.get(oldParentId) || oldParentId;
-        clean.parentId = newParentId;
+        if (clean.parentId) {
+          const oldParentId = clean.parentId as string;
+          clean.parentId = glAccountIdMap.get(oldParentId) || oldParentId;
+        }
         const created = await tx.glAccount.create({ data: clean as never });
         glAccountIdMap.set(account.id as string, created.id);
       }

@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { apiHandler } from '@/lib/api-handler';
+import { requireCompanyContext } from '@/lib/context-storage';
 import { db } from '@/lib/db';
 import { getPeriodStrategy } from '@/lib/fiscal-period/strategies';
 import { fiscalConfigSchema } from '@/lib/fiscal-period/types';
+import { serverT } from '@/lib/server-i18n';
 
 export const POST = apiHandler(async (req: NextRequest) => {
-  const { companyId, year, config } = await req.json();
+  const locale = req.headers.get('x-locale') || 'es';
+  const { companyId } = requireCompanyContext();
+  const { year, config } = await req.json();
   const validated = fiscalConfigSchema.parse(config);
   const strategy = getPeriodStrategy(validated.type);
   const calculated = strategy.calculate({ year, config: validated });
@@ -21,7 +25,10 @@ export const POST = apiHandler(async (req: NextRequest) => {
     ),
   );
   if (conflict)
-    return NextResponse.json({ error: 'Conflicto de período o nombre duplicado' }, { status: 409 });
+    return NextResponse.json(
+      { error: serverT(locale, 'apiErrors.fiscalPeriods.conflict') },
+      { status: 409 },
+    );
 
   const created = await db.$transaction(
     calculated.map(({ isShort, ...p }) => db.fiscalPeriod.create({ data: { companyId, ...p } })),

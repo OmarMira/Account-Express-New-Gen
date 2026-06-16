@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { logger } from '@/lib/logger';
 import { db } from '@/lib/db';
 import { createAuditLogWithRetry } from '@/lib/audit';
@@ -19,6 +20,7 @@ import { trackPDFParseDuration } from '@/lib/metrics';
 import { withTiming } from '@/lib/timing';
 import { generateImportHash } from '@/lib/accounting/import-hash';
 import { toStatementMonth, toDateString } from '@/lib/accounting/date-window';
+import type { ParsedTransaction, StatementBalanceInfo, RuleCondition, BankRuleWithConditions } from '@/lib/types/shared';
 
 export interface ImportResult {
   statementId: string;
@@ -51,7 +53,7 @@ export class ImportService {
   }): Promise<ImportResult> {
     // ─── PDF parsing ──────────────────────────────────────────────────
     if (extension === 'pdf') {
-      let transactions: any[] = [];
+      let transactions: ParsedTransaction[] = [];
       let bankName = '';
       let accountNo: string | undefined;
       let openingBalance: number | undefined;
@@ -125,6 +127,11 @@ export class ImportService {
         }
       }
 
+      // Guard: validate before touching the DB — no phantom accounts on failed imports
+      if (transactions.length === 0) {
+        throw new ValidationError('No hay transacciones para importar');
+      }
+
       logger.info('Looking up bank account', { bankName, accountNo: accountNo || null });
       const { account: bankAccount, newAccountCreated: pdfNewAccount } =
         await this.findOrCreateBankAccount(
@@ -140,7 +147,7 @@ export class ImportService {
         accountId: bankAccount.id,
       });
 
-      const balanceInfo: any = {};
+      const balanceInfo: Partial<StatementBalanceInfo> = {};
       if (startDate) balanceInfo.startDate = startDate;
       if (endDate) balanceInfo.endDate = endDate;
       if (openingBalance !== undefined) balanceInfo.openingBalance = openingBalance;
@@ -190,7 +197,7 @@ export class ImportService {
 
     // ─── CSV parsing ─────────────────────────────────────────────────
     if (extension === 'csv' || extension === 'tsv' || extension === 'txt') {
-      let transactions: any[];
+      let transactions: ParsedTransaction[];
       let bankName = '';
 
       try {
@@ -222,7 +229,7 @@ export class ImportService {
 
     // ─── OFX/QFX parsing ─────────────────────────────────────────────
     if (extension === 'ofx' || extension === 'qfx') {
-      let parsed: any;
+      let parsed: { bankName: string; transactions: ParsedTransaction[]; accountNumber?: string; openingBalance?: number; closingBalance?: number; startDate?: Date; endDate?: Date };
 
       try {
         parsed = parseOFX(content);
@@ -278,7 +285,7 @@ export class ImportService {
     accountNumber?: string,
     openingBalance: number = 0,
     currency: string = 'USD',
-  ): Promise<{ account: any; newAccountCreated: boolean }> {
+  ): Promise<{ account: { id: string; accountName: string; accountNo?: string | null; bankName: string; companyId: string }; newAccountCreated: boolean }> {
     if (bankAccountId) {
       const account = await db.bankAccount.findFirst({
         where: { id: bankAccountId, companyId },
@@ -318,12 +325,7 @@ export class ImportService {
     transactions: { date: Date; description: string; amount: number; reference?: string }[],
     format: string,
     fileName: string,
-    balanceInfo?: {
-      startDate: Date;
-      endDate: Date;
-      openingBalance: number;
-      closingBalance: number;
-    },
+    balanceInfo?: Partial<StatementBalanceInfo>,
   ) {
     if (transactions.length === 0) {
       throw new ValidationError('No hay transacciones para importar');
@@ -425,7 +427,7 @@ export class ImportService {
         const { matchedRuleId, glAccountId } = this.applyBankRule(
           txn.description,
           txn.amount,
-          bankRules,
+          bankRules as BankRuleWithConditions[],
         );
 
         if (matchedRuleId) autoCategorizedCount++;
@@ -460,10 +462,10 @@ export class ImportService {
     };
   }
 
-  private static matchCondition(description: string, amount: number, cond: any): boolean {
+  private static matchCondition(description: string, amount: number, cond: RuleCondition): boolean {
     const field = (cond.field || 'description').toLowerCase();
     const operator = cond.operator;
-    const value = cond.value;
+    const value = String(cond.value);
 
     if (!value) return false;
 
@@ -501,7 +503,7 @@ export class ImportService {
   private static applyBankRule(
     description: string,
     amount: number,
-    rules: any[],
+    rules: BankRuleWithConditions[],
   ): { matchedRuleId: string | null; glAccountId: string | null } {
     const isDebit = amount < 0;
 
@@ -519,7 +521,7 @@ export class ImportService {
           operator: rule.conditionType,
           value: rule.conditionValue,
         };
-        if (!this.matchCondition(description, amount, legacyCond)) {
+        if (!this.matchCondition(description, amount, legacyCond as RuleCondition)) {
           continue;
         }
       } else {
@@ -593,7 +595,7 @@ export class ImportService {
     return 'Cuenta Bancaria Importada';
   }
 
-  public static async recalculateBalances(tx: any, bankAccountId: string) {
+  public static async recalculateBalances(tx: Prisma.TransactionClient, bankAccountId: string) {
     const statements = await tx.bankStatement.findMany({
       where: { bankAccountId },
       orderBy: [{ startDate: 'asc' }, { endDate: 'asc' }],

@@ -94,20 +94,21 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
 
   try {
     const body = await request.json();
-    let {
+    const {
       name,
       conditionType,
       conditionValue,
-      transactionDirection,
-      glAccountId,
       glAccountCode,
       priority = 10,
       isActive = true,
       directionProfile, // { creditPct, debitPct } — optional, sent by AI wizard
-      conditions,
-      debitGlAccountId,
-      creditGlAccountId,
     } = body;
+    // These are reassigned during GL account resolution and validation
+    let glAccountId = body.glAccountId;
+    let debitGlAccountId = body.debitGlAccountId;
+    let creditGlAccountId = body.creditGlAccountId;
+    let transactionDirection = body.transactionDirection;
+    let conditions = body.conditions;
 
     // Validate required fields
     if (!name?.trim()) {
@@ -136,6 +137,8 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
           'equals',
           'amount_greater',
           'amount_less',
+          'greater_than',
+          'less_than',
         ];
         if (!cond.operator || !validConditionTypes.includes(cond.operator)) {
           return NextResponse.json(
@@ -143,7 +146,12 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
             { status: 400 },
           );
         }
-        if (!cond.value || !cond.value.trim()) {
+        if (
+          cond.value === undefined ||
+          cond.value === null ||
+          cond.value === '' ||
+          !String(cond.value).trim()
+        ) {
           return NextResponse.json({ error: 'condition value cannot be empty' }, { status: 400 });
         }
         if (
@@ -173,6 +181,8 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
         'equals',
         'amount_greater',
         'amount_less',
+        'greater_than',
+        'less_than',
       ];
       if (!validConditionTypes.includes(conditionType)) {
         return NextResponse.json(
@@ -180,7 +190,12 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
           { status: 400 },
         );
       }
-      if (!conditionValue.trim()) {
+      if (
+        conditionValue === undefined ||
+        conditionValue === null ||
+        conditionValue === '' ||
+        !String(conditionValue).trim()
+      ) {
         return NextResponse.json({ error: 'conditionValue cannot be empty' }, { status: 400 });
       }
       if (
@@ -246,23 +261,21 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
       }
     }
 
-    // Validate GL Accounts existence and company matching
-    if (debitGlAccountId) {
-      const dbAcc = await db.glAccount.findFirst({
-        where: { id: debitGlAccountId, companyId },
+    // Validate GL Accounts existence and company matching (batched)
+    const glAccountIdsToCheck = [debitGlAccountId, creditGlAccountId].filter(Boolean);
+    if (glAccountIdsToCheck.length > 0) {
+      const existingAccounts = await db.glAccount.findMany({
+        where: { id: { in: glAccountIdsToCheck }, companyId, isActive: true },
+        select: { id: true },
       });
-      if (!dbAcc) {
+      const existingAccountIds = new Set(existingAccounts.map((a) => a.id));
+      if (debitGlAccountId && !existingAccountIds.has(debitGlAccountId)) {
         return NextResponse.json(
           { error: 'Debit GL account not found or forbidden' },
           { status: 400 },
         );
       }
-    }
-    if (creditGlAccountId) {
-      const dbAcc = await db.glAccount.findFirst({
-        where: { id: creditGlAccountId, companyId },
-      });
-      if (!dbAcc) {
+      if (creditGlAccountId && !existingAccountIds.has(creditGlAccountId)) {
         return NextResponse.json(
           { error: 'Credit GL account not found or forbidden' },
           { status: 400 },
@@ -321,7 +334,7 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
     for (const existing of existingRules) {
       const existingConditions: Array<{ field: string; operator: string; value: string }> =
         Array.isArray(existing.conditions) && existing.conditions.length > 0
-          ? (existing.conditions as any[])
+          ? (existing.conditions as Array<{ field: string; operator: string; value: string }>)
           : [
               {
                 field: 'description',
@@ -374,6 +387,36 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
             }
           }
         }
+      }
+    }
+
+    // Step 3 — Reverse-direction overlap: incoming broader pattern may shadow existing
+    const isAmountOp = (
+      conditions as Array<{ field: string; operator: string; value: string }>
+    ).some((c) =>
+      ['amount_greater', 'amount_less', 'greater_than', 'less_than'].includes(c.operator),
+    );
+    const incomingVal = (conditionValue || conditions[0]?.value || '').toLowerCase();
+    for (const existingRule of existingRules) {
+      const existingConditions = existingRule.conditions as Array<{
+        field: string;
+        operator: string;
+        value: string;
+      }> | null;
+      const exVal =
+        existingRule.conditionValue?.toLowerCase() ||
+        existingConditions?.[0]?.value?.toLowerCase() ||
+        '';
+      if (
+        !isAmountOp &&
+        incomingVal &&
+        exVal &&
+        (incomingVal.includes(exVal) || exVal.includes(incomingVal))
+      ) {
+        warnings.push({
+          type: 'overlap',
+          message: `This rule may be shadowed by rule '${existingRule.name}' (ID: ${existingRule.id}) which has a broader pattern and higher priority.`,
+        });
       }
     }
     // ─────────────────────────────────────────────────────────────────

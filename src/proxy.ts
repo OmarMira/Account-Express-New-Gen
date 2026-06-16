@@ -77,6 +77,8 @@ export async function proxy(request: NextRequest) {
   const method = request.method;
   const isApi = pathname.startsWith('/api/');
 
+  const PUBLIC_API_ROUTES = ['/api/auth/login', '/api/auth/register', '/api/health'];
+
   const securityHeaders = getSecurityHeaders();
 
   // 0. CORS preflight
@@ -88,6 +90,21 @@ export async function proxy(request: NextRequest) {
       res.headers.set(key, value);
     });
     return res;
+  }
+
+  // 1. Session presence check for protected API routes
+  if (isApi && !PUBLIC_API_ROUTES.includes(pathname)) {
+    const sessionToken =
+      request.cookies.get('session')?.value ??
+      request.headers.get('authorization')?.replace('Bearer ', '') ??
+      null;
+
+    if (!sessionToken) {
+      return NextResponse.json(
+        { error: 'Unauthorized', code: 'AUTH_REQUIRED' },
+        { status: 401, headers: securityHeaders },
+      );
+    }
   }
 
   const response = NextResponse.next();

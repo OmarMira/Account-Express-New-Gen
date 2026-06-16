@@ -72,8 +72,8 @@ export async function generateInsights(companyId: string, role: string): Promise
     const budgetsPath = join(process.cwd(), 'data/budgets.json');
     if (existsSync(budgetsPath)) {
       const budgets = JSON.parse(readFileSync(budgetsPath, 'utf-8'));
-      const activeYear = 2025; // Sincronizado con nuestro ejercicio de datos importados
-      const activeMonth = 1;
+      const activeYear = year;
+      const activeMonth = month;
 
       const monthBudgets = budgets[activeYear]?.[activeMonth] || {};
       const start = new Date(Date.UTC(activeYear, activeMonth - 1, 1));
@@ -133,8 +133,8 @@ export async function generateInsights(companyId: string, role: string): Promise
   }
 
   // 4. Resumen ejecutivo (plantilla dinámica)
-  const activeYear = 2025;
-  const activeMonth = 5;
+  const activeYear = year;
+  const activeMonth = month;
   const period = `${activeYear}-${String(activeMonth).padStart(2, '0')}`;
 
   const start = new Date(Date.UTC(activeYear, activeMonth - 1, 1));

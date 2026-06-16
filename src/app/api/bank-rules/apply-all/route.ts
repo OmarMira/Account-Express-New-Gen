@@ -3,7 +3,15 @@ import { db } from '@/lib/db';
 import { apiHandler, type RouteContext } from '@/lib/api-handler';
 import { requireCompanyContext } from '@/lib/context-storage';
 
-import { transactionMatchesRule } from '@/lib/services/rule-matching-engine';
+import {
+  transactionMatchesRule,
+  loadEntityFirstContext,
+  evaluateWinningRule,
+  loadRolePriorities,
+  type Transaction,
+  type Rule,
+  type MatchingRule,
+} from '@/lib/services/rule-matching-engine';
 
 // ─── POST /api/bank-rules/apply-all ────────────────────────────────
 // Apply ALL active rules to all unmatched transactions.
@@ -12,6 +20,9 @@ import { transactionMatchesRule } from '@/lib/services/rule-matching-engine';
 // Body: { companyId }
 export const POST = apiHandler(async (request: NextRequest, context: RouteContext) => {
   const { userId, companyId } = requireCompanyContext();
+
+  // Load entity-first context for SOCIO conflict detection
+  const efCtx = await loadEntityFirstContext(companyId);
 
   // Get all active rules sorted by priority
   const rules = await db.bankRule.findMany({
@@ -43,42 +54,89 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
     },
   });
 
+  const MAX_UNMATCHED = 5000;
+  const totalUnmatched = unmatchedTransactions.length;
+  if (unmatchedTransactions.length > MAX_UNMATCHED) {
+    unmatchedTransactions.length = MAX_UNMATCHED;
+  }
+
   let totalMatched = 0;
-  const matchResults: { ruleId: string; ruleName: string; count: number }[] = [];
+  const winnerMap = new Map<string, { ruleId: string; ruleName: string; txIds: string[] }>();
 
-  // Track which transactions have been matched
-  const matchedTxIds = new Set<string>();
+  const rolePriorities = loadRolePriorities();
+  const entityContexts = await db.entityContext.findMany({
+    where: { companyId },
+    select: { pattern: true, role: true },
+  });
 
-  // Process each rule in priority order
-  for (const rule of rules) {
-    const txsForThisRule = unmatchedTransactions.filter(
-      (tx) => !matchedTxIds.has(tx.id) && transactionMatchesRule(tx, rule),
+  for (const tx of unmatchedTransactions) {
+    const matchingRules = rules.filter((rule) =>
+      transactionMatchesRule(
+        tx as Transaction,
+        rule as Rule,
+        efCtx.knownSocioPatterns,
+        efCtx.entityFirstMode,
+      ),
+    ) as MatchingRule[];
+
+    if (matchingRules.length === 0) continue;
+
+    const winner = evaluateWinningRule(
+      matchingRules,
+      tx as Transaction,
+      companyId,
+      rolePriorities,
+      entityContexts,
     );
-
-    if (txsForThisRule.length > 0) {
-      const txIds = txsForThisRule.map((tx) => tx.id);
-      await db.bankTransaction.updateMany({
-        where: { id: { in: txIds } },
-        data: {
-          glAccountId: rule.glAccountId,
-          matchedRuleId: rule.id,
-        },
-      });
-
-      txIds.forEach((tid) => matchedTxIds.add(tid));
-      totalMatched += txIds.length;
-      matchResults.push({
-        ruleId: rule.id,
-        ruleName: rule.name,
-        count: txIds.length,
-      });
+    const existing = winnerMap.get(winner.id);
+    if (existing) {
+      existing.txIds.push(tx.id);
+    } else {
+      winnerMap.set(winner.id, { ruleId: winner.id, ruleName: winner.name, txIds: [tx.id] });
     }
   }
+
+  for (const [, entry] of winnerMap) {
+    const rule = rules.find((r) => r.id === entry.ruleId);
+    if (!rule) continue;
+
+    const debitIds: string[] = [];
+    const creditIds: string[] = [];
+
+    for (const txId of entry.txIds) {
+      const tx = unmatchedTransactions.find((t) => t.id === txId);
+      if (!tx) continue;
+      if (tx.amount < 0) debitIds.push(txId);
+      else creditIds.push(txId);
+    }
+
+    if (debitIds.length > 0) {
+      await db.bankTransaction.updateMany({
+        where: { id: { in: debitIds } },
+        data: { glAccountId: rule.debitGlAccountId || rule.glAccountId, matchedRuleId: rule.id },
+      });
+    }
+
+    if (creditIds.length > 0) {
+      await db.bankTransaction.updateMany({
+        where: { id: { in: creditIds } },
+        data: { glAccountId: rule.creditGlAccountId || rule.glAccountId, matchedRuleId: rule.id },
+      });
+    }
+
+    totalMatched += entry.txIds.length;
+  }
+
+  const matchResults = Array.from(winnerMap.values()).map((entry) => ({
+    ruleId: entry.ruleId,
+    ruleName: entry.ruleName,
+    count: entry.txIds.length,
+  }));
 
   return NextResponse.json({
     success: true,
     matched: totalMatched,
-    total: unmatchedTransactions.length,
+    total: totalUnmatched,
     rulesApplied: matchResults,
   });
 });

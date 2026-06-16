@@ -25,7 +25,18 @@ export const POST = apiHandler(async (request: NextRequest) => {
     select: { legalName: true },
   });
   const companyName = company?.legalName || '';
-  const results: any[] = [];
+  interface ValidationResult {
+    fileName: string;
+    extension: string;
+    requiresApproval: boolean;
+    extractedHolder?: string;
+    score?: number;
+    error?: string;
+    companyName?: string;
+    matches?: boolean;
+  }
+
+  const results: ValidationResult[] = [];
 
   for (const file of files) {
     const fileName = file.name;

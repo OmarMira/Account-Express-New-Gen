@@ -5,10 +5,24 @@ import { AI_CONFIG } from '@/lib/constants/ai-config';
 import { apiHandler, type RouteContext } from '@/lib/api-handler';
 import { requireCurrentUserId } from '@/lib/context-storage';
 import { decrypt, encrypt } from '@/lib/crypto';
+import { db } from '@/lib/db';
+
+async function requireAdminRole(userId: string): Promise<NextResponse | null> {
+  const user = await db.user.findUnique({
+    where: { id: userId },
+    select: { role: true },
+  });
+  if (!user || !['company_admin', 'super_admin'].includes(user.role)) {
+    return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+  }
+  return null;
+}
 
 export const GET = apiHandler(
   async (request: NextRequest, context: RouteContext) => {
     const userId = requireCurrentUserId();
+    const denied = await requireAdminRole(userId);
+    if (denied) return denied;
 
     try {
       const envPath = path.join(process.cwd(), '.env');
@@ -58,6 +72,8 @@ export const GET = apiHandler(
 export const POST = apiHandler(
   async (request: NextRequest, context: RouteContext) => {
     const userId = requireCurrentUserId();
+    const denied = await requireAdminRole(userId);
+    if (denied) return denied;
 
     try {
       const { apiKey, model } = await request.json();
@@ -71,7 +87,9 @@ export const POST = apiHandler(
       try {
         await access(envPath);
         envContent = await readFile(envPath, 'utf8');
-      } catch {}
+      } catch {
+        /* file doesn't exist yet, envContent stays empty */
+      }
 
       // Encrypt key before writing to disk
       const encryptedKey = encrypt(apiKey);

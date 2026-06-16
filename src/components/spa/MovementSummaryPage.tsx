@@ -170,19 +170,46 @@ export function MovementSummaryPage() {
   const t = useLanguageStore((s) => s.t);
   const activeCompany = useAuthStore((s) => s.activeCompany);
 
-  // Date defaults: current month
-  const today = new Date();
-  const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-  const defaultFrom = firstOfMonth.toISOString().split('T')[0];
-  const defaultTo = today.toISOString().split('T')[0];
-
-  const [fromDate, setFromDate] = useState(defaultFrom);
-  const [toDate, setToDate] = useState(defaultTo);
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [datesInitialized, setDatesInitialized] = useState(false);
   const [accountId, setAccountId] = useState('');
   const [data, setData] = useState<MovementSummaryResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [glAccounts, setGlAccounts] = useState<GlAccount[]>([]);
+
+  // Fetch date boundaries for the company transactions
+  useEffect(() => {
+    if (!activeCompany?.id) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(`/api/movement-summary?companyId=${activeCompany.id}&rangeOnly=true`);
+        if (res.ok && !cancelled) {
+          const json = await res.json();
+          // Fallback to current month if there are no transactions
+          const today = new Date();
+          const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+          const defaultFrom = firstOfMonth.toISOString().split('T')[0];
+          const defaultTo = today.toISOString().split('T')[0];
+
+          setFromDate(json.minDate || defaultFrom);
+          setToDate(json.maxDate || defaultTo);
+          setDatesInitialized(true);
+        }
+      } catch {
+        const today = new Date();
+        const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        setFromDate(firstOfMonth.toISOString().split('T')[0]);
+        setToDate(today.toISOString().split('T')[0]);
+        setDatesInitialized(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCompany?.id]);
 
   // Fetch GL accounts for the dropdown
   useEffect(() => {
@@ -209,7 +236,7 @@ export function MovementSummaryPage() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
-    if (!activeCompany?.id) return;
+    if (!activeCompany?.id || !datesInitialized) return;
     const controller = new AbortController();
 
     const doFetch = async () => {

@@ -3,7 +3,15 @@ import { db } from '@/lib/db';
 import { apiHandler } from '@/lib/api-handler';
 import { requireCompanyContext } from '@/lib/context-storage';
 import { assertActiveFiscalPeriod } from '@/lib/fiscal-period-guard';
-import { transactionMatchesRule } from '@/lib/services/rule-matching-engine';
+import {
+  transactionMatchesRule,
+  loadEntityFirstContext,
+  evaluateWinningRule,
+  loadRolePriorities,
+  type Transaction,
+  type Rule,
+  type MatchingRule,
+} from '@/lib/services/rule-matching-engine';
 
 // ─── POST /api/reconciliation/auto ─────────────────────────────────
 // Auto-reconcile using bank rules + amount matching with journal entries.
@@ -31,130 +39,170 @@ export const POST = apiHandler(async (request: NextRequest) => {
     return NextResponse.json({ error: 'Bank account not found' }, { status: 404 });
   }
 
+  // Load entity-first context for SOCIO conflict detection
+  const efCtx = await loadEntityFirstContext(companyId);
+
   // Get active rules sorted by priority
   const rules = await db.bankRule.findMany({
     where: { companyId, isActive: true },
     orderBy: { priority: 'asc' },
   });
 
-  // Get unreconciled transactions
-  const statements = await db.bankStatement.findMany({
-    where: { bankAccountId },
-    select: { id: true },
-  });
-  const statementIds = statements.map((s) => s.id);
-
-  const unreconciledTransactions = await db.bankTransaction.findMany({
-    where: {
-      statementId: { in: statementIds },
-      isReconciled: false,
-    },
-  });
-
-  if (unreconciledTransactions.length === 0) {
-    return NextResponse.json({
-      success: true,
-      matched: 0,
-      matchedByRule: 0,
-      matchedByAmount: 0,
-      journalEntriesCreated: 0,
-      message: 'No unreconciled transactions found.',
+  const result = await db.$transaction(async (tx) => {
+    // Get unreconciled transactions
+    const statements = await tx.bankStatement.findMany({
+      where: { bankAccountId },
+      select: { id: true },
     });
-  }
+    const statementIds = statements.map((s) => s.id);
 
-  // ── Step 1: Match by rules ──
-  const matchedTxIds = new Set<string>();
-  const matchMap = new Map<string, { ruleId: string; ruleName: string; glAccountId: string }>();
-
-  for (const rule of rules) {
-    for (const tx of unreconciledTransactions) {
-      if (matchedTxIds.has(tx.id)) continue;
-      if (transactionMatchesRule(tx, rule)) {
-        matchedTxIds.add(tx.id);
-        matchMap.set(tx.id, {
-          ruleId: rule.id,
-          ruleName: rule.name,
-          glAccountId: rule.glAccountId || '',
-        });
-      }
-    }
-  }
-
-  let matchedByRule = matchedTxIds.size;
-  let matchedByAmount = 0;
-
-  // ── Step 2: Match by amount with journal entries ──
-  if (matchByAmount && unreconciledTransactions.length > matchedTxIds.size) {
-    // Get posted journal lines for the bank GL account
-    const journalLines = await db.journalLine.findMany({
+    const unreconciledTransactions = await tx.bankTransaction.findMany({
       where: {
-        glAccountId: bankAccount.glAccountId,
-        entry: { companyId, status: 'posted' },
+        statementId: { in: statementIds },
+        isReconciled: false,
       },
-      include: {
-        entry: {
-          select: { id: true, date: true, description: true, reference: true, lines: true },
-        },
-      },
-      orderBy: { entry: { date: 'asc' } },
     });
 
-    // Build a map of journal entry amounts (net per entry on bank account)
-    const journalEntryMap = new Map<
-      string,
-      { amount: number; date: string; description: string; counterGlAccountId: string }
-    >();
+    if (unreconciledTransactions.length === 0) {
+      return {
+        matched: 0,
+        matchedByRule: 0,
+        matchedByAmount: 0,
+        journalEntriesCreated: 0,
+        total: 0,
+        message: 'No unreconciled transactions found.',
+      };
+    }
 
-    for (const jl of journalLines) {
-      const existing = journalEntryMap.get(jl.entryId);
-      const net = jl.debit - jl.credit;
-      if (existing) {
-        existing.amount += net;
-      } else {
-        // Find the counter GL account
-        const counterLine = jl.entry.lines.find((l) => l.glAccountId !== bankAccount.glAccountId);
-        journalEntryMap.set(jl.entryId, {
-          amount: net,
-          date: jl.entry.date.toISOString().split('T')[0],
-          description: jl.entry.description,
-          counterGlAccountId: counterLine?.glAccountId || '',
+    // ── Step 1: Match by rules ──
+    const matchedTxIds = new Set<string>();
+    const matchMap = new Map<string, { ruleId: string; ruleName: string; glAccountId: string }>();
+
+    const rolePriorities = loadRolePriorities();
+    const entityContexts = await db.entityContext.findMany({
+      where: { companyId },
+      select: { pattern: true, role: true },
+    });
+
+    for (const t of unreconciledTransactions) {
+      if (matchedTxIds.has(t.id)) continue;
+
+      const matchingRules = rules.filter((rule) =>
+        transactionMatchesRule(
+          t as Transaction,
+          rule as Rule,
+          efCtx.knownSocioPatterns,
+          efCtx.entityFirstMode,
+        ),
+      ) as MatchingRule[];
+
+      if (matchingRules.length > 0) {
+        const winner = evaluateWinningRule(
+          matchingRules,
+          t as Transaction,
+          companyId,
+          rolePriorities,
+          entityContexts,
+        );
+        matchedTxIds.add(t.id);
+        matchMap.set(t.id, {
+          ruleId: winner.id,
+          ruleName: winner.name,
+          glAccountId: winner.glAccountId || '',
         });
       }
     }
 
-    // Match remaining transactions by amount
-    for (const tx of unreconciledTransactions) {
-      if (matchedTxIds.has(tx.id)) continue;
+    const matchedByRule = matchedTxIds.size;
+    let matchedByAmount = 0;
 
-      const txDate = tx.date.toISOString().split('T')[0];
-      const txAmount = tx.amount;
+    // ── Step 2: Match by amount with journal entries ──
+    if (matchByAmount && unreconciledTransactions.length > matchedTxIds.size) {
+      // Get posted journal lines for the bank GL account
+      const journalLines = await tx.journalLine.findMany({
+        where: {
+          glAccountId: bankAccount.glAccountId,
+          entry: { companyId, status: 'posted' },
+        },
+        include: {
+          entry: {
+            select: { id: true, date: true, description: true, reference: true, lines: true },
+          },
+        },
+        orderBy: { entry: { date: 'asc' } },
+      });
 
-      for (const [entryId, jeInfo] of journalEntryMap) {
-        if (Math.abs(jeInfo.amount - txAmount) < 0.01 && jeInfo.date === txDate) {
-          matchedTxIds.add(tx.id);
-          matchMap.set(tx.id, {
-            ruleId: '',
-            ruleName: 'Amount Match',
-            glAccountId: jeInfo.counterGlAccountId,
+      // Build a map of journal entry amounts (net per entry on bank account)
+      const journalEntryMap = new Map<
+        string,
+        { amount: number; date: string; description: string; counterGlAccountId: string }
+      >();
+
+      for (const jl of journalLines) {
+        const existing = journalEntryMap.get(jl.entryId);
+        const net = jl.debit - jl.credit;
+        if (existing) {
+          existing.amount += net;
+        } else {
+          // Find the counter GL account
+          const counterLine = jl.entry.lines.find((l) => l.glAccountId !== bankAccount.glAccountId);
+          journalEntryMap.set(jl.entryId, {
+            amount: net,
+            date: jl.entry.date.toISOString().split('T')[0],
+            description: jl.entry.description,
+            counterGlAccountId: counterLine?.glAccountId || '',
           });
-          matchedByAmount++;
-          journalEntryMap.delete(entryId); // Don't reuse this entry
-          break;
+        }
+      }
+
+      // Match remaining transactions by amount
+      for (const t of unreconciledTransactions) {
+        if (matchedTxIds.has(t.id)) continue;
+
+        const txDate = t.date.toISOString().split('T')[0];
+        const txAmount = t.amount;
+
+        for (const [entryId, jeInfo] of journalEntryMap) {
+          if (Math.abs(jeInfo.amount - txAmount) < 0.01 && jeInfo.date === txDate) {
+            matchedTxIds.add(t.id);
+            matchMap.set(t.id, {
+              ruleId: '',
+              ruleName: 'Amount Match',
+              glAccountId: jeInfo.counterGlAccountId,
+            });
+            matchedByAmount++;
+            journalEntryMap.delete(entryId); // Don't reuse this entry
+            break;
+          }
         }
       }
     }
-  }
 
-  let journalEntriesCreated = 0;
+    // Pre-validate rules: if creating journal entries, all winning rules MUST have a GL account.
+    const invalidRules = new Set<string>();
+    for (const [_, match] of matchMap) {
+      if (createJournalEntries && match.ruleId && (!match.glAccountId || !bankAccount.glAccountId)) {
+        invalidRules.add(match.ruleName);
+      }
+    }
 
-  // Process matched transactions
-  await db.$transaction(async (tx) => {
+    if (invalidRules.size > 0) {
+      const rulesList = Array.from(invalidRules).join(', ');
+      return {
+        isValidationError: true,
+        message: `Error de Integridad: Las siguientes reglas no tienen una cuenta contable asignada y no pueden generar asientos automáticos: ${rulesList}. Por favor edita las reglas o desmarca la opción de crear asientos.`,
+      };
+    }
+
+    let journalEntriesCreated = 0;
+
+    // Process matched transactions
     for (const [txId, match] of matchMap) {
       const transaction = unreconciledTransactions.find((t) => t.id === txId);
       if (!transaction) continue;
 
       // Verify that the transaction date is in an active fiscal period
-      await assertActiveFiscalPeriod(companyId, transaction.date);
+      await assertActiveFiscalPeriod(companyId, transaction.date, tx);
 
       const updateData: Record<string, unknown> = {
         glAccountId: match.glAccountId,
@@ -178,8 +226,7 @@ export const POST = apiHandler(async (request: NextRequest) => {
       if (createJournalEntries && match.ruleId) {
         const amount = Math.abs(transaction.amount);
         const debitAccountId = transaction.amount > 0 ? bankAccount.glAccountId : match.glAccountId;
-        const creditAccountId =
-          transaction.amount > 0 ? match.glAccountId : bankAccount.glAccountId;
+        const creditAccountId = transaction.amount > 0 ? match.glAccountId : bankAccount.glAccountId;
 
         const description = `Auto-reconcile: ${transaction.description} (Rule: ${match.ruleName})`;
 
@@ -207,11 +254,34 @@ export const POST = apiHandler(async (request: NextRequest) => {
         where: { reconciliationPeriodId: periodId },
       });
       await tx.reconciliationPeriod.update({
-        where: { id: periodId },
+        where: { id: periodId, companyId },
         data: { transactionCount: periodTxCount },
       });
     }
+
+    return {
+      matched: matchedTxIds.size,
+      matchedByRule,
+      matchedByAmount,
+      journalEntriesCreated,
+      total: unreconciledTransactions.length,
+    };
   });
+
+  if ('isValidationError' in result && result.isValidationError) {
+    return NextResponse.json({ error: result.message }, { status: 400 });
+  }
+
+  if ('message' in result) {
+    return NextResponse.json({
+      success: true,
+      matched: 0,
+      matchedByRule: 0,
+      matchedByAmount: 0,
+      journalEntriesCreated: 0,
+      message: result.message,
+    });
+  }
 
   // Audit log
   await db.auditLog.create({
@@ -222,10 +292,10 @@ export const POST = apiHandler(async (request: NextRequest) => {
       entity: 'BankTransaction',
       details: JSON.stringify({
         bankAccountId,
-        matchedByRule,
-        matchedByAmount,
-        totalMatched: matchedTxIds.size,
-        journalEntriesCreated,
+        matchedByRule: result.matchedByRule,
+        matchedByAmount: result.matchedByAmount,
+        totalMatched: result.matched,
+        journalEntriesCreated: result.journalEntriesCreated,
         periodId,
       }),
     },
@@ -233,10 +303,10 @@ export const POST = apiHandler(async (request: NextRequest) => {
 
   return NextResponse.json({
     success: true,
-    matched: matchedTxIds.size,
-    total: unreconciledTransactions.length,
-    matchedByRule,
-    matchedByAmount,
-    journalEntriesCreated,
+    matched: result.matched,
+    total: result.total,
+    matchedByRule: result.matchedByRule,
+    matchedByAmount: result.matchedByAmount,
+    journalEntriesCreated: result.journalEntriesCreated,
   });
 });

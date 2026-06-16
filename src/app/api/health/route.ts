@@ -11,7 +11,7 @@ export async function GET() {
     await db.$queryRaw`SELECT 1`;
 
     // 2. Cargar versión de configuración de seguridad
-    const config = await readJsonConfig<any>('security-config.json');
+    const config = await readJsonConfig<{ version?: string }>('security-config.json');
 
     // 3. Métricas operativas (no sensibles)
     const [lastBackup, audit24h, lockedPeriods] = await Promise.all([

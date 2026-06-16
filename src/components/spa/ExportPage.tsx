@@ -175,7 +175,7 @@ export function ExportPage() {
     setStartDates(sd);
     setEndDates(ed);
     setAsOfDates(aod);
-  }, []);
+  }, []); // eslint-disable-line -- thirtyDaysAgo and today are stable date strings computed once
 
   // Fetch bank accounts for reconciliation export
   useEffect(() => {

@@ -30,7 +30,7 @@ export function BudgetVarianceReport({
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {data?.data.map((row: any) => (
+          {data?.data.map((row: { accountCode: string; accountName: string; budget: number; actual: number; variance: number; variancePercent: number; status: string }) => (
             <div
               key={row.accountCode}
               className="flex items-center justify-between p-3 rounded border bg-card hover:bg-muted/50"

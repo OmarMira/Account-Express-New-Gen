@@ -440,8 +440,8 @@ export function FinancialDashboardPage() {
           const cleanCounts = new Map<string, number>();
           const rawDescriptions = new Map<string, string>();
 
-          data.transactions.forEach((tx: any) => {
-            const rawDesc = tx.description || '';
+          data.transactions.forEach((tx: Transaction) => {
+            const rawDesc = tx.descripcion || '';
             let clean = rawDesc.toUpperCase();
             clean = clean.replace(/\b\d{3,}\b/g, ''); // eliminar números de 3+ dígitos
             clean = clean.replace(/[^A-ZÁÉÍÓÚÑ\s]/g, ' ');
@@ -471,7 +471,7 @@ export function FinancialDashboardPage() {
           setRecurrentMap(localRecurrent);
 
           // 2. Clasificar las transacciones con las descripciones recurrentes identificadas
-          const parsed = data.transactions.map((tx: any) => ({
+          const parsed = data.transactions.map((tx: Transaction) => ({
             ...tx,
             categoria: classifyTransaction(tx),
           }));
@@ -480,7 +480,7 @@ export function FinancialDashboardPage() {
 
           const incCats = new Set<string>();
           const expCats = new Set<string>();
-          parsed.forEach((tx: any) => {
+          parsed.forEach((tx: Transaction) => {
             if (tx.tipo === 'credito') {
               incCats.add(tx.categoria || 'Sin asignar');
             } else {
@@ -493,7 +493,7 @@ export function FinancialDashboardPage() {
           setSelectedIncomeCategories(incCats);
           setSelectedExpenseCategories(expCats);
 
-          const dates = parsed.map((tx: any) => tx.fecha).sort();
+          const dates = parsed.map((tx: Transaction) => tx.fecha).sort();
           setFilterStartDate(dates[0]);
           setFilterEndDate(dates[dates.length - 1]);
         } else {
@@ -508,7 +508,7 @@ export function FinancialDashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [activeCompany]);
+  }, [activeCompany, classifyTransaction]);
 
   useEffect(() => {
     loadData();
@@ -879,7 +879,7 @@ export function FinancialDashboardPage() {
   }, [monthlyAggregatedData, topIncomeCategory]);
 
   // Recharts tooltip formatter helper
-  const fmtTooltip = (value: any) => formatCurrency(Number(value));
+  const fmtTooltip = (value: string | number) => formatCurrency(Number(value));
 
   // --- AUTOMATED CONCLUSIONS & ALERTS GENERATOR (Grouped) ---
   const categorizedConclusions = useMemo(() => {
@@ -1423,7 +1423,7 @@ export function FinancialDashboardPage() {
                 </label>
                 <select
                   value={filterReconciliation}
-                  onChange={(e: any) => setFilterReconciliation(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFilterReconciliation(e.target.value as 'all' | 'reconciled' | 'unreconciled')}
                   className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:border-teal-500 font-medium"
                 >
                   <option value="all">{dt.allTransactions}</option>
@@ -1784,7 +1784,7 @@ export function FinancialDashboardPage() {
                 tickFormatter={(v) => `$${v / 1000}k`}
               />
               <Tooltip
-                formatter={(value: any) => formatCurrency(value)}
+                formatter={(value: string | number) => formatCurrency(Number(value))}
                 contentStyle={{
                   backgroundColor: '#0f172a',
                   border: 'none',
@@ -1844,7 +1844,7 @@ export function FinancialDashboardPage() {
                 tickFormatter={(v) => `$${v / 1000}k`}
               />
               <Tooltip
-                formatter={(value: any) => formatCurrency(value)}
+                formatter={(value: string | number) => formatCurrency(Number(value))}
                 contentStyle={{
                   backgroundColor: '#0f172a',
                   border: 'none',
@@ -1859,7 +1859,7 @@ export function FinancialDashboardPage() {
                 strokeWidth={2.5}
                 fill="url(#areaBal)"
                 name={dt.cierreLabel}
-                dot={(props: any) => {
+                dot={(props: { cx?: number; cy?: number; payload: { monthKey: string; month: string; net: number } }) => {
                   const { cx, cy, payload } = props;
                   if (payload.monthKey === minCierreMonth) {
                     return (
@@ -1901,7 +1901,7 @@ export function FinancialDashboardPage() {
                       <Cell key={`cell-${idx}`} fill={entry.color} />
                     ))}
                 </Pie>
-                <Tooltip formatter={(value: any) => formatCurrency(value)} />
+                <Tooltip formatter={(value: string | number) => formatCurrency(Number(value))} />
               </PieChart>
             </ResponsiveContainer>
             <div className="flex-1 grid grid-cols-2 gap-x-4 gap-y-2">
@@ -1947,7 +1947,7 @@ export function FinancialDashboardPage() {
                       <Cell key={`cell-${idx}`} fill={entry.color} />
                     ))}
                 </Pie>
-                <Tooltip formatter={(value: any) => formatCurrency(value)} />
+                <Tooltip formatter={(value: string | number) => formatCurrency(Number(value))} />
               </PieChart>
             </ResponsiveContainer>
             <div className="flex-1 grid grid-cols-2 gap-x-4 gap-y-2">
@@ -2000,7 +2000,7 @@ export function FinancialDashboardPage() {
                 tickFormatter={(v) => `$${v / 1000}k`}
               />
               <Tooltip
-                formatter={(value: any) => formatCurrency(value)}
+                formatter={(value: string | number) => formatCurrency(Number(value))}
                 contentStyle={{
                   backgroundColor: '#0f172a',
                   border: 'none',
@@ -2056,7 +2056,7 @@ export function FinancialDashboardPage() {
                 tickLine={false}
                 tickFormatter={(v) => `$${v / 1000}k`}
               />
-              <Tooltip formatter={(value: any) => formatCurrency(value)} />
+              <Tooltip formatter={(value: string | number) => formatCurrency(Number(value))} />
               <Bar
                 dataKey="Monto"
                 fill={PALETTE.morado}
@@ -2100,7 +2100,7 @@ export function FinancialDashboardPage() {
                 tickLine={false}
                 tickFormatter={(v) => `$${v / 1000}k`}
               />
-              <Tooltip formatter={(value: any) => formatCurrency(value)} />
+              <Tooltip formatter={(value: string | number) => formatCurrency(Number(value))} />
               <Legend verticalAlign="top" height={36} iconType="circle" />
               {top3ExpenseCategories.map((cat, idx) => {
                 const colors = [PALETTE.azul, PALETTE.rojo, PALETTE.ambar];
@@ -2154,7 +2154,7 @@ export function FinancialDashboardPage() {
                 tickLine={false}
                 tickFormatter={(v) => `$${v / 1000}k`}
               />
-              <Tooltip formatter={(value: any) => formatCurrency(value)} />
+              <Tooltip formatter={(value: string | number) => formatCurrency(Number(value))} />
               <Legend verticalAlign="top" height={36} iconType="circle" />
               {top3IncomeCategories.map((cat, idx) => {
                 const colors = [PALETTE.verde, PALETTE.azul, PALETTE.morado];
@@ -2215,7 +2215,7 @@ export function FinancialDashboardPage() {
                 tickLine={false}
                 tickFormatter={(v) => `$${v / 1000}k`}
               />
-              <Tooltip formatter={(value: any) => formatCurrency(value)} />
+              <Tooltip formatter={(value: string | number) => formatCurrency(Number(value))} />
               <ReferenceLine
                 y={15000}
                 stroke={PALETTE.rojo}
@@ -2279,7 +2279,7 @@ export function FinancialDashboardPage() {
                 tickLine={false}
                 tickFormatter={(v) => `$${v / 1000}k`}
               />
-              <Tooltip formatter={(value: any) => formatCurrency(value)} />
+              <Tooltip formatter={(value: string | number) => formatCurrency(Number(value))} />
               <Legend verticalAlign="top" height={36} iconType="circle" />
               <Bar
                 dataKey="Rentas"
@@ -2568,7 +2568,7 @@ function PremiumCard({
 }: PremiumCardProps) {
   const isPositive = isUp;
 
-  const themes: any = {
+  const themes: Record<string, string> = {
     teal: 'bg-teal-500/10 border-teal-500/20 text-teal-600 dark:text-teal-400',
     rose: 'bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400',
     emerald: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400',

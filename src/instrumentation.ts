@@ -24,7 +24,7 @@ export async function register() {
 
     // POLYFILL: Debe ejecutarse ANTES de que cualquier módulo importe pdfjs-dist
     if (typeof globalThis.DOMMatrix === 'undefined') {
-      (globalThis as any).DOMMatrix = class DOMMatrix {
+      (globalThis as unknown as { DOMMatrix: unknown }).DOMMatrix = class DOMMatrix {
         constructor() {}
         toString() {
           return 'matrix(1,0,0,1,0,0)';

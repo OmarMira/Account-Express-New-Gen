@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const conditionSchema = z.object({
-  field: z.enum(['description', 'amount', 'reference']),
+  field: z.enum(['description', 'amount']),
   operator: z.enum([
     'contains',
     'equals',

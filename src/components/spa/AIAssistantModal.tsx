@@ -197,7 +197,7 @@ export function AIAssistantModal() {
       const accounts = data.accounts ?? [];
 
       // Find cash & cash equivalents (parent account "1010")
-      const parentAcc = accounts.find((a: any) => a.code === '1010');
+      const parentAcc = accounts.find((a: { code: string; id: string }) => a.code === '1010');
       if (!parentAcc) {
         throw new Error('No se encontró la cuenta base "1010 - Cash & Cash Equivalents"');
       }
@@ -205,10 +205,10 @@ export function AIAssistantModal() {
 
       // Find sub-accounts of 1010 or starting with 101
       const subAccounts = accounts.filter(
-        (a: any) => a.parentId === parentAcc.id || (a.code.startsWith('101') && a.code !== '1010'),
+        (a: { parentId: string; code: string }) => a.parentId === parentAcc.id || (a.code.startsWith('101') && a.code !== '1010'),
       );
       let nextCode = 1011;
-      const codes = subAccounts.map((a: any) => parseInt(a.code, 10)).filter((c: any) => !isNaN(c));
+      const codes = subAccounts.map((a: { code: string }) => parseInt(a.code, 10)).filter((c: number) => !isNaN(c));
       if (codes.length > 0) {
         nextCode = Math.max(...codes) + 1;
       }
@@ -1086,9 +1086,9 @@ function RuleView({
                         </Label>
                         <Select
                           value={c.operator}
-                          onValueChange={(val: any) => {
+                          onValueChange={(val: string) => {
                             const updated = [...parsedRule.conditions];
-                            updated[i] = { ...updated[i], operator: val };
+                            updated[i] = { ...updated[i], operator: val as ConditionV2['operator'] };
                             setParsedRule({ ...parsedRule, conditions: updated });
                           }}
                         >

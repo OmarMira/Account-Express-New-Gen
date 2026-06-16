@@ -65,7 +65,12 @@ export function validateMagicBytes(ext: string, buffer: Buffer): void {
   }
 }
 
+const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
+
 export function validateFile(file: File, buffer: Buffer): string {
+  if (file.size > MAX_FILE_SIZE || buffer.length > MAX_FILE_SIZE) {
+    throw new ValidationError(`El archivo excede el tamaño máximo permitido de 20MB.`);
+  }
   const ext = validateFileExtension(file.name);
   validateFileMimeType(ext, file.type);
   validateMagicBytes(ext, buffer);
