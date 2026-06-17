@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { apiHandler, type RouteContext } from '@/lib/api-handler';
 import { requireCompanyContext } from '@/lib/context-storage';
+import { serverT } from '@/lib/server-i18n';
 
 import {
   transactionMatchesRule,
@@ -39,6 +40,16 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
     });
   }
 
+  // Get locale for i18n
+  const locale = request.headers.get('x-locale') || 'es';
+
+  // Read company's maxApplyTransactions cap
+  const company = await db.company.findUnique({
+    where: { id: companyId },
+    select: { maxApplyTransactions: true },
+  });
+  const maxApplyCap = company?.maxApplyTransactions ?? null;
+
   // Get all unmatched transactions for this company
   const companyStatements = await db.bankStatement.findMany({
     where: { companyId },
@@ -54,16 +65,30 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
     },
   });
 
-  const MAX_UNMATCHED = 5000;
   const totalUnmatched = unmatchedTransactions.length;
-  if (unmatchedTransactions.length > MAX_UNMATCHED) {
-    unmatchedTransactions.length = MAX_UNMATCHED;
+  let warning: string | undefined;
+
+  if (maxApplyCap !== null) {
+    // Company-configured cap
+    if (unmatchedTransactions.length > maxApplyCap) {
+      unmatchedTransactions.length = maxApplyCap;
+      warning = serverT(locale, 'bankRules.applyAllCapWarning')
+        .replace('{applied}', String(maxApplyCap))
+        .replace('{total}', String(totalUnmatched))
+        .replace('{remaining}', String(totalUnmatched - maxApplyCap));
+    }
+  } else {
+    // Null cap = unlimited; keep 5000 hard safety net without warning
+    const MAX_SAFETY = 5000;
+    if (unmatchedTransactions.length > MAX_SAFETY) {
+      unmatchedTransactions.length = MAX_SAFETY;
+    }
   }
 
   let totalMatched = 0;
   const winnerMap = new Map<string, { ruleId: string; ruleName: string; txIds: string[] }>();
 
-  const rolePriorities = loadRolePriorities();
+  const rolePriorities = await loadRolePriorities();
   const entityContexts = await db.entityContext.findMany({
     where: { companyId },
     select: { pattern: true, role: true },
@@ -133,10 +158,13 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
     count: entry.txIds.length,
   }));
 
-  return NextResponse.json({
+  const response: Record<string, unknown> = {
     success: true,
     matched: totalMatched,
     total: totalUnmatched,
     rulesApplied: matchResults,
-  });
+  };
+  if (warning) response.warning = warning;
+
+  return NextResponse.json(response);
 });

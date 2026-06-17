@@ -56,6 +56,10 @@ describe('Direction Profiles Integration Exception Flag', () => {
       glAccountId: null,
       suggestSubAccount: false,
       subAccountName: null,
+      confidence: 0.95,
+      confidenceLabel: 'high',
+      explanation: 'Contexto previo para SOCIO',
+      uncertaintyReasons: [],
       account: {
         code: '3010',
         name: 'Capital Social / Aportes de Socios',
@@ -97,6 +101,10 @@ describe('Direction Profiles Integration Exception Flag', () => {
       glAccountId: null,
       suggestSubAccount: false,
       subAccountName: null,
+      confidence: 0.85,
+      confidenceLabel: 'high',
+      explanation: 'Clasificación por heurístico',
+      uncertaintyReasons: [],
       account: {
         code: '2010',
         name: 'Cuentas por Pagar',

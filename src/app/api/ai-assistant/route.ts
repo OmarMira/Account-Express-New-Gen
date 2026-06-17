@@ -71,6 +71,8 @@ const ParsedRuleV2Schema = z.object({
   glAccountName: z.string().optional().nullable(),
   transactionDirection: z.enum(['any', 'debit', 'credit']).default('any'),
   priority: z.coerce.number().int().min(0).max(20).default(10),
+  confidence: z.coerce.number().min(0).max(1).optional(),
+  confidenceLabel: z.enum(['high', 'medium', 'low']).optional(),
 });
 
 // ─── TOOLS definition ───────────────────────────────────────────────
@@ -167,10 +169,23 @@ const TOOLS = [
     function: {
       name: 'get_transaction_stats',
       description:
-        'Calcula estadísticas acumuladas de las transacciones (total count, sumas, mínimos, máximos y promedios) para responder preguntas sobre totales generales.',
+        'Calcula estadísticas acumuladas de las transacciones (total count, sumas, mínimos, máximos y promedios) para responder preguntas sobre totales generales. Puedes filtrar por descripción (ej. nombre de socio).',
       parameters: {
         type: 'object',
-        properties: {},
+        properties: {
+          description: {
+            type: 'string',
+            description: 'Texto a buscar en la descripción de las transacciones.',
+          },
+          startDate: {
+            type: 'string',
+            description: 'Fecha de inicio en formato ISO (YYYY-MM-DD).',
+          },
+          endDate: {
+            type: 'string',
+            description: 'Fecha de fin en formato ISO (YYYY-MM-DD).',
+          },
+        },
       },
     },
   },
@@ -445,14 +460,30 @@ async function executeTool(
       }
 
       case 'get_transaction_stats': {
-        const totalCount = await db.bankTransaction.count({ where: { statement: { companyId } } });
+        const description = args.description as string | undefined;
+        const startDate = args.startDate as string | undefined;
+        const endDate = args.endDate as string | undefined;
+        
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const where: any = { statement: { companyId } };
+
+        if (description) {
+          where.description = { contains: description };
+        }
+        if (startDate || endDate) {
+          where.date = {};
+          if (startDate) where.date.gte = new Date(startDate);
+          if (endDate) where.date.lte = new Date(endDate);
+        }
+
+        const totalCount = await db.bankTransaction.count({ where });
         const reconciledCount = await db.bankTransaction.count({
-          where: { statement: { companyId }, isReconciled: true },
+          where: { ...where, isReconciled: true },
         });
         const unreconciledCount = totalCount - reconciledCount;
 
         const aggregations = await db.bankTransaction.aggregate({
-          where: { statement: { companyId } },
+          where,
           _sum: {
             amount: true,
           },
@@ -1044,12 +1075,22 @@ YOUR CAPABILITIES:
 - Explain accounting concepts in simple terms
 - Answer real-time specific questions about the company's accounts, rules, bank transactions, entities (partners/socios, clients, vendors), journal entries, fiscal periods, reconciliation periods, bank statements, users, and audit logs using the available tools.
 
-ASSISTANT ACTIONS:
+ASSISTANT ACTIONS & DEEP LINKING:
 - Cuando sugieras crear una cuenta de banco específica en el Plan de Cuentas (por ejemplo, como subcuenta de Cash & Cash Equivalents 1010), al final de tu respuesta de sugerencia debes agregar de manera exacta e invariable la etiqueta: [Te ayudo a crearla](action:create-account)
 - No agregues explicaciones adicionales después de esa etiqueta.
+- Cuando menciones una cuenta contable específica o sus saldos/gastos, incluye un enlace markdown directo usando su código exacto. Ejemplo: [Cuenta 3040-01](/accounts?code=3040-01) o [Ver detalles de la cuenta](/accounts?code=3040).
+- Obtén el código correcto de la cuenta consultando tus herramientas ('get_gl_accounts', 'get_entity_contexts', etc.), NUNCA lo inventes.
+- Cuando expliques cómo realizar un proceso en el sistema, incluye un enlace directo a la pantalla correspondiente. Ejemplos: 
+  - Crear o administrar usuarios -> [Ir a Usuarios](/admin/users)
+  - Cargar transacciones/importar -> [Ir a Importación](/import)
+  - Reglas bancarias -> [Ir a Reglas](/bank-rules)
+  - Conciliación -> [Ir a Conciliación](/reconciliation)
+  - Plan de cuentas -> [Ir a Plan de Cuentas](/accounts)
+- Cuando el cálculo sea extenso o dependa de ver muchas transacciones individuales, provee el monto total y sugiere al usuario ver el detalle en la pantalla con el enlace correspondiente.
 
 DATABASE ACCESS GUIDELINES:
 - When the user asks about system-specific counts, balances, rules, accounts, transactions, entities, journal entries, fiscal/reconciliation periods, statements, users, or audit logs, ALWAYS call the appropriate tool.
+- IMPORTANT: DO NOT say "I will query the database now" or "Voy a solicitar los datos al motor" and stop. If you need data, CALL the tool IMMEDIATELY in the same response. Do not ask for permission to use tools. Do not output text describing your future tool calls. Just call them directly.
 - Do NOT guess or hallucinate any numbers or data; use the tools to get exact and true information.
 - Format all numeric values (currency balances, transaction counts) clearly and beautifully (e.g. $1,250.00).
 - If no companyId or active company is linked, explain that you need a selected company to view details.
@@ -1273,6 +1314,7 @@ EXAMPLE OF COMPLETED BIFURCATED RULE RESPONSE:
         reply = clarificationQuestion || '⚠️ Necesito más detalles para poder crear la regla.';
       }
     } else {
+      isComplete = false;
       logger.warn('Zod validation failed for parsed rule', { zodError: ruleResult.error });
       // If we extracted a clarification question before Zod failed, use it
       if (clarificationQuestion) {
@@ -1292,10 +1334,18 @@ EXAMPLE OF COMPLETED BIFURCATED RULE RESPONSE:
     }
   }
 
+  const ruleWithConfidence = parsedRule
+    ? {
+        ...parsedRule,
+        confidence: parsedRule.confidence ?? 0.85,
+        confidenceLabel: parsedRule.confidenceLabel ?? 'high',
+      }
+    : undefined;
+
   return NextResponse.json({
     reply,
     isComplete,
     rawJson: rawReply,
-    ...(parsedRule ? { parsedRule } : {}),
+    ...(ruleWithConfidence ? { parsedRule: ruleWithConfidence } : {}),
   });
 }

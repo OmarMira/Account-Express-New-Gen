@@ -110,6 +110,8 @@ export interface ParsedRuleFromAI {
   glAccountName?: string | null;
   transactionDirection?: string;
   priority?: number;
+  confidence?: number;
+  confidenceLabel?: string;
 }
 
 // ─── Dynamic Prisma where input types ────────────────────────────────

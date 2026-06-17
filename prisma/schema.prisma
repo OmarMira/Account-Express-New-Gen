@@ -47,6 +47,7 @@ model Company {
   isActive              Boolean                @default(true)
   isOnboardingComplete  Boolean                @default(false)
   entityFirstMode       Boolean                @default(false)
+  maxApplyTransactions  Int?
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
   auditLogs             AuditLog[]

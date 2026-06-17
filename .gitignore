@@ -41,3 +41,10 @@ next-env.d.ts
 /prisma/test.db
 /prisma/dev.db-shm
 /prisma/dev.db-wal
+# Local Pi runtime state
+.atl/
+# Agent/IDE artifacts
+.openclaw/
+.pi/
+.windsurf/
+scratch/

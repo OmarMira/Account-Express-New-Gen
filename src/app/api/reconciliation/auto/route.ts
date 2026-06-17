@@ -78,7 +78,7 @@ export const POST = apiHandler(async (request: NextRequest) => {
     const matchedTxIds = new Set<string>();
     const matchMap = new Map<string, { ruleId: string; ruleName: string; glAccountId: string }>();
 
-    const rolePriorities = loadRolePriorities();
+    const rolePriorities = await loadRolePriorities();
     const entityContexts = await db.entityContext.findMany({
       where: { companyId },
       select: { pattern: true, role: true },

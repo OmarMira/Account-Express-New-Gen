@@ -56,6 +56,11 @@ interface ParsedRule {
   // Legacy V1 fields (kept for backwards compat)
   conditionType?: string;
   conditionValue?: string;
+  // Confidence/reasoning fields (from PR 2)
+  confidence?: number;
+  confidenceLabel?: 'high' | 'medium' | 'low';
+  explanation?: string;
+  uncertaintyReasons?: string[];
 }
 
 interface HistoryEntry {
@@ -706,6 +711,52 @@ function ChatView({
   handleSaveWizardAccount: () => Promise<void>;
 }) {
   const hasMessages = messages.length > 0;
+  const setCurrentView = useAuthStore((s) => s.setCurrentView);
+  const setAiAssistantOpen = useAuthStore((s) => s.setAiAssistantOpen);
+
+  function parseMessageContent(text: string) {
+    let parsed = text.replace('[Te ayudo a crearla](action:create-account)', '').trim();
+    const parts = [];
+    const regex = /\[([^\]]+)\]\(([^)]+)\)/g;
+    let lastIndex = 0;
+    let match;
+    while ((match = regex.exec(parsed)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push(parsed.substring(lastIndex, match.index));
+      }
+      const label = match[1];
+      const url = match[2];
+      
+      if (url.startsWith('/')) {
+          let viewPath = url.split('?')[0].replace('/', '');
+          if (viewPath === 'bank-transactions') viewPath = 'reconciliation';
+          if (viewPath === 'transactions') viewPath = 'reconciliation';
+          
+          parts.push(
+            <a key={match.index} onClick={(e) => { 
+                e.preventDefault(); 
+                window.history.pushState({}, '', url); 
+                setCurrentView(viewPath as any); 
+                setAiAssistantOpen(false); 
+              }} 
+              className="underline text-blue-300 hover:text-blue-100 font-medium transition-colors cursor-pointer">
+              {label}
+            </a>
+          );
+      } else {
+          parts.push(
+            <a href={url} key={match.index} className="underline text-blue-300 hover:text-blue-100 font-medium transition-colors cursor-pointer" target="_blank" rel="noopener noreferrer">
+              {label}
+            </a>
+          );
+      }
+      lastIndex = regex.lastIndex;
+    }
+    if (lastIndex < parsed.length) {
+      parts.push(parsed.substring(lastIndex));
+    }
+    return parts.length > 0 ? parts : parsed;
+  }
 
   return (
     <>
@@ -739,9 +790,7 @@ function ChatView({
                           : 'bg-white/10 text-slate-200 rounded-bl-md',
                       )}
                     >
-                      {msg.content
-                        .replace('[Te ayudo a crearla](action:create-account)', '')
-                        .trim()}
+                      {parseMessageContent(msg.content)}
                     </div>
                     {msg.role === 'assistant' && msg.content.includes('action:create-account') && (
                       <Button
@@ -1031,9 +1080,27 @@ function RuleView({
                     <Sparkles className="size-4" />
                     {t('aiAssistant.parsedRule')}
                   </h4>
-                  <Badge className="bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border-emerald-500/30">
-                    Listo
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    {parsedRule.confidence !== undefined && (
+                      <Badge
+                        variant={
+                          parsedRule.confidence >= 0.8 ? 'default' :
+                          parsedRule.confidence >= 0.5 ? 'secondary' :
+                          'destructive'
+                        }
+                        className="text-[10px]"
+                      >
+                        {parsedRule.confidence >= 0.8
+                          ? t('ruleBuilder.highConfidence')
+                          : parsedRule.confidence >= 0.5
+                            ? t('ruleBuilder.mediumConfidence')
+                            : t('ruleBuilder.lowConfidence')}
+                      </Badge>
+                    )}
+                    <Badge className="bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border-emerald-500/30">
+                      Listo
+                    </Badge>
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3 p-4">
                   {/* Name */}
@@ -1249,6 +1316,33 @@ function RuleView({
                     />
                   </div>
                 </div>
+
+                {parsedRule.explanation && (
+                  <div className="border-t border-white/10 px-4 py-3">
+                    <div className={`rounded-lg p-3 border ${
+                      (parsedRule.confidence ?? 0.85) >= 0.8
+                        ? 'bg-green-500/5 border-green-500/20'
+                        : (parsedRule.confidence ?? 0.85) >= 0.5
+                          ? 'bg-amber-500/5 border-amber-500/20'
+                          : 'bg-red-500/5 border-red-500/20'
+                    }`}>
+                      <p className="text-xs text-slate-300 leading-relaxed">
+                        {parsedRule.explanation}
+                      </p>
+                      {parsedRule.uncertaintyReasons && parsedRule.uncertaintyReasons.length > 0 && (
+                        <ul className="mt-2 space-y-1">
+                          {parsedRule.uncertaintyReasons.map((reason, idx) => (
+                            <li key={idx} className="text-xs text-slate-400 flex items-start gap-1">
+                              <span className="text-red-400 mt-0.5">•</span>
+                              {reason}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 <div className="border-t border-white/10 px-4 py-3">
                   <Button
                     onClick={handleSaveRule}

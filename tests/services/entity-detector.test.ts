@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { clusterCandidates, extractName, loadConfig } from '@/lib/services/entity-detector';
+import type { ClusterOptions } from '@/lib/services/entity-detector';
 
 describe('Entity Extraction & Clustering', () => {
   it('debe extraer y agrupar más de 3 entidades sin truncar o limitar a 3', () => {
@@ -110,5 +111,137 @@ describe('extractName — Priority 3 (INDN ACH) only fires as fallback', () => {
 
     expect(result).not.toBeNull();
     expect(result!.toUpperCase()).not.toContain('OMAR MIRA');
+  });
+});
+
+// ─── Escenario 4: Exact mode en clusterCandidates ──
+describe('clusterCandidates — exact mode', () => {
+  const baseTxs = [
+    { description: 'Zelle from ACME CORP', amount: 100, date: '2026-06-01' },
+    { description: 'Zelle from ACME CORP', amount: 200, date: '2026-06-01' },
+    { description: 'Zelle from WAL-MART', amount: 50, date: '2026-06-01' },
+    { description: 'Zelle from WAL-MART', amount: 75, date: '2026-06-01' },
+    { description: 'Zelle from ACME CORP', amount: 150, date: '2026-06-01' },
+    { description: 'Zelle from PUBLIX', amount: 30, date: '2026-06-01' },
+  ];
+
+  it('groups same entity via normalized key equality', () => {
+    const config = loadConfig();
+    const result = clusterCandidates(baseTxs, config, { mode: 'exact' });
+
+    // ACME CORP: 3 occurrences, WAL-MART: 2, PUBLIX: 1
+    const acme = result.find(c => c.canonicalName.toUpperCase().includes('ACME'));
+    const walmart = result.find(c => c.canonicalName.toUpperCase().includes('WAL-MART'));
+    const publix = result.find(c => c.canonicalName.toUpperCase().includes('PUBLIX'));
+
+    expect(acme?.occurrences).toBe(3);
+    expect(walmart?.occurrences).toBe(2);
+    // PUBLIX has only 1 occurrence — may be filtered by config's minOccurrences
+    // so we check length but don't assert on publix directly
+    expect(result.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('groups entities ignoring whitespace and case differences', () => {
+    const config = loadConfig();
+    const txs = [
+      { description: 'Zelle from  STARBUCKS', amount: 10, date: '2026-06-01' },
+      { description: 'zelle from starbucks', amount: 15, date: '2026-06-01' },
+      { description: 'Zelle from   STARBUCKS ', amount: 20, date: '2026-06-01' },
+    ];
+    const result = clusterCandidates(txs, config, { mode: 'exact' });
+
+    expect(result).toHaveLength(1);
+    expect(result[0].occurrences).toBe(3);
+  });
+
+  it('with minOccurrences: 2 filters out single-occurrence entities', () => {
+    const config = loadConfig();
+    const result = clusterCandidates(baseTxs, config, { mode: 'exact', minOccurrences: 2 });
+
+    // Only ACME (3) and WAL-MART (2) should remain
+    expect(result.length).toBe(2);
+    result.forEach(c => {
+      expect(c.occurrences).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  it('with minLength override filters shorter extracted names', () => {
+    const config = loadConfig();
+    const txs = [
+      { description: 'Zelle from ACME CORP', amount: 100, date: '2026-06-01' },
+      { description: 'Zelle from ACME CORP', amount: 200, date: '2026-06-01' },
+      { description: 'Zelle from IKEA', amount: 50, date: '2026-06-01' },
+      { description: 'Zelle from IKEA', amount: 75, date: '2026-06-01' },
+    ];
+    // minLength: 6 — "IKEA" (4 chars) should be filtered
+    const result = clusterCandidates(txs, config, { mode: 'exact', minLength: 6 });
+
+    expect(result).toHaveLength(1);
+    expect(result[0].canonicalName.toUpperCase()).toContain('ACME');
+  });
+
+  it('extraNumberStrip: true accepts the option without error', () => {
+    const config = loadConfig();
+    const result = clusterCandidates(baseTxs, config, {
+      mode: 'exact',
+      extraNumberStrip: true,
+    });
+    expect(Array.isArray(result)).toBe(true);
+  });
+});
+
+// ─── Escenario 5: Backward compatibility ──
+describe('clusterCandidates — backward compatibility', () => {
+  const txs = [
+    { description: 'Zelle from 7-ELEVEN', amount: 50, date: '2026-05-25' },
+    { description: 'Zelle from 7-ELEVEN', amount: 50, date: '2026-05-25' },
+    { description: 'Zelle from WAL-MART', amount: 100, date: '2026-05-25' },
+    { description: 'Zelle from WAL-MART', amount: 100, date: '2026-05-25' },
+    { description: 'Zelle from O\'REILLY', amount: 150, date: '2026-05-25' },
+  ];
+
+  it('clusterCandidates(txs, config) — 2-arg call — produces fuzzy results', () => {
+    const config = loadConfig();
+    const result = clusterCandidates(txs, config);
+    // Should use fuzzy mode (Jaro-Winkler) — same as before
+    expect(result.length).toBeGreaterThanOrEqual(1);
+    expect(result.length).toBeLessThanOrEqual(3);
+    result.forEach(c => {
+      expect(c).toHaveProperty('canonicalName');
+      expect(c).toHaveProperty('occurrences');
+      expect(c).toHaveProperty('directionProfile');
+    });
+  });
+
+  it('clusterCandidates(txs, config, {}) — empty options — defaults to fuzzy', () => {
+    const config = loadConfig();
+    const result = clusterCandidates(txs, config, {});
+    // Same behavior as 2-arg call
+    expect(result.length).toBeGreaterThanOrEqual(1);
+    result.forEach(c => {
+      expect(c).toHaveProperty('canonicalName');
+      expect(c).toHaveProperty('directionProfile');
+    });
+  });
+
+  it('ClusterOptions type is exported and all fields optional', () => {
+    // Compile-time check: this line must compile
+    const opts: ClusterOptions = {};
+    expect(opts.mode).toBeUndefined();
+    
+    const exact: ClusterOptions = { mode: 'exact' };
+    expect(exact.mode).toBe('exact');
+    
+    const full: ClusterOptions = {
+      mode: 'exact',
+      minOccurrences: 3,
+      minLength: 5,
+      extraNumberStrip: true,
+      smartFrequency: true,
+      requireRole: true,
+      threshold: 0.8,
+    };
+    expect(full.mode).toBe('exact');
+    expect(full.minOccurrences).toBe(3);
   });
 });

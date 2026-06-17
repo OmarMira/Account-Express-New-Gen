@@ -1,0 +1,46 @@
+# OpenSpec Configuration — AccountExpress
+context: >
+  Next.js 16.2.9 (App Router, webpack) + TypeScript 5.9 (strict) + Prisma 6 (SQLite)
+  + Zustand 5 + Tailwind v4 + shadcn/ui. Accounting system with reconciliation,
+  bank rules, fiscal periods, journal entries, multi-tenant. Bun runtime, Vitest 4.
+  Rioplatense Spanish for chat, English for code artifacts. proxy.ts instead of
+  middleware.ts (Next.js 16 convention).
+
+strict_tdd: true
+
+testing:
+  runner: vitest
+  command: bun x vitest --reporter=verbose --no-file-parallelism
+  layers:
+    unit: true
+    integration: true
+    e2e: false
+  coverage: true
+  coverage_command: bun x vitest --coverage
+  setup:
+    - tests/setup.ts
+    - tests/components/setup.ts
+
+quality:
+  linter: eslint
+  linter_available: false
+  linter_command: ""
+  type_checker: typescript
+  type_checker_available: true
+  type_checker_command: npx tsc --noEmit
+  formatter: prettier
+  formatter_available: false
+  formatter_command: ""
+
+phases:
+  propose: true
+  spec: true
+  design: true
+  tasks: true
+  apply: true
+  verify: true
+  archive: true
+
+engram:
+  project: sistema
+  scope: project

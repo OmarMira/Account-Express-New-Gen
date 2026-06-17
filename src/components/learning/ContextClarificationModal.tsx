@@ -28,6 +28,7 @@ import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
 import entityRoles from '../../../rules/entity-roles.json';
 import { ROLE_ACCOUNT_MAP } from '@/lib/constants/role-account-map';
+import type { EntityRole } from '@/lib/constants/entity-roles';
 
 const DEFAULT_ROLES = entityRoles;
 
@@ -74,7 +75,7 @@ export function ContextClarificationModal({
           setAccounts(accs);
 
           // Pre-select GL Account based on default role mapping
-          const defaultCode = ROLE_ACCOUNT_MAP[role]?.fallback;
+          const defaultCode = ROLE_ACCOUNT_MAP[role as EntityRole]?.fallback;
           if (defaultCode) {
             const matched = accs.find((a) => a.code === defaultCode);
             if (matched) {
@@ -95,7 +96,7 @@ export function ContextClarificationModal({
   // Update selected account when role changes
   useEffect(() => {
     if (!accounts.length) return;
-    const defaultCode = ROLE_ACCOUNT_MAP[role]?.fallback;
+    const defaultCode = ROLE_ACCOUNT_MAP[role as EntityRole]?.fallback;
     if (defaultCode) {
       const matched = accounts.find((a) => a.code === defaultCode);
       if (matched) {

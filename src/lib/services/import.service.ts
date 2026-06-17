@@ -20,7 +20,12 @@ import { trackPDFParseDuration } from '@/lib/metrics';
 import { withTiming } from '@/lib/timing';
 import { generateImportHash } from '@/lib/accounting/import-hash';
 import { toStatementMonth, toDateString } from '@/lib/accounting/date-window';
-import type { ParsedTransaction, StatementBalanceInfo, RuleCondition, BankRuleWithConditions } from '@/lib/types/shared';
+import type { ParsedTransaction, StatementBalanceInfo, RuleCondition } from '@/lib/types/shared';
+import {
+  findMatchingRule,
+  type Transaction,
+  type MatchingRule,
+} from '@/lib/services/rule-matching-engine';
 
 export interface ImportResult {
   statementId: string;
@@ -422,17 +427,19 @@ export class ImportService {
       });
 
       let autoCategorizedCount = 0;
+      const transactionsToInsert = [];
 
-      const transactionsToInsert = uniqueTransactions.map((txn, idx) => {
-        const { matchedRuleId, glAccountId } = this.applyBankRule(
-          txn.description,
-          txn.amount,
-          bankRules as BankRuleWithConditions[],
+      for (let idx = 0; idx < uniqueTransactions.length; idx++) {
+        const txn = uniqueTransactions[idx];
+        const { matchedRuleId, glAccountId } = await findMatchingRule(
+          { description: txn.description, amount: txn.amount } as Transaction,
+          bankRules as unknown as MatchingRule[],
+          companyId,
         );
 
         if (matchedRuleId) autoCategorizedCount++;
 
-        return {
+        transactionsToInsert.push({
           statementId: statement.id,
           date: txn.date,
           description: txn.description,
@@ -442,8 +449,8 @@ export class ImportService {
           glAccountId: glAccountId || null,
           matchedRuleId: matchedRuleId || null,
           importHash: uniqueHashes[idx], // SHA-256 para idempotencia
-        };
-      });
+        });
+      }
 
       await tx.bankTransaction.createMany({
         data: transactionsToInsert,
@@ -460,104 +467,6 @@ export class ImportService {
       autoCategorizedCount: result.autoCategorizedCount,
       duplicatesSkipped,
     };
-  }
-
-  private static matchCondition(description: string, amount: number, cond: RuleCondition): boolean {
-    const field = (cond.field || 'description').toLowerCase();
-    const operator = cond.operator;
-    const value = String(cond.value);
-
-    if (!value) return false;
-
-    if (operator === 'amount_greater') {
-      return Math.abs(amount) > parseFloat(value);
-    }
-    if (operator === 'amount_less') {
-      return Math.abs(amount) < parseFloat(value);
-    }
-
-    if (field === 'amount') {
-      const absAmount = Math.abs(amount);
-      const valNum = parseFloat(value);
-      if (isNaN(valNum)) return false;
-      if (operator === 'equals') return absAmount === valNum;
-      return false;
-    } else {
-      const desc = description.toUpperCase();
-      const val = value.toUpperCase();
-      switch (operator) {
-        case 'contains':
-          return desc.includes(val);
-        case 'starts_with':
-          return desc.startsWith(val);
-        case 'ends_with':
-          return desc.endsWith(val);
-        case 'equals':
-          return desc === val;
-        default:
-          return false;
-      }
-    }
-  }
-
-  private static applyBankRule(
-    description: string,
-    amount: number,
-    rules: BankRuleWithConditions[],
-  ): { matchedRuleId: string | null; glAccountId: string | null } {
-    const isDebit = amount < 0;
-
-    for (const rule of rules) {
-      // Legacy direction checks if they still exist (kept for absolute safety)
-      if (rule.transactionDirection === 'credit' && amount <= 0) continue;
-      if (rule.transactionDirection === 'debit' && amount >= 0) continue;
-
-      // 1. Evaluate conditions (V2 AND matching with legacy fallback)
-      const conditions = rule.conditions;
-      if (!conditions || !Array.isArray(conditions) || conditions.length === 0) {
-        // Legacy fallback
-        const legacyCond = {
-          field: 'description',
-          operator: rule.conditionType,
-          value: rule.conditionValue,
-        };
-        if (!this.matchCondition(description, amount, legacyCond as RuleCondition)) {
-          continue;
-        }
-      } else {
-        // AND evaluation of multiple conditions
-        let allMatch = true;
-        for (const cond of conditions) {
-          if (!this.matchCondition(description, amount, cond)) {
-            allMatch = false;
-            break;
-          }
-        }
-        if (!allMatch) continue;
-      }
-
-      // 2. Resolve GL Account ID with bifurcation and strict safety guard
-      let resolvedGlAccountId: string | null = null;
-      const hasBifurcated =
-        (rule.debitGlAccountId !== null && rule.debitGlAccountId !== undefined) ||
-        (rule.creditGlAccountId !== null && rule.creditGlAccountId !== undefined);
-
-      if (hasBifurcated) {
-        if (isDebit) {
-          if (!rule.debitGlAccountId) continue;
-          resolvedGlAccountId = rule.debitGlAccountId;
-        } else {
-          if (!rule.creditGlAccountId) continue;
-          resolvedGlAccountId = rule.creditGlAccountId;
-        }
-      } else {
-        resolvedGlAccountId = rule.glAccountId;
-      }
-
-      return { matchedRuleId: rule.id, glAccountId: resolvedGlAccountId };
-    }
-
-    return { matchedRuleId: null, glAccountId: null };
   }
 
   private static extractBankNameFromFilename(fileName: string): string {

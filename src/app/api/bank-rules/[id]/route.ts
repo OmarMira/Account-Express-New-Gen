@@ -4,6 +4,7 @@ import { apiHandler, type RouteContext } from '@/lib/api-handler';
 import { requireCompanyContext } from '@/lib/context-storage';
 import { createAuditLogWithRetry } from '@/lib/audit';
 import { validateDirectionProfile } from '@/lib/services/direction-validation';
+import { serverT } from '@/lib/server-i18n';
 
 import {
   transactionMatchesRule,
@@ -69,6 +70,20 @@ export const PUT = apiHandler(async (request: NextRequest, context: RouteContext
   // Validate fields if provided
   if (name !== undefined && name !== null && !String(name).trim()) {
     return NextResponse.json({ error: 'name cannot be empty' }, { status: 400 });
+  }
+
+  // Check for duplicate name within the same company
+  if (name !== undefined && name !== null && String(name).trim()) {
+    const dupName = await db.bankRule.findFirst({
+      where: { companyId, name: String(name).trim(), NOT: { id } },
+    });
+    if (dupName) {
+      const locale = request.headers.get('x-locale') || 'es';
+      return NextResponse.json(
+        { error: serverT(locale, 'bankRules.errors.duplicateName') },
+        { status: 409 },
+      );
+    }
   }
 
   if (transactionDirection !== undefined) {

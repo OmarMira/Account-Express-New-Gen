@@ -54,10 +54,14 @@ export interface EntityCandidate {
     debitPct: number;
   };
   sampleDescriptions: string[];
+  totalAmount?: number;
   hasContext?: boolean;
   contextRole?: string;
   suggestedAccountCode?: string;
   suggestedAccountId?: string;
+  confidence?: number;
+  confidenceLabel?: 'high' | 'medium' | 'low';
+  explanation?: string;
 }
 
 // ========== CACHE DE CONFIGURACIÓN ==========
@@ -185,10 +189,111 @@ export function extractName(desc: string, config: EntityDetectionConfig): string
   return null;
 }
 
-// ========== CLUSTERING FUZZY CON DIRECCIONALIDAD ==========
+// ========== CLUSTER OPTIONS ==========
+export interface ClusterOptions {
+  mode?: 'fuzzy' | 'exact';
+  threshold?: number;
+  minOccurrences?: number;
+  minLength?: number;
+  smartFrequency?: boolean;
+  extraNumberStrip?: boolean;
+  requireRole?: boolean;
+}
+
+// ========== CLUSTERING PRINCIPAL: DISPATCH BY MODE ==========
 export function clusterCandidates(
   transactions: BankTransactionRaw[],
   config: EntityDetectionConfig,
+  options?: ClusterOptions,
+): EntityCandidate[] {
+  const mode = options?.mode ?? 'fuzzy';
+
+  if (mode === 'exact') {
+    return clusterExact(transactions, config, options);
+  }
+
+  return clusterFuzzy(transactions, config, options);
+}
+
+// ========== MODO EXACTO: AGRUPACIÓN POR LLAVE NORMALIZADA ==========
+function clusterExact(
+  transactions: BankTransactionRaw[],
+  config: EntityDetectionConfig,
+  options?: ClusterOptions,
+): EntityCandidate[] {
+  const effectiveMinOccurrences = options?.minOccurrences ?? config.validation.minOccurrences;
+  const effectiveMinLength = options?.minLength ?? config.clustering.minLength;
+  const { stopWords } = config.clustering;
+  const { ignorePatterns } = config.validation;
+
+  const candidatesMap = new Map<
+    string,
+    {
+      names: string[];
+      count: number;
+      credits: number;
+      debits: number;
+      samples: Set<string>;
+      totalAmount: number;
+    }
+  >();
+
+  for (const tx of transactions) {
+    let cleaned = sanitizeDescription(tx.description, config);
+
+    // Apply extraNumberStrip BEFORE extraction if enabled
+    if (options?.extraNumberStrip) {
+      cleaned = cleaned.replace(/\b\d[\d.,\/-]*\b/g, '').replace(/\s{2,}/g, ' ').trim();
+    }
+
+    const name = extractName(cleaned, config);
+    if (!name) continue;
+
+    const nameUpper = name.toUpperCase();
+    if (name.length < effectiveMinLength) continue;
+
+    if (ignorePatterns.some((p) => new RegExp(`\\b${p}\\b`, 'i').test(nameUpper))) continue;
+    if (stopWords.some((sw) => nameUpper === sw.toUpperCase())) continue;
+
+    // Normalized key for exact matching (numbers always stripped)
+    const key = name
+      .replace(/\b\d[\d.,\/-]*\b/g, '')
+      .replace(/\s{2,}/g, ' ')
+      .toLowerCase()
+      .trim();
+
+    if (!key) continue; // skip if key is empty after stripping
+
+    const absAmount = Math.abs(tx.amount);
+    const isCredit = tx.amount > 0;
+    if (candidatesMap.has(key)) {
+      const cluster = candidatesMap.get(key)!;
+      cluster.names.push(name);
+      cluster.count++;
+      cluster.totalAmount += absAmount;
+      if (isCredit) cluster.credits++;
+      else cluster.debits++;
+      if (cluster.samples.size < 5) cluster.samples.add(tx.description);
+    } else {
+      candidatesMap.set(key, {
+        names: [name],
+        count: 1,
+        credits: isCredit ? 1 : 0,
+        debits: isCredit ? 0 : 1,
+        samples: new Set([tx.description]),
+        totalAmount: absAmount,
+      });
+    }
+  }
+
+  return buildCandidatesFromMap(candidatesMap, effectiveMinOccurrences);
+}
+
+// ========== MODO FUZZY: JARO-WINKLER ORIGINAL (BACKWARD COMPATIBLE) ==========
+function clusterFuzzy(
+  transactions: BankTransactionRaw[],
+  config: EntityDetectionConfig,
+  _options?: ClusterOptions,
 ): EntityCandidate[] {
   const candidatesMap = new Map<
     string,
@@ -242,6 +347,14 @@ export function clusterCandidates(
     }
   }
 
+  return buildCandidatesFromMap(candidatesMap, minOccurrences);
+}
+
+// ========== CONSTRUIR RESULTADOS DESDE MAPA DE CLUSTERS (COMPARTIDO) ==========
+function buildCandidatesFromMap(
+  candidatesMap: Map<string, { names: string[]; count: number; credits: number; debits: number; samples: Set<string>; totalAmount?: number }>,
+  minOccurrences: number,
+): EntityCandidate[] {
   const result: EntityCandidate[] = [];
   for (const [key, cluster] of candidatesMap.entries()) {
     if (cluster.count < minOccurrences) continue;
@@ -267,6 +380,7 @@ export function clusterCandidates(
       occurrences: total,
       directionProfile: { creditPct, debitPct },
       sampleDescriptions: Array.from(cluster.samples),
+      totalAmount: cluster.totalAmount,
     });
   }
 

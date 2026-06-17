@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/dialog';
 import { AccountSelector, type GlAccountOption } from '@/components/spa/journal/AccountSelector';
 import { ROLE_ACCOUNT_MAP } from '@/lib/constants/role-account-map';
+import type { EntityRole } from '@/lib/constants/entity-roles';
 import { logger } from '@/lib/logger';
 
 interface ValidationErrorResponse {
@@ -90,7 +91,7 @@ function resolveSuggestionAccount(
 ): { code: string; name: string; exists: boolean } {
   let account = allGlAccounts.find((a) => a.code === sug.account.code);
   if (account) return { code: sug.account.code, name: account.name, exists: true };
-  const mapping = sug.role ? ROLE_ACCOUNT_MAP[sug.role] : undefined;
+  const mapping = sug.role ? ROLE_ACCOUNT_MAP[sug.role as EntityRole] : undefined;
   if (mapping) {
     const heuristicCode = direction === 'debit' ? mapping.debit : mapping.credit;
     account = allGlAccounts.find((a) => a.code === heuristicCode);
@@ -163,6 +164,10 @@ interface AISuggestion {
   suggestSubAccount: boolean;
   subAccountName?: string;
   conditions?: RuleCondition[];
+  confidence?: number;
+  confidenceLabel?: 'high' | 'medium' | 'low';
+  explanation?: string;
+  uncertaintyReasons?: string[];
 }
 
 interface ConversationalRuleBuilderProps {
@@ -354,6 +359,34 @@ export function ConversationalRuleBuilder({
 
   const current = candidates[currentIndex];
 
+  // ─── Resolución de cuenta por rol (refleja ROLE_ACCOUNT_MAP del backend) ───
+  // Usado cuando el scan no pudo sugerir cuenta pero conocemos el rol por contexto.
+  const ROLE_ACCOUNT_SUGGESTIONS: Record<string, { fallback: string; isMultiEntity: boolean }> = {
+    SOCIO: { fallback: '3010', isMultiEntity: true },
+    EMPLEADO: { fallback: '6030', isMultiEntity: false },
+    INQUILINO: { fallback: '4020', isMultiEntity: false },
+    CLIENTE: { fallback: '4010', isMultiEntity: false },
+    TARJETA_CREDITO: { fallback: '2020', isMultiEntity: false },
+    PRESTAMO: { fallback: '2040', isMultiEntity: false },
+    PROVEEDOR: { fallback: '6070', isMultiEntity: false },
+    GASTO_OPERATIVO: { fallback: '5000', isMultiEntity: false },
+    INGRESO: { fallback: '4010', isMultiEntity: false },
+  };
+
+  function resolveAccountFromRole(
+    role: string,
+  ): { code: string; isMultiEntity: boolean } | null {
+    const upper = role.toUpperCase();
+    // Exact match
+    const exact = ROLE_ACCOUNT_SUGGESTIONS[upper];
+    if (exact) return { code: exact.fallback, isMultiEntity: exact.isMultiEntity };
+    // Partial match (compound names como "EMPRESA DE LOS SOCIOS")
+    for (const [canonical, mapping] of Object.entries(ROLE_ACCOUNT_SUGGESTIONS)) {
+      if (upper.includes(canonical)) return { code: mapping.fallback, isMultiEntity: mapping.isMultiEntity };
+    }
+    return null;
+  }
+
   // Auto-carga: skip chat when entity has existing context
   useEffect(() => {
     if (!current || !current.hasContext) return;
@@ -369,7 +402,8 @@ export function ConversationalRuleBuilder({
     if (!account) return;
 
     autoLoadedRef.current = current.id;
-    const isSocio = current.contextRole === 'SOCIO';
+    const roleUpper = current.contextRole?.toUpperCase() || '';
+    const isMultiEntity = roleUpper === 'SOCIO' || roleUpper.includes('SOCIO');
     const subName = current.canonicalName
       .trim()
       .split(/\s+/)
@@ -379,12 +413,12 @@ export function ConversationalRuleBuilder({
     setSuggestion({
       role: current.contextRole || '',
       account: { code: account.code, name: account.name, accountType: account.accountType },
-      suggestSubAccount: isSocio,
+      suggestSubAccount: isMultiEntity,
       subAccountName: subName,
       conditions: [{ field: 'description', operator: 'contains', value: current.canonicalName }],
     });
 
-    if (isSocio) {
+    if (isMultiEntity) {
       setGlAccountMode('create');
       setGlAccountId(null);
       setGlAccountCodeInput(account.code);
@@ -399,54 +433,93 @@ export function ConversationalRuleBuilder({
     }
   }, [current, allGlAccounts]);
 
-  // Carga inicial de candidatos desde scan (sin clustering)
+  // Segundo intento: si auto-load no encontró cuenta sugerida pero tenemos rol,
+  // resolver desde ROLE_ACCOUNT_SUGGESTIONS y pre-seleccionar.
   useEffect(() => {
-    async function fetchCandidates() {
-      try {
-        setLoading(true);
-        const res = await fetch(`/api/ai-rules/scan?companyId=${companyId}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-        });
-        if (!res.ok) throw new Error(t('ruleBuilder.fetchError'));
-        const data = await res.json();
-        const raw = data.patterns || [];
-        // Map scan patterns to EntityCandidate format
-        const mapped: EntityCandidate[] = raw.map(
-          (p: {
-            id: string;
-            description: string;
-            occurrences: number;
-            direction: string;
-            rawDescription: string;
-            hasContext?: boolean;
-            contextRole?: string;
-            suggestedAccountCode?: string;
-            suggestedAccountId?: string;
-          }) => ({
-            id: p.id,
-            canonicalName: p.description,
-            occurrences: p.occurrences,
-            directionProfile: {
-              creditPct: p.direction === 'credit' ? 1 : 0,
-              debitPct: p.direction === 'debit' ? 1 : 0,
-            },
-            sampleDescriptions: [p.rawDescription],
-            hasContext: p.hasContext ?? false,
-            contextRole: p.contextRole ?? undefined,
-            suggestedAccountCode: p.suggestedAccountCode ?? undefined,
-            suggestedAccountId: p.suggestedAccountId ?? undefined,
-          }),
-        );
-        setCandidates(mapped);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : t('ruleBuilder.unknownError'));
-      } finally {
-        setLoading(false);
-      }
+    if (!current || !current.hasContext) return;
+    if (suggestion) return; // ya hay sugerencia
+    if (!current.contextRole) return;
+
+    const resolved = resolveAccountFromRole(current.contextRole);
+    if (!resolved) return;
+
+    const account = allGlAccounts.find((a) => a.code === resolved.code);
+    if (!account) return;
+
+    // Pre-seleccionar cuenta y modo
+    setGlAccountId(account.id);
+    setGlAccountCodeInput(account.code);
+    setGlAccountNameInput(account.name);
+    setGlAccountMode(resolved.isMultiEntity ? 'create' : 'link');
+    setLocalSuggestSubAccount(resolved.isMultiEntity);
+  }, [current, suggestion, allGlAccounts]);
+
+  // Carga inicial de candidatos desde scan (sin clustering)
+  const fetchCandidates = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await fetch(`/api/ai-rules/scan?companyId=${companyId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) throw new Error(t('ruleBuilder.fetchError'));
+      const data = await res.json();
+      const raw = data.patterns || [];
+      // Map scan patterns to EntityCandidate format
+      const mapped: EntityCandidate[] = raw.map(
+        (p: {
+          id: string;
+          description: string;
+          occurrences: number;
+          direction: string;
+          rawDescription: string;
+          hasContext?: boolean;
+          contextRole?: string;
+          suggestedAccountCode?: string;
+          suggestedAccountId?: string;
+          confidence?: number;
+          confidenceLabel?: string;
+          explanation?: string;
+        }) => ({
+          id: p.id,
+          canonicalName: p.description,
+          occurrences: p.occurrences,
+          directionProfile: {
+            creditPct: p.direction === 'credit' ? 1 : 0,
+            debitPct: p.direction === 'debit' ? 1 : 0,
+          },
+          sampleDescriptions: [p.rawDescription],
+          hasContext: p.hasContext ?? false,
+          contextRole: p.contextRole ?? undefined,
+          suggestedAccountCode: p.suggestedAccountCode ?? undefined,
+          suggestedAccountId: p.suggestedAccountId ?? undefined,
+          confidence: p.confidence ?? undefined,
+          confidenceLabel: (p.confidenceLabel as 'high' | 'medium' | 'low') ?? undefined,
+          explanation: p.explanation ?? undefined,
+        }),
+      );
+      setCandidates(mapped);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('ruleBuilder.unknownError'));
+    } finally {
+      setLoading(false);
     }
-    fetchCandidates();
   }, [companyId, t]);
+
+  const handleRefresh = useCallback(() => {
+    setCurrentIndex(0);
+    setSuggestion(null);
+    setAnswer('');
+    setEditableConditions([]);
+    setSimulationResult(null);
+    suggestionCache.current = {};
+    fetchCandidates();
+  }, [fetchCandidates]);
+
+  useEffect(() => {
+    fetchCandidates();
+  }, [fetchCandidates]);
 
   // Helper para procesar respuesta libre o Smart Chips
   const submitWithAnswer = useCallback(
@@ -492,16 +565,14 @@ export function ConversationalRuleBuilder({
           const th = profile?.deviationThreshold ?? 0.9;
           const direction = current.directionProfile.creditPct >= th ? 'credit' : 'debit';
           const resolved = resolveSuggestionAccount(sug, allGlAccounts, direction);
-          sug.account.code = resolved.code;
           sug.account.name = resolved.name;
 
           if (sug.suggestSubAccount) {
             // Preserve parent code — server will create sub-account under it
-            setGlAccountCodeInput(sug.account.code);
+            setGlAccountCodeInput(resolved.code);
           } else {
             // Standalone account: find next available code
-            const nextCode = getNextCode(sug.account.code, allGlAccounts);
-            sug.account.code = nextCode;
+            const nextCode = getNextCode(resolved.code, allGlAccounts);
             setGlAccountCodeInput(nextCode);
           }
           setGlAccountNameInput(sug.account.name);
@@ -747,7 +818,15 @@ export function ConversationalRuleBuilder({
     );
   if (candidates.length === 0)
     return (
-      <div className="p-6 text-center text-muted-foreground">{t('ruleBuilder.noCandidates')}</div>
+      <div className="p-8 text-center space-y-4">
+        <div className="text-muted-foreground">
+          <p>{t('ruleBuilder.noCandidates')}</p>
+          <p className="text-sm mt-2">{t('ruleBuilder.noCandidatesHint')}</p>
+        </div>
+        <Button onClick={handleRefresh} variant="outline">
+          {t('common.refresh')}
+        </Button>
+      </div>
     );
   if (currentIndex >= candidates.length)
     return (
@@ -787,6 +866,20 @@ export function ConversationalRuleBuilder({
           >
             <h3 className="font-semibold text-lg tracking-tight">
               {current.canonicalName}
+              {current.confidence !== undefined && (
+                <Badge
+                  variant={
+                    current.confidence >= 0.8 ? 'default' :
+                    current.confidence >= 0.5 ? 'secondary' :
+                    'destructive'
+                  }
+                  className="ml-2 text-xs"
+                >
+                  {current.confidence >= 0.8 ? t('ruleBuilder.highConfidence') :
+                   current.confidence >= 0.5 ? t('ruleBuilder.mediumConfidence') :
+                   t('ruleBuilder.lowConfidence')}
+                </Badge>
+              )}
               {(current.contextRole || suggestion?.role) && (
                 <span className="text-sm font-normal text-muted-foreground ml-2">
                   ({current.contextRole || suggestion?.role})
@@ -809,6 +902,9 @@ export function ConversationalRuleBuilder({
                 {directionLabel}
               </Badge>
             </div>
+            {current.explanation && (
+              <p className="text-xs text-muted-foreground mt-2">{current.explanation}</p>
+            )}
           </div>
 
           {/* Flujo Conversacional */}
@@ -833,12 +929,97 @@ export function ConversationalRuleBuilder({
                       if (selected) {
                         setGlAccountCodeInput(selected.code);
                         setGlAccountNameInput(selected.name);
+                        // No resetear el modo si ya fue pre-seleccionado por rol
+                        // (el segundo useEffect lo dejó en 'create' si es multi-entidad)
                       }
                     }}
                     placeholder={t('ruleBuilder.selectAccountPlaceholder')}
                   />
                 </div>
               </div>
+
+              {/* Account options toggles — visible once account is selected */}
+              {glAccountId && (
+                <>
+                  {/* Agrupar / Individual toggle */}
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium">{t('ruleBuilder.groupingLabel')}</label>
+                    <div className="grid grid-cols-2 gap-2 bg-slate-900/50 dark:bg-slate-900/80 p-1 rounded-lg border">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLocalSuggestSubAccount(false);
+                          if (glAccountId) {
+                            setGlAccountMode('link');
+                          }
+                        }}
+                        className={`py-1.5 text-xs font-semibold rounded-md transition-all ${
+                          !localSuggestSubAccount
+                            ? 'bg-blue-600 text-white shadow-sm'
+                            : 'text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        {t('ruleBuilder.groupUnder', { code: glAccountCodeInput || '' })}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLocalSuggestSubAccount(true);
+                          setGlAccountMode('create');
+                        }}
+                        className={`py-1.5 text-xs font-semibold rounded-md transition-all ${
+                          localSuggestSubAccount
+                            ? 'bg-blue-600 text-white shadow-sm'
+                            : 'text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        {t('ruleBuilder.groupIndividual')}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Toggle Crear / Vincular */}
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium">
+                      {t('ruleBuilder.chartOfAccountsLabel')}
+                    </label>
+                    <div className="grid grid-cols-2 gap-2 bg-slate-900/50 dark:bg-slate-900/80 p-1 rounded-lg border">
+                      <button
+                        type="button"
+                        onClick={() => setGlAccountMode('create')}
+                        className={`py-1.5 text-xs font-semibold rounded-md transition-all ${
+                          glAccountMode === 'create'
+                            ? 'bg-blue-600 text-white shadow-sm'
+                            : 'text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        {t('ruleBuilder.createNewAuto')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setGlAccountMode('link')}
+                        className={`py-1.5 text-xs font-semibold rounded-md transition-all ${
+                          glAccountMode === 'link'
+                            ? 'bg-blue-600 text-white shadow-sm'
+                            : 'text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        {t('ruleBuilder.linkExisting')}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Sub-account preview when individual mode */}
+                  {localSuggestSubAccount && (
+                    <div className="text-xs text-muted-foreground bg-slate-900/20 dark:bg-slate-900/40 p-3 rounded-md border border-slate-700/30 space-y-1">
+                      <p className="leading-relaxed">
+                        {t('ruleBuilder.subAccountHint').replace('{name}', current.canonicalName)}
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
+
               <div className="flex gap-2">
                 <Button
                   onClick={async () => {
@@ -850,7 +1031,8 @@ export function ConversationalRuleBuilder({
                         name: glAccountNameInput,
                         accountType: allGlAccounts.find((a) => a.id === glAccountId)?.accountType,
                       },
-                      suggestSubAccount: false,
+                      suggestSubAccount: localSuggestSubAccount,
+                      subAccountName: localSuggestSubAccount ? current.canonicalName : undefined,
                       conditions: [
                         {
                           field: 'description',
@@ -859,7 +1041,7 @@ export function ConversationalRuleBuilder({
                         },
                       ],
                     });
-                    setGlAccountMode('link');
+                    // Keep current glAccountMode/localSuggestSubAccount state
                   }}
                   className="flex-1"
                 >
@@ -1025,6 +1207,47 @@ export function ConversationalRuleBuilder({
                     </div>
                   );
                 })()}
+
+                {suggestion.confidence !== undefined && (
+                  <div className={`rounded-lg p-3 border ${
+                    suggestion.confidence >= 0.8
+                      ? 'bg-green-500/5 border-green-500/20'
+                      : suggestion.confidence >= 0.5
+                        ? 'bg-amber-500/5 border-amber-500/20'
+                        : 'bg-red-500/5 border-red-500/20'
+                  }`}>
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        variant={
+                          suggestion.confidence >= 0.8 ? 'default' :
+                          suggestion.confidence >= 0.5 ? 'secondary' :
+                          'destructive'
+                        }
+                        className="text-xs"
+                      >
+                        {suggestion.confidence >= 0.8 ? t('ruleBuilder.highConfidence') :
+                         suggestion.confidence >= 0.5 ? t('ruleBuilder.mediumConfidence') :
+                         t('ruleBuilder.lowConfidence')}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {Math.round(suggestion.confidence * 100)}%
+                      </span>
+                    </div>
+                    {suggestion.explanation && (
+                      <p className="text-xs text-muted-foreground mt-2">{suggestion.explanation}</p>
+                    )}
+                    {suggestion.uncertaintyReasons && suggestion.uncertaintyReasons.length > 0 && (
+                      <ul className="mt-2 space-y-1">
+                        {suggestion.uncertaintyReasons.map((reason, idx) => (
+                          <li key={idx} className="text-xs text-muted-foreground flex items-start gap-1">
+                            <span className="text-red-400 mt-0.5">•</span>
+                            {t('ruleBuilder.uncertaintyReason', { reason })}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
 
                 {/* Agrupar / Individual toggle */}
                 <div className="space-y-1">

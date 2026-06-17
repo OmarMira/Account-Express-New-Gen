@@ -42,7 +42,9 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import { Trash2, Loader2 } from 'lucide-react';
+import { Trash2, Loader2, Plus } from 'lucide-react';
+import { UI_ROLES } from '@/lib/constants/entity-roles';
+import { AccountSelector, type GlAccountOption } from '@/components/spa/journal/AccountSelector';
 
 interface EntityItem {
   id: string;
@@ -64,19 +66,10 @@ interface PaginatedResponse {
   };
 }
 
-const ROLES = [
-  { value: 'INQUILINO', key: 'entityManagement.role.INQUILINO' },
-  { value: 'PROVEEDOR', key: 'entityManagement.role.PROVEEDOR' },
-  { value: 'SOCIO', key: 'entityManagement.role.SOCIO' },
-  { value: 'CLIENTE', key: 'entityManagement.role.CLIENTE' },
-  { value: 'EMPLEADO', key: 'entityManagement.role.EMPLEADO' },
-  { value: 'TARJETA_CREDITO', key: 'entityManagement.role.TARJETA_CREDITO' },
-  { value: 'PRESTAMO', key: 'entityManagement.role.PRESTAMO' },
-  { value: 'GASTO_OPERATIVO', key: 'entityManagement.role.GASTO_OPERATIVO' },
-  { value: 'INGRESO', key: 'entityManagement.role.INGRESO' },
-  { value: 'OTRO', key: 'entityManagement.role.OTRO' },
-  { value: 'IGNORADA', key: 'entityManagement.role.IGNORADA' },
-];
+const ROLES = UI_ROLES.map((role) => ({
+  value: role,
+  key: `entityManagement.role.${role}`,
+}));
 
 export function EntityManagementPage() {
   const t = useLanguageStore((s) => s.t);
@@ -95,6 +88,14 @@ export function EntityManagementPage() {
 
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
+
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [createPattern, setCreatePattern] = useState('');
+  const [createRole, setCreateRole] = useState('');
+  const [createGlAccountId, setCreateGlAccountId] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [accounts, setAccounts] = useState<GlAccountOption[]>([]);
+  const [loadingAccounts, setLoadingAccounts] = useState(false);
 
   const loadEntities = useCallback(async (p: number) => {
     if (!activeCompany?.id) return;
@@ -235,6 +236,65 @@ export function EntityManagementPage() {
     }
   };
 
+  // ─── Fetch accounts for AccountSelector ─────────────────────────────
+  const fetchAccounts = useCallback(async () => {
+    if (!activeCompany?.id) return;
+    setLoadingAccounts(true);
+    try {
+      const res = await fetch(`/api/accounts?companyId=${activeCompany.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setAccounts(data.data ?? data);
+      }
+    } catch {
+      // silent
+    } finally {
+      setLoadingAccounts(false);
+    }
+  }, [activeCompany]);
+
+  useEffect(() => {
+    fetchAccounts();
+  }, [fetchAccounts]);
+
+  // ─── Create entity handler ──────────────────────────────────────────
+  const handleCreateEntity = async () => {
+    if (!createPattern.trim() || !createRole) {
+      toast.error(t('entityManagement.create.validationError'));
+      return;
+    }
+    setCreating(true);
+    try {
+      const res = await fetch('/api/learning/entities', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pattern: createPattern.trim(),
+          role: createRole,
+          glAccountId: createGlAccountId ?? undefined,
+        }),
+      });
+
+      if (res.status === 409) {
+        toast.error(t('entityManagement.create.duplicateError'));
+        return;
+      }
+
+      if (!res.ok) throw new Error('createFailed');
+
+      toast.success(t('entityManagement.create.success'));
+      setCreateDialogOpen(false);
+      setCreatePattern('');
+      setCreateRole('');
+      setCreateGlAccountId(null);
+      loadEntities(page);
+    } catch {
+      toast.error(t('entityManagement.create.duplicateError'));
+    } finally {
+      setCreating(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="space-y-4 p-4">
@@ -251,35 +311,41 @@ export function EntityManagementPage() {
         <p className="text-sm text-muted-foreground">{t('entityManagement.description')}</p>
       </div>
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
-        <div className="flex flex-col gap-1.5 flex-1 max-w-sm">
-          <label className="text-xs font-medium text-muted-foreground">
-            {t('entityManagement.search.label')}
-          </label>
-          <Input
-            placeholder={t('entityManagement.search.placeholder')}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+          <div className="flex flex-col gap-1.5 flex-1 max-w-sm">
+            <label className="text-xs font-medium text-muted-foreground">
+              {t('entityManagement.search.label')}
+            </label>
+            <Input
+              placeholder={t('entityManagement.search.placeholder')}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5 w-full sm:w-48">
+            <label className="text-xs font-medium text-muted-foreground">
+              {t('entityManagement.filter.roleLabel')}
+            </label>
+            <Select value={roleFilter} onValueChange={setRoleFilter}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('entityManagement.filter.allRoles')}</SelectItem>
+                {ROLES.map((r) => (
+                  <SelectItem key={r.value} value={r.value}>
+                    {t(r.key as string)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-        <div className="flex flex-col gap-1.5 w-full sm:w-48">
-          <label className="text-xs font-medium text-muted-foreground">
-            {t('entityManagement.filter.roleLabel')}
-          </label>
-          <Select value={roleFilter} onValueChange={setRoleFilter}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t('entityManagement.filter.allRoles')}</SelectItem>
-              {ROLES.map((r) => (
-                <SelectItem key={r.value} value={r.value}>
-                  {t(r.key as string)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <Button onClick={() => setCreateDialogOpen(true)}>
+          <Plus className="mr-2 size-4" />
+          {t('entityManagement.create.title')}
+        </Button>
       </div>
 
       {entities.length === 0 ? (
@@ -446,6 +512,92 @@ export function EntityManagementPage() {
             <Button onClick={handleSaveEdit} disabled={saving}>
               {saving && <Loader2 className="mr-2 size-4 animate-spin" />}
               {t('entityManagement.edit.save')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Create Entity Dialog ─────────────────────────────────────── */}
+      <Dialog
+        open={createDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCreateDialogOpen(false);
+            setCreatePattern('');
+            setCreateRole('');
+            setCreateGlAccountId(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('entityManagement.create.title')}</DialogTitle>
+            <DialogDescription>
+              {t('entityManagement.description')}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                {t('entityManagement.create.patternLabel')}
+              </label>
+              <Input
+                value={createPattern}
+                onChange={(e) => setCreatePattern(e.target.value)}
+                placeholder={t('entityManagement.search.placeholder')}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                {t('entityManagement.create.roleLabel')}
+              </label>
+              <Select value={createRole} onValueChange={setCreateRole}>
+                <SelectTrigger>
+                  <SelectValue placeholder={t('learning.rolePlaceholder')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {ROLES.map((r) => (
+                    <SelectItem key={r.value} value={r.value}>
+                      {t(r.key as string)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                {t('entityManagement.create.glAccountLabel')}
+              </label>
+              {loadingAccounts ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="size-4 animate-spin" />
+                  <span>{t('learning.loadingAccounts')}</span>
+                </div>
+              ) : (
+                <AccountSelector
+                  accounts={accounts}
+                  value={createGlAccountId}
+                  onChange={setCreateGlAccountId}
+                  placeholder={t('learning.accountPlaceholder')}
+                />
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCreateDialogOpen(false);
+                setCreatePattern('');
+                setCreateRole('');
+                setCreateGlAccountId(null);
+              }}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button onClick={handleCreateEntity} disabled={creating}>
+              {creating && <Loader2 className="mr-2 size-4 animate-spin" />}
+              {t('entityManagement.create.submit')}
             </Button>
           </DialogFooter>
         </DialogContent>

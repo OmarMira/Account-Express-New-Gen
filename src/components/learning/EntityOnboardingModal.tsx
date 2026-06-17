@@ -133,7 +133,16 @@ export function EntityOnboardingModal({
     }
 
     setSavedCount(count);
-    toast.success(t('learning.classifiedCount').replace('{count}', String(count)));
+    const skipped = entries.length - count;
+    if (skipped > 0) {
+      toast.warning(
+        t('learning.classifiedCount').replace('{count}', String(count)) +
+          '. ' +
+          t('learning.customRoleMissing').replace('{count}', String(skipped)),
+      );
+    } else {
+      toast.success(t('learning.classifiedCount').replace('{count}', String(count)));
+    }
     setSaving(false);
 
     if (onComplete) onComplete();
@@ -160,6 +169,9 @@ export function EntityOnboardingModal({
   if (!isOpen) return null;
 
   const hasSelections = Object.keys(selections).length > 0;
+  const invalidOtro = Object.entries(selections).filter(
+    ([, sel]) => sel.role === 'OTRO' && !(sel.userInput || '').trim(),
+  ).length;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -239,14 +251,21 @@ export function EntityOnboardingModal({
                       </SelectContent>
                     </Select>
                     {role === 'OTRO' && (
-                      <Input
-                        className="h-8 text-sm mt-1"
-                        placeholder={t('learning.customRoleName')}
-                        value={sel?.userInput || ''}
-                        onChange={(e) =>
-                          updateSelection(candidate.canonicalName, 'userInput', e.target.value)
-                        }
-                      />
+                      <div>
+                        <Input
+                          className={`h-8 text-sm mt-1 ${role === 'OTRO' && !(sel?.userInput || '').trim() ? 'border-destructive' : ''}`}
+                          placeholder={t('learning.customRoleName')}
+                          value={sel?.userInput || ''}
+                          onChange={(e) =>
+                            updateSelection(candidate.canonicalName, 'userInput', e.target.value)
+                          }
+                        />
+                        {role === 'OTRO' && !(sel?.userInput || '').trim() && (
+                          <p className="text-xs text-destructive mt-1">
+                            {t('learning.customRoleRequired')}
+                          </p>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -260,7 +279,7 @@ export function EntityOnboardingModal({
             {savedCount > 0 ? t('learning.close') : t('common.cancel')}
           </Button>
           {candidates.length > 0 && (
-            <Button onClick={handleClassifyAll} disabled={saving || !hasSelections}>
+            <Button onClick={handleClassifyAll} disabled={saving || !hasSelections || invalidOtro > 0}>
               {saving ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

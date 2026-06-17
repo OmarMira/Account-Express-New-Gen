@@ -1,4 +1,4 @@
-import { readFileSync } from 'fs';
+import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { loadConfig, extractComponents } from '@/lib/services/entity-detector';
 import { getKnownSocioPatterns } from '@/lib/services/entity-classifier';
@@ -35,6 +35,12 @@ function evaluateCondition(tx: Transaction, cond: RuleCondition): boolean {
   // Normalize: lowercase, trim, and collapse multiple spaces to single space
   const strTxVal = String(txValue).toLowerCase().trim().replace(/\s+/g, ' ');
   const strCondVal = String(value).toLowerCase().trim().replace(/\s+/g, ' ');
+
+  // Empty conditions after normalization never match (skip silently)
+  if (!strCondVal) return false;
+
+  // Wildcard '*' matches any non-empty value
+  if (strCondVal === '*') return strTxVal.length > 0;
 
   switch (operator) {
     case 'equals':
@@ -127,7 +133,9 @@ export function transactionMatchesRule(
       const isSocioRule = ruleConditions.some(
         (c: RuleCondition) =>
           c.field === 'description' &&
-          knownSocioPatterns.some((p: string) => String(c.value).toLowerCase().includes(p)),
+          knownSocioPatterns.some((p: string) =>
+            String(c.value).toLowerCase().includes(p.toLowerCase()),
+          ),
       );
       // Legacy V1 fallback: check conditionValue against known patterns when conditions array is absent
       if (!isSocioRule && (!rule.conditions || rule.conditions.length === 0)) {
@@ -166,22 +174,42 @@ export function transactionMatchesRule(
   return false;
 }
 
-let cachedRolePriorities: Record<string, number> | null = null;
+interface CachedPriorities {
+  data: Record<string, number>;
+  timestamp: number;
+}
 
-export function loadRolePriorities(): Record<string, number> {
-  if (cachedRolePriorities) return cachedRolePriorities;
+let cachedRolePriorities: CachedPriorities | null = null;
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const ROLE_PRIORITIES_PATH = join(process.cwd(), 'rules/entity-roles.json');
+
+/**
+ * Load role priorities from entity-roles.json with async TTL cache (5-minute).
+ * Uses fs.promises.readFile — does not block the event loop.
+ */
+export async function loadRolePriorities(): Promise<Record<string, number>> {
+  const now = Date.now();
+  if (cachedRolePriorities && now - cachedRolePriorities.timestamp < CACHE_TTL_MS) {
+    return cachedRolePriorities.data;
+  }
   try {
-    const path = join(process.cwd(), 'rules/entity-roles.json');
-    const roles = JSON.parse(readFileSync(path, 'utf-8')) as string[];
+    const content = await readFile(ROLE_PRIORITIES_PATH, 'utf-8');
+    const roles = JSON.parse(content) as string[];
     const map: Record<string, number> = {};
     roles.forEach((role, index) => {
       map[role.toUpperCase()] = index + 1;
     });
-    cachedRolePriorities = map;
+    cachedRolePriorities = { data: map, timestamp: now };
     return map;
   } catch {
     return {};
   }
+}
+
+/** Internal sync fallback — returns cached data or empty (non-blocking, no fs call). */
+function loadRolePrioritiesSync(): Record<string, number> {
+  if (cachedRolePriorities) return cachedRolePriorities.data;
+  return {};
 }
 
 export interface MatchingRule {
@@ -197,11 +225,45 @@ export interface MatchingRule {
   creditGlAccountId?: string | null;
 }
 
+export interface MatchResult {
+  matchedRuleId: string | null;
+  glAccountId: string | null;
+}
+
+/**
+ * High-level matching — loads entity context, filters rules,
+ * scores via evaluateWinningRule, returns best match or null.
+ */
+export async function findMatchingRule(
+  tx: Transaction,
+  rules: MatchingRule[],
+  companyId: string,
+): Promise<MatchResult> {
+  const context = await loadEntityFirstContext(companyId);
+  const rolePriorities = await loadRolePriorities();
+
+  const matchingRules = rules.filter((rule) =>
+    transactionMatchesRule(tx, rule, context.knownSocioPatterns, context.entityFirstMode),
+  );
+
+  if (matchingRules.length === 0) {
+    return { matchedRuleId: null, glAccountId: null };
+  }
+
+  const winner = evaluateWinningRule(matchingRules, tx, companyId, rolePriorities);
+
+  return {
+    matchedRuleId: winner.id,
+    glAccountId:
+      winner.glAccountId ?? winner.debitGlAccountId ?? winner.creditGlAccountId ?? null,
+  };
+}
+
 export function evaluateWinningRule(
   matchingRules: MatchingRule[],
   tx: Transaction,
   companyId: string,
-  rolePriorities: Record<string, number> = loadRolePriorities(),
+  rolePriorities: Record<string, number> = loadRolePrioritiesSync(),
   contexts?: Array<{ pattern: string; role: string }>,
 ): MatchingRule {
   if (matchingRules.length <= 1) return matchingRules[0];

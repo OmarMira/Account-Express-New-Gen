@@ -6,8 +6,11 @@ import { logger } from '@/lib/logger';
 import { checkPromptInjection, addSystemDelimiter } from '@/lib/guardrails';
 import { findContext } from '@/lib/services/entity-context-service';
 import { ROLE_ACCOUNT_MAP } from '@/lib/constants/role-account-map';
+import type { EntityRole } from '@/lib/constants/entity-roles';
 import { serverT } from '@/lib/server-i18n';
-import type { RuleCondition, AssistantConfig, HeuristicRule } from '@/lib/types/shared';
+import type { RuleCondition, AssistantConfig } from '@/lib/types/shared';
+import { collectSignals } from './signal-collector';
+import { decide } from './decision-engine';
 
 export interface ConversationalParseResult {
   role: string;
@@ -22,6 +25,10 @@ export interface ConversationalParseResult {
     normalBalance?: string;
   };
   conditions?: RuleCondition[] | null;
+  confidence: number;
+  confidenceLabel: 'high' | 'medium' | 'low';
+  explanation: string;
+  uncertaintyReasons: string[];
 }
 
 // ── Internal: read assistant config from disk ──
@@ -32,80 +39,6 @@ function readAssistantConfigSync(): AssistantConfig {
   } catch {
     return {};
   }
-}
-
-// ── Fallback: Local heuristic parse (unchanged logic, readAssistantConfigSync) ──
-export function localHeuristicParse(
-  userInput: string,
-  direction?: 'debit' | 'credit',
-): { role: string; glAccountCode: string } {
-  const text = userInput.toLowerCase().trim();
-
-  let priorities: string[] = [
-    'SOCIO',
-    'EMPLEADO',
-    'INQUILINO',
-    'CLIENTE',
-    'GASTO_OPERATIVO',
-    'INGRESO',
-  ];
-  let fallback = { role: 'PROVEEDOR', glAccountCode: '6070' };
-  let rules: HeuristicRule[] = [];
-
-  try {
-    const configPath = join(process.cwd(), 'rules/assistant-config.json');
-    const config = JSON.parse(readFileSync(configPath, 'utf-8'));
-    if (config.heuristics) {
-      if (Array.isArray(config.heuristics.priorities)) {
-        priorities = config.heuristics.priorities;
-      }
-      if (config.heuristics.fallback) {
-        fallback = config.heuristics.fallback;
-      }
-      if (Array.isArray(config.heuristics.rules)) {
-        rules = config.heuristics.rules;
-      }
-    }
-  } catch (err) {
-    logger.warn('[CONVERSATIONAL PARSE LOAD CONFIG FAIL, FALLING BACK TO DEFAULTS]', {
-      error: String(err),
-    });
-  }
-
-  // Detectar idioma usando las palabras clave configuradas dinámicamente
-  const enKeywordsList: string[] = [];
-  rules.forEach((rule) => {
-    if (rule.keywords && Array.isArray(rule.keywords.en)) {
-      enKeywordsList.push(...rule.keywords.en);
-    }
-  });
-
-  const isEnglish =
-    enKeywordsList.length > 0
-      ? new RegExp(
-          `\\b(${enKeywordsList.map((k) => k.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')).join('|')})\\b`,
-          'i',
-        ).test(text)
-      : false;
-
-  // Evaluar por orden estricto de prioridad configurado
-  for (const roleName of priorities) {
-    const rule = rules.find((r) => r.role === roleName);
-    if (!rule) continue;
-
-    const keywords = isEnglish ? rule.keywords.en : rule.keywords.es;
-    if (Array.isArray(keywords) && keywords.some((k) => text.includes(k.toLowerCase()))) {
-      const code =
-        direction === 'debit'
-          ? (rule as HeuristicRule).debitGlAccountCode || rule.glAccountCode
-          : direction === 'credit'
-            ? (rule as HeuristicRule).creditGlAccountCode || rule.glAccountCode
-            : rule.glAccountCode;
-      return { role: rule.role, glAccountCode: code };
-    }
-  }
-
-  return fallback;
 }
 
 // ── Layer 1: AI Parser ──
@@ -301,9 +234,11 @@ export async function resolveGLAccount(
 }
 
 // ── Facade: parseConversationalContext ──
-// Orchestrates: try AI parser → fallback to heuristics → resolve GL account from DB.
-// Preserves audit logging on successful AI response.
-// Accepts optional DI params (fetchFn, prismaClient) that flow to layers.
+// Uses the signal-based decision engine to resolve role + GL account.
+// 1. Checks EntityContext, tries AI, runs heuristic → collects all signals
+// 2. Calls decide() to resolve conflicts
+// 3. Resolves GL account from the selected signal
+// 4. Returns with confidence, explanation, uncertaintyReasons
 export async function parseConversationalContext(
   companyId: string,
   pattern: string,
@@ -314,121 +249,37 @@ export async function parseConversationalContext(
   direction?: 'debit' | 'credit',
   locale?: string,
 ): Promise<ConversationalParseResult> {
-  // Early return: si ya existe EntityContext, usarlo directamente sin re-clasificar
+  const assistantConfig = readAssistantConfigSync() as any;
+  // Flatten heuristics: config has { priorities: [], rules: [] }, engine expects { heuristics: Array<{keywords, role, glAccountCode}> }
+  const rawRules = assistantConfig?.heuristics?.rules ?? [];
+  const flattenedRules = rawRules.map((r: any) => ({
+    keywords: [...(r.keywords?.es ?? []), ...(r.keywords?.en ?? [])],
+    role: r.role,
+    glAccountCode: r.glAccountCode,
+    direction: 'any' as const,
+  }));
+  const engineConfig = { heuristics: flattenedRules };
+  const directionVal = direction ?? 'mixed';
+
+  // Step 1: get EntityContext
   const existingContext = await findContext(companyId, pattern).catch(() => null);
-  if (existingContext) {
-    const ctxRole = existingContext.role;
-    let ctxGlAccountId = existingContext.glAccountId ?? null;
-    let ctxAccount: {
-      code: string;
-      name: string;
-      accountType: string | null;
-      normalBalance: string | null;
-    } | null = existingContext.glAccount
-      ? {
-          code: existingContext.glAccount.code,
-          name: existingContext.glAccount.name,
-          accountType: existingContext.glAccount.accountType,
-          normalBalance: existingContext.glAccount.normalBalance,
-        }
-      : null;
 
-    // Resolve default account for role if unassigned
-    if (!ctxGlAccountId && !ctxAccount) {
-      const mapping = ROLE_ACCOUNT_MAP[ctxRole];
-      if (mapping) {
-        const defaultCode =
-          direction === 'debit'
-            ? mapping.debit
-            : direction === 'credit'
-              ? mapping.credit
-              : mapping.fallback;
-        let resolved = await resolveGLAccount(
-          companyId,
-          defaultCode,
-          { db: prismaClient ?? db },
-          locale,
-        );
-        if (!resolved.glAccountId && defaultCode !== mapping.fallback) {
-          const fallbackResolved = await resolveGLAccount(
-            companyId,
-            mapping.fallback,
-            { db: prismaClient ?? db },
-            locale,
-          );
-          if (fallbackResolved.glAccountId) {
-            resolved = fallbackResolved;
-          }
-        }
-        ctxGlAccountId = resolved.glAccountId;
-        ctxAccount = {
-          code: resolved.account.code || defaultCode,
-          name: resolved.account.name || serverT(locale, 'accounts.unclassified'),
-          accountType: resolved.account.accountType ?? null,
-          normalBalance: resolved.account.normalBalance ?? null,
-        };
-      }
-    }
-
-    const finalAccount = ctxAccount || {
-      code: '',
-      name: serverT(locale, 'accounts.unclassified'),
-      accountType: null,
-      normalBalance: null,
-    };
-
-    const suggestSubAccount = ctxRole === 'SOCIO';
-    const subAccountName = suggestSubAccount
-      ? pattern
-          .trim()
-          .split(/\s+/)
-          .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-          .join(' ')
-      : null;
-
-    const conditions: RuleCondition[] = [
-      { field: 'description', operator: 'contains', value: pattern },
-    ];
-
-    return {
-      role: ctxRole,
-      glAccountCode: finalAccount.code,
-      glAccountId: ctxGlAccountId,
-      suggestSubAccount,
-      subAccountName,
-      account: {
-        code: finalAccount.code,
-        name: finalAccount.name,
-        accountType: finalAccount.accountType ?? undefined,
-        normalBalance: finalAccount.normalBalance ?? undefined,
-      },
-      conditions,
-    };
-  }
-
+  // Step 2: try AI (parseWithAI)
   const apiKey = process.env.AI_API_KEY;
   const baseUrl = process.env.AI_BASE_URL;
   const model = process.env.AI_MODEL;
 
-  let parsed: {
-    role: string;
-    glAccountCode: string;
-    conditions?: RuleCondition[];
-    suggestSubAccount: boolean;
-    subAccountName: string | null;
-  } | null = null;
+  let aiResponse: { role?: string; glAccountCode?: string } | null = null;
 
-  // Intento con IA externa
   if (apiKey && baseUrl && model) {
     try {
-      parsed = await parseWithAI(pattern, userInput, {
+      const parsed = await parseWithAI(pattern, userInput, {
         apiKey,
         baseUrl,
         model,
         fetch: fetchFn,
       });
 
-      // 🔍 AUDITORÍA: Registrar respuesta de IA externa (sin exponer API key)
       if (userId) {
         safeAuditLog({
           companyId,
@@ -445,142 +296,160 @@ export async function parseConversationalContext(
         }).catch((e) => logger.warn('[AI AUDIT LOG FAIL]', { error: String(e) }));
       }
 
-      // Validate AI suggestion exists in DB — fall through to heuristic if not
       if (parsed) {
         const existingAccount = await (prismaClient ?? db).glAccount.findFirst({
           where: { companyId, code: String(parsed.glAccountCode).trim(), isActive: true },
         });
-        if (!existingAccount) {
-          logger.warn('[AI SUGGESTED CODE NOT FOUND IN DB, FALLING BACK TO HEURISTIC]', {
+        if (existingAccount) {
+          aiResponse = { role: parsed.role, glAccountCode: parsed.glAccountCode };
+        } else {
+          logger.warn('[AI SUGGESTED CODE NOT FOUND IN DB]', {
             code: parsed.glAccountCode,
             companyId,
           });
-          parsed = null;
-        }
-      }
-
-      // Determinism: if direction is clear and heuristic found a match, prefer heuristic's code
-      if (parsed && direction) {
-        const heuristic = localHeuristicParse(userInput, direction);
-        const isFallback = heuristic.role === 'PROVEEDOR' && heuristic.glAccountCode === '6070';
-        if (!isFallback && heuristic.glAccountCode !== parsed.glAccountCode) {
-          logger.info('[HEURISTIC OVERRIDE AI CODE]', {
-            role: parsed.role,
-            aiCode: parsed.glAccountCode,
-            heuristicCode: heuristic.glAccountCode,
-            direction,
-          });
-          parsed.glAccountCode = heuristic.glAccountCode;
         }
       }
     } catch {
-      // AI failed — fall through to heuristic below
+      // AI failed — aiResponse stays null
     }
   }
 
-  // Fallback a lógica local si la IA falla o no está configurada
-  // Note: we preserve suggestSubAccount/subAccountName from a previous AI result
-  // even if the AI-suggested code was rejected (non-existent in DB).
-  if (!parsed) {
-    const local = localHeuristicParse(userInput, direction);
-    let suggestSubAccount = false;
-    let subAccountName: string | null = null;
-    if (local.role === 'SOCIO') {
-      suggestSubAccount = true;
-      subAccountName = pattern
-        .trim()
-        .split(/\s+/)
-        .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-        .join(' ');
-    }
-    parsed = {
-      role: local.role,
-      glAccountCode: local.glAccountCode,
-      suggestSubAccount,
-      subAccountName,
-    };
-  }
+  // Step 3: collect signals from all sources
+  const signals = collectSignals({
+    entityContext: existingContext,
+    userInput,
+    direction: directionVal,
+    assistantConfig: engineConfig,
+    aiResponse,
+  }, locale);
 
-  // Normalización y búsqueda en BD
-  const role = String(parsed.role).toUpperCase().trim();
-  const glAccountCode = String(parsed.glAccountCode).trim();
+  // Step 4: decide which signal wins
+  const result = decide(signals, locale);
 
-  let { glAccountId, account } = await resolveGLAccount(companyId, glAccountCode, {
-    db: prismaClient,
-  });
+  // Step 5: resolve GL account from the selected signal
+  if (result.selected) {
+    let role = String(result.selected.role ?? '').toUpperCase().trim();
+    let glAccountCode = String(result.selected.glAccountCode ?? '').trim();
 
-  // Auto-create known system accounts if missing (e.g. Owner's Draw 3040)
-  if (!glAccountId) {
-    const SYSTEM_ACCOUNTS: Record<
-      string,
-      { name: string; type: string; normalBalance: string; parentCode: string }
-    > = {
-      '3010': {
-        name: "Partner Contributions / Capital",
-        type: 'equity',
-        normalBalance: 'credit',
-        parentCode: '3000',
-      },
-      '3040': {
-        name: "Owner's Draw / Partner Withdrawals",
-        type: 'equity',
-        normalBalance: 'debit',
-        parentCode: '3000',
-      },
-    };
-
-    const def = SYSTEM_ACCOUNTS[glAccountCode];
-    if (def) {
-      try {
-        const client = prismaClient ?? db;
-        const parent = await client.glAccount.findFirst({
-          where: { companyId, code: def.parentCode, isActive: true },
-        });
-        const created = await client.glAccount.create({
-          data: {
-            companyId,
-            code: glAccountCode,
-            name: def.name,
-            accountType: def.type,
-            normalBalance: def.normalBalance,
-            parentId: parent?.id ?? null,
-            isActive: true,
-          },
-        });
-        glAccountId = created.id;
-        account = {
-          code: created.code,
-          name: created.name,
-          accountType: created.accountType,
-          normalBalance: created.normalBalance,
-        };
-        logger.info('[AUTO-CREATED SYSTEM ACCOUNT]', {
-          code: glAccountCode,
-          companyId,
-          accountId: created.id,
-        });
-      } catch (createErr) {
-        logger.warn('[FAILED TO AUTO-CREATE SYSTEM ACCOUNT]', {
-          code: glAccountCode,
-          companyId,
-          error: String(createErr),
-        });
+    // If entity context was selected but has no assigned glAccount, resolve via ROLE_ACCOUNT_MAP
+    if (!glAccountCode && existingContext) {
+      const mapping = ROLE_ACCOUNT_MAP[role as EntityRole];
+      if (mapping) {
+        glAccountCode = direction === 'debit' ? mapping.debit
+          : direction === 'credit' ? mapping.credit
+          : mapping.fallback;
       }
     }
+
+    let { glAccountId, account } = await resolveGLAccount(companyId, glAccountCode, {
+      db: prismaClient,
+    });
+
+    // Auto-create known system accounts if missing
+    if (!glAccountId) {
+      const SYSTEM_ACCOUNTS: Record<
+        string,
+        { name: string; type: string; normalBalance: string; parentCode: string }
+      > = {
+        '3010': {
+          name: "Partner Contributions / Capital",
+          type: 'equity',
+          normalBalance: 'credit',
+          parentCode: '3000',
+        },
+        '3040': {
+          name: "Owner's Draw / Partner Withdrawals",
+          type: 'equity',
+          normalBalance: 'debit',
+          parentCode: '3000',
+        },
+      };
+
+      const def = SYSTEM_ACCOUNTS[glAccountCode];
+      if (def) {
+        try {
+          const client = prismaClient ?? db;
+          const parent = await client.glAccount.findFirst({
+            where: { companyId, code: def.parentCode, isActive: true },
+          });
+          const created = await client.glAccount.create({
+            data: {
+              companyId,
+              code: glAccountCode,
+              name: def.name,
+              accountType: def.type,
+              normalBalance: def.normalBalance,
+              parentId: parent?.id ?? null,
+              isActive: true,
+            },
+          });
+          glAccountId = created.id;
+          account = {
+            code: created.code,
+            name: created.name,
+            accountType: created.accountType,
+            normalBalance: created.normalBalance,
+          };
+          logger.info('[AUTO-CREATED SYSTEM ACCOUNT]', {
+            code: glAccountCode,
+            companyId,
+            accountId: created.id,
+          });
+        } catch (createErr) {
+          logger.warn('[FAILED TO AUTO-CREATE SYSTEM ACCOUNT]', {
+            code: glAccountCode,
+            companyId,
+            error: String(createErr),
+          });
+        }
+      }
+    }
+
+    const suggestSubAccount = role === 'SOCIO';
+    const subAccountName = suggestSubAccount
+      ? pattern
+          .trim()
+          .split(/\s+/)
+          .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+          .join(' ')
+      : null;
+
+    const conditions: RuleCondition[] = [
+      { field: 'description', operator: 'contains', value: pattern },
+    ];
+
+    return {
+      role,
+      glAccountCode,
+      glAccountId,
+      suggestSubAccount,
+      subAccountName,
+      account: {
+        code: account.code,
+        name: account.name,
+        accountType: account.accountType ?? undefined,
+        normalBalance: account.normalBalance ?? undefined,
+      },
+      conditions,
+      confidence: result.confidence,
+      confidenceLabel: result.confidenceLabel,
+      explanation: result.explanation,
+      uncertaintyReasons: result.uncertaintyReasons,
+    };
   }
 
-  let conditions = parsed.conditions;
-  if (!conditions || !Array.isArray(conditions) || conditions.length === 0) {
-    conditions = [{ field: 'description', operator: 'contains', value: pattern }];
-  }
-
+  // Step 6: SIN_CLASIFICAR — no signal with sufficient confidence
   return {
-    role,
-    glAccountCode,
-    glAccountId,
-    suggestSubAccount: Boolean(parsed.suggestSubAccount),
-    subAccountName: parsed.subAccountName ? String(parsed.subAccountName) : null,
-    account,
-    conditions,
+    role: '',
+    glAccountCode: '',
+    glAccountId: null,
+    suggestSubAccount: false,
+    subAccountName: null,
+    account: { code: '', name: serverT(locale, 'accounts.unclassified') },
+    conditions: [{ field: 'description', operator: 'contains', value: pattern }],
+    confidence: 0,
+    confidenceLabel: 'low',
+    explanation: result.explanation,
+    uncertaintyReasons: result.uncertaintyReasons,
   };
 }
