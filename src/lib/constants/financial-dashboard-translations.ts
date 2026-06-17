@@ -91,6 +91,14 @@ export const LOCAL_TRANSLATIONS: Record<string, Record<string, string>> = {
     colReconDesc: '"si"/"no", "true"/"false" o "1"/"0" (opcional, por defecto "no").',
     infoDisclaimer:
       'El sistema cuenta con un motor de tolerancia inteligente para inferir campos incompletos, corregir formatos de fechas y deducir la clasificación contable en base a reglas dinámicas.',
+    topExpenseHistory: 'Histórico mensual de la categoría principal de egresos operacionales',
+    topRecurrentExpenses: 'Gastos recurrentes principales por mes',
+    topRecurrentHistory: 'Histórico mensual de las principales salidas operacionales del usuario',
+    topIncomeTrends: 'Tendencia de principales fuentes de ingresos',
+    topIncomeTrendsHistory: 'Desempeño mensual de los créditos mayores registrados',
+    avgMonthlyBalance: 'Saldo promedio mensual',
+    avgDailyBalanceDesc: 'Promedio del saldo diario con umbral de seguridad',
+    mainIncomeVsOthers: 'Comparativa del principal ingreso frente a otras fuentes secundarias',
   },
   en: {
     loadingMetrics: 'Loading metrics and reconciliations...',
@@ -180,6 +188,14 @@ export const LOCAL_TRANSLATIONS: Record<string, Record<string, string>> = {
     colReconDesc: '"si"/"no", "true"/"false", or "1"/"0" (optional, default "no").',
     infoDisclaimer:
       'The system has an intelligent tolerance engine to infer incomplete fields, correct date formats, and deduce accounting classification based on dynamic rules.',
+    topExpenseHistory: 'Monthly history of primary operational expenses category',
+    topRecurrentExpenses: 'Primary Recurring Expenses by Month',
+    topRecurrentHistory: 'Monthly history of major operational outflows',
+    topIncomeTrends: 'Trend of Primary Income Sources',
+    topIncomeTrendsHistory: 'Monthly performance of registered major credits',
+    avgMonthlyBalance: 'Monthly Average Balance',
+    avgDailyBalanceDesc: 'Average daily balance with safety threshold',
+    mainIncomeVsOthers: 'Comparison of primary income against secondary sources',
   },
 };
 
