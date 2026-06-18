@@ -26,19 +26,31 @@ IGNORADA MUST NOT appear in any user-facing dropdown. `ROLE_ACCOUNT_MAP` MUST de
 
 ### Requirement: Role Validation
 
-The Zod schema in `entity-context.ts` MUST validate the `role` field against `ENTITY_ROLES` using `z.enum()`. Validation MUST reject any value not present in the shared constant. This validation MUST apply to new record creation only — existing database records MUST NOT be re-validated.
+The Zod schema `entityContextSchema` in `entity-context.ts` MUST validate the `role` field against `ENTITY_ROLES` using `entityRoleSchema` (`z.enum(ENTITY_ROLES)`). Validation MUST reject any value not present in the shared constant. This validation MUST apply to ALL creation and update paths:
+- POST `/api/learning/context` — auto-fixed via entityContextSchema import
+- PATCH `/api/entity-context/[id]` — explicit Zod validation with entityRoleSchema
+- POST `/api/learning/classify-entity` — validates role before classifyEntity()
+- POST `/api/learning/entities` — already validates via entityRoleSchema
+
+Existing database records with non-canonical roles MUST coalesce to `"OTRO"` on read via nullish coalescing. A one-time migration script maps any `role NOT IN ENTITY_ROLES` to `"OTRO"`.
 
 #### Scenario: Valid role passes validation
 
 - GIVEN a valid role from `ENTITY_ROLES`
-- WHEN creating an EntityContext record via the Zod schema
+- WHEN creating an EntityContext record via any creation path
 - THEN validation MUST pass
 
 #### Scenario: Invalid role is rejected
 
 - GIVEN a role value not present in `ENTITY_ROLES`
-- WHEN creating an EntityContext record via the Zod schema
-- THEN validation MUST fail with an error indicating the role is invalid
+- WHEN creating or updating an EntityContext record via any of the 4 paths
+- THEN validation MUST fail with a 400 error indicating the role is invalid
+
+#### Scenario: PATCH rejects invalid role
+
+- GIVEN an existing EntityContext
+- WHEN PATCHing with `{ role: "INVALID" }`
+- THEN return 400 with validation error
 
 ### Requirement: Manual Entity Creation (UI)
 
@@ -154,3 +166,71 @@ Existing callers MUST receive the same return type regardless of mode. The `Clus
 - GIVEN code destructuring `{ entity, count, similarity }` from cluster results
 - WHEN the same code calls `clusterCandidates` with `mode: 'exact'` instead of default
 - THEN the destructured fields have identical keys and types
+
+### Requirement: OTRO AI Role Suggestion
+
+When the user selects OTRO in EntityOnboardingModal, a free-text input appears ("Describí qué es esta entidad..."). After a ~1s debounce from typing stop (min 5 chars), the system MUST call `POST /api/learning/suggest-role` which returns `{ suggestedRole, confidence, explanation }` via `parseWithAI()`.
+
+- confidence >= 0.7 → Toast with "[ASIGNAR]" button; clicking sets canonical role
+- confidence < 0.7 → Toast asking for more detail
+- 2 consecutive failures → Hide suggestions for this session
+- AI network error → Toast "No disponible ahora. Elegí manualmente."
+- OTRO without assigned canonical role → Save blocked (entity NEVER persists "OTRO" as role)
+
+#### Scenario: Valid suggestion returned
+
+- GIVEN `{ description: "cobra alquileres mensuales" }`
+- WHEN POST /api/learning/suggest-role
+- THEN response `{ suggestedRole: "INQUILINO", confidence: 0.92, explanation: "Cobro recurrente de alquiler" }`
+
+#### Scenario: Assign sets canonical role
+
+- GIVEN user types "cobra alquiler" and toast suggests INQUILINO
+- WHEN user clicks [ASIGNAR]
+- THEN role is set to INQUILINO (NOT OTRO)
+- AND GL account selector opens pre-filtered for INQUILINO accounts
+
+### Requirement: Direction Mismatch Warning
+
+On role assignment (create or edit), the system MUST call `checkRoleDirectionMismatch()`. On mismatch, display a non-blocking yellow banner. The user may override via an explicitly labeled button. SOCIO (expectedDirection: mixed) MUST bypass the warning regardless of direction profile. Override events MUST be logged server-side.
+
+#### Scenario: Warning shown for mismatch
+
+- GIVEN user assigns CLIENTE to an entity with 100% debits
+- WHEN checkRoleDirectionMismatch returns mismatched=true
+- THEN yellow banner is displayed and user must confirm override
+
+#### Scenario: SOCIO bypasses warning
+
+- GIVEN user assigns SOCIO to entity with any direction profile
+- WHEN checkRoleDirectionMismatch returns mismatched=false
+- THEN no warning shown
+
+#### Scenario: Warning logged on override
+
+- GIVEN user clicks override button
+- WHEN entity is saved
+- THEN mismatch event is logged server-side with role, expected direction, actual direction, and user info
+
+### Requirement: Split Mixed Entities
+
+In EntityOnboardingModal, when a candidate has `creditPct >= 0.15 && debitPct >= 0.15`, the system MUST show a split option. The user selects a direction (credit or debit) → creates EntityContext with `{ pattern, role, transactionDirection }`. The other direction's transactions remain unclassified. On next scan, if the pattern+direction exists and opposite-direction unclassified transactions remain, the system prompts to create a separate entity for the remaining direction.
+
+#### Scenario: Mixed entity shows split option
+
+- GIVEN candidate with 60% credit / 40% debit
+- WHEN rendered in EntityOnboardingModal
+- THEN "Split into 2 entities?" button appears
+
+#### Scenario: Dominant direction does not show split
+
+- GIVEN candidate with 90% credit / 10% debit
+- WHEN rendered
+- THEN split button is hidden
+
+#### Scenario: Successful split creates suffixed pattern
+
+- GIVEN mixed candidate with pattern "OMAR MIRA"
+- WHEN user splits keeping credits
+- THEN EntityContext `{ pattern: "OMAR MIRA - ingresos", transactionDirection: "credit" }` is created
+- AND debit transactions stay unclassified

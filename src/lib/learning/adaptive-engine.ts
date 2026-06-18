@@ -23,6 +23,14 @@ export type FeedbackEvent = {
   amount?: number; // Optional transaction amount
 };
 
+/**
+ * Computes a deterministic hash for a bank description to use in dedup checks.
+ * Normalizes casing and trims whitespace before hashing.
+ */
+export function computeDescriptionHash(description: string): string {
+  return createHash('sha256').update(description.toLowerCase().trim()).digest('hex');
+}
+
 export async function recordFeedback(event: FeedbackEvent) {
   const configPath = join(process.cwd(), 'rules/learning-engine.json');
   const config = JSON.parse(readFileSync(configPath, 'utf-8'));
@@ -45,6 +53,32 @@ export async function recordFeedback(event: FeedbackEvent) {
       }
     } catch (err) {
       logger.info('[ADAPTIVE] Log rotation skipped', { error: String(err) });
+    }
+  }
+
+  // Dedup: skip if same description hash already exists in the active log
+  const descHash = computeDescriptionHash(event.bankDescription);
+  if (existsSync(logPath)) {
+    try {
+      const existingContent = readFileSync(logPath, 'utf-8');
+      const existingLines = existingContent.trim().split('\n').filter(Boolean);
+      for (const line of existingLines) {
+        try {
+          const existingEvent: FeedbackEvent = JSON.parse(line);
+          const existingHash = computeDescriptionHash(existingEvent.bankDescription);
+          if (existingHash === descHash) {
+            logger.info('[ADAPTIVE] Duplicate feedback skipped', {
+              hash: descHash,
+              description: event.bankDescription,
+            });
+            return;
+          }
+        } catch {
+          // Skip malformed lines
+        }
+      }
+    } catch {
+      // File may be empty or unreadable — proceed to append
     }
   }
 

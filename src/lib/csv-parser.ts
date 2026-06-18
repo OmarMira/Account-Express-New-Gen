@@ -83,7 +83,8 @@ export function parseCSV(content: string): ParsedTransaction[] {
 // ─── Line splitting (handles quoted fields) ──────────────────────────
 
 function splitIntoLines(content: string): string[] {
-  // Handle both \r\n and \n
+  // Handle both \r\n and \n — only track quotes to avoid splitting
+  // inside quoted fields. Leave escape processing to parseLine().
   const raw = content.replace(/\r\n/g, '\n');
   const lines: string[] = [];
   let current = '';
@@ -92,14 +93,8 @@ function splitIntoLines(content: string): string[] {
   for (let i = 0; i < raw.length; i++) {
     const ch = raw[i];
     if (ch === '"') {
-      // Check for escaped quote
-      if (inQuotes && i + 1 < raw.length && raw[i + 1] === '"') {
-        current += '"';
-        i++;
-      } else {
-        inQuotes = !inQuotes;
-        current += ch;
-      }
+      inQuotes = !inQuotes;
+      current += ch;
     } else if (ch === '\n' && !inQuotes) {
       lines.push(current);
       current = '';

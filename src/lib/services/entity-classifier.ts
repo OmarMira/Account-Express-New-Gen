@@ -12,10 +12,11 @@ export interface ClassifyEntityInput {
   glAccountCode?: string;
   source?: 'user' | 'ai';
   userId?: string;
+  transactionDirection?: string | null;
 }
 
 export async function classifyEntity(input: ClassifyEntityInput): Promise<void> {
-  const { companyId, pattern, role, roles, glAccountCode, source, userId } = input;
+  const { companyId, pattern, role, roles, glAccountCode, source, userId, transactionDirection } = input;
 
   let glAccountId: string | null = null;
   if (glAccountCode) {
@@ -33,6 +34,7 @@ export async function classifyEntity(input: ClassifyEntityInput): Promise<void> 
     glAccountId,
     source: source ?? 'user',
     userId,
+    transactionDirection,
   });
 
   logger.info('[ENTITY CLASSIFIED]', { companyId, pattern, role, roles });

@@ -5,7 +5,7 @@
  */
 export function normalizeBankDescription(raw: string): string {
   return raw
-    .replace(/Conf#[\w]+/gi, '') // Referencias Zelle (Conf# T0YKY6RCL)
+    .replace(/Conf#\s*[\w]+/gi, '') // Referencias Zelle (Conf#T0YKY6RCL o Conf# T0YKY6RCL)
     .replace(/\bID:[\w]+/gi, '') // IDs ACH/WEB (ID:M4884, ID:2057245)
     .replace(/CO ID:[\d\s]+/gi, '') // CO ID bancarios (CO ID:1133133497)
     .replace(/DES:[^\s]+/gi, '') // Etiquetas de red (DES:ACH PMT)

@@ -6,14 +6,12 @@ import {
   ArrowLeftRight,
   Check,
   Download,
-  Loader2,
   Landmark,
   Play,
   AlertTriangle,
   Search,
   Undo2,
   PlusCircle,
-  FileText,
   Calendar,
   X,
   Scissors,
@@ -32,7 +30,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -48,105 +45,28 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
-} from '@/components/ui/dialog';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useLanguageStore } from '@/store/language-store';
 import { useAuthStore } from '@/store/auth-store';
 import { AccountSelector, type GlAccountOption } from '@/components/spa/journal/AccountSelector';
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
-
-/* ─── Types ─── */
-interface BankAccountOption {
-  id: string;
-  accountName: string;
-  bankName: string;
-}
-
-interface StatementOption {
-  id: string;
-  startDate: string;
-  endDate: string;
-  openingBalance: number;
-  closingBalance: number;
-  format: string;
-  fileName: string | null;
-}
-
-interface GlAccount {
-  id: string;
-  code: string;
-  name: string;
-  accountType: string;
-  normalBalance: string;
-}
-
-interface Transaction {
-  id: string;
-  date: string;
-  description: string;
-  amount: number;
-  reference: string | null;
-  glAccountId: string | null;
-  glAccount: { id: string; code: string; name: string } | null;
-  matchedRule: { id: string; name: string } | null;
-  reconciledAt: string | null;
-  createdAt: string;
-}
-
-interface ReconciliationSummary {
-  statementBalance: number;
-  bookBalance: number;
-  difference: number;
-  totalTransactions: number;
-  reconciledCount: number;
-  unreconciledCount: number;
-  pendingReviewCount: number;
-  depositsTotal: number;
-  paymentsTotal: number;
-  filteredCount: number;
-}
-
-interface BankAccountInfo {
-  id: string;
-  accountName: string;
-  bankName: string;
-  balance: number;
-  currency: string;
-  glAccount: GlAccount;
-}
-
-interface ReconPeriod {
-  id: string;
-  bankAccountId: string;
-  userId: string;
-  statementBalance: number;
-  bookBalance: number;
-  difference: number;
-  status: string;
-  startedAt: string;
-  completedAt: string | null;
-  transactionCount: number;
-  notes: string | null;
-  user?: { firstName: string; lastName: string };
-}
+import {
+  SplitTransactionDialog,
+  AutoMatchDialog,
+  ReconcileDialog,
+  UnreconcileDialog,
+  AdjustmentDialog,
+  HistoryDialog,
+} from '@/components/reconciliation/ReconciliationDialogs';
+import type {
+  BankAccountOption,
+  StatementOption,
+  Transaction,
+  ReconciliationSummary,
+  BankAccountInfo,
+  ReconPeriod,
+} from '@/lib/types/reconciliation';
 
 /* ─── Component ─── */
 export function ReconciliationPage() {
@@ -1218,147 +1138,15 @@ export function ReconciliationPage() {
             </CardContent>
           </Card>
 
-          {/* Split Transaction Dialog */}
-          <Dialog open={splitDialogOpen} onOpenChange={setSplitDialogOpen}>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>{t('reconciliation.splitTransaction')}</DialogTitle>
-                <DialogDescription>
-                  {t('reconciliation.splitTransactionDesc').replace(
-                    '{amount}',
-                    formatCurrency(splittingTx?.amount || 0),
-                  )}
-                </DialogDescription>
-              </DialogHeader>
-
-              <div className="space-y-4 py-4">
-                <div className="max-h-[300px] overflow-y-auto space-y-3 pr-2">
-                  {currentSplits.map((split, index) => (
-                    <div
-                      key={index}
-                      className="flex items-start gap-3 p-3 rounded-xl border bg-muted/30"
-                    >
-                      <div className="flex-1 space-y-2">
-                        <Label className="text-[10px] uppercase font-bold text-muted-foreground">
-                          Cuenta Contable
-                        </Label>
-                        <AccountSelector
-                          accounts={accounts}
-                          value={split.glAccountId}
-                          onChange={(id) => {
-                            const next = [...currentSplits];
-                            next[index].glAccountId = id || '';
-                            setCurrentSplits(next);
-                          }}
-                        />
-                      </div>
-                      <div className="w-32 space-y-2">
-                        <Label className="text-[10px] uppercase font-bold text-muted-foreground">
-                          Monto
-                        </Label>
-                        <Input
-                          type="number"
-                          value={split.amount}
-                          onChange={(e) => {
-                            const next = [...currentSplits];
-                            next[index].amount = parseFloat(e.target.value) || 0;
-                            setCurrentSplits(next);
-                          }}
-                          className="h-10 text-right font-mono"
-                        />
-                      </div>
-                      <div className="flex-1 space-y-2">
-                        <Label className="text-[10px] uppercase font-bold text-muted-foreground">
-                          Descripción
-                        </Label>
-                        <Input
-                          value={split.description}
-                          onChange={(e) => {
-                            const next = [...currentSplits];
-                            next[index].description = e.target.value;
-                            setCurrentSplits(next);
-                          }}
-                          className="h-10"
-                        />
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="mt-6 text-rose-500 hover:text-rose-600 hover:bg-rose-50"
-                        onClick={() => {
-                          if (currentSplits.length > 1) {
-                            setCurrentSplits(currentSplits.filter((_, i) => i !== index));
-                          }
-                        }}
-                      >
-                        <X className="size-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full gap-2 border-dashed"
-                  onClick={() => {
-                    setCurrentSplits([
-                      ...currentSplits,
-                      { glAccountId: '', amount: 0, description: splittingTx?.description || '' },
-                    ]);
-                  }}
-                >
-                  <PlusCircle className="size-4" />
-                  {t('reconciliation.addSplit')}
-                </Button>
-
-                <div className="flex items-center justify-between p-4 rounded-xl bg-primary/5 border border-primary/10">
-                  <div className="text-sm">
-                    <p className="text-muted-foreground">{t('reconciliation.totalSplit')}</p>
-                    <p className="font-bold text-lg">
-                      {formatCurrency(currentSplits.reduce((sum, s) => sum + s.amount, 0))}
-                    </p>
-                  </div>
-                  <div className="text-right text-sm">
-                    <p className="text-muted-foreground">{t('reconciliation.pendingDifference')}</p>
-                    <p
-                      className={cn(
-                        'font-bold text-lg',
-                        Math.abs(
-                          Math.abs(splittingTx?.amount || 0) -
-                            currentSplits.reduce((sum, s) => sum + s.amount, 0),
-                        ) < 0.01
-                          ? 'text-emerald-600'
-                          : 'text-rose-600',
-                      )}
-                    >
-                      {formatCurrency(
-                        Math.abs(splittingTx?.amount || 0) -
-                          currentSplits.reduce((sum, s) => sum + s.amount, 0),
-                      )}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setSplitDialogOpen(false)}>
-                  {t('common.cancel')}
-                </Button>
-                <Button
-                  onClick={saveSplits}
-                  disabled={
-                    Math.abs(
-                      Math.abs(splittingTx?.amount || 0) -
-                        currentSplits.reduce((sum, s) => sum + s.amount, 0),
-                    ) > 0.01
-                  }
-                >
-                  {t('reconciliation.confirmSplit')}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          <SplitTransactionDialog
+            open={splitDialogOpen}
+            onOpenChange={setSplitDialogOpen}
+            splittingTx={splittingTx}
+            currentSplits={currentSplits}
+            setCurrentSplits={setCurrentSplits}
+            accounts={accounts}
+            onSave={saveSplits}
+          />
 
           {/* Deposits / Credits */}
           <Card>
@@ -1592,336 +1380,49 @@ export function ReconciliationPage() {
         </div>
       )}
 
-      {/* ─── DIALOGS ─── */}
+      <AutoMatchDialog
+        open={autoMatchDialogOpen}
+        onOpenChange={setAutoMatchDialogOpen}
+        autoMatching={autoMatching}
+        autoMatchResult={autoMatchResult}
+        createJournalEntries={createJournalEntries}
+        onConfirm={handleAutoMatch}
+      />
 
-      {/* Auto-Match Dialog */}
-      <Dialog open={autoMatchDialogOpen} onOpenChange={setAutoMatchDialogOpen}>
-        <DialogContent className="sm:max-w-[480px]">
-          <DialogHeader>
-            <DialogTitle>{t('reconciliation.autoMatchTitle')}</DialogTitle>
-            <DialogDescription>{t('reconciliation.autoMatchDesc')}</DialogDescription>
-          </DialogHeader>
-          {createJournalEntries && (
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
-              <AlertTriangle className="size-4 text-amber-600" />
-              <p className="text-xs text-amber-700 dark:text-amber-400">
-                {t('reconciliation.createJournalEntriesDesc')}
-              </p>
-            </div>
-          )}
-          {autoMatchResult ? (
-            <div className="space-y-4">
-              <Card className="bg-emerald-50 border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-800">
-                <CardContent className="p-4 text-center">
-                  <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">
-                    {autoMatchResult.matched}
-                  </p>
-                  <p className="text-sm text-emerald-600 dark:text-emerald-400 mt-1">
-                    {t('reconciliation.transactionsMatched')}
-                  </p>
-                  <div className="flex justify-center gap-4 mt-2">
-                    <span className="text-xs text-muted-foreground">
-                      {t('reconciliation.matchedByRule')}: {autoMatchResult.matchedByRule}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {t('reconciliation.matchedByAmount')}: {autoMatchResult.matchedByAmount}
-                    </span>
-                  </div>
-                  {autoMatchResult.total > autoMatchResult.matched && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {autoMatchResult.total - autoMatchResult.matched}{' '}
-                      {t('reconciliation.stillUnmatched')}
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-              <DialogFooter>
-                <Button onClick={() => setAutoMatchDialogOpen(false)}>{t('common.confirm')}</Button>
-              </DialogFooter>
-            </div>
-          ) : (
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setAutoMatchDialogOpen(false)}>
-                {t('common.cancel')}
-              </Button>
-              <Button onClick={handleAutoMatch} disabled={autoMatching} className="gap-2">
-                {autoMatching && <Loader2 className="size-4 animate-spin" />}
-                <Play className="size-4" />
-                {t('reconciliation.autoMatch')}
-              </Button>
-            </DialogFooter>
-          )}
-        </DialogContent>
-      </Dialog>
+      <ReconcileDialog
+        open={reconcileDialogOpen}
+        onOpenChange={setReconcileDialogOpen}
+        reconciling={reconciling}
+        reconcileResult={reconcileResult}
+        selectedCount={selectedTxIds.size}
+        createJournalEntries={createJournalEntries}
+        onConfirm={handleReconcile}
+      />
 
-      {/* Reconcile Confirmation Dialog */}
-      <Dialog open={reconcileDialogOpen} onOpenChange={setReconcileDialogOpen}>
-        <DialogContent className="sm:max-w-[420px]">
-          <DialogHeader>
-            <DialogTitle>{t('reconciliation.confirmReconcile')}</DialogTitle>
-            <DialogDescription>
-              {t('reconciliation.confirmReconcileDesc').replace(
-                '{count}',
-                String(selectedTxIds.size),
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          {createJournalEntries && (
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
-              <AlertTriangle className="size-4 text-amber-600" />
-              <p className="text-xs text-amber-700 dark:text-amber-400">
-                {t('reconciliation.createJournalEntriesDesc')}
-              </p>
-            </div>
-          )}
-          {reconcileResult !== null ? (
-            <div className="space-y-4">
-              <Card className="bg-emerald-50 border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-800">
-                <CardContent className="p-4 text-center">
-                  <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">
-                    {reconcileResult}
-                  </p>
-                  <p className="text-sm text-emerald-600 dark:text-emerald-400 mt-1">
-                    {t('reconciliation.transactionsReconciled')}
-                  </p>
-                </CardContent>
-              </Card>
-              <DialogFooter>
-                <Button onClick={() => setReconcileDialogOpen(false)}>{t('common.confirm')}</Button>
-              </DialogFooter>
-            </div>
-          ) : (
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setReconcileDialogOpen(false)}>
-                {t('common.cancel')}
-              </Button>
-              <Button onClick={handleReconcile} disabled={reconciling} className="gap-2">
-                {reconciling && <Loader2 className="size-4 animate-spin" />}
-                <Check className="size-4" />
-                {t('reconciliation.reconcileSelected')} ({selectedTxIds.size})
-              </Button>
-            </DialogFooter>
-          )}
-        </DialogContent>
-      </Dialog>
+      <UnreconcileDialog
+        open={unreconcileDialogOpen}
+        onOpenChange={setUnreconcileDialogOpen}
+        unreconciling={unreconciling}
+        unreconcileResult={unreconcileResult}
+        selectedCount={selectedTxIds.size}
+        onConfirm={handleUnreconcile}
+      />
 
-      {/* Unreconcile Confirmation Dialog */}
-      <Dialog open={unreconcileDialogOpen} onOpenChange={setUnreconcileDialogOpen}>
-        <DialogContent className="sm:max-w-[420px]">
-          <DialogHeader>
-            <DialogTitle>{t('reconciliation.confirmUnreconcile')}</DialogTitle>
-            <DialogDescription>
-              {t('reconciliation.confirmUnreconcileDesc').replace(
-                '{count}',
-                String(selectedTxIds.size),
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          {unreconcileResult !== null ? (
-            <div className="space-y-4">
-              <Card className="bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800">
-                <CardContent className="p-4 text-center">
-                  <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">
-                    {unreconcileResult}
-                  </p>
-                  <p className="text-sm text-amber-600 dark:text-amber-400 mt-1">
-                    {t('reconciliation.transactionsUnreconciled')}
-                  </p>
-                </CardContent>
-              </Card>
-              <DialogFooter>
-                <Button onClick={() => setUnreconcileDialogOpen(false)}>
-                  {t('common.confirm')}
-                </Button>
-              </DialogFooter>
-            </div>
-          ) : (
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setUnreconcileDialogOpen(false)}>
-                {t('common.cancel')}
-              </Button>
-              <Button
-                onClick={handleUnreconcile}
-                disabled={unreconciling}
-                className="gap-2"
-                variant="destructive"
-              >
-                {unreconciling && <Loader2 className="size-4 animate-spin" />}
-                <Undo2 className="size-4" />
-                {t('reconciliation.unreconcileSelected')} ({selectedTxIds.size})
-              </Button>
-            </DialogFooter>
-          )}
-        </DialogContent>
-      </Dialog>
+      <AdjustmentDialog
+        open={adjustmentDialogOpen}
+        onOpenChange={setAdjustmentDialogOpen}
+        adjusting={adjusting}
+        adjustForm={adjustForm}
+        onFormChange={setAdjustForm}
+        accounts={accounts}
+        onSave={handleAdjustment}
+      />
 
-      {/* Adjustment Dialog */}
-      <Dialog open={adjustmentDialogOpen} onOpenChange={setAdjustmentDialogOpen}>
-        <DialogContent className="sm:max-w-[520px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <PlusCircle className="size-5" />
-              {t('reconciliation.adjustmentTitle')}
-            </DialogTitle>
-            <DialogDescription>{t('reconciliation.adjustmentDesc')}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-sm">{t('reconciliation.adjustmentDate')}</Label>
-                <Input
-                  type="date"
-                  value={adjustForm.date}
-                  onChange={(e) => setAdjustForm({ ...adjustForm, date: e.target.value })}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-sm">{t('reconciliation.adjustmentAmount')}</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={adjustForm.amount}
-                  onChange={(e) => setAdjustForm({ ...adjustForm, amount: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-sm">{t('reconciliation.adjustmentDescription')}</Label>
-              <Input
-                placeholder="e.g., Bank fee adjustment"
-                value={adjustForm.description}
-                onChange={(e) => setAdjustForm({ ...adjustForm, description: e.target.value })}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-sm">{t('reconciliation.adjustmentDebitAccount')}</Label>
-                <AccountSelector
-                  accounts={accounts}
-                  value={adjustForm.debitAccountId}
-                  onChange={(id) => setAdjustForm({ ...adjustForm, debitAccountId: id ?? '' })}
-                  placeholder="Select debit account"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-sm">{t('reconciliation.adjustmentCreditAccount')}</Label>
-                <AccountSelector
-                  accounts={accounts}
-                  value={adjustForm.creditAccountId}
-                  onChange={(id) => setAdjustForm({ ...adjustForm, creditAccountId: id ?? '' })}
-                  placeholder="Select credit account"
-                />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-sm">{t('reconciliation.adjustmentNotes')}</Label>
-              <Textarea
-                placeholder={t('reconciliation.adjustmentNotes')}
-                value={adjustForm.notes}
-                onChange={(e) => setAdjustForm({ ...adjustForm, notes: e.target.value })}
-                rows={2}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setAdjustmentDialogOpen(false)}>
-              {t('common.cancel')}
-            </Button>
-            <Button
-              onClick={handleAdjustment}
-              disabled={
-                adjusting ||
-                !adjustForm.description ||
-                !adjustForm.debitAccountId ||
-                !adjustForm.creditAccountId ||
-                !adjustForm.amount
-              }
-              className="gap-2"
-            >
-              {adjusting && <Loader2 className="size-4 animate-spin" />}
-              <PlusCircle className="size-4" />
-              {t('reconciliation.createAdjustment')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* History Dialog */}
-      <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <HistoryIcon className="size-5" />
-              {t('reconciliation.historyTitle')}
-            </DialogTitle>
-          </DialogHeader>
-          {historyPeriods.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <FileText className="size-12 text-muted-foreground/30 mb-3" />
-              <p className="text-muted-foreground">{t('reconciliation.noHistory')}</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {historyPeriods.map((p) => (
-                <div key={p.id} className="p-4 rounded-lg border space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Badge
-                        variant={
-                          p.status === 'completed'
-                            ? 'default'
-                            : p.status === 'open'
-                              ? 'secondary'
-                              : 'outline'
-                        }
-                      >
-                        {p.status === 'completed'
-                          ? t('reconciliation.periodCompletedStatus')
-                          : p.status === 'open'
-                            ? t('reconciliation.periodOpen')
-                            : t('reconciliation.periodCancelled')}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground">
-                        {t('reconciliation.startedBy')}:{' '}
-                        {p.user ? `${p.user.firstName} ${p.user.lastName}` : '—'}
-                      </span>
-                    </div>
-                    <span className="text-xs text-muted-foreground">{formatDate(p.startedAt)}</span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 text-sm">
-                    <div>
-                      <span className="text-muted-foreground">Stmt: </span>
-                      <span className="font-mono">{formatCurrency(p.statementBalance)}</span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Book: </span>
-                      <span className="font-mono">{formatCurrency(p.bookBalance)}</span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Diff: </span>
-                      <span
-                        className={cn(
-                          'font-mono',
-                          Math.abs(p.difference) < 0.005 ? 'text-emerald-600' : 'text-rose-600',
-                        )}
-                      >
-                        {formatCurrency(p.difference)}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>
-                      {p.transactionCount} {t('reconciliation.transactionsReconciled')}
-                    </span>
-                    {p.completedAt && <span>{formatDate(p.completedAt)}</span>}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <HistoryDialog
+        open={historyDialogOpen}
+        onOpenChange={setHistoryDialogOpen}
+        historyPeriods={historyPeriods}
+      />
     </div>
   );
 }

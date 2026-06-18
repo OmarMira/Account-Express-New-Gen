@@ -50,6 +50,14 @@ The system MUST provide `resolveRolePriority(candidate, entityContexts)` returni
 
 The system MUST provide `resolveDirection(candidate)` returning `"debit"`, `"credit"`, or `null` based on the candidate's resolved role and transaction type.
 
+`ROLE_ACCOUNT_MAP` MUST include an `expectedDirection` field for each role: `'credit'`, `'debit'`, or `'mixed'`.
+
+| Role | expectedDirection |
+|------|-----------------|
+| CLIENTE, INGRESO, INQUILINO | credit |
+| PROVEEDOR, EMPLEADO, GASTO_OPERATIVO, TARJETA_CREDITO, PRESTAMO | debit |
+| SOCIO | mixed |
+
 #### Scenario: Known role resolves direction
 
 - GIVEN a candidate with role PROVEEDOR
@@ -61,6 +69,30 @@ The system MUST provide `resolveDirection(candidate)` returning `"debit"`, `"cre
 - GIVEN a candidate with role OTRO or IGNORADA
 - WHEN `resolveDirection` is called
 - THEN `null` is returned
+
+#### Scenario: Direction mapped correctly
+
+- GIVEN `ROLE_ACCOUNT_MAP` with `expectedDirection` for each role
+- WHEN any role is looked up
+- THEN `expectedDirection` matches the expected-direction table above
+
+### Requirement: Role-Direction Mismatch Detection
+
+The system MUST provide `checkRoleDirectionMismatch(role, directionProfile)` returning `{ mismatched: boolean, expected: string, actual: string } | null`. This is a pure function with no side effects, callable from both backend (entity-enricher) and frontend (EntityOnboardingModal, EntityManagementPage).
+
+When `expectedDirection` conflicts with the entity's direction profile (e.g., role expects credits but entity has 90% debits), `mismatched` MUST be `true`. SOCIO (expectedDirection: mixed) MUST never mismatch. OTRO/IGNORADA (null expectedDirection) MUST never mismatch.
+
+#### Scenario: Mismatch detected
+
+- GIVEN role CLIENTE (expected: credit) and directionProfile `{ creditPct: 0.1, debitPct: 0.9 }`
+- WHEN `checkRoleDirectionMismatch` is called
+- THEN `mismatched` is true, `expected` is "credit", `actual` is "debit"
+
+#### Scenario: SOCIO never mismatches
+
+- GIVEN role SOCIO (expected: mixed) and ANY directionProfile
+- WHEN `checkRoleDirectionMismatch` is called
+- THEN `mismatched` is always false
 
 ### Requirement: Per-Candidate Enrichment
 

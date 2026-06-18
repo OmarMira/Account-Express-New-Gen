@@ -302,17 +302,18 @@ model Session {
 }
 
 model EntityContext {
-  id          String     @id @default(cuid())
-  companyId   String
-  pattern     String
-  role        String
-  roles       String?
-  glAccountId String?
-  source      String     @default("user")
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  glAccount   GlAccount? @relation(fields: [glAccountId], references: [id], onDelete: SetNull)
-  company     Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  id                   String     @id @default(cuid())
+  companyId            String
+  pattern              String
+  role                 String
+  roles                String?
+  transactionDirection String?
+  glAccountId          String?
+  source               String     @default("user")
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+  glAccount            GlAccount? @relation(fields: [glAccountId], references: [id], onDelete: SetNull)
+  company              Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@unique([companyId, pattern])
   @@index([companyId])

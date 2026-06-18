@@ -1,22 +1,14 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Upload,
-  FileSpreadsheet,
-  FileText,
-  File,
   Loader2,
-  CheckCircle2,
   AlertCircle,
-  X,
   Clock,
   BarChart3,
   Landmark,
-  ArrowLeftRight,
   RefreshCcw,
   FileUp,
-  Sparkles,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -39,7 +31,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Check } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
 import { useLanguageStore } from '@/store/language-store';
 import { Input } from '@/components/ui/input';
@@ -53,144 +44,20 @@ import {
 import { AccountSelector, type GlAccountOption } from './journal/AccountSelector';
 import { EntityOnboardingModal } from '@/components/learning/EntityOnboardingModal';
 import { logger } from '@/lib/logger';
-
-// ─── Types ────────────────────────────────────────────────────────────
-
-interface BankAccountOption {
-  id: string;
-  accountName: string;
-  bankName: string;
-  accountNo: string | null;
-}
-
-interface ImportStatement {
-  id: string;
-  bankAccountId: string;
-  bankAccount: { id: string; accountName: string; bankName: string };
-  startDate: string;
-  endDate: string;
-  openingBalance: number;
-  closingBalance: number;
-  format: string;
-  fileName: string | null;
-  createdAt: string;
-  transactionCount: number;
-  autoCategorizedCount: number;
-  autoCategorizedPercent: number;
-}
-
-interface ImportResult {
-  statementId: string;
-  transactionCount: number;
-  autoCategorizedCount: number;
-  duplicatesSkipped: number;
-  newAccountCreated: boolean;
-  bankAccountName: string;
-  skippedNote?: string;
-}
-
-interface ValidationResult {
-  requiresApproval: boolean;
-  fileName: string;
-  extractedHolder: string;
-  score: number;
-}
-
-interface GlAccountData {
-  id: string;
-  code: string;
-  name: string;
-  accountType: string;
-  parentId?: string | null;
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function getFileIcon(fileName: string) {
-  const ext = fileName.split('.').pop()?.toLowerCase();
-  switch (ext) {
-    case 'csv':
-    case 'tsv':
-      return <FileSpreadsheet className="size-8 text-emerald-500" />;
-    case 'ofx':
-    case 'qfx':
-      return <FileText className="size-8 text-teal-500" />;
-    case 'pdf':
-      return <File className="size-8 text-red-500" />;
-    default:
-      return <File className="size-8 text-muted-foreground" />;
-  }
-}
-
-function getFormatBadge(format: string) {
-  const config: Record<string, { className: string; label: string }> = {
-    csv: {
-      className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
-      label: 'CSV',
-    },
-    ofx: {
-      className: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300',
-      label: 'OFX',
-    },
-    qfx: {
-      className: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300',
-      label: 'QFX',
-    },
-    pdf: {
-      className: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
-      label: 'PDF',
-    },
-  };
-  const c = config[format] || config.csv;
-  return (
-    <Badge variant="outline" className={cn('text-[10px] font-semibold uppercase', c.className)}>
-      {c.label}
-    </Badge>
-  );
-}
-
-function formatDateShort(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-  });
-}
-
-const ACCEPTED_TYPES = ['.csv', '.tsv', '.txt', '.ofx', '.qfx', '.pdf'];
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
-
-const CURRENCIES = [
-  { value: 'USD', label: 'USD ($)' },
-  { value: 'EUR', label: 'EUR (€)' },
-  { value: 'GBP', label: 'GBP (£)' },
-  { value: 'MXN', label: 'MXN ($)' },
-  { value: 'CAD', label: 'CAD ($)' },
-];
-
-const FORMAT_BADGES: { label: string; className: string }[] = [
-  {
-    label: 'CSV',
-    className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
-  },
-  {
-    label: 'OFX',
-    className: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300',
-  },
-  {
-    label: 'QFX',
-    className: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300',
-  },
-  {
-    label: 'PDF',
-    className: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
-  },
-];
+import { ImportDropZone } from '@/components/import/ImportDropZone';
+import { ImportResultDialog } from '@/components/import/ImportResultDialog';
+import { MismatchWarningDialog } from '@/components/import/MismatchWarningDialog';
+import {
+  type BankAccountOption,
+  type ImportStatement,
+  type ImportResult,
+  type ValidationResult,
+  type GlAccountData,
+  CURRENCIES,
+  getFileIcon,
+  getFormatBadge,
+  formatDateShort,
+} from '@/lib/types/import-page';
 
 // ─── Main Component ───────────────────────────────────────────────────
 
@@ -223,7 +90,6 @@ export function ImportPage() {
   const [assetAccounts, setAssetAccounts] = useState<GlAccountOption[]>([]);
 
   // Upload state
-  const [isDragging, setIsDragging] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -240,8 +106,6 @@ export function ImportPage() {
   >([]);
   const [mismatchModalOpen, setMismatchModalOpen] = useState(false);
   const [isStrict, setIsStrict] = useState(false);
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ─── Helpers ────────────────────────────────────────────────────────
   function formatNumberWithComas(val: string): string {
@@ -317,77 +181,23 @@ export function ImportPage() {
     fetchAssetAccounts();
   }, [fetchBankAccounts, fetchHistory, fetchAssetAccounts]);
 
-  // ─── Drag & Drop ─────────────────────────────────────────────────
-
-  function handleDragOver(e: React.DragEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(true);
-  }
-
-  function handleDragLeave(e: React.DragEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-  }
-
-  function handleDrop(e: React.DragEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-    setUploadError('');
-
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-      validateAndAddFiles(Array.from(files));
-    }
-  }
-
-  function handleFileInput(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = e.target.files;
-    if (files && files.length > 0) {
-      validateAndAddFiles(Array.from(files));
-    }
-  }
-
-  function validateAndAddFiles(files: File[]) {
-    const validFiles: File[] = [];
-    let errorMsg = '';
-
-    for (const file of files) {
-      const ext = '.' + (file.name.split('.').pop()?.toLowerCase() || '');
-      if (!ACCEPTED_TYPES.includes(ext)) {
-        errorMsg = `${t('common.type')}: "${ext}" — ${t('banks.supportedFormats')}`;
-        continue;
-      }
-      if (file.size > MAX_FILE_SIZE) {
-        errorMsg = `${t('common.type')}: ${formatFileSize(file.size)} — ${t('banks.supportedFormats')}`;
-        continue;
-      }
-      validFiles.push(file);
-    }
-
-    if (validFiles.length > 0) {
-      setSelectedFiles((prev) => [...prev, ...validFiles]);
-    }
-    if (errorMsg) {
-      setUploadError(errorMsg);
-    }
-  }
+  // ─── Handlers ────────────────────────────────────────────────────
 
   function removeFile(index: number) {
     setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
   }
 
   function clearFiles() {
     setSelectedFiles([]);
     setUploadError('');
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+  }
+
+  function handleFilesAdded(files: File[]) {
+    setSelectedFiles((prev) => [...prev, ...files]);
+  }
+
+  function handleUploadError(error: string) {
+    setUploadError(error);
   }
 
   // ─── Upload ───────────────────────────────────────────────────────
@@ -396,6 +206,11 @@ export function ImportPage() {
     setMismatchModalOpen(false);
     setSelectedFiles([]);
   };
+
+  function handleAcceptMismatch() {
+    setMismatchModalOpen(false);
+    handleUpload(true);
+  }
 
   async function handleUpload(forceBypass: boolean = false) {
     if (selectedFiles.length === 0 || !activeCompany) return;
@@ -696,125 +511,14 @@ export function ImportPage() {
         <CardContent className="pt-6">
           <div className="space-y-5">
             {/* Drop zone */}
-            <div
-              className={cn(
-                'relative rounded-xl border-2 border-dashed p-8 text-center transition-all cursor-pointer',
-                isDragging
-                  ? 'border-primary bg-primary/5 scale-[1.01]'
-                  : selectedFiles.length > 0
-                    ? 'border-emerald-300 dark:border-emerald-700 bg-emerald-50/50 dark:bg-emerald-950/20'
-                    : 'border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/50',
-                uploading && 'pointer-events-none opacity-60',
-              )}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              onClick={(e) => {
-                if (uploading) return;
-                // Only click if we clicked the dropzone itself, not children buttons
-                if (
-                  (e.target as HTMLElement).tagName === 'BUTTON' ||
-                  (e.target as HTMLElement).closest('button')
-                ) {
-                  return;
-                }
-                fileInputRef.current?.click();
-              }}
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                className="hidden"
-                accept=".csv,.tsv,.txt,.ofx,.qfx,.pdf"
-                multiple
-                onChange={handleFileInput}
-              />
-
-              {selectedFiles.length > 0 ? (
-                /* Selected files preview */
-                <div className="flex flex-col items-center gap-4 w-full max-w-md mx-auto">
-                  <div className="w-full space-y-2 max-h-[200px] overflow-y-auto pr-1">
-                    {selectedFiles.map((file, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center justify-between p-2 rounded-lg border bg-background text-left"
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          {getFileIcon(file.name)}
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium truncate max-w-[200px]">
-                              {file.name}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {formatFileSize(file.size)}
-                            </p>
-                          </div>
-                        </div>
-                        {!uploading && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-8 text-muted-foreground hover:text-red-600 shrink-0"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeFile(idx);
-                            }}
-                          >
-                            <X className="size-4" />
-                          </Button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  {!uploading && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-muted-foreground hover:text-red-600"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        clearFiles();
-                      }}
-                    >
-                      <X className="size-3.5 mr-1" />
-                      {t('importPage.clearAll')}
-                    </Button>
-                  )}
-                </div>
-              ) : (
-                /* Empty drop zone */
-                <div className="flex flex-col items-center gap-3">
-                  <div
-                    className={cn(
-                      'flex size-14 items-center justify-center rounded-full transition-colors',
-                      isDragging ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground',
-                    )}
-                  >
-                    <Upload className="size-6" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">
-                      {isDragging ? t('banks.dragDrop') : t('banks.dragDrop')}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {t('banks.supportedFormats')}
-                    </p>
-                  </div>
-                  {/* Prominent format badges */}
-                  <div className="flex items-center gap-2 mt-2">
-                    {FORMAT_BADGES.map((fmt) => (
-                      <Badge
-                        key={fmt.label}
-                        variant="outline"
-                        className={cn('text-xs font-bold px-3 py-1', fmt.className)}
-                      >
-                        {fmt.label}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
+            <ImportDropZone
+              files={selectedFiles}
+              onFilesAdded={handleFilesAdded}
+              onRemoveFile={removeFile}
+              onClearFiles={clearFiles}
+              onError={handleUploadError}
+              uploading={uploading}
+            />
 
             {/* Upload progress */}
             {uploading && (
@@ -958,145 +662,19 @@ export function ImportPage() {
       </Card>
 
       {/* ─── Import Result Dialog ───────────────────────────────────── */}
-      <Dialog open={resultOpen} onOpenChange={setResultOpen}>
-        <DialogContent className="sm:max-w-[520px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 leading-normal">
-              <div className="flex size-8 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/40">
-                <CheckCircle2 className="size-5 text-emerald-600 dark:text-emerald-400" />
-              </div>
-              {t('banks.importSuccess')}
-            </DialogTitle>
-            <DialogDescription>{t('banks.importSuccessMessage')}</DialogDescription>
-          </DialogHeader>
-
-          {importResult && (
-            <div className="space-y-4 py-2">
-              {/* Summary cards */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-lg border p-3 text-center">
-                  <p className="text-2xl font-bold font-mono text-teal-600 dark:text-teal-400">
-                    {importResult.transactionCount}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {t('banks.transactionsImported')}
-                  </p>
-                </div>
-                <div className="rounded-lg border p-3 text-center">
-                  <p className="text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400">
-                    {importResult.transactionCount > 0
-                      ? Math.round(
-                          (importResult.autoCategorizedCount / importResult.transactionCount) * 100,
-                        )
-                      : 0}
-                    %
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">{t('banks.autoCategorized')}</p>
-                </div>
-              </div>
-
-              {/* Details */}
-              <div className="rounded-lg border p-3 space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">{t('banks.autoCategorized')}</span>
-                  <span className="font-medium shrink-0">
-                    {importResult.autoCategorizedCount} / {importResult.transactionCount}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-sm gap-2">
-                  <span className="text-muted-foreground shrink-0">{t('banks.title')}</span>
-                  <span className="font-medium truncate text-right max-w-[280px]">
-                    {importResult.bankAccountName}
-                  </span>
-                </div>
-                {importResult.newAccountCreated && (
-                  <div className="flex items-center gap-2 rounded-md bg-teal-50 dark:bg-teal-950/30 p-2 text-sm">
-                    <Landmark className="size-4 text-teal-600 dark:text-teal-400" />
-                    <span className="text-teal-700 dark:text-teal-300">
-                      {t('banks.newAccountCreated')}
-                    </span>
-                  </div>
-                )}
-                {importResult.duplicatesSkipped > 0 && (
-                  <div className="flex items-center gap-2 rounded-md bg-amber-50 dark:bg-amber-950/30 p-2 text-sm">
-                    <AlertCircle className="size-4 text-amber-600 dark:text-amber-400" />
-                    <span className="text-amber-700 dark:text-amber-300">
-                      {importResult.duplicatesSkipped} {t('reconciliation.duplicatesSkipped')}
-                    </span>
-                  </div>
-                )}
-                {importResult.skippedNote && (
-                  <div className="flex items-center gap-2 rounded-md bg-blue-50 dark:bg-blue-950/30 p-2 text-sm">
-                    <AlertCircle className="size-4 text-blue-600 dark:text-blue-400" />
-                    <span className="text-blue-700 dark:text-blue-300">
-                      {importResult.skippedNote}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Categorization bar */}
-              {importResult.transactionCount > 0 && (
-                <div className="space-y-1.5">
-                  <p className="text-xs text-muted-foreground">
-                    {t('banks.categorizationProgress')}
-                  </p>
-                  <div className="h-2 rounded-full bg-muted overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-emerald-500 transition-all duration-500"
-                      style={{
-                        width: `${
-                          importResult.transactionCount > 0
-                            ? (importResult.autoCategorizedCount / importResult.transactionCount) *
-                              100
-                            : 0
-                        }%`,
-                      }}
-                    />
-                  </div>
-                  {importResult.autoCategorizedCount < importResult.transactionCount && (
-                    <p className="text-xs text-amber-600 dark:text-amber-400">
-                      {importResult.transactionCount - importResult.autoCategorizedCount}{' '}
-                      {t('banks.transactions').toLowerCase()} {t('banks.uncategorizedNote')}
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          <DialogFooter className="flex-col sm:flex-row flex-wrap gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setResultOpen(false)}
-              className="w-full sm:flex-1"
-            >
-              {t('common.cancel')}
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setResultOpen(false);
-                setEntityOnboardingOpen(true);
-              }}
-              className="w-full sm:flex-1"
-            >
-              <Sparkles className="size-4 mr-1 shrink-0" />
-              <span className="truncate">{t('learning.classifyEntities')}</span>
-            </Button>
-            <Button
-              onClick={() => {
-                setResultOpen(false);
-                setCurrentView('reconciliation');
-              }}
-              className="w-full sm:w-auto"
-            >
-              <ArrowLeftRight className="size-4 mr-1" />
-              {t('banks.goToReconciliation')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ImportResultDialog
+        open={resultOpen}
+        onOpenChange={setResultOpen}
+        result={importResult}
+        onClassifyEntities={() => {
+          setResultOpen(false);
+          setEntityOnboardingOpen(true);
+        }}
+        onGoToReconciliation={() => {
+          setResultOpen(false);
+          setCurrentView('reconciliation');
+        }}
+      />
 
       {/* ─── Entity Onboarding Modal ───────────────── */}
       <EntityOnboardingModal
@@ -1278,111 +856,15 @@ export function ImportPage() {
       </Dialog>
 
       {/* ─── Account Holder Mismatch Warning Dialog ───────────────── */}
-      <Dialog open={mismatchModalOpen} onOpenChange={setMismatchModalOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle
-              className={`flex items-center gap-2 ${isStrict ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}`}
-            >
-              <AlertCircle className="size-5 shrink-0" />
-              <span>
-                {isStrict
-                  ? t('importPage.strictValidationTitle')
-                  : t('importPage.holderMismatchTitle')}
-              </span>
-            </DialogTitle>
-            <DialogDescription>
-              {isStrict
-                ? t('importPage.strictBlockedDesc')
-                : t('importPage.holderMismatchDesc')}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-2">
-            <div className="rounded-lg border overflow-hidden max-h-[160px] overflow-y-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t('importPage.tableFile')}</TableHead>
-                    <TableHead>{t('importPage.tablePdfHolder')}</TableHead>
-                    <TableHead className="text-right">{t('importPage.tableSimilarity')}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {mismatchFiles.map((f, idx) => (
-                    <TableRow key={idx}>
-                      <TableCell className="font-medium text-xs truncate max-w-[150px]">
-                        {f.fileName}
-                      </TableCell>
-                      <TableCell
-                        className={`text-xs font-semibold ${isStrict ? 'text-red-700 dark:text-red-400' : 'text-amber-700 dark:text-amber-400'}`}
-                      >
-                        {f.extractedHolder}
-                      </TableCell>
-                      <TableCell className="text-right text-xs font-mono">{f.score}%</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-
-            {isStrict ? (
-              <div className="rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 p-3 text-xs text-red-800 dark:text-red-300 leading-relaxed space-y-2">
-                <p className="font-semibold">🚫 {t('importPage.strictErrorTitle')}</p>
-                <p>
-                  {t('importPage.strictErrorDesc')
-                    .replace('{company}', activeCompany?.legalName || '')
-                    .replace('{holders}', mismatchFiles
-                      .map((f) => f.extractedHolder)
-                      .filter((v, i, a) => a.indexOf(v) === i)
-                      .join(', '))}
-                </p>
-                <p className="font-medium">
-                  {t('importPage.strictErrorAction')}
-                </p>
-              </div>
-            ) : (
-              <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 p-3 text-xs text-amber-800 dark:text-amber-300 leading-relaxed space-y-2">
-                <p className="font-semibold">⚠️ {t('importPage.integrityWarningTitle')}</p>
-                <p>
-                  {t('importPage.integrityWarningDesc')
-                    .replace('{company}', activeCompany?.legalName || '')
-                    .replace('{holders}', mismatchFiles
-                      .map((f) => f.extractedHolder)
-                      .filter((v, i, a) => a.indexOf(v) === i)
-                      .join(', '))}
-                </p>
-                <p className="font-medium">
-                  {t('importPage.integrityWarningAction')}
-                </p>
-              </div>
-            )}
-          </div>
-
-          <DialogFooter className="flex gap-2">
-            {isStrict ? (
-              <Button className="w-full" variant="outline" onClick={handleRejectMismatches}>
-                {t('importPage.close')}
-              </Button>
-            ) : (
-              <>
-                <Button variant="outline" onClick={handleRejectMismatches}>
-                  {t('importPage.rejectAndCancel')}
-                </Button>
-                <Button
-                  onClick={() => {
-                    setMismatchModalOpen(false);
-                    handleUpload(true);
-                  }}
-                  className="bg-amber-600 hover:bg-amber-700 text-white"
-                >
-                  {t('importPage.acceptAndImport')}
-                </Button>
-              </>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <MismatchWarningDialog
+        open={mismatchModalOpen}
+        onOpenChange={setMismatchModalOpen}
+        mismatches={mismatchFiles}
+        isStrict={isStrict}
+        companyName={activeCompany?.legalName || ''}
+        onReject={handleRejectMismatches}
+        onAccept={handleAcceptMismatch}
+      />
     </div>
   );
 }

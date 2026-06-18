@@ -4,6 +4,7 @@ import { requireCompanyContext } from '@/lib/context-storage';
 import { classifyEntity, getEntityCandidates } from '@/lib/services/entity-classifier';
 import { parseConversationalContext } from '@/lib/services/conversational-service';
 import { safeAuditLog } from '@/lib/services/audit-service';
+import { entityRoleSchema } from '@/lib/constants/entity-roles';
 import { logger } from '@/lib/logger';
 import { serverT } from '@/lib/server-i18n';
 
@@ -13,13 +14,18 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
 
   try {
     const body = await request.json();
-    const { pattern, userInput, glAccountCode, role } = body;
+    const { pattern, userInput, glAccountCode, role, transactionDirection, directionOverride } = body;
 
     if (!pattern) {
       return NextResponse.json(
         { error: serverT(locale, 'learning.patternRequired') },
         { status: 400 },
       );
+    }
+
+    // Log direction override for audit trail
+    if (directionOverride) {
+      logger.warn('[DIRECTION OVERRIDE]', { pattern, role, userId });
     }
 
     let finalRole = role;
@@ -41,6 +47,21 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
       finalGlAccountCode = finalGlAccountCode || parseResult.glAccountCode;
     }
 
+    // Validate role against canonical entity roles before persisting
+    if (finalRole) {
+      const roleResult = entityRoleSchema.safeParse(finalRole);
+      if (!roleResult.success) {
+        return NextResponse.json(
+          {
+            error: 'Invalid role',
+            details: roleResult.error.flatten(),
+            validRoles: entityRoleSchema.options,
+          },
+          { status: 400 },
+        );
+      }
+    }
+
     await classifyEntity({
       companyId,
       pattern,
@@ -49,6 +70,7 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
       glAccountCode: finalGlAccountCode || undefined,
       source: 'user',
       userId,
+      transactionDirection: transactionDirection ?? undefined,
     });
 
     await safeAuditLog({
@@ -60,6 +82,7 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
         pattern,
         role: finalRole,
         glAccountCode: finalGlAccountCode || null,
+        directionOverride: directionOverride || undefined,
       },
     });
 

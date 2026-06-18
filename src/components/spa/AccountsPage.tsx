@@ -2,25 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 import { ACCOUNT_TYPES } from '@/lib/constants/account-types';
-import {
-  Plus,
-  Search,
-  ChevronRight,
-  ChevronDown,
-  Lock,
-  Pencil,
-  Trash2,
-  FolderOpen,
-  Folder,
-  Loader2,
-  Landmark,
-  Shield,
-  Wallet,
-  TrendingUp,
-  Receipt,
-} from 'lucide-react';
+import { Plus, Search, Landmark } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,16 +16,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLanguageStore } from '@/store/language-store';
 import { useAuthStore } from '@/store/auth-store';
-import { BalanceBadge } from '@/components/spa/accounts/BalanceBadge';
 import type {
   GlAccount as GlAccountType,
   AccountFormData,
 } from '@/components/spa/accounts/AccountFormDialog';
 import { logger } from '@/lib/logger';
+import { TYPE_SECTION_CONFIG } from '@/lib/constants/account-tree';
+import { AccountTypeSection } from '@/components/accounts/AccountTypeSection';
 
 // ── Lazy-loaded modals — not included in the initial bundle ──────────
 const AccountFormDialog = dynamic(
@@ -68,121 +52,6 @@ const DEFAULT_FORM: AccountFormData = {
   accountType: '',
   normalBalance: '',
   parentId: '',
-};
-
-/* ─── Type section config ─── */
-interface TypeSectionConfig {
-  key: string;
-  i18nKey: string;
-  accent: string;
-  accentBg: string;
-  accentText: string;
-  accentBorder: string;
-  accentBorderLight: string;
-  icon: React.ElementType;
-  iconBg: string;
-  iconColor: string;
-}
-
-const TYPE_SECTION_CONFIG: TypeSectionConfig[] = [
-  {
-    key: 'asset',
-    i18nKey: 'accounts.asset',
-    accent: 'teal',
-    accentBg: 'bg-teal-600 dark:bg-teal-500',
-    accentText: 'text-white',
-    accentBorder: 'border-teal-200 dark:border-teal-800',
-    accentBorderLight: 'border-teal-100 dark:border-teal-900/50',
-    icon: Landmark,
-    iconBg: 'bg-teal-50 dark:bg-teal-950/40',
-    iconColor: 'text-teal-600 dark:text-teal-400',
-  },
-  {
-    key: 'liability',
-    i18nKey: 'accounts.liability',
-    accent: 'amber',
-    accentBg: 'bg-amber-500 dark:bg-amber-600',
-    accentText: 'text-white',
-    accentBorder: 'border-amber-200 dark:border-amber-800',
-    accentBorderLight: 'border-amber-100 dark:border-amber-900/50',
-    icon: Shield,
-    iconBg: 'bg-amber-50 dark:bg-amber-950/40',
-    iconColor: 'text-amber-600 dark:text-amber-400',
-  },
-  {
-    key: 'equity',
-    i18nKey: 'accounts.equity',
-    accent: 'violet',
-    accentBg: 'bg-violet-600 dark:bg-violet-500',
-    accentText: 'text-white',
-    accentBorder: 'border-violet-200 dark:border-violet-800',
-    accentBorderLight: 'border-violet-100 dark:border-violet-900/50',
-    icon: Wallet,
-    iconBg: 'bg-violet-50 dark:bg-violet-950/40',
-    iconColor: 'text-violet-600 dark:text-violet-400',
-  },
-  {
-    key: 'revenue',
-    i18nKey: 'accounts.revenue',
-    accent: 'emerald',
-    accentBg: 'bg-emerald-600 dark:bg-emerald-500',
-    accentText: 'text-white',
-    accentBorder: 'border-emerald-200 dark:border-emerald-800',
-    accentBorderLight: 'border-emerald-100 dark:border-emerald-900/50',
-    icon: TrendingUp,
-    iconBg: 'bg-emerald-50 dark:bg-emerald-950/40',
-    iconColor: 'text-emerald-600 dark:text-emerald-400',
-  },
-  {
-    key: 'expense',
-    i18nKey: 'accounts.expense',
-    accent: 'rose',
-    accentBg: 'bg-rose-600 dark:bg-rose-500',
-    accentText: 'text-white',
-    accentBorder: 'border-rose-200 dark:border-rose-800',
-    accentBorderLight: 'border-rose-100 dark:border-rose-900/50',
-    icon: Receipt,
-    iconBg: 'bg-rose-50 dark:bg-rose-950/40',
-    iconColor: 'text-rose-600 dark:text-rose-400',
-  },
-];
-
-/* ─── Code color per type ─── */
-const CODE_COLORS: Record<string, string> = {
-  asset: 'text-teal-700 dark:text-teal-400',
-  liability: 'text-amber-700 dark:text-amber-400',
-  equity: 'text-violet-700 dark:text-violet-400',
-  revenue: 'text-emerald-700 dark:text-emerald-400',
-  expense: 'text-rose-700 dark:text-rose-400',
-};
-
-/* ─── Connection line color per type ─── */
-const LINE_COLORS: Record<string, string> = {
-  asset: 'border-teal-300 dark:border-teal-700',
-  liability: 'border-amber-300 dark:border-amber-700',
-  equity: 'border-violet-300 dark:border-violet-700',
-  revenue: 'border-emerald-300 dark:border-emerald-700',
-  expense: 'border-rose-300 dark:border-rose-700',
-};
-
-/* ─── Animation Variants ─── */
-const sectionVariants = {
-  hidden: { opacity: 0, y: 16 },
-  visible: (i: number) => ({
-    opacity: 1,
-    y: 0,
-    transition: { delay: i * 0.08, duration: 0.4, ease: 'easeOut' as const },
-  }),
-};
-
-const rowVariants = {
-  hidden: { opacity: 0, x: -8 },
-  visible: (i: number) => ({
-    opacity: 1,
-    x: 0,
-    transition: { delay: i * 0.025, duration: 0.25, ease: 'easeOut' as const },
-  }),
-  exit: { opacity: 0, x: -8, transition: { duration: 0.15 } },
 };
 
 /* ─── AccountsPage ─── */
@@ -419,231 +288,28 @@ export function AccountsPage() {
     }
   }
 
-  /* ── Render account row within a type section ── */
-  function renderAccountRow(
-    account: GlAccount,
-    depth: number,
-    index: number,
-    config: TypeSectionConfig,
-  ) {
-    const hasChildren = (account._count?.children ?? 0) > 0;
-    const isExpanded = expandedIds.has(account.id);
-    const children = childrenMap.get(account.id) ?? [];
-    const isRoot = depth === 0;
-
-    return (
-      <motion.div
-        key={account.id}
-        custom={index}
-        variants={rowVariants}
-        initial="hidden"
-        animate="visible"
-        exit="exit"
-        layout
-      >
-        <Collapsible open={isExpanded} onOpenChange={() => toggleExpand(account.id)}>
-          <div
-            className={cn(
-              'group flex items-center gap-2 rounded-md px-3 py-2 transition-colors',
-              'hover:bg-muted/60',
-              !account.isActive && 'opacity-50',
-              depth > 0 && 'ml-1',
-            )}
-          >
-            {/* Tree indentation + connection line */}
-            {depth > 0 && (
-              <div className="shrink-0 flex items-center">
-                <div
-                  className={cn(
-                    'border-l-2 rounded-l',
-                    LINE_COLORS[config.key] ?? 'border-muted-foreground/30',
-                  )}
-                  style={{ height: '20px', marginLeft: `${(depth - 1) * 24}px` }}
-                />
-              </div>
-            )}
-
-            {/* Expand arrow or spacer */}
-            <div className="shrink-0 w-6">
-              {hasChildren ? (
-                <CollapsibleTrigger asChild>
-                  <Button variant="ghost" size="icon" className="size-6 p-0">
-                    {isExpanded ? (
-                      <ChevronDown className="size-3.5 text-muted-foreground" />
-                    ) : (
-                      <ChevronRight className="size-3.5 text-muted-foreground" />
-                    )}
-                  </Button>
-                </CollapsibleTrigger>
-              ) : (
-                <div className="w-6" />
-              )}
-            </div>
-
-            {/* Folder icon for parent accounts */}
-            <div className="shrink-0 w-4">
-              {hasChildren ? (
-                isExpanded ? (
-                  <FolderOpen className="size-4 text-muted-foreground" />
-                ) : (
-                  <Folder className="size-4 text-muted-foreground" />
-                )
-              ) : null}
-            </div>
-
-            {/* Code */}
-            <span
-              className={cn(
-                'font-mono text-sm font-semibold min-w-[60px] shrink-0',
-                CODE_COLORS[config.key] ?? 'text-muted-foreground',
-              )}
-            >
-              {account.code}
-            </span>
-
-            {/* Name */}
-            <span
-              className={cn('flex-1 truncate', isRoot ? 'font-semibold' : 'font-medium text-sm')}
-            >
-              {account.isSystem && (
-                <Lock className="inline size-3 mr-1 text-amber-500" aria-label="System account" />
-              )}
-              {account.name}
-            </span>
-
-            {/* Normal balance badge */}
-            <div className="shrink-0 hidden sm:block">
-              <BalanceBadge normalBalance={account.normalBalance} />
-            </div>
-
-            {/* Status badge */}
-            <div className="shrink-0 hidden sm:block">
-              <Badge
-                variant={account.isActive ? 'default' : 'secondary'}
-                className={cn(
-                  'text-[10px] px-1.5 py-0',
-                  account.isActive
-                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'
-                    : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
-                )}
-              >
-                {account.isActive ? t('common.active') : t('common.inactive')}
-              </Badge>
-            </div>
-
-            {/* Actions */}
-            <div className="shrink-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-7"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openEditModal(account);
-                }}
-              >
-                <Pencil className="size-3" />
-              </Button>
-              {!account.isSystem && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-7 text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/30"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setDeleteTarget(account);
-                    setDeleteError('');
-                  }}
-                >
-                  <Trash2 className="size-3" />
-                </Button>
-              )}
-            </div>
-          </div>
-
-          {/* Children */}
-          {hasChildren && (
-            <CollapsibleContent>
-              {children.map((child, childIndex) =>
-                renderAccountRow(child, depth + 1, index + childIndex + 1, config),
-              )}
-            </CollapsibleContent>
-          )}
-        </Collapsible>
-      </motion.div>
-    );
-  }
-
-  /* ── Render a type section ── */
-  function renderTypeSection(
-    config: TypeSectionConfig,
-    typeAccounts: GlAccount[],
-    sectionIndex: number,
-  ) {
-    const typeLabel = t(config.i18nKey);
-    const isCollapsed = collapsedTypes.has(config.key);
-    const Icon = config.icon;
-    const rootAccounts = typeAccounts
-      .filter((a) => !a.parentId)
-      .sort((a, b) => a.code.localeCompare(b.code));
-    const accountCount = typeAccounts.length;
-
-    return (
-      <motion.div
-        key={config.key}
-        custom={sectionIndex}
-        variants={sectionVariants}
-        initial="hidden"
-        animate="visible"
-        layout
-      >
-        <Collapsible open={!isCollapsed} onOpenChange={() => toggleTypeSection(config.key)}>
-          <div className={cn('rounded-xl border overflow-hidden', config.accentBorder)}>
-            {/* Section header */}
-            <CollapsibleTrigger asChild>
-              <button
-                className={cn(
-                  'w-full flex items-center gap-3 px-4 py-3 transition-colors',
-                  'hover:opacity-90 cursor-pointer',
-                  config.accentBg,
-                  config.accentText,
-                )}
-              >
-                <div className={cn('rounded-lg p-1.5 bg-white/20')}>
-                  <Icon className="size-4" />
-                </div>
-                <div className="flex-1 text-left">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-sm tracking-wide uppercase">{typeLabel}</span>
-                    <Badge className="bg-white/25 text-white border-0 text-[11px] font-medium">
-                      {accountCount}
-                    </Badge>
-                  </div>
-                </div>
-                <motion.div
-                  animate={{ rotate: isCollapsed ? 0 : 180 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <ChevronDown className="size-5" />
-                </motion.div>
-              </button>
-            </CollapsibleTrigger>
-
-            {/* Section content */}
-            <CollapsibleContent>
-              <div className="p-2 space-y-0.5 bg-muted/20">
-                {rootAccounts.map((account, i) => renderAccountRow(account, 0, i, config))}
-                {rootAccounts.length === 0 && typeAccounts.length === 0 && (
-                  <div className="py-6 text-center text-sm text-muted-foreground">
-                    {t('common.noData')}
-                  </div>
-                )}
-              </div>
-            </CollapsibleContent>
-          </div>
-        </Collapsible>
-      </motion.div>
-    );
+  /* ── Toggle account active status ── */
+  async function handleToggleActive(account: GlAccount) {
+    if (!activeCompany?.id) return;
+    try {
+      const res = await fetch(`/api/accounts/${account.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId: activeCompany.id,
+          code: account.code,
+          name: account.name,
+          accountType: account.accountType,
+          normalBalance: account.normalBalance,
+          parentId: account.parentId || null,
+          isActive: !account.isActive,
+        }),
+      });
+      if (!res.ok) throw new Error('Failed to toggle active status');
+      fetchAccounts();
+    } catch (err) {
+      logger.error('[ACCOUNTS PAGE TOGGLE ACTIVE]', { error: String(err) });
+    }
   }
 
   /* ── Count ── */
@@ -772,7 +438,25 @@ export function AccountsPage() {
             {visibleTypeConfigs.map((config, idx) => {
               const typeAccounts = accountsByType.get(config.key);
               if (!typeAccounts || typeAccounts.length === 0) return null;
-              return renderTypeSection(config, typeAccounts, idx);
+              return (
+                <AccountTypeSection
+                  key={config.key}
+                  config={config}
+                  typeAccounts={typeAccounts}
+                  sectionIndex={idx}
+                  collapsedTypes={collapsedTypes}
+                  onToggleTypeSection={toggleTypeSection}
+                  expandedIds={expandedIds}
+                  childrenMap={childrenMap}
+                  onToggleExpand={toggleExpand}
+                  onOpenEdit={(account) => openEditModal(account as GlAccount)}
+                  onToggleActive={(account) => { handleToggleActive(account as GlAccount); }}
+                  onDeleteClick={(account) => {
+                    setDeleteTarget(account as GlAccount);
+                    setDeleteError('');
+                  }}
+                />
+              );
             })}
           </AnimatePresence>
         )}

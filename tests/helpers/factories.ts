@@ -143,8 +143,8 @@ export async function clearDatabase() {
   } else {
     console.warn('⚠️ Session model not available in Prisma client; skipping session cleanup.');
   }
+  await db.entityContext.deleteMany().catch(() => {});
   await db.auditLog.deleteMany().catch(() => {});
-  await db.journalLine.deleteMany().catch(() => {});
   await db.journalEntry.deleteMany().catch(() => {});
   await db.bankTransaction.deleteMany().catch(() => {});
   await db.bankStatement.deleteMany().catch(() => {});

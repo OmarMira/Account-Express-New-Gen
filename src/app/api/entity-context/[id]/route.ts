@@ -5,6 +5,7 @@ import {
   updateEntityContext,
   removeEntityContext,
 } from '@/lib/services/entity-context-crud-service';
+import { entityRoleSchema } from '@/lib/constants/entity-roles';
 import { logger } from '@/lib/logger';
 
 // ─── PATCH /api/entity-context/[id] ───────────────────────────────────
@@ -16,21 +17,37 @@ export const PATCH = apiHandler(async (request: NextRequest, context: RouteConte
 
   try {
     const body = await request.json();
-    const { role, glAccountId, roles } = body as {
+    const { role, glAccountId, roles, transactionDirection } = body as {
       role?: string;
       glAccountId?: string | null;
       roles?: string[];
+      transactionDirection?: string | null;
     };
 
     // At least one field must be provided
-    if (role === undefined && glAccountId === undefined && roles === undefined) {
+    if (role === undefined && glAccountId === undefined && roles === undefined && transactionDirection === undefined) {
       return NextResponse.json(
-        { error: 'At least one field (role, glAccountId, roles) is required' },
+        { error: 'At least one field (role, glAccountId, roles, transactionDirection) is required' },
         { status: 400 },
       );
     }
 
-    const updated = await updateEntityContext(companyId, id, { role, glAccountId, roles });
+    // Validate role against canonical entity roles if provided
+    if (role !== undefined) {
+      const roleResult = entityRoleSchema.safeParse(role);
+      if (!roleResult.success) {
+        return NextResponse.json(
+          {
+            error: 'Invalid role',
+            details: roleResult.error.flatten(),
+            validRoles: entityRoleSchema.options,
+          },
+          { status: 400 },
+        );
+      }
+    }
+
+    const updated = await updateEntityContext(companyId, id, { role, glAccountId, roles, transactionDirection });
 
     if (!updated) {
       return NextResponse.json({ error: 'Entity not found' }, { status: 404 });

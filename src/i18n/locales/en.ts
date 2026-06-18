@@ -1067,6 +1067,42 @@ const en = {
       'The suggested account is not valid for EXPENSE transactions. Adjust the role or select an Expense/Asset account.',
     patternRequired: 'Pattern is required.',
     serverError: 'Internal server error.',
+
+    // F2 — Direction warning
+    directionWarningCredit:
+      '{entityName} has {pct}% debits but role {roleName} expects only credits. Assign anyway?',
+    directionWarningDebit:
+      '{entityName} has {pct}% credits but role {roleName} expects only debits. Assign anyway?',
+    directionOverride: 'Assign anyway',
+    directionOverrideAcknowledge: 'Forced assignment recorded.',
+
+    // F3 — Split UI
+    splitTitle:
+      'This entity has payments (debits) and collections (credits). Create two separate entities?',
+    splitCredit: 'Credits only',
+    splitDebit: 'Debits only',
+    splitBoth: 'Both (no split)',
+
+    // Batch classification
+    otroDescription: 'Describe what this entity is...',
+    preClassify: 'Pre classify entities',
+    classify: 'Classify entities',
+    suggestionBanner: {
+      title: 'Suggestion: {role}',
+      confidence: 'Confidence: {percent}%',
+      lowConfidence: 'Low confidence: {percent}%',
+      accept: 'Assign',
+      discard: 'Discard',
+      edit: 'Edit role manually',
+      error: 'Could not determine the role. Explain in your own words what this entity does.',
+      retry: 'Retry',
+      assigned: 'Role assigned: {role}',
+      pending: 'Classifying...',
+    },
+    batch: {
+      loading: 'Classifying entities...',
+      error: 'Error classifying some entities',
+    },
   },
   ruleBuilder: {
     title: 'Smart Classification Assistant',

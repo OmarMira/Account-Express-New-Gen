@@ -1084,6 +1084,42 @@ const es = {
       'La cuenta sugerida no es válida para transacciones de GASTO. Ajustá el rol o seleccioná una cuenta de Gasto/Activo.',
     patternRequired: 'El patrón es requerido.',
     serverError: 'Error interno del servidor.',
+
+    // F2 — Direction warning
+    directionWarningCredit:
+      '{entityName} tiene {pct}% débitos pero el rol {roleName} espera solo créditos. ¿Asignar de todas formas?',
+    directionWarningDebit:
+      '{entityName} tiene {pct}% créditos pero el rol {roleName} espera solo débitos. ¿Asignar de todas formas?',
+    directionOverride: 'Asignar de todas formas',
+    directionOverrideAcknowledge: 'Asignación forzada registrada.',
+
+    // F3 — Split UI
+    splitTitle:
+      'Esta entidad tiene pagos (débitos) y cobros (créditos). ¿Crear dos entidades separadas?',
+    splitCredit: 'Solo créditos',
+    splitDebit: 'Solo débitos',
+    splitBoth: 'Ambos (no dividir)',
+
+    // Batch classification
+    otroDescription: 'Describí qué es esta entidad...',
+    preClassify: 'Pre clasificar entidades',
+    classify: 'Clasificar entidades',
+    suggestionBanner: {
+      title: 'Sugerencia: {role}',
+      confidence: 'Confianza: {percent}%',
+      lowConfidence: 'Confianza baja: {percent}%',
+      accept: 'Asignar',
+      discard: 'Descartar',
+      edit: 'Editar rol manual',
+      error: 'No se pudo determinar el rol. Volvé a explicar con tus palabras qué hace esta entidad.',
+      retry: 'Re-intentar',
+      assigned: 'Rol asignado: {role}',
+      pending: 'Clasificando...',
+    },
+    batch: {
+      loading: 'Clasificando entidades...',
+      error: 'Error al clasificar algunas entidades',
+    },
   },
   ruleBuilder: {
     title: 'Asistente de Clasificación Inteligente',

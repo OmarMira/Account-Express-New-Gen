@@ -2,7 +2,7 @@ import { normalizePattern } from '@/lib/services/pattern-normalizer';
 import { loadConfig, extractComponents } from '@/lib/services/entity-detector';
 import type { EntityCandidate } from '@/lib/services/entity-detector';
 import type { EntityContextWithGlAccount } from '@/lib/types/entity-context';
-import type { EntityRole } from '@/lib/constants/entity-roles';
+import { ENTITY_ROLES, EXPECTED_DIRECTION, type EntityRole } from '@/lib/constants/entity-roles';
 import { ROLE_ACCOUNT_MAP } from '@/lib/constants/role-account-map';
 import { toConfidenceLabel } from '@/lib/types/reasoning';
 import { serverT } from '@/lib/server-i18n';
@@ -34,6 +34,7 @@ export interface EnrichedCandidate extends EntityCandidate {
   confidence: number;
   confidenceLabel: 'high' | 'medium' | 'low';
   explanation: string;
+  directionWarning?: string | null;
 }
 
 export interface ScanEntry {
@@ -184,6 +185,45 @@ export function resolveDirection(
   return null;
 }
 
+// ========== DIRECTION MISMATCH CHECK ==========
+
+/**
+ * Check if a role's expected transaction direction conflicts with the actual
+ * direction profile of an entity candidate.
+ *
+ * - OTRO / IGNORADA (expectedDirection = null) → no warning
+ * - SOCIO (expectedDirection = 'mixed') → no warning
+ * - CLIENTE / INGRESO / INQUILINO (expected = 'credit') with debitPct > 0.5 → warning
+ * - PROVEEDOR / EMPLEADO / GASTO_OPERATIVO / TARJETA_CREDITO / PRESTAMO (expected = 'debit') with creditPct > 0.5 → warning
+ *
+ * @returns `{ warning: string }` when a mismatch is detected, otherwise `null`.
+ */
+export function checkRoleDirectionMismatch(
+  role: string,
+  debitPct: number,
+  creditPct: number,
+): { warning: string } | null {
+  const upperRole = role.toUpperCase();
+
+  // Only check canonical roles
+  if (!ENTITY_ROLES.includes(upperRole as EntityRole)) return null;
+
+  const expectedDirection = EXPECTED_DIRECTION[upperRole as EntityRole];
+
+  // OTRO / IGNORADA (null) and SOCIO (mixed) never warn
+  if (expectedDirection === null || expectedDirection === 'mixed') return null;
+
+  if (expectedDirection === 'credit' && debitPct > 0.5) {
+    return { warning: `Role ${upperRole} expects credits but most transactions are debits` };
+  }
+
+  if (expectedDirection === 'debit' && creditPct > 0.5) {
+    return { warning: `Role ${upperRole} expects debits but most transactions are credits` };
+  }
+
+  return null;
+}
+
 // ========== T5d: BUILD SCAN PATTERN ==========
 
 export function buildScanPattern(
@@ -256,6 +296,12 @@ export function enrichCandidates(
     // Step 5: skip if an existing rule already covers this pattern
     if (hasExistingRule(candidate, description, input.existingRules)) continue;
 
+    // Step 6: check role ↔ direction mismatch
+    const roleToCheck = context?.role ?? '';
+    const directionWarning = roleToCheck
+      ? checkRoleDirectionMismatch(roleToCheck, candidate.directionProfile.debitPct, candidate.directionProfile.creditPct)
+      : null;
+
     result.push({
       ...candidate,
       hasContext: context !== null,
@@ -266,6 +312,7 @@ export function enrichCandidates(
       confidence,
       confidenceLabel,
       explanation,
+      directionWarning: directionWarning?.warning ?? null,
     });
   }
 

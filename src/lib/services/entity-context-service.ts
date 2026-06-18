@@ -19,6 +19,7 @@ export async function saveContext(data: {
   glAccountId?: string | null;
   source?: 'user' | 'ai';
   userId?: string;
+  transactionDirection?: string | null;
 }) {
   const normalized = normalizePattern(data.pattern);
   const validated = entityContextSchema.parse({
@@ -26,6 +27,7 @@ export async function saveContext(data: {
     pattern: normalized,
     role: data.role.toUpperCase(),
     glAccountId: data.glAccountId,
+    transactionDirection: data.transactionDirection,
   });
 
   const rolesJson = data.roles?.length
@@ -44,6 +46,7 @@ export async function saveContext(data: {
       roles: rolesJson,
       glAccountId: validated.glAccountId,
       source: data.source ?? 'user',
+      transactionDirection: validated.transactionDirection ?? null,
     },
     create: {
       companyId: validated.companyId,
@@ -52,6 +55,7 @@ export async function saveContext(data: {
       roles: rolesJson,
       glAccountId: validated.glAccountId,
       source: data.source ?? 'user',
+      transactionDirection: validated.transactionDirection ?? null,
     },
   });
 

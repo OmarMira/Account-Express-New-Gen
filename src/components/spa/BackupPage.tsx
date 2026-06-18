@@ -3,19 +3,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   DatabaseBackup,
-  Download,
-  Upload,
   Loader2,
-  CheckCircle2,
   AlertTriangle,
   Trash2,
   HardDrive,
   Clock,
   FileJson,
-  ShieldCheck,
   ArrowDownToLine,
-  Calendar,
-  HardDriveDownload,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useLanguageStore } from '@/store/language-store';
@@ -23,9 +17,7 @@ import { useAuthStore } from '@/store/auth-store';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Separator } from '@/components/ui/separator';
 import { Progress } from '@/components/ui/progress';
 import {
   AlertDialog,
@@ -37,62 +29,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-
-/* ─── Types ───────────────────────────────────────────────────────── */
-
-interface BackupRecord {
-  id: string;
-  filename: string;
-  size: number;
-  createdAt: string;
-  companyInfo: {
-    id: string;
-    legalName: string;
-  };
-  recordCounts: {
-    company: number;
-    glAccounts: number;
-    bankAccounts: number;
-    bankStatements: number;
-    bankTransactions: number;
-    bankRules: number;
-    journalEntries: number;
-    journalLines: number;
-    fiscalPeriods: number;
-    companyMembers: number;
-    users: number;
-  };
-}
-
-/* ─── Animation Variants ──────────────────────────────────────────── */
-
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { staggerChildren: 0.06 } },
-};
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0 },
-};
-
-/* ─── Helpers ─────────────────────────────────────────────────────── */
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
+import { containerVariants, itemVariants, formatFileSize, type BackupRecord } from '@/lib/types/backup';
+import { BackupItem } from '@/components/backup/BackupItem';
+import { RestoreDropZone } from '@/components/backup/RestoreDropZone';
 
 /* ─── Backup Page ─────────────────────────────────────────────────── */
 
@@ -112,8 +51,6 @@ export function BackupPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [downloading, setDownloading] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const dropRef = useRef<HTMLDivElement>(null);
   const mountedRef = useRef(true);
 
   // Fetch backups
@@ -267,7 +204,6 @@ export function BackupPage() {
           description: `${totalRecords} ${t('settings.backup.records')}`,
         });
         setRestoreFile(null);
-        if (fileInputRef.current) fileInputRef.current.value = '';
         await fetchBackups();
       } else {
         toast.error(t('settings.backup.restoreFailed'), {
@@ -279,44 +215,6 @@ export function BackupPage() {
     }
     setRestoring(false);
     setRestoreProgress(0);
-  }
-
-  // Drag & Drop handlers
-  function handleDragOver(e: React.DragEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    if (dropRef.current) {
-      dropRef.current.classList.add('border-primary', 'bg-primary/5');
-    }
-  }
-
-  function handleDragLeave(e: React.DragEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    if (dropRef.current) {
-      dropRef.current.classList.remove('border-primary', 'bg-primary/5');
-    }
-  }
-
-  function handleDrop(e: React.DragEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    if (dropRef.current) {
-      dropRef.current.classList.remove('border-primary', 'bg-primary/5');
-    }
-    const file = e.dataTransfer.files[0];
-    if (file && file.name.endsWith('.json')) {
-      setRestoreFile(file);
-    } else {
-      toast.error(t('settings.backup.errorInvalidFile'));
-    }
-  }
-
-  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (file) {
-      setRestoreFile(file);
-    }
   }
 
   // Restore progress overlay
@@ -423,82 +321,11 @@ export function BackupPage() {
                 </p>
               </div>
 
-              {/* Drop zone */}
-              <div
-                ref={dropRef}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                onClick={() => fileInputRef.current?.click()}
-                className={`
-                  flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed p-6 cursor-pointer transition-colors
-                  ${
-                    restoreFile
-                      ? 'border-emerald-300 bg-emerald-50/50 dark:border-emerald-800 dark:bg-emerald-950/20'
-                      : 'border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/50'
-                  }
-                `}
-              >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".json"
-                  onChange={handleFileSelect}
-                  className="hidden"
-                />
-                {restoreFile ? (
-                  <>
-                    <div className="flex size-10 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900">
-                      <CheckCircle2 className="size-5 text-emerald-600 dark:text-emerald-400" />
-                    </div>
-                    <div className="text-center">
-                      <p className="text-sm font-medium">{restoreFile.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatFileSize(restoreFile.size)}
-                      </p>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex size-10 items-center justify-center rounded-full bg-muted">
-                      <Upload className="size-5 text-muted-foreground" />
-                    </div>
-                    <div className="text-center">
-                      <p className="text-sm font-medium">{t('settings.backup.selectFile')}</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {t('settings.backup.dragDrop')}
-                      </p>
-                    </div>
-                  </>
-                )}
-              </div>
-
-              <p className="text-xs text-muted-foreground">
-                {t('settings.backup.supportedFormats')}
-              </p>
-
-              {restoreFile && (
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => {
-                      setRestoreFile(null);
-                      if (fileInputRef.current) fileInputRef.current.value = '';
-                    }}
-                    variant="outline"
-                    size="sm"
-                  >
-                    {t('common.cancel')}
-                  </Button>
-                  <Button
-                    onClick={() => setShowRestoreConfirm(true)}
-                    variant="destructive"
-                    size="sm"
-                  >
-                    <ArrowDownToLine className="size-4 mr-1" />
-                    {t('settings.backup.restoreBackup')}
-                  </Button>
-                </div>
-              )}
+              <RestoreDropZone
+                restoreFile={restoreFile}
+                onFileSelect={setRestoreFile}
+                onRestoreClick={() => setShowRestoreConfirm(true)}
+              />
             </CardContent>
           </Card>
         </motion.div>
@@ -535,7 +362,6 @@ export function BackupPage() {
                       downloading={downloading === backup.id}
                       onDownload={() => handleDownload(backup)}
                       onDelete={() => setShowDeleteConfirm(backup.filename)}
-                      t={t}
                     />
                   ))}
                 </div>
@@ -606,93 +432,4 @@ export function BackupPage() {
   );
 }
 
-/* ─── Backup Item Component ───────────────────────────────────────── */
 
-function BackupItem({
-  backup,
-  downloading,
-  onDownload,
-  onDelete,
-  t,
-}: {
-  backup: BackupRecord;
-  downloading: boolean;
-  onDownload: () => void;
-  onDelete: () => void;
-  t: (key: string) => string;
-}) {
-  const totalRecords = (Object.values(backup.recordCounts) as number[]).reduce((a, b) => a + b, 0);
-
-  return (
-    <div className="flex items-start gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/30">
-      <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10 shrink-0 mt-0.5">
-        <ShieldCheck className="size-4 text-primary" />
-      </div>
-
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <p className="text-sm font-medium truncate">{backup.companyInfo.legalName}</p>
-          <Badge variant="secondary" className="text-[10px] shrink-0">
-            {t('settings.backup.manual')}
-          </Badge>
-        </div>
-        <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1">
-            <Calendar className="size-3" />
-            {formatDate(backup.createdAt)}
-          </span>
-          <span className="flex items-center gap-1">
-            <HardDrive className="size-3" />
-            {formatFileSize(backup.size)}
-          </span>
-          <span>
-            {totalRecords} {t('settings.backup.records')}
-          </span>
-        </div>
-        <div className="flex flex-wrap gap-1 mt-1.5">
-          {backup.recordCounts.glAccounts > 0 && (
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-              {backup.recordCounts.glAccounts} accounts
-            </Badge>
-          )}
-          {backup.recordCounts.journalEntries > 0 && (
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-              {backup.recordCounts.journalEntries} entries
-            </Badge>
-          )}
-          {backup.recordCounts.bankTransactions > 0 && (
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-              {backup.recordCounts.bankTransactions} transactions
-            </Badge>
-          )}
-        </div>
-      </div>
-
-      <div className="flex items-center gap-1 shrink-0">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-8"
-          onClick={onDownload}
-          disabled={downloading}
-        >
-          {downloading ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <Download className="size-4" />
-          )}
-          <span className="sr-only">{t('settings.backup.download')}</span>
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-8 text-muted-foreground hover:text-destructive"
-          onClick={onDelete}
-        >
-          <Trash2 className="size-4" />
-          <span className="sr-only">{t('common.delete')}</span>
-        </Button>
-      </div>
-    </div>
-  );
-}

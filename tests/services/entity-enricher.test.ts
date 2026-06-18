@@ -4,6 +4,7 @@ import {
   suggestGlAccount,
   resolveDirection,
   enrichCandidates,
+  checkRoleDirectionMismatch,
 } from '@/lib/services/entity-enricher';
 import type { EntityContextWithGlAccount } from '@/lib/types/entity-context';
 import type { EntityCandidate } from '@/lib/services/entity-detector';
@@ -21,6 +22,7 @@ const mockContextProveedor: EntityContextWithGlAccount = {
   source: 'user',
   createdAt: new Date('2026-01-01'),
   updatedAt: new Date('2026-01-01'),
+  transactionDirection: null,
   glAccount: { id: 'gla_1', code: '6070', name: 'Costo de Ventas' },
 };
 
@@ -34,6 +36,7 @@ const mockContextCliente: EntityContextWithGlAccount = {
   source: 'user',
   createdAt: new Date('2026-01-01'),
   updatedAt: new Date('2026-01-01'),
+  transactionDirection: null,
   glAccount: null,
 };
 
@@ -47,6 +50,7 @@ const mockContextSocio: EntityContextWithGlAccount = {
   source: 'user',
   createdAt: new Date('2026-01-01'),
   updatedAt: new Date('2026-01-01'),
+  transactionDirection: null,
   glAccount: null,
 };
 
@@ -223,6 +227,56 @@ describe('resolveDirection', () => {
       directionProfile: { creditPct: 0, debitPct: 0 },
     });
     expect(resolveDirection(candidate)).toBeNull();
+  });
+});
+
+// ─── checkRoleDirectionMismatch ────────────────────────────────────
+describe('checkRoleDirectionMismatch', () => {
+  // F1: CLIENTE expects credit → mostly credits = no warning
+  it('returns null when CLIENTE direction matches (mostly credits)', () => {
+    const result = checkRoleDirectionMismatch('CLIENTE', 0.2, 0.8);
+    expect(result).toBeNull();
+  });
+
+  // F2: CLIENTE expects credit but mostly debits → warning
+  it('returns warning when CLIENTE expects credit but most txns are debits', () => {
+    const result = checkRoleDirectionMismatch('CLIENTE', 0.8, 0.2);
+    expect(result).not.toBeNull();
+    expect(result!.warning).toContain('expects credits');
+    expect(result!.warning).toContain('debits');
+  });
+
+  // F3: SOCIO is 'mixed' → never warns
+  it('returns null for SOCIO regardless of direction (mixed)', () => {
+    expect(checkRoleDirectionMismatch('SOCIO', 0.9, 0.1)).toBeNull();
+    expect(checkRoleDirectionMismatch('SOCIO', 0.1, 0.9)).toBeNull();
+    expect(checkRoleDirectionMismatch('SOCIO', 0.5, 0.5)).toBeNull();
+  });
+
+  // F4: INGRESO expects credit but mostly debits → warning
+  it('returns warning when INGRESO expects credit but most txns are debits', () => {
+    const result = checkRoleDirectionMismatch('INGRESO', 0.8, 0.2);
+    expect(result).not.toBeNull();
+    expect(result!.warning).toContain('expects credits');
+  });
+
+  // F5: PROVEEDOR expects debit but mostly credits → warning
+  it('returns warning when PROVEEDOR expects debit but most txns are credits', () => {
+    const result = checkRoleDirectionMismatch('PROVEEDOR', 0.2, 0.8);
+    expect(result).not.toBeNull();
+    expect(result!.warning).toContain('expects debits');
+    expect(result!.warning).toContain('credits');
+  });
+
+  // F6: OTRO and IGNORADA have no expected direction → always null
+  it('returns null for OTRO and IGNORADA (no expected direction)', () => {
+    expect(checkRoleDirectionMismatch('OTRO', 0.9, 0.1)).toBeNull();
+    expect(checkRoleDirectionMismatch('OTRO', 0.1, 0.9)).toBeNull();
+    expect(checkRoleDirectionMismatch('IGNORADA', 0.9, 0.1)).toBeNull();
+  });
+
+  it('returns null for non-canonical role string', () => {
+    expect(checkRoleDirectionMismatch('CUALQUIER_COSA', 0.9, 0.1)).toBeNull();
   });
 });
 

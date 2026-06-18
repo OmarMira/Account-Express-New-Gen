@@ -22,6 +22,7 @@ export interface UpdateEntityInput {
   role?: string;
   glAccountId?: string | null;
   roles?: string[];
+  transactionDirection?: string | null;
 }
 
 export interface BulkDeleteInput {

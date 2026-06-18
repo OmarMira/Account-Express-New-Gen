@@ -7,19 +7,12 @@ import {
   Activity,
   ArrowLeft,
   ShieldAlert,
-  Database,
-  UserCheck,
-  TrendingUp,
   Cpu,
   LogOut,
-  Moon,
-  Sun,
 } from 'lucide-react';
 import { useAuthStore, type ViewName } from '@/store/auth-store';
 import { useLanguageStore } from '@/store/language-store';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { ThemeToggle } from '@/components/spa/ThemeToggle';
 import { LanguageSelector } from '@/components/spa/LanguageSelector';
@@ -30,6 +23,7 @@ import AdminUsersPage from './AdminUsersPage';
 import AdminAuditLogsPage from './AdminAuditLogsPage';
 import AdminCompanyDetailPage from './AdminCompanyDetailPage';
 import { logger } from '@/lib/logger';
+import { AdminStatCards, AdminQuickActions } from '@/components/dashboard/DashboardPageBlocks';
 
 // Nav menu item component
 interface NavBtnProps {
@@ -227,164 +221,9 @@ export default function SuperAdminDashboardPage() {
                   <div className="absolute right-0 top-0 h-full w-1/3 bg-gradient-to-l from-indigo-500/10 to-transparent pointer-events-none" />
                 </div>
 
-                {/* Dashboard Stats */}
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                  <Card
-                    className="cursor-pointer hover:shadow-md hover:border-indigo-500/50 transition-all duration-200 group"
-                    onClick={() => setCurrentView('admin-companies')}
-                  >
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                      <CardTitle className="text-sm font-semibold text-muted-foreground">
-                        {t('superAdmin.totalCompanies')}
-                      </CardTitle>
-                      <div className="rounded-xl bg-indigo-500/10 p-2 text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform">
-                        <Building2 className="size-5" />
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      {statsLoading ? (
-                        <div className="h-9 w-16 animate-pulse bg-muted rounded my-0.5" />
-                      ) : (
-                        <span className="text-3xl font-bold text-foreground">
-                          {stats.companiesCount}
-                        </span>
-                      )}
-                      <p className="text-xs text-muted-foreground mt-1">{t('superAdmin.totalCompaniesDesc')}</p>
-                    </CardContent>
-                  </Card>
+                <AdminStatCards t={t} stats={stats} loading={statsLoading} onNavigate={(v) => setCurrentView(v as ViewName)} />
 
-                  <Card
-                    className="cursor-pointer hover:shadow-md hover:border-indigo-500/50 transition-all duration-200 group"
-                    onClick={() => setCurrentView('admin-users')}
-                  >
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                      <CardTitle className="text-sm font-semibold text-muted-foreground">
-                        {t('superAdmin.globalUsers')}
-                      </CardTitle>
-                      <div className="rounded-xl bg-violet-500/10 p-2 text-violet-600 dark:text-violet-400 group-hover:scale-110 transition-transform">
-                        <Users className="size-5" />
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      {statsLoading ? (
-                        <div className="h-9 w-16 animate-pulse bg-muted rounded my-0.5" />
-                      ) : (
-                        <span className="text-3xl font-bold text-foreground">
-                          {stats.usersCount}
-                        </span>
-                      )}
-                      <p className="text-xs text-muted-foreground mt-1">{t('superAdmin.globalUsersDesc')}</p>
-                    </CardContent>
-                  </Card>
-
-                  <Card
-                    className="cursor-pointer hover:shadow-md hover:border-indigo-500/50 transition-all duration-200 group"
-                    onClick={() => setCurrentView('admin-audit-logs')}
-                  >
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                      <CardTitle className="text-sm font-semibold text-muted-foreground">
-                        {t('superAdmin.auditLogs')}
-                      </CardTitle>
-                      <div className="rounded-xl bg-emerald-500/10 p-2 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform">
-                        <Activity className="size-5" />
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      {statsLoading ? (
-                        <div className="h-9 w-16 animate-pulse bg-muted rounded my-0.5" />
-                      ) : (
-                        <span className="text-3xl font-bold text-foreground">
-                          {stats.logsCount}
-                        </span>
-                      )}
-                      <p className="text-xs text-muted-foreground mt-1">{t('superAdmin.auditLogsDesc')}</p>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="group">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                      <CardTitle className="text-sm font-semibold text-muted-foreground">
-                        {t('superAdmin.serverLoad')}
-                      </CardTitle>
-                      <div className="rounded-xl bg-amber-500/10 p-2 text-amber-600 dark:text-amber-400 group-hover:scale-110 transition-transform">
-                        <Database className="size-5" />
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      {statsLoading ? (
-                        <div className="h-9 w-16 animate-pulse bg-muted rounded my-0.5" />
-                      ) : (
-                        <span className="text-3xl font-bold text-foreground">
-                          {stats.systemLoad}
-                        </span>
-                      )}
-                      <p className="text-xs text-muted-foreground mt-1">{t('superAdmin.serverLoadDesc')}</p>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {/* Quick actions panel */}
-                <div className="grid gap-6 md:grid-cols-3">
-                  <Card className="relative overflow-hidden group hover:border-indigo-500/30 transition-colors">
-                    <CardHeader>
-                      <CardTitle className="text-base font-bold flex items-center gap-2">
-                        <Building2 className="size-5 text-indigo-600" />
-                        {t('superAdmin.companiesCardTitle')}
-                      </CardTitle>
-                      <CardDescription>{t('superAdmin.companiesCardDesc')}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="pt-2">
-                      <Button
-                        variant="secondary"
-                        className="w-full justify-between"
-                        onClick={() => setCurrentView('admin-companies')}
-                      >
-                        {t('superAdmin.manageBtn')}
-                        <ArrowLeft className="size-4 rotate-180" />
-                      </Button>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="relative overflow-hidden group hover:border-violet-500/30 transition-colors">
-                    <CardHeader>
-                      <CardTitle className="text-base font-bold flex items-center gap-2">
-                        <Users className="size-5 text-violet-600" />
-                        {t('superAdmin.usersCardTitle')}
-                      </CardTitle>
-                      <CardDescription>{t('superAdmin.usersCardDesc')}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="pt-2">
-                      <Button
-                        variant="secondary"
-                        className="w-full justify-between"
-                        onClick={() => setCurrentView('admin-users')}
-                      >
-                        {t('superAdmin.manageBtn')}
-                        <ArrowLeft className="size-4 rotate-180" />
-                      </Button>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="relative overflow-hidden group hover:border-emerald-500/30 transition-colors">
-                    <CardHeader>
-                      <CardTitle className="text-base font-bold flex items-center gap-2">
-                        <Activity className="size-5 text-emerald-600" />
-                        {t('superAdmin.logsCardTitle')}
-                      </CardTitle>
-                      <CardDescription>{t('superAdmin.logsCardDesc')}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="pt-2">
-                      <Button
-                        variant="secondary"
-                        className="w-full justify-between"
-                        onClick={() => setCurrentView('admin-audit-logs')}
-                      >
-                        {t('superAdmin.manageBtn')}
-                        <ArrowLeft className="size-4 rotate-180" />
-                      </Button>
-                    </CardContent>
-                  </Card>
-                </div>
+                <AdminQuickActions t={t} onNavigate={(v) => setCurrentView(v as ViewName)} />
               </div>
             )}
 
