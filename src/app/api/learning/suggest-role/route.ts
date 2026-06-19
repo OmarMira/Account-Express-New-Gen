@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { apiHandler, type RouteContext } from '@/lib/api-handler';
-import { ENTITY_ROLES } from '@/lib/constants/entity-roles';
+import { ENTITY_ROLES, EXPECTED_DIRECTION } from '@/lib/constants/entity-roles';
 import type { EntityRole } from '@/lib/constants/entity-roles';
 import { checkPromptInjection } from '@/lib/guardrails';
 import { db } from '@/lib/db';
@@ -12,10 +12,12 @@ import { roleIsValidForDirection } from '@/lib/services/direction-filter';
 export const POST = apiHandler(async (request: NextRequest, context: RouteContext) => {
   try {
     const body = await request.json();
-    const { description, companyId, directionProfile } = body as {
+    const { description, companyId, directionProfile, sampleDescriptions, totalAmount } = body as {
       description?: string;
       companyId?: string;
       directionProfile?: { creditPct: number; debitPct: number };
+      sampleDescriptions?: string[];
+      totalAmount?: { min: number; max: number };
     };
 
     // Validate input: description is required, min 3 chars
@@ -88,8 +90,70 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
 
     // Build the focused prompt for role suggestion
     const rolesList = candidateRoles.map((r) => `- ${r}`).join('\n');
+
+    // Rich context section
+    const contextParts: string[] = [];
+    contextParts.push(`Description: ${trimmedDesc}`);
+
+    if (directionProfile) {
+      const creditPct = Math.round(directionProfile.creditPct * 100);
+      const debitPct = Math.round(directionProfile.debitPct * 100);
+      contextParts.push(
+        `This entity has ${debitPct}% debit transactions (money OUT) and ${creditPct}% credit transactions (money IN)`,
+      );
+
+      // Blocked role rules based on direction
+      const blockedCreditRoles = candidateRoles.filter((r) => {
+        const result = roleIsValidForDirection(r, directionProfile);
+        return !result.valid;
+      });
+
+      if (blockedCreditRoles.length > 0) {
+        // Roles blocked because they expect the opposite direction
+        const blockedDebitRoles = blockedCreditRoles.filter((r) => {
+          const role = r as EntityRole;
+          return ENTITY_ROLES.includes(role) && EXPECTED_DIRECTION[role] === 'debit';
+        });
+        const blockedCreditRoles2 = blockedCreditRoles.filter((r) => {
+          const role = r as EntityRole;
+          return ENTITY_ROLES.includes(role) && EXPECTED_DIRECTION[role] === 'credit';
+        });
+
+        if (blockedDebitRoles.length > 0) {
+          contextParts.push(
+            'If all transactions are money IN (credits >= 80%), this entity CANNOT be: ' +
+              blockedDebitRoles.join(', '),
+          );
+        }
+        if (blockedCreditRoles2.length > 0) {
+          contextParts.push(
+            'If all transactions are money OUT (debits >= 80%), this entity CANNOT be: ' +
+              blockedCreditRoles2.join(', '),
+          );
+        }
+      }
+    }
+
+    // Sample descriptions (up to 3)
+    if (sampleDescriptions && sampleDescriptions.length > 0) {
+      const samples = sampleDescriptions.slice(0, 3);
+      contextParts.push('Sample descriptions:');
+      for (const s of samples) {
+        contextParts.push(`  - ${s}`);
+      }
+    }
+
+    // Amount range
+    if (totalAmount) {
+      contextParts.push(`Amount range: $${totalAmount.min} to $${totalAmount.max}`);
+    }
+
+    const contextBlock = contextParts.join('\n');
+
     const systemPrompt = 'You are an accounting entity classifier. Return only valid JSON.';
-    const userPrompt = `Given this entity description: "${trimmedDesc}"
+    const userPrompt = `Given this entity:
+${contextBlock}
+
 Determine which accounting role best fits.
 Roles:
 ${rolesList}

@@ -20,6 +20,7 @@ export async function saveContext(data: {
   source?: 'user' | 'ai';
   userId?: string;
   transactionDirection?: string | null;
+  userDescription?: string | null;
 }) {
   const normalized = normalizePattern(data.pattern);
   const validated = entityContextSchema.parse({
@@ -47,6 +48,7 @@ export async function saveContext(data: {
       glAccountId: validated.glAccountId,
       source: data.source ?? 'user',
       transactionDirection: validated.transactionDirection ?? null,
+      userDescription: data.userDescription ?? null,
     },
     create: {
       companyId: validated.companyId,
@@ -56,6 +58,7 @@ export async function saveContext(data: {
       glAccountId: validated.glAccountId,
       source: data.source ?? 'user',
       transactionDirection: validated.transactionDirection ?? null,
+      userDescription: data.userDescription ?? null,
     },
   });
 

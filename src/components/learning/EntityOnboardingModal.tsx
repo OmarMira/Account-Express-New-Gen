@@ -557,9 +557,39 @@ export function EntityOnboardingModal({
       const splitDir = splitSelections[pattern];
       const isSplit = splitDir === 'credit' || splitDir === 'debit';
 
-      // Determine the effective role — OTRO is never saved (4.4)
+      // Determine the effective role
       let finalRole = sel.role;
-      if (!finalRole || finalRole === 'OTRO') continue;
+      if (!finalRole) continue;
+
+      // Handle OTRO: save with userDescription if description >= 5 chars
+      if (finalRole === 'OTRO') {
+        const userDesc = descriptions[pattern] || descriptionsSnapshot.current[pattern] || '';
+        if (userDesc.trim().length < 5) continue; // Skip OTRO without enough description
+
+        try {
+          const res = await fetch('/api/learning/classify-entity', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              companyId,
+              pattern,
+              role: 'OTRO',
+              source: 'user',
+              userDescription: userDesc.trim(),
+            }),
+          });
+
+          if (res.ok) {
+            count++;
+            savedRef.current.add(pattern);
+          } else {
+            logger.warn('[OTRO SAVE FAILED]', { pattern, status: res.status });
+          }
+        } catch (err) {
+          logger.error('[OTRO SAVE ERROR]', { pattern, error: String(err) });
+        }
+        continue;
+      }
 
       if (isSplit) {
         // 4.2 — Save the split entity with suffixed pattern and transactionDirection

@@ -4,6 +4,7 @@ import { requireCompanyContext } from '@/lib/context-storage';
 import { classifyEntity, getEntityCandidates } from '@/lib/services/entity-classifier';
 import { parseConversationalContext } from '@/lib/services/conversational-service';
 import { safeAuditLog } from '@/lib/services/audit-service';
+import { db } from '@/lib/db';
 import { entityRoleSchema } from '@/lib/constants/entity-roles';
 import { logger } from '@/lib/logger';
 import { serverT } from '@/lib/server-i18n';
@@ -14,7 +15,7 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
 
   try {
     const body = await request.json();
-    const { pattern, userInput, glAccountCode, role, transactionDirection, directionOverride } = body;
+    const { pattern, userInput, glAccountCode, role, transactionDirection, directionOverride, userDescription } = body;
 
     if (!pattern) {
       return NextResponse.json(
@@ -71,6 +72,7 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
       source: 'user',
       userId,
       transactionDirection: transactionDirection ?? undefined,
+      userDescription: userDescription ?? null,
     });
 
     await safeAuditLog({
@@ -100,8 +102,28 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
 export const GET = apiHandler(async (request: NextRequest, context: RouteContext) => {
   const { userId, companyId } = requireCompanyContext();
   const locale = request.headers.get('x-locale') ?? 'en';
+  const { searchParams } = new URL(request.url);
+  const includeOtro = searchParams.get('includeOtro') === 'true';
 
   try {
+    if (includeOtro) {
+      // Return OTRO entities for review/re-classification
+      const otroEntities = await db.entityContext.findMany({
+        where: { companyId, role: 'OTRO' },
+        orderBy: { updatedAt: 'desc' },
+      });
+
+      await safeAuditLog({
+        companyId,
+        userId,
+        action: 'ENTITY_OTRO_FETCHED',
+        entity: 'EntityContext',
+        details: { count: otroEntities.length },
+      });
+
+      return NextResponse.json({ success: true, data: otroEntities });
+    }
+
     const candidates = await getEntityCandidates(companyId);
 
     await safeAuditLog({
