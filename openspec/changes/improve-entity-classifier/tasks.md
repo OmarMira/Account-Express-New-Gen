@@ -52,11 +52,11 @@ Chain strategy: pending
 
 ## Layer 5: Web search fallback
 
-- [ ] **T-13** Create `src/lib/services/web-search-service.ts` — `searchEntity(entityName)` with Google Custom Search API. `AbortController` 5s timeout. Config via `WEB_SEARCH_ENABLED`, `WEB_SEARCH_API_KEY`, `WEB_SEARCH_ENGINE_ID`. Return `{ title, snippet, sourceUrl }` or null. *(Deps: none | ~70)*
-- [ ] **T-14** `src/app/api/learning/suggest-role/route.ts` — After AI returns, if confidence < 80% and `WEB_SEARCH_ENABLED=true`, call `searchEntity()`. Pass result snippet to AI for re-classification. Cap re-classification confidence at 0.70. *(Deps: T-07, T-13 | ~30)*
-- [ ] **T-15** Create `tests/services/web-search-service.test.ts` — Mock `fetch`. Test: success path, timeout, disabled via env var, missing API key. *(Deps: T-13 | ~60)*
+- [x] **T-13** Create `src/lib/services/web-search-service.ts` — `searchEntity(entityName)` with Google Custom Search API. `AbortController` 5s timeout. Config via `WEB_SEARCH_ENABLED`, `WEB_SEARCH_API_KEY`, `WEB_SEARCH_CX`. Return `{ title, snippet, sourceUrl }` or null. *(Deps: none | ~70)*
+- [x] **T-14** `src/app/api/learning/suggest-role/route.ts` — After AI returns, if confidence < 80% and `WEB_SEARCH_ENABLED=true`, call `searchEntity()`. Pass result snippet to AI for re-classification. Cap re-classification confidence at 0.70. *(Deps: T-07, T-13 | ~30)*
+- [x] **T-15** Create `tests/services/web-search-service.test.ts` — Mock `fetch`. Test: success path, timeout, disabled via env var, missing API key. *(Deps: T-13 | ~60)*
 
 ## Layer 6: Polish
 
-- [ ] **T-16** `src/lib/constants/entity-roles.ts` — Review `EXPECTED_DIRECTION` mapping. Tune if needed based on real-world validation (no changes expected now). *(Deps: none | ~5)*
-- [ ] **T-17** Run full test suite — `npx vitest run` (or project test command). Fix any regressions from the changes. *(Deps: T-01–T-16 | ~0)*
+- [x] **T-16** `src/lib/constants/entity-roles.ts` — Review `EXPECTED_DIRECTION` mapping. Tune if needed based on real-world validation (no changes expected now). *(Deps: none | ~5)*
+- [x] **T-17** Run full test suite — `bunx vitest run` (or project test command). Fix any regressions from the changes. *(Deps: T-01–T-16 | ~0)*

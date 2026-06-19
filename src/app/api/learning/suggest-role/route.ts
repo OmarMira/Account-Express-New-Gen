@@ -6,6 +6,7 @@ import { checkPromptInjection } from '@/lib/guardrails';
 import { db } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { roleIsValidForDirection } from '@/lib/services/direction-filter';
+import { searchEntity } from '@/lib/services/web-search-service';
 
 // ── POST /api/learning/suggest-role ──────────────────────────────────
 // Hybrid suggest: searches local EntityContext first, falls back to AI.
@@ -211,6 +212,86 @@ Only return one of the canonical roles. Never return free text.`;
           length: content.length,
         });
         throw new Error('Could not extract role from AI response');
+      }
+
+      // ── Phase 3: Web search fallback for low-confidence results ──
+      if (aiResult.confidence < 0.80 && process.env.WEB_SEARCH_ENABLED === 'true') {
+        const webResult = await searchEntity(trimmedDesc);
+
+        if (webResult) {
+          logger.info('[SUGGEST_ROLE WEB_SEARCH_REPROMPT]', {
+            entity: trimmedDesc,
+            title: webResult.title,
+          });
+
+          const rePrompt = `Web search result for "${trimmedDesc}":
+Title: ${webResult.title}
+Snippet: ${webResult.snippet}
+Source: ${webResult.sourceUrl}
+
+Based on this additional context, re-evaluate the role.`;
+
+          const rePromptMessages = [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+            { role: 'user', content: rePrompt },
+          ];
+
+          const reController = new AbortController();
+          const reTimeout = setTimeout(() => reController.abort(), 10000);
+
+          try {
+            const reResponse = await fetch(`${baseUrl}/chat/completions`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${apiKey}`,
+                'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+              },
+              body: JSON.stringify({
+                model,
+                temperature: 0.1,
+                max_tokens: 300,
+                messages: rePromptMessages,
+              }),
+              signal: reController.signal,
+            });
+
+            clearTimeout(reTimeout);
+
+            if (reResponse.ok) {
+              const reData = await reResponse.json();
+              const reContent: string | undefined = reData.choices?.[0]?.message?.content;
+
+              if (reContent) {
+                const reResult = parseSuggestion(reContent);
+
+                if (reResult && reResult.confidence > aiResult.confidence) {
+                  const previousConfidence = aiResult.confidence;
+                  const originalReConfidence = reResult.confidence;
+
+                  // Cap web-search-driven confidence at 0.70
+                  reResult.confidence = Math.min(reResult.confidence, 0.70);
+
+                  aiResult = reResult;
+
+                  logger.info('[SUGGEST_ROLE WEB_SEARCH_IMPROVED]', {
+                    entity: trimmedDesc,
+                    previousConfidence,
+                    newRole: reResult.role,
+                    capApplied: originalReConfidence > 0.70,
+                  });
+                }
+              }
+            }
+          } catch {
+            logger.warn('[SUGGEST_ROLE WEB_SEARCH_REPROMPT_FAILED]', {
+              entity: trimmedDesc,
+            });
+          } finally {
+            clearTimeout(reTimeout);
+          }
+        }
       }
     } catch (err: unknown) {
       clearTimeout(timeout);
