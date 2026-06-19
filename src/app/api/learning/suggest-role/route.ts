@@ -13,12 +13,13 @@ import { searchEntity } from '@/lib/services/web-search-service';
 export const POST = apiHandler(async (request: NextRequest, context: RouteContext) => {
   try {
     const body = await request.json();
-    const { description, companyId, directionProfile, sampleDescriptions, totalAmount } = body as {
+    const { description, companyId, directionProfile, sampleDescriptions, totalAmount, occurrences } = body as {
       description?: string;
       companyId?: string;
       directionProfile?: { creditPct: number; debitPct: number };
       sampleDescriptions?: string[];
       totalAmount?: { min: number; max: number };
+      occurrences?: number;
     };
 
     // Validate input: description is required, min 3 chars
@@ -95,6 +96,9 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
     // Rich context section
     const contextParts: string[] = [];
     contextParts.push(`Description: ${trimmedDesc}`);
+    if (occurrences !== undefined && occurrences > 0) {
+      contextParts.push(`Transactions: ${occurrences}`);
+    }
 
     if (directionProfile) {
       const creditPct = Math.round(directionProfile.creditPct * 100);

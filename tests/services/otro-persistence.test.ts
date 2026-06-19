@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { clearDatabase, createTestCompany, createTestUser, createTestCompanyMember } from '../helpers/factories';
+import { clearDatabase, createTestCompany, createTestUser, createTestCompanyMember, createTestGlAccount, createTestBankAccount, createTestBankStatement, createTestBankTransaction } from '../helpers/factories';
 import { createSession } from '@/lib/sessions';
 import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
@@ -91,21 +91,66 @@ describe('OTRO Persistence', () => {
 
   it('excludes OTRO entities from pending candidates', async () => {
     const { getEntityCandidates } = await import('@/lib/services/entity-classifier');
+    const { classifyEntity } = await import('@/lib/services/entity-classifier');
 
-    // Mock the DB calls that getEntityCandidates makes
-    // Since we don't have bank accounts/transactions, it will return []
-    // The key test is that PAPELERA XYZ is not returned as a candidate
-    const candidates = await getEntityCandidates(companyId);
+    // Use a unique entity name not used in other tests
+    const txnDesc = 'Zelle payment from NUEVA EMPRESA SRL for services rendered';
 
-    // With no bank accounts, candidates should be empty
-    // But PAPELERA XYZ should definitely not appear
-    if (candidates.length > 0) {
-      const hasPapelera = candidates.some(
-        (c: { canonicalName: string }) =>
-          c.canonicalName.toLowerCase().includes('papelera'),
-      );
-      expect(hasPapelera).toBe(false);
-    }
+    // Create a bank account + 2 transactions (minOccurrences=2 threshold)
+    const gl = await createTestGlAccount({ companyId, code: '1101', name: 'Cash 2' });
+    const ba = await createTestBankAccount(companyId, gl.id, 'OTRO Test Bank 2');
+    const stmt = await createTestBankStatement(companyId, ba.id);
+    await createTestBankTransaction(companyId, stmt.id, {
+      date: '2025-02-01',
+      amount: 500,
+      description: txnDesc,
+    });
+    await createTestBankTransaction(companyId, stmt.id, {
+      date: '2025-02-10',
+      amount: 300,
+      description: txnDesc,
+    });
+
+    // First try: candidate should appear (not yet classified)
+    const before = await getEntityCandidates(companyId);
+    const hasNuevaBefore = before.some(
+      (c: { canonicalName: string }) =>
+        c.canonicalName.toLowerCase().includes('nueva empresa'),
+    );
+    expect(hasNuevaBefore).toBe(true);
+
+    // Now classify it as OTRO
+    await classifyEntity({
+      companyId,
+      pattern: 'NUEVA EMPRESA SRL',
+      role: 'OTRO',
+      source: 'user',
+      userId,
+      userDescription: 'services vendor',
+    });
+
+    // Second try: candidate should NOT appear (already classified as OTRO)
+    const after = await getEntityCandidates(companyId);
+    const hasNuevaAfter = after.some(
+      (c: { canonicalName: string }) =>
+        c.canonicalName.toLowerCase().includes('nueva empresa'),
+    );
+    expect(hasNuevaAfter).toBe(false);
+  });
+
+  it('blocks saving OTRO without userDescription', async () => {
+    const { classifyEntity } = await import('@/lib/services/entity-classifier');
+
+    await expect(
+      classifyEntity({
+        companyId,
+        pattern: 'SIN DESCRIPCION',
+        role: 'OTRO',
+        source: 'user',
+        userId,
+        // No userDescription
+      }),
+    ).rejects.toThrow();
   });
 
   it('allows saving a second OTRO entity with userDescription', async () => {

@@ -19,6 +19,10 @@ export interface ClassifyEntityInput {
 export async function classifyEntity(input: ClassifyEntityInput): Promise<void> {
   const { companyId, pattern, role, roles, glAccountCode, source, userId, transactionDirection, userDescription } = input;
 
+  if (role === 'OTRO' && !userDescription) {
+    throw new Error('userDescription is required when role is OTRO');
+  }
+
   let glAccountId: string | null = null;
   if (glAccountCode) {
     const acc = await db.glAccount.findFirst({
