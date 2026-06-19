@@ -307,6 +307,7 @@ model EntityContext {
   pattern              String
   role                 String
   roles                String?
+  userDescription      String?
   transactionDirection String?
   glAccountId          String?
   source               String     @default("user")

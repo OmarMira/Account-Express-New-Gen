@@ -5,13 +5,18 @@ import type { EntityRole } from '@/lib/constants/entity-roles';
 import { checkPromptInjection } from '@/lib/guardrails';
 import { db } from '@/lib/db';
 import { logger } from '@/lib/logger';
+import { roleIsValidForDirection } from '@/lib/services/direction-filter';
 
 // ── POST /api/learning/suggest-role ──────────────────────────────────
 // Hybrid suggest: searches local EntityContext first, falls back to AI.
 export const POST = apiHandler(async (request: NextRequest, context: RouteContext) => {
   try {
     const body = await request.json();
-    const { description, companyId } = body as { description?: string; companyId?: string };
+    const { description, companyId, directionProfile } = body as {
+      description?: string;
+      companyId?: string;
+      directionProfile?: { creditPct: number; debitPct: number };
+    };
 
     // Validate input: description is required, min 3 chars
     if (!description || typeof description !== 'string' || description.trim().length < 3) {
@@ -60,8 +65,29 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
       );
     }
 
+    // Filter roles by direction profile (if provided)
+    let candidateRoles: string[] = [...ENTITY_ROLES];
+    if (directionProfile) {
+      const filteredOut: string[] = [];
+      candidateRoles = ENTITY_ROLES.filter((role) => {
+        const result = roleIsValidForDirection(role, directionProfile);
+        if (!result.valid) {
+          filteredOut.push(role);
+        }
+        return result.valid;
+      });
+
+      if (filteredOut.length > 0) {
+        logger.info('[SUGGEST_ROLE DIRECTION_FILTER]', {
+          filteredOut,
+          profile: directionProfile,
+          remaining: candidateRoles,
+        });
+      }
+    }
+
     // Build the focused prompt for role suggestion
-    const rolesList = ENTITY_ROLES.map((r) => `- ${r}`).join('\n');
+    const rolesList = candidateRoles.map((r) => `- ${r}`).join('\n');
     const systemPrompt = 'You are an accounting entity classifier. Return only valid JSON.';
     const userPrompt = `Given this entity description: "${trimmedDesc}"
 Determine which accounting role best fits.
