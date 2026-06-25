@@ -7,18 +7,9 @@ const globalForPrisma = globalThis as unknown as {
   isListenerRegistered?: boolean;
 };
 
-// Configuración correcta para poder emitir eventos 'query'
-const isTest = process.env.NODE_ENV === 'test' || process.env.VITEST === 'true';
-const dbUrl = isTest ? 'file:./test.db' : undefined;
-
 export const db =
   globalForPrisma.prisma ??
   new PrismaClient({
-    datasources: dbUrl ? {
-      db: {
-        url: dbUrl,
-      },
-    } : undefined,
     log: [
       { level: 'query', emit: 'event' },
       { level: 'warn', emit: 'stdout' },
@@ -30,30 +21,9 @@ if (process.env.NODE_ENV !== 'production') {
   globalForPrisma.prisma = db;
 }
 
-// Optimización para SQLite (WAL Mode)
 const isEdge = process.env.NEXT_RUNTIME === 'edge';
-if (!isEdge && db && !globalForPrisma.prisma) {
-  db.$connect()
-    .then(async () => {
-      try {
-        const [{ journal_mode }] =
-          await db.$queryRawUnsafe<{ journal_mode: string }[]>(`PRAGMA journal_mode=WAL;`);
-        await db.$queryRawUnsafe(`PRAGMA synchronous=NORMAL;`);
-        logger.info('SQLITE_OPTIMIZED', {
-          journalMode: journal_mode,
-          cacheSize: '20MB',
-          busyTimeout: '5000ms',
-        });
-      } catch (err) {
-        logger.warn('SQLITE_WAL_SKIPPED', { reason: String(err) });
-      }
-    })
-    .catch((err) => {
-      logger.error('⚠️ DB connect failed:', { error: String(err) });
-    });
-}
 
-// ─── Query Profiling Singleton real ─────────────────────────────────────────
+// ─── Query Profiling Singleton ───────────────────────────────────────────────
 // Prisma's $on type only exposes events configured via log emit — the
 // default PrismaClient generic loses this context, so we cast narrowly.
 type DBWithQueryEvents = PrismaClient & {

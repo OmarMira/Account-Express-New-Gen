@@ -9,6 +9,7 @@ import {
   validateAccountHolder,
   isStrictModeEnabled,
 } from '@/lib/validation/account-holder-validator';
+import { JournalEntryService } from '@/lib/services/journal-entry.service';
 import {
   ValidationError,
   NotFoundError,
@@ -162,6 +163,7 @@ export class ImportService {
       const result = await this.importTransactions(
         companyId,
         bankAccount.id,
+        bankAccount.glAccountId,
         transactions,
         'pdf',
         fileName,
@@ -220,6 +222,7 @@ export class ImportService {
       const result = await this.importTransactions(
         companyId,
         bankAccount.id,
+        bankAccount.glAccountId,
         transactions,
         'csv',
         fileName,
@@ -259,6 +262,7 @@ export class ImportService {
       const result = await this.importTransactions(
         companyId,
         bankAccount.id,
+        bankAccount.glAccountId,
         parsed.transactions,
         extension as 'ofx' | 'qfx',
         fileName,
@@ -327,6 +331,7 @@ export class ImportService {
   private static async importTransactions(
     companyId: string,
     bankAccountId: string,
+    bankGlAccountId: string,
     transactions: { date: Date; description: string; amount: number; reference?: string }[],
     format: string,
     fileName: string,
@@ -455,6 +460,23 @@ export class ImportService {
       await tx.bankTransaction.createMany({
         data: transactionsToInsert,
       });
+
+      // Create journal entries for transactions with auto-assigned GL accounts
+      const createdTxs = await tx.bankTransaction.findMany({
+        where: { statementId: statement.id, glAccountId: { not: null }, journalEntryId: null },
+        select: { id: true, date: true, amount: true, description: true, glAccountId: true },
+      });
+      for (const bt of createdTxs) {
+        await JournalEntryService.createFromBankTransaction(tx, {
+          bankTxId: bt.id,
+          bankTxDate: bt.date,
+          bankTxAmount: Number(bt.amount),
+          bankTxDescription: bt.description,
+          bankGlAccountId,
+          counterpartyGlAccountId: bt.glAccountId!,
+          companyId,
+        });
+      }
 
       await ImportService.recalculateBalances(tx, bankAccountId);
 

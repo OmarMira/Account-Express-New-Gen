@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { db } from '@/lib/db';
 import { apiHandler, type RouteContext } from '@/lib/api-handler';
 import { requireCompanyContext } from '@/lib/context-storage';
+import { JournalEntryService } from '@/lib/services/journal-entry.service';
 
 // ─── GET /api/banks?companyId=xxx ──────────────────────────────────────
 export const GET = apiHandler(async (request: NextRequest, context: RouteContext) => {
@@ -25,6 +27,8 @@ export const GET = apiHandler(async (request: NextRequest, context: RouteContext
 });
 
 // ─── POST /api/banks ──────────────────────────────────────────────────
+// If balance > 0, creates an opening journal entry:
+//   Dr Bank GL / Cr Opening Balance Equity
 export const POST = apiHandler(async (request: NextRequest, context: RouteContext) => {
   const { userId, companyId } = requireCompanyContext();
   const body = await request.json();
@@ -33,9 +37,7 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
   // Validate required fields
   if (!accountName || !bankName || !glAccountId) {
     return NextResponse.json(
-      {
-        error: 'accountName, bankName, and glAccountId are required',
-      },
+      { error: 'accountName, bankName, and glAccountId are required' },
       { status: 400 },
     );
   }
@@ -49,32 +51,50 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
   }
   if (glAccount.accountType !== 'asset') {
     return NextResponse.json(
-      {
-        error: 'Bank accounts must be linked to an asset-type GL account',
-      },
+      { error: 'Bank accounts must be linked to an asset-type GL account' },
       { status: 400 },
     );
   }
 
-  const account = await db.bankAccount.create({
-    data: {
-      companyId,
-      accountName: accountName.trim(),
-      bankName: bankName.trim(),
-      accountNo: accountNo?.trim() || null,
-      routingNo: routingNo?.trim() || null,
-      glAccountId,
-      balance: parseFloat(balance) || 0,
-      initialBalance: parseFloat(balance) || 0,
-      currency: currency || 'USD',
-      isActive: true,
-    },
-    include: {
-      glAccount: {
-        select: { id: true, code: true, name: true, accountType: true },
+  const initialBalance = new Prisma.Decimal(balance || 0);
+
+  const result = await db.$transaction(async (tx) => {
+    const account = await tx.bankAccount.create({
+      data: {
+        companyId,
+        accountName: accountName.trim(),
+        bankName: bankName.trim(),
+        accountNo: accountNo?.trim() || null,
+        routingNo: routingNo?.trim() || null,
+        glAccountId,
+        balance: initialBalance,
+        initialBalance,
+        currency: currency || 'USD',
+        isActive: true,
       },
-    },
+      include: {
+        glAccount: {
+          select: { id: true, code: true, name: true, accountType: true },
+        },
+      },
+    });
+
+    // Create opening journal entry if initial balance > 0
+    if (initialBalance.greaterThan(0)) {
+      const openingEquityId = await JournalEntryService.ensureOpeningBalanceEquity(tx, companyId);
+      await JournalEntryService.createFromBankTransaction(tx, {
+        bankTxId: '',
+        bankTxDate: new Date(),
+        bankTxAmount: initialBalance.toNumber(),
+        bankTxDescription: 'Opening balance',
+        bankGlAccountId: glAccountId,
+        counterpartyGlAccountId: openingEquityId,
+        companyId,
+      });
+    }
+
+    return account;
   });
 
-  return NextResponse.json({ account }, { status: 201 });
+  return NextResponse.json({ account: result }, { status: 201 });
 });

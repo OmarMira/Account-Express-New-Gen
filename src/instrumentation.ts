@@ -1,5 +1,5 @@
 // ─── Next.js Instrumentation Hook ────────────────────────────────────────────
-// Called once when the server starts. Used to initialize SQLite PRAGMAs.
+// Called once when the server starts. Used to verify DB connection and set session params.
 // See: https://nextjs.org/docs/app/building-your-application/optimizing/instrumentation
 
 import * as Sentry from '@sentry/nextjs';

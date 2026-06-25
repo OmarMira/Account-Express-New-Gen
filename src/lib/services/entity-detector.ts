@@ -201,6 +201,18 @@ export interface ClusterOptions {
 }
 
 // ========== CLUSTERING PRINCIPAL: DISPATCH BY MODE ==========
+// ========== CLUSTER BY BEHAVIOR (WIZARD FLOW) ==========
+export function clusterByBehavior(
+  transactions: BankTransactionRaw[],
+  config: EntityDetectionConfig,
+): EntityCandidate[] {
+  return clusterCandidates(transactions, config, {
+    mode: 'exact',
+    extraNumberStrip: true,
+    smartFrequency: true,
+  });
+}
+
 export function clusterCandidates(
   transactions: BankTransactionRaw[],
   config: EntityDetectionConfig,

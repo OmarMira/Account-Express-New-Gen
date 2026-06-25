@@ -102,6 +102,13 @@ export const CHART_OF_ACCOUNTS: AccountSeed[] = [
   },
   { code: '3000', name: 'Equity', type: 'equity', normalBalance: 'credit' },
   {
+    code: '3050',
+    name: 'Opening Balance Equity',
+    type: 'equity',
+    normalBalance: 'credit',
+    parentCode: '3000',
+  },
+  {
     code: '3010',
     name: "Owner's Equity",
     type: 'equity',

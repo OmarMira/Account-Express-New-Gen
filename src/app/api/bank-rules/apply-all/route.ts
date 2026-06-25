@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { apiHandler, type RouteContext } from '@/lib/api-handler';
 import { requireCompanyContext } from '@/lib/context-storage';
 import { serverT } from '@/lib/server-i18n';
+import { JournalEntryService } from '@/lib/services/journal-entry.service';
 
 import {
   transactionMatchesRule,
@@ -121,6 +122,9 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
     }
   }
 
+  // Track which bank accounts' GL IDs are affected for journal entry creation
+  const matchedTxIds: string[] = [];
+
   for (const [, entry] of winnerMap) {
     const rule = rules.find((r) => r.id === entry.ruleId);
     if (!rule) continue;
@@ -140,6 +144,7 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
         where: { id: { in: debitIds } },
         data: { glAccountId: rule.debitGlAccountId || rule.glAccountId, matchedRuleId: rule.id },
       });
+      matchedTxIds.push(...debitIds);
     }
 
     if (creditIds.length > 0) {
@@ -147,9 +152,49 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
         where: { id: { in: creditIds } },
         data: { glAccountId: rule.creditGlAccountId || rule.glAccountId, matchedRuleId: rule.id },
       });
+      matchedTxIds.push(...creditIds);
     }
 
     totalMatched += entry.txIds.length;
+  }
+
+  // Create journal entries for all matched transactions, grouped by bank
+  if (matchedTxIds.length > 0) {
+    const matchedTxs = await db.bankTransaction.findMany({
+      where: { id: { in: matchedTxIds }, glAccountId: { not: null }, journalEntryId: null },
+      select: { id: true, date: true, amount: true, description: true, glAccountId: true, statementId: true },
+    });
+
+    // Group by bank account to get the bank GL account ID
+    const statements = await db.bankStatement.findMany({
+      where: { id: { in: [...new Set(matchedTxs.map((t) => t.statementId))] } },
+      select: { id: true, bankAccountId: true },
+    });
+    const bankAccounts = await db.bankAccount.findMany({
+      where: { id: { in: [...new Set(statements.map((s) => s.bankAccountId))] } },
+      select: { id: true, glAccountId: true },
+    });
+    const bankGlByStatement = new Map<string, string>();
+    for (const st of statements) {
+      const ba = bankAccounts.find((b) => b.id === st.bankAccountId);
+      if (ba) bankGlByStatement.set(st.id, ba.glAccountId);
+    }
+
+    await db.$transaction(async (tx) => {
+      for (const bt of matchedTxs) {
+        const bankGl = bankGlByStatement.get(bt.statementId);
+        if (!bankGl || !bt.glAccountId) continue;
+        await JournalEntryService.createFromBankTransaction(tx, {
+          bankTxId: bt.id,
+          bankTxDate: bt.date,
+          bankTxAmount: Number(bt.amount),
+          bankTxDescription: bt.description,
+          bankGlAccountId: bankGl,
+          counterpartyGlAccountId: bt.glAccountId,
+          companyId,
+        });
+      }
+    });
   }
 
   const matchResults = Array.from(winnerMap.values()).map((entry) => ({

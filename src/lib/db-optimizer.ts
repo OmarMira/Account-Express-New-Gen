@@ -1,25 +1,22 @@
-// ─── SQLite Optimizer ────────────────────────────────────────────────────────
-// Applies critical PRAGMA settings for performance.
-// WAL mode active always (dev + production) — benefits concurrent reads during writes.
+// ─── PostgreSQL Connection Health Check ──────────────────────────────────────
+// No PRAGMAs needed — PostgreSQL uses WAL natively and tuning is server-level.
+// This just verifies connectivity and sets a safe statement timeout.
 
 import { db } from './db';
 import { logger } from './logger';
 
 export async function optimizeSQLite() {
   try {
-    await db.$queryRawUnsafe('PRAGMA journal_mode = WAL');
-    await db.$queryRawUnsafe('PRAGMA synchronous = NORMAL');
-    await db.$queryRawUnsafe('PRAGMA cache_size = -20000'); // 20MB cache
-    await db.$queryRawUnsafe('PRAGMA temp_store = MEMORY');
-    await db.$queryRawUnsafe('PRAGMA busy_timeout = 5000'); // 5s retry on lock
-    await db.$queryRawUnsafe('PRAGMA foreign_keys = ON');
+    // Verify connection with a lightweight query
+    const result = await db.$queryRawUnsafe<{ version: string }[]>('SELECT version()');
+    const pgVersion = result?.[0]?.version ?? 'unknown';
+    logger.info('PG_CONNECTED', { version: pgVersion });
 
-    // Verify WAL mode
-    const result = (await db.$queryRawUnsafe('PRAGMA journal_mode')) as { journal_mode: string }[];
-    const journalMode = result?.[0]?.journal_mode;
-    logger.info('SQLITE_OPTIMIZED', { journalMode, cacheSize: '20MB', busyTimeout: '5000ms' });
+    // Set a sane session-level statement timeout (30s) to prevent runaway queries
+    await db.$executeRawUnsafe("SET statement_timeout = '30s'");
+    logger.info('PG_STATEMENT_TIMEOUT_SET', { timeout: '30s' });
   } catch (error) {
-    logger.error('SQLITE_OPTIMIZATION_FAILED', {
+    logger.error('PG_CONNECTION_FAILED', {
       error: error instanceof Error ? error.message : String(error),
     });
   }

@@ -11,5 +11,8 @@ export default defineConfig({
     setupFiles: ['./tests/setup.ts'],
     globals: true,
     fileParallelism: false,
+    env: {
+      DATABASE_URL: 'postgresql://postgres:postgrespassword@localhost:5432/accountexpress_test?schema=public',
+    },
   },
 });

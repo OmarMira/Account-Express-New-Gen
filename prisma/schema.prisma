@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -95,6 +95,7 @@ model GlAccount {
   entityContexts  EntityContext[]
   parent          GlAccount?        @relation("AccountHierarchy", fields: [parentId], references: [id])
   children        GlAccount[]       @relation("AccountHierarchy")
+  balance         Decimal           @default(0) @db.Decimal(18, 2)
   company         Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
   journalLines    JournalLine[]
 
@@ -111,8 +112,8 @@ model BankAccount {
   accountNo             String?
   routingNo             String?
   glAccountId           String
-  balance               Float                  @default(0)
-  initialBalance        Float                  @default(0)
+  balance               Decimal                @default(0) @db.Decimal(18, 2)
+  initialBalance        Decimal                @default(0) @db.Decimal(18, 2)
   currency              String                 @default("USD")
   isActive              Boolean                @default(true)
   createdAt             DateTime               @default(now())
@@ -133,10 +134,10 @@ model BankStatement {
   bankAccountId  String
   startDate      DateTime
   endDate        DateTime
-  openingBalance Float
-  closingBalance Float
-  totalCredits   Float             @default(0)
-  totalDebits    Float             @default(0)
+  openingBalance Decimal          @db.Decimal(18, 2)
+  closingBalance Decimal          @db.Decimal(18, 2)
+  totalCredits   Decimal          @default(0) @db.Decimal(18, 2)
+  totalDebits    Decimal          @default(0) @db.Decimal(18, 2)
   format         String
   fileName       String?
   createdAt      DateTime          @default(now())
@@ -153,7 +154,7 @@ model BankTransaction {
   statementId            String
   date                   DateTime
   description            String
-  amount                 Float
+  amount                 Decimal          @db.Decimal(18, 2)
   reference              String?
   isReconciled           Boolean               @default(false)
   glAccountId            String?
@@ -162,13 +163,14 @@ model BankTransaction {
   reconciliationPeriodId String?
   status                 String                @default("posted")
   importHash             String?               @unique
-  journalLineId          String?               @unique
+  journalEntryId         String?               @unique
   createdAt              DateTime              @default(now())
   updatedAt              DateTime              @updatedAt
+  journalEntry           JournalEntry?         @relation(fields: [journalEntryId], references: [id])
   reconciliationPeriod   ReconciliationPeriod? @relation(fields: [reconciliationPeriodId], references: [id])
-  matchedRule            BankRule?             @relation(fields: [matchedRuleId], references: [id])
-  glAccount              GlAccount?            @relation(fields: [glAccountId], references: [id])
-  statement              BankStatement         @relation(fields: [statementId], references: [id], onDelete: Cascade)
+  matchedRule            BankRule?              @relation(fields: [matchedRuleId], references: [id])
+  glAccount              GlAccount?             @relation(fields: [glAccountId], references: [id])
+  statement              BankStatement          @relation(fields: [statementId], references: [id], onDelete: Cascade)
 
   @@index([statementId])
   @@index([glAccountId])
@@ -178,7 +180,7 @@ model BankTransaction {
   @@index([reference])
   @@index([statementId, date])
   @@index([importHash])
-  @@index([isReconciled, journalLineId, date])
+  @@index([isReconciled, journalEntryId, date])
 }
 
 model ReconciliationPeriod {
@@ -186,9 +188,9 @@ model ReconciliationPeriod {
   companyId        String
   bankAccountId    String
   userId           String
-  statementBalance Float             @default(0)
-  bookBalance      Float             @default(0)
-  difference       Float             @default(0)
+  statementBalance Decimal           @default(0) @db.Decimal(18, 2)
+  bookBalance      Decimal           @default(0) @db.Decimal(18, 2)
+  difference       Decimal           @default(0) @db.Decimal(18, 2)
   status           String            @default("open")
   startedAt        DateTime          @default(now())
   completedAt      DateTime?
@@ -236,8 +238,9 @@ model JournalEntry {
   status      String        @default("draft")
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
-  company     Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company     Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
   lines       JournalLine[]
+  transactions BankTransaction[]
 
   @@index([companyId, date])
 }
@@ -247,8 +250,8 @@ model JournalLine {
   entryId     String
   glAccountId String
   description String?
-  debit       Float        @default(0)
-  credit      Float        @default(0)
+  debit       Decimal      @default(0) @db.Decimal(18, 2)
+  credit      Decimal      @default(0) @db.Decimal(18, 2)
   glAccount   GlAccount    @relation(fields: [glAccountId], references: [id])
   entry       JournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
 

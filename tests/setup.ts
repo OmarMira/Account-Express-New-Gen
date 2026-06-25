@@ -1,7 +1,5 @@
-// Safeguard: Force DATABASE_URL to use a test database so we never wipe dev.db
-if (!process.env.DATABASE_URL || process.env.DATABASE_URL.includes('dev.db')) {
-  process.env.DATABASE_URL = 'file:./test.db';
-}
+// DATABASE_URL is set in vitest.config.ts to the test PostgreSQL database
+// This prevents accidental writes to the dev database during tests.
 
 import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
 import path from 'path';
