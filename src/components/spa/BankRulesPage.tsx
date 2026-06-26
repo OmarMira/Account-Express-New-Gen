@@ -84,6 +84,10 @@ interface BankRule {
   updatedAt: string;
   glAccount: GlAccount;
   _matchCount: number;
+  // V2 fields (additive, no V1 removal)
+  conditions: { field: string; operator: string; value: string }[];
+  debitGlAccountId: string | null;
+  creditGlAccountId: string | null;
 }
 
 interface RuleForm {
