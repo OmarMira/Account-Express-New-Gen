@@ -10,7 +10,6 @@ afterEach(() => cleanup());
 // jsdom DOM API shims for Radix UI Select
 // @ts-expect-error incomplete jsdom impl
 EventTarget.prototype.hasPointerCapture ??= () => false;
-// @ts-expect-error incomplete jsdom impl
 Element.prototype.scrollIntoView ??= () => {};
 
 const tFn = (key: string) => key;
@@ -195,11 +194,11 @@ describe('BankRulesPage', () => {
     await waitFor(() => {
       // Find the POST fetch call
       const postCall = mockFetch.mock.calls.find(
-        ([url, opts]: [string, RequestInit]) =>
-          url === '/api/bank-rules' && opts.method === 'POST',
+        (call: any[]) =>
+          call[0] === '/api/bank-rules' && call[1]?.method === 'POST',
       );
       expect(postCall).toBeDefined();
-      const body = JSON.parse(postCall[1].body as string);
+      const body = JSON.parse((postCall as any[])[1].body);
 
       // Assert V2 shape
       expect(body).toHaveProperty('conditions');
@@ -239,11 +238,11 @@ describe('BankRulesPage', () => {
 
     await waitFor(() => {
       const postCall = mockFetch.mock.calls.find(
-        ([url, opts]: [string, RequestInit]) =>
-          url === '/api/bank-rules' && opts.method === 'POST',
+        (call: any[]) =>
+          call[0] === '/api/bank-rules' && call[1]?.method === 'POST',
       );
       expect(postCall).toBeDefined();
-      const body = JSON.parse(postCall[1].body as string);
+      const body = JSON.parse((postCall as any[])[1].body);
       expect(body).toHaveProperty('debitGlAccountId', 'acc-1');
       expect(body).toHaveProperty('creditGlAccountId', null);
     });
@@ -272,11 +271,11 @@ describe('BankRulesPage', () => {
 
     await waitFor(() => {
       const postCall = mockFetch.mock.calls.find(
-        ([url, opts]: [string, RequestInit]) =>
-          url === '/api/bank-rules' && opts.method === 'POST',
+        (call: any[]) =>
+          call[0] === '/api/bank-rules' && call[1]?.method === 'POST',
       );
       expect(postCall).toBeDefined();
-      const body = JSON.parse(postCall[1].body as string);
+      const body = JSON.parse((postCall as any[])[1].body);
       expect(body).toHaveProperty('creditGlAccountId', 'acc-1');
       expect(body).toHaveProperty('debitGlAccountId', null);
     });
@@ -301,11 +300,11 @@ describe('BankRulesPage', () => {
 
     await waitFor(() => {
       const postCall = mockFetch.mock.calls.find(
-        ([url, opts]: [string, RequestInit]) =>
-          url === '/api/bank-rules' && opts.method === 'POST',
+        (call: any[]) =>
+          call[0] === '/api/bank-rules' && call[1]?.method === 'POST',
       );
       expect(postCall).toBeDefined();
-      const body = JSON.parse(postCall[1].body as string);
+      const body = JSON.parse((postCall as any[])[1].body);
       expect(body).toHaveProperty('debitGlAccountId', 'acc-1');
       expect(body).toHaveProperty('creditGlAccountId', 'acc-1');
     });

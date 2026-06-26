@@ -146,10 +146,10 @@ function setupFetch(
 ) {
   mockFetch.mockImplementation((url: string, req?: RequestInit) => {
     const u = typeof url === 'string' ? url : '';
-    if (u.includes('/api/learning/classify-entity') && (!req || req.method === 'GET')) {
+    if (u.includes('/api/learning/smart-classify') && (!req || req.method === 'GET')) {
       return Promise.resolve({
         ok: true,
-        json: () => Promise.resolve({ success: true, data: candidates }),
+        json: () => Promise.resolve({ data: candidates }),
       });
     }
     if (u.includes('/api/learning/suggest-role')) {
@@ -382,12 +382,11 @@ describe('EntityOnboardingModal', () => {
       setupFetch([entityA, { ...mixedCandidate, canonicalName: 'ENTITY_B' }]);
       mockFetch.mockImplementation((url: string, req?: RequestInit) => {
         const u = typeof url === 'string' ? url : '';
-        if (u.includes('/api/learning/classify-entity') && (!req || req.method === 'GET')) {
+        if (u.includes('/api/learning/smart-classify') && (!req || req.method === 'GET')) {
           return Promise.resolve({
             ok: true,
             json: () =>
               Promise.resolve({
-                success: true,
                 data: [
                   { ...debitCandidate, canonicalName: 'ENTITY_A' },
                   { ...mixedCandidate, canonicalName: 'ENTITY_B' },
@@ -527,12 +526,11 @@ describe('EntityOnboardingModal', () => {
       let callIndex = 0;
       mockFetch.mockImplementation((url: string, req?: RequestInit) => {
         const u = typeof url === 'string' ? url : '';
-        if (u.includes('/api/learning/classify-entity') && (!req || req.method === 'GET')) {
+        if (u.includes('/api/learning/smart-classify') && (!req || req.method === 'GET')) {
           return Promise.resolve({
             ok: true,
             json: () =>
               Promise.resolve({
-                success: true,
                 data: [
                   { ...debitCandidate, canonicalName: 'ENTITY_A' },
                   { ...debitCandidate, canonicalName: 'ENTITY_B' },
@@ -685,11 +683,11 @@ describe('EntityOnboardingModal', () => {
 
       mockFetch.mockImplementation((url: string, req?: RequestInit) => {
         const u = typeof url === 'string' ? url : '';
-        if (u.includes('/api/learning/classify-entity') && (!req || req.method === 'GET')) {
+        if (u.includes('/api/learning/smart-classify') && (!req || req.method === 'GET')) {
           return Promise.resolve({
             ok: true,
             json: () =>
-              Promise.resolve({ success: true, data: [debitCandidate] }),
+              Promise.resolve({ data: [debitCandidate] }),
           });
         }
         if (u.includes('/api/learning/suggest-role')) {
@@ -777,12 +775,11 @@ describe('EntityOnboardingModal', () => {
 
       mockFetch.mockImplementation((url: string, req?: RequestInit) => {
         const u = typeof url === 'string' ? url : '';
-        if (u.includes('/api/learning/classify-entity') && (!req || req.method === 'GET')) {
+        if (u.includes('/api/learning/smart-classify') && (!req || req.method === 'GET')) {
           return Promise.resolve({
             ok: true,
             json: () =>
               Promise.resolve({
-                success: true,
                 data: [debitCandidate],
               }),
           });
@@ -869,12 +866,11 @@ describe('EntityOnboardingModal', () => {
 
       mockFetch.mockImplementation((url: string, req?: RequestInit) => {
         const u = typeof url === 'string' ? url : '';
-        if (u.includes('/api/learning/classify-entity') && (!req || req.method === 'GET')) {
+        if (u.includes('/api/learning/smart-classify') && (!req || req.method === 'GET')) {
           return Promise.resolve({
             ok: true,
             json: () =>
               Promise.resolve({
-                success: true,
                 data: [
                   { ...debitCandidate, canonicalName: 'ENTITY_A' },
                   { ...debitCandidate, canonicalName: 'ENTITY_B' },
