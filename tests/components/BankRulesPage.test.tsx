@@ -60,6 +60,9 @@ const mockRules = [
     updatedAt: '2026-01-01T00:00:00Z',
     glAccount: { id: 'acc-1', code: '5010', name: 'Cost of Goods', accountType: 'expense' },
     _matchCount: 42,
+    conditions: [{ field: 'description', operator: 'contains', value: 'WALMART' }],
+    debitGlAccountId: 'acc-1',
+    creditGlAccountId: null,
   },
   {
     id: 'r2',
@@ -75,6 +78,9 @@ const mockRules = [
     updatedAt: '2026-01-15T00:00:00Z',
     glAccount: { id: 'acc-2', code: '6100', name: 'Transport', accountType: 'expense' },
     _matchCount: 8,
+    conditions: [{ field: 'description', operator: 'contains', value: 'UBER' }],
+    debitGlAccountId: 'acc-2',
+    creditGlAccountId: null,
   },
 ];
 
