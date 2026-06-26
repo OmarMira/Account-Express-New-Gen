@@ -532,9 +532,9 @@ describe('EntityOnboardingModal', () => {
             json: () =>
               Promise.resolve({
                 data: [
-                  { ...debitCandidate, canonicalName: 'ENTITY_A' },
-                  { ...debitCandidate, canonicalName: 'ENTITY_B' },
-                  { ...debitCandidate, canonicalName: 'ENTITY_C' },
+                  { ...debitCandidate, id: 'can_a', canonicalName: 'ENTITY_A' },
+                  { ...debitCandidate, id: 'can_b', canonicalName: 'ENTITY_B' },
+                  { ...debitCandidate, id: 'can_c', canonicalName: 'ENTITY_C' },
                 ],
               }),
           });
@@ -872,8 +872,8 @@ describe('EntityOnboardingModal', () => {
             json: () =>
               Promise.resolve({
                 data: [
-                  { ...debitCandidate, canonicalName: 'ENTITY_A' },
-                  { ...debitCandidate, canonicalName: 'ENTITY_B' },
+                  { ...debitCandidate, id: 'can_a', canonicalName: 'ENTITY_A' },
+                  { ...debitCandidate, id: 'can_b', canonicalName: 'ENTITY_B' },
                 ],
               }),
           });
