@@ -7,6 +7,12 @@ import { BankRulesPage } from '@/components/spa/BankRulesPage';
 
 afterEach(() => cleanup());
 
+// jsdom DOM API shims for Radix UI Select
+// @ts-expect-error incomplete jsdom impl
+EventTarget.prototype.hasPointerCapture ??= () => false;
+// @ts-expect-error incomplete jsdom impl
+Element.prototype.scrollIntoView ??= () => {};
+
 const tFn = (key: string) => key;
 const mockLangState = { t: tFn, language: 'en' };
 vi.mock('@/store/language-store', () => ({
@@ -30,6 +36,8 @@ vi.mock('@/components/spa/journal/AccountSelector', () => ({
   AccountSelector: ({ value, onChange }: { value: string | null; onChange: (id: string) => void }) => (
     <select data-testid="account-selector" value={value || ''} onChange={(e) => onChange(e.target.value)}>
       <option value="">Select account</option>
+      <option value="acc-1">acc-1</option>
+      <option value="acc-2">acc-2</option>
     </select>
   ),
 }));
@@ -158,5 +166,148 @@ describe('BankRulesPage', () => {
 
     const skeletons = document.querySelectorAll('[data-slot="skeleton"]');
     expect(skeletons.length).toBeGreaterThan(0);
+  });
+
+  it('sends V2 fields (conditions, debitGlAccountId, creditGlAccountId) on create', async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    setupFetchSuccess();
+    render(<BankRulesPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('bankRules.newRule')).toBeInTheDocument();
+    });
+
+    // Click "New Rule" button
+    await user.click(screen.getByText('bankRules.newRule'));
+
+    // Fill name
+    await user.type(screen.getByLabelText('bankRules.ruleName'), 'TestRule');
+
+    // Fill condition value (V1 field, no htmlFor label — match by placeholder)
+    await user.type(screen.getByPlaceholderText('WALMART'), 'TestRule');
+
+    // Select GL account
+    await user.selectOptions(screen.getByTestId('account-selector'), 'acc-1');
+
+    // Submit
+    await user.click(screen.getByText('common.save'));
+
+    await waitFor(() => {
+      // Find the POST fetch call
+      const postCall = mockFetch.mock.calls.find(
+        ([url, opts]: [string, RequestInit]) =>
+          url === '/api/bank-rules' && opts.method === 'POST',
+      );
+      expect(postCall).toBeDefined();
+      const body = JSON.parse(postCall[1].body as string);
+
+      // Assert V2 shape
+      expect(body).toHaveProperty('conditions');
+      expect(Array.isArray(body.conditions)).toBe(true);
+      expect(body.conditions[0]).toEqual({
+        field: 'description',
+        operator: 'contains',
+        value: 'TestRule',
+      });
+
+      // Default transactionDirection is 'any' → both account IDs set
+      expect(body).toHaveProperty('debitGlAccountId', 'acc-1');
+      expect(body).toHaveProperty('creditGlAccountId', 'acc-1');
+    });
+  });
+
+  it('maps direction=debit → debitGlAccountId set, creditGlAccountId=null', async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    setupFetchSuccess();
+    render(<BankRulesPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('bankRules.newRule')).toBeInTheDocument();
+    });
+    await user.click(screen.getByText('bankRules.newRule'));
+
+    await user.type(screen.getByLabelText('bankRules.ruleName'), 'TestRule');
+    await user.type(screen.getByPlaceholderText('WALMART'), 'TestRule');
+    await user.selectOptions(screen.getByTestId('account-selector'), 'acc-1');
+
+    // Open direction select (second combobox) and choose 'debit'
+    const [, directionTrigger] = screen.getAllByRole('combobox');
+    await user.click(directionTrigger);
+    await user.click(screen.getByRole('option', { name: 'bankRules.debit' }));
+
+    await user.click(screen.getByText('common.save'));
+
+    await waitFor(() => {
+      const postCall = mockFetch.mock.calls.find(
+        ([url, opts]: [string, RequestInit]) =>
+          url === '/api/bank-rules' && opts.method === 'POST',
+      );
+      expect(postCall).toBeDefined();
+      const body = JSON.parse(postCall[1].body as string);
+      expect(body).toHaveProperty('debitGlAccountId', 'acc-1');
+      expect(body).toHaveProperty('creditGlAccountId', null);
+    });
+  });
+
+  it('maps direction=credit → creditGlAccountId set, debitGlAccountId=null', async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    setupFetchSuccess();
+    render(<BankRulesPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('bankRules.newRule')).toBeInTheDocument();
+    });
+    await user.click(screen.getByText('bankRules.newRule'));
+
+    await user.type(screen.getByLabelText('bankRules.ruleName'), 'TestRule');
+    await user.type(screen.getByPlaceholderText('WALMART'), 'TestRule');
+    await user.selectOptions(screen.getByTestId('account-selector'), 'acc-1');
+
+    // Open direction select (second combobox) and choose 'credit'
+    const [, directionTrigger2] = screen.getAllByRole('combobox');
+    await user.click(directionTrigger2);
+    await user.click(screen.getByRole('option', { name: 'bankRules.credit' }));
+
+    await user.click(screen.getByText('common.save'));
+
+    await waitFor(() => {
+      const postCall = mockFetch.mock.calls.find(
+        ([url, opts]: [string, RequestInit]) =>
+          url === '/api/bank-rules' && opts.method === 'POST',
+      );
+      expect(postCall).toBeDefined();
+      const body = JSON.parse(postCall[1].body as string);
+      expect(body).toHaveProperty('creditGlAccountId', 'acc-1');
+      expect(body).toHaveProperty('debitGlAccountId', null);
+    });
+  });
+
+  it('maps direction=any → both debitGlAccountId and creditGlAccountId set', async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    setupFetchSuccess();
+    render(<BankRulesPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('bankRules.newRule')).toBeInTheDocument();
+    });
+    await user.click(screen.getByText('bankRules.newRule'));
+
+    await user.type(screen.getByLabelText('bankRules.ruleName'), 'TestRule');
+    await user.type(screen.getByPlaceholderText('WALMART'), 'TestRule');
+    await user.selectOptions(screen.getByTestId('account-selector'), 'acc-1');
+
+    // Direction stays 'any' (default)
+    await user.click(screen.getByText('common.save'));
+
+    await waitFor(() => {
+      const postCall = mockFetch.mock.calls.find(
+        ([url, opts]: [string, RequestInit]) =>
+          url === '/api/bank-rules' && opts.method === 'POST',
+      );
+      expect(postCall).toBeDefined();
+      const body = JSON.parse(postCall[1].body as string);
+      expect(body).toHaveProperty('debitGlAccountId', 'acc-1');
+      expect(body).toHaveProperty('creditGlAccountId', 'acc-1');
+    });
   });
 });
