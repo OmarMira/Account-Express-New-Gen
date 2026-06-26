@@ -65,7 +65,7 @@ describe('POST /api/learning/suggest-role — prompt construction', () => {
     };
 
     let capturedBody: string | null = null;
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url: string, opts?: RequestInit) => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url: string | URL | Request, opts?: RequestInit | undefined) => {
       capturedBody = typeof opts?.body === 'string' ? opts.body : null;
       return new Response(JSON.stringify(mockResponse), { status: 200 });
     });
@@ -108,7 +108,7 @@ describe('POST /api/learning/suggest-role — prompt construction', () => {
     };
 
     let capturedBody: string | null = null;
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url: string, opts?: RequestInit) => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url: string | URL | Request, opts?: RequestInit | undefined) => {
       capturedBody = typeof opts?.body === 'string' ? opts.body : null;
       return new Response(JSON.stringify(mockResponse), { status: 200 });
     });
@@ -154,7 +154,7 @@ describe('POST /api/learning/suggest-role — prompt construction', () => {
     };
 
     let capturedBody: string | null = null;
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url: string, opts?: RequestInit) => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url: string | URL | Request, opts?: RequestInit | undefined) => {
       capturedBody = typeof opts?.body === 'string' ? opts.body : null;
       return new Response(JSON.stringify(mockResponse), { status: 200 });
     });
@@ -193,7 +193,7 @@ describe('POST /api/learning/suggest-role — prompt construction', () => {
     };
 
     let capturedBody: string | null = null;
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url: string, opts?: RequestInit) => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url: string | URL | Request, opts?: RequestInit | undefined) => {
       capturedBody = typeof opts?.body === 'string' ? opts.body : null;
       return new Response(JSON.stringify(mockResponse), { status: 200 });
     });
@@ -259,7 +259,7 @@ describe('POST /api/learning/suggest-role — prompt construction', () => {
       // First AI call returns low confidence, second returns high confidence
       let callCount = 0;
       let rePromptBody: string | null = null;
-      vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url: string, opts?: RequestInit) => {
+      vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url: string | URL | Request, opts?: RequestInit | undefined) => {
         callCount++;
         if (callCount === 2) {
           rePromptBody = typeof opts?.body === 'string' ? opts.body : null;

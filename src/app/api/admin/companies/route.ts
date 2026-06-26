@@ -63,7 +63,8 @@ export const POST = apiHandler(
         },
       });
 
-      await seedChartOfAccounts(tx, newCompany.id);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await seedChartOfAccounts(tx as any, newCompany.id);
 
       await tx.auditLog.create({
         data: {

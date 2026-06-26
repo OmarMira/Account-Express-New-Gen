@@ -39,7 +39,8 @@ export const POST = apiHandler(
       });
 
       // 3. Seed accounts
-      await seedChartOfAccounts(tx, newCompany.id);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await seedChartOfAccounts(tx as any, newCompany.id);
 
       // 5. Create audit log
       await createAuditLogWithRetry(
@@ -51,7 +52,8 @@ export const POST = apiHandler(
           entityId: newCompany.id,
           details: `Created company ${newCompany.legalName} and auto-seeded chart of accounts`,
         },
-        tx,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        tx as any,
       );
 
       return newCompany;

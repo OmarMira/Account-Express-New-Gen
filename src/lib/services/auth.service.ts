@@ -104,7 +104,8 @@ export class AuthService {
       });
 
       // Seed chart of accounts
-      await seedChartOfAccounts(tx, company.id);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await seedChartOfAccounts(tx as any, company.id);
 
       return { user, company };
     });

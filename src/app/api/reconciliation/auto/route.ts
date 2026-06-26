@@ -202,7 +202,8 @@ export const POST = apiHandler(async (request: NextRequest) => {
       if (!transaction) continue;
 
       // Verify that the transaction date is in an active fiscal period
-      await assertActiveFiscalPeriod(companyId, transaction.date, tx);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await assertActiveFiscalPeriod(companyId, transaction.date, tx as any);
 
       const updateData: Record<string, unknown> = {
         glAccountId: match.glAccountId,

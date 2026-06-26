@@ -41,7 +41,8 @@ export class JournalService {
     // Create entry with lines in a transaction
     const entry = await db.$transaction(async (tx) => {
       // Check fiscal period INSIDE the transaction to prevent TOCTOU race
-      await assertActiveFiscalPeriod(companyId, date, tx);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await assertActiveFiscalPeriod(companyId, date, tx as any);
       const newEntry = await tx.journalEntry.create({
         data: {
           companyId,

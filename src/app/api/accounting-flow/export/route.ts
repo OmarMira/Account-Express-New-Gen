@@ -76,7 +76,8 @@ export const GET = apiHandler(async (request: NextRequest) => {
   }
 
   // Generar datos
-  const data = await aggregateAccountingFlow(db, {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const data = await aggregateAccountingFlow(db as any, {
     companyId,
     startDate,
     endDate,

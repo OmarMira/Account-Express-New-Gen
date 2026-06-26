@@ -1,5 +1,3 @@
-import { PrismaClient } from '@prisma/client';
-
 export interface FuzzyCandidate {
   id: string;
   description: string;
@@ -36,8 +34,9 @@ function getEffectiveTolerance(description: string | undefined, base: number): n
  * Nota: SQLite no soporta índices parciales. El índice compuesto
  * @@index([isReconciled, journalLineId, date]) cubre este query.
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function fetchFuzzyCandidates(
-  prisma: PrismaClient,
+  prisma: any,
   options: FuzzyPreFilterOptions,
 ): Promise<FuzzyCandidate[]> {
   const baseTolerance = options.tolerancePercent ?? 0.02;

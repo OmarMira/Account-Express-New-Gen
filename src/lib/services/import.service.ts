@@ -294,7 +294,7 @@ export class ImportService {
     accountNumber?: string,
     openingBalance: number = 0,
     currency: string = 'USD',
-  ): Promise<{ account: { id: string; accountName: string; accountNo?: string | null; bankName: string; companyId: string }; newAccountCreated: boolean }> {
+  ): Promise<{ account: { id: string; accountName: string; accountNo?: string | null; bankName: string; companyId: string; glAccountId: string }; newAccountCreated: boolean }> {
     if (bankAccountId) {
       const account = await db.bankAccount.findFirst({
         where: { id: bankAccountId, companyId },
@@ -467,7 +467,8 @@ export class ImportService {
         select: { id: true, date: true, amount: true, description: true, glAccountId: true },
       });
       for (const bt of createdTxs) {
-        await JournalEntryService.createFromBankTransaction(tx, {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await JournalEntryService.createFromBankTransaction(tx as any, {
           bankTxId: bt.id,
           bankTxDate: bt.date,
           bankTxAmount: Number(bt.amount),
@@ -478,7 +479,8 @@ export class ImportService {
         });
       }
 
-      await ImportService.recalculateBalances(tx, bankAccountId);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await ImportService.recalculateBalances(tx as any, bankAccountId);
 
       return { statementId: statement.id, autoCategorizedCount };
     });

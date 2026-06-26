@@ -44,7 +44,8 @@ export const POST = apiHandler(async (request: NextRequest) => {
 
   try {
     // 1. Pre-filtro en SQLite (Date objects — nunca number)
-    const candidates = await fetchFuzzyCandidates(db, {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const candidates = await fetchFuzzyCandidates(db as any, {
       companyId,
       dateFrom: from,
       dateTo: to,

@@ -13,7 +13,8 @@ export async function listEntityContexts(
   const skip = (page - 1) * limit;
   const orderBy = { [sortBy]: sortDir };
 
-  const where: { companyId: string; pattern?: { contains: string }; role?: string } = { companyId };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const where: any = { companyId };
 
   if (search && search.trim()) {
     where.pattern = {
@@ -38,7 +39,8 @@ export async function listEntityContexts(
   ]);
 
   return {
-    data,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    data: data as any,
     pagination: {
       page,
       limit,

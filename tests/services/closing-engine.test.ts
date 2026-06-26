@@ -49,6 +49,7 @@ const makeAcc = (overrides: Record<string, any> = {}) => ({
   isSystem: false,
   createdAt: new Date(),
   updatedAt: new Date(),
+  balance: 0,
   ...overrides,
 });
 

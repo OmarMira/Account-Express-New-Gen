@@ -88,7 +88,8 @@ export async function executeYearClose(companyId: string, year: number, config: 
         entityId: entry.id,
         details: JSON.stringify({ year }),
       },
-      tx,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      tx as any,
     );
     await tx.fiscalPeriod.updateMany({
       where: { companyId, startDate: { lte: fiscalEnd }, endDate: { lte: fiscalEnd } },

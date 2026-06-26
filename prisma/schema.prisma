@@ -164,9 +164,11 @@ model BankTransaction {
   status                 String                @default("posted")
   importHash             String?               @unique
   journalEntryId         String?               @unique
+  journalLineId          String?               @unique
   createdAt              DateTime              @default(now())
   updatedAt              DateTime              @updatedAt
   journalEntry           JournalEntry?         @relation(fields: [journalEntryId], references: [id])
+  journalLine            JournalLine?          @relation(fields: [journalLineId], references: [id])
   reconciliationPeriod   ReconciliationPeriod? @relation(fields: [reconciliationPeriodId], references: [id])
   matchedRule            BankRule?              @relation(fields: [matchedRuleId], references: [id])
   glAccount              GlAccount?             @relation(fields: [glAccountId], references: [id])
@@ -246,14 +248,15 @@ model JournalEntry {
 }
 
 model JournalLine {
-  id          String       @id @default(cuid())
-  entryId     String
-  glAccountId String
-  description String?
-  debit       Decimal      @default(0) @db.Decimal(18, 2)
-  credit      Decimal      @default(0) @db.Decimal(18, 2)
-  glAccount   GlAccount    @relation(fields: [glAccountId], references: [id])
-  entry       JournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  id              String            @id @default(cuid())
+  entryId         String
+  glAccountId     String
+  description     String?
+  debit           Decimal           @default(0) @db.Decimal(18, 2)
+  credit          Decimal           @default(0) @db.Decimal(18, 2)
+  glAccount       GlAccount         @relation(fields: [glAccountId], references: [id])
+  entry           JournalEntry      @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  bankTransaction BankTransaction?
 
   @@index([entryId])
   @@index([glAccountId])

@@ -184,7 +184,8 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
       for (const bt of matchedTxs) {
         const bankGl = bankGlByStatement.get(bt.statementId);
         if (!bankGl || !bt.glAccountId) continue;
-        await JournalEntryService.createFromBankTransaction(tx, {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await JournalEntryService.createFromBankTransaction(tx as any, {
           bankTxId: bt.id,
           bankTxDate: bt.date,
           bankTxAmount: Number(bt.amount),

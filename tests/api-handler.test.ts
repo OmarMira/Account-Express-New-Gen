@@ -42,7 +42,7 @@ vi.mock('@/lib/logger', () => ({
 // ── Helpers ─────────────────────────────────────────────────
 
 function createRequest(url = 'http://localhost/api/test', init?: RequestInit): NextRequest {
-  return new NextRequest(url, init);
+  return new NextRequest(url, init as any);
 }
 
 const defaultContext: RouteContext = { params: Promise.resolve({}) };

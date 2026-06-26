@@ -60,7 +60,6 @@ const creditCandidate: EntityCandidate = {
   totalAmount: 5000,
   direction: 'credit',
   amountCluster: 'variable',
-  possibleRecurrence: false,
   avgAmount: 1000,
   frequency: 'irregular',
 };
@@ -74,7 +73,6 @@ const debitCandidate: EntityCandidate = {
   totalAmount: 3000,
   direction: 'debit',
   amountCluster: 'fixed',
-  possibleRecurrence: true,
   avgAmount: 1000,
   frequency: 'monthly',
 };

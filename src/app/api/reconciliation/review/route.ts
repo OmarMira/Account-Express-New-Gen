@@ -66,7 +66,8 @@ export const POST = apiHandler(async (request: NextRequest) => {
           entityId: transactionId,
           details: `Approved pending review transaction: ${bankTx.description}`,
         },
-        tx,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        tx as any,
       );
     });
 
@@ -115,7 +116,8 @@ export const POST = apiHandler(async (request: NextRequest) => {
         entityId: transactionId,
         details: `Rejected pending review transaction: ${bankTx.description}${suspenseAccount ? `. Moved to Suspense Account (${suspenseAccount.code})` : ''}`,
       },
-      tx,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      tx as any,
     );
   });
 

@@ -62,6 +62,14 @@ export interface EntityCandidate {
   confidence?: number;
   confidenceLabel?: 'high' | 'medium' | 'low';
   explanation?: string;
+  /** Inferred direction from transaction history: 'credit' | 'debit' */
+  direction?: 'credit' | 'debit';
+  /** Cluster label for amount ranges (e.g. 'fijo', 'variable') */
+  amountCluster?: string;
+  /** Human-readable frequency label (e.g. 'mensual', 'único') */
+  frequency?: string;
+  /** Average transaction amount */
+  avgAmount?: number;
 }
 
 // ========== CACHE DE CONFIGURACIÓN ==========

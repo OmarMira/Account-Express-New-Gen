@@ -36,7 +36,8 @@ export const GET = apiHandler(async (request: NextRequest) => {
     throw new ValidationError(serverT(locale, 'apiErrors.accountingFlow.invalidDates'));
   }
 
-  const result = await aggregateAccountingFlow(db, {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const result = await aggregateAccountingFlow(db as any, {
     companyId,
     startDate,
     endDate,

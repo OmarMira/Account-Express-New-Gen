@@ -260,7 +260,8 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
             subAccountName,
           }),
         },
-        tx,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        tx as any,
       );
 
       return newRule;

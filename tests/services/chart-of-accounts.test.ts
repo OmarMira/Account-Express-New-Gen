@@ -124,7 +124,7 @@ describe('seedChartOfAccounts', () => {
     );
     expect(call1010).toBeDefined();
     // parentId should be the generated id of account 1000 (which was created first as id-1)
-    expect(call1010[0].data.parentId).toBe('generated-id-1');
+    expect(call1010![0].data.parentId).toBe('generated-id-1');
   });
 
   it('sets parentId to null for top-level accounts', async () => {
@@ -136,7 +136,7 @@ describe('seedChartOfAccounts', () => {
         (c: any[]) => c[0].data.code === code,
       );
       expect(call).toBeDefined();
-      expect(call[0].data.parentId).toBeNull();
+      expect(call![0].data.parentId).toBeNull();
     }
   });
 });

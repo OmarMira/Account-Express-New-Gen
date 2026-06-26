@@ -78,7 +78,8 @@ export const PATCH = apiHandler(async (request: NextRequest, context: RouteConte
 
     // Create the journal entry if the bank account has a GL account linked
     if (bankGlAccountId) {
-      const entryId = await JournalEntryService.createFromBankTransaction(tx, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const entryId = await JournalEntryService.createFromBankTransaction(tx as any, {
         bankTxId: updated.id,
         bankTxDate: updated.date,
         bankTxAmount: Number(updated.amount),

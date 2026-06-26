@@ -225,7 +225,8 @@ export async function completeOnboarding(
           journalEntryId: journalEntryId || null,
         }),
       },
-      tx,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      tx as any,
     );
 
     logger.info('Complete system activation succeeded', { legalName: updatedCompany.legalName });

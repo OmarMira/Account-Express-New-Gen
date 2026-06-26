@@ -46,7 +46,6 @@ const creditEntity: WizardEntity = {
     totalAmount: 5000,
     direction: 'credit',
     amountCluster: 'variable',
-    possibleRecurrence: false,
     avgAmount: 1000,
     frequency: 'irregular',
   },

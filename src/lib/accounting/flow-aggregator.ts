@@ -1,4 +1,3 @@
-import { PrismaClient } from '@prisma/client';
 import type {
   AccountingFlowResponse,
   FlowTransaction,
@@ -14,8 +13,9 @@ export interface AggregatorFilters {
   endDate: Date;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function aggregateAccountingFlow(
-  prisma: PrismaClient,
+  prisma: any,
   filters: AggregatorFilters,
 ): Promise<AccountingFlowResponse> {
   const { companyId, startDate, endDate } = filters;
@@ -41,7 +41,7 @@ export async function aggregateAccountingFlow(
       select: { glAccountId: true },
     });
 
-    const cashAccountIds = bankAccounts.map((ba) => ba.glAccountId);
+    const cashAccountIds = bankAccounts.map((ba: { glAccountId: string | null }) => ba.glAccountId);
 
     if (cashAccountIds.length === 0) {
       return fallbackResponse;
@@ -67,10 +67,10 @@ export async function aggregateAccountingFlow(
 
     for (const entry of journalEntries) {
       // Filtrar las líneas del asiento que tocan la cuenta de efectivo
-      const cashLines = entry.lines.filter((line) => cashAccountIds.includes(line.glAccountId));
+      const cashLines = entry.lines.filter((line: { glAccountId: string | null }) => cashAccountIds.includes(line.glAccountId));
 
       // Las líneas de contrapartida (las que no tocan efectivo)
-      const offsetLines = entry.lines.filter((line) => !cashAccountIds.includes(line.glAccountId));
+      const offsetLines = entry.lines.filter((line: { glAccountId: string | null }) => !cashAccountIds.includes(line.glAccountId));
 
       // Determinar la contrapartida principal (la de mayor monto absoluto)
       let primaryOffset = { code: '9999', name: 'Contrapartida Múltiple' };

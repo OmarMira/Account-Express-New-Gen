@@ -81,8 +81,10 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
 
     // Create opening journal entry if initial balance > 0
     if (initialBalance.greaterThan(0)) {
-      const openingEquityId = await JournalEntryService.ensureOpeningBalanceEquity(tx, companyId);
-      await JournalEntryService.createFromBankTransaction(tx, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const openingEquityId = await JournalEntryService.ensureOpeningBalanceEquity(tx as any, companyId);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await JournalEntryService.createFromBankTransaction(tx as any, {
         bankTxId: '',
         bankTxDate: new Date(),
         bankTxAmount: initialBalance.toNumber(),

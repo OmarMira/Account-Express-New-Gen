@@ -19,8 +19,8 @@ function mapEntryWithTotals(entry: {
     date: entry.date.toISOString(),
     createdAt: entry.createdAt.toISOString(),
     updatedAt: entry.updatedAt.toISOString(),
-    _totalDebit: entry.lines.reduce((sum, l) => sum + l.debit, 0),
-    _totalCredit: entry.lines.reduce((sum, l) => sum + l.credit, 0),
+    _totalDebit: Number(entry.lines.reduce((sum, l) => sum + l.debit, 0)),
+    _totalCredit: Number(entry.lines.reduce((sum, l) => sum + l.credit, 0)),
   };
 }
 

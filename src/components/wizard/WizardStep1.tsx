@@ -30,7 +30,7 @@ interface WizardStep1Props {
 }
 
 /** Roles shown in the dropdown (excludes IGNORADA and OTRO — handled separately). */
-const DROPDOWN_ROLES = UI_ROLES.filter((r) => r !== 'OTRO' && r !== 'IGNORADA');
+const DROPDOWN_ROLES = UI_ROLES.filter((r) => r !== 'OTRO');
 
 function formatAmount(amount: number | undefined): string {
   if (amount == null) return '—';
