@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { db } from '@/lib/db';
 import type { PaginatedResult, UpdateEntityInput, BulkDeleteInput, EntityContextWithGlAccount } from '@/lib/types/entity-context';
 
@@ -13,8 +14,7 @@ export async function listEntityContexts(
   const skip = (page - 1) * limit;
   const orderBy = { [sortBy]: sortDir };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const where: any = { companyId };
+  const where: Prisma.EntityContextWhereInput = { companyId };
 
   if (search && search.trim()) {
     where.pattern = {
