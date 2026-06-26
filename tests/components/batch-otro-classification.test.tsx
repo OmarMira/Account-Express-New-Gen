@@ -115,6 +115,12 @@ const mockFetch = vi.fn();
 function setupFetch(candidates: any[] = [debitCandidate]) {
   mockFetch.mockImplementation((url: string, req?: RequestInit) => {
     const u = typeof url === 'string' ? url : '';
+    if (u.includes('/api/learning/smart-classify')) {
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ success: true, data: candidates }),
+      });
+    }
     if (u.includes('/api/learning/classify-entity') && (!req || req.method === 'GET')) {
       return Promise.resolve({
         ok: true,

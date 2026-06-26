@@ -62,8 +62,8 @@ Revert schema + down migration, revert suggest-role prompt, revert modal directi
 
 ## Success Criteria
 
-- [ ] suggest-role prompt includes direction + samples + amounts
-- [ ] Roles contradicting dominant direction excluded from AI suggestions
-- [ ] OTRO entities persist to EntityContext on accepted suggestion or save with description
-- [ ] Web search called when AI confidence < 0.5 or errors
-- [ ] All existing tests pass; new tests cover direction filter, OTRO persistence, rich prompt
+- [x] suggest-role prompt includes direction + samples + amounts
+- [x] Roles contradicting dominant direction excluded from AI suggestions
+- [x] OTRO entities persist to EntityContext on accepted suggestion or save with description
+- [x] Web search called when AI confidence < 0.5 or errors
+- [x] All existing tests pass; new tests cover direction filter, OTRO persistence, rich prompt

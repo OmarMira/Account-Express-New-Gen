@@ -54,6 +54,7 @@ interface EntityItem {
   createdAt: string;
   isCandidate?: boolean;
   occurrences?: number;
+  userDescription?: string | null;
 }
 
 interface PaginatedResponse {
@@ -396,6 +397,7 @@ export function EntityManagementPage() {
                   </TableHead>
                   <TableHead>{t('entityManagement.columns.pattern')}</TableHead>
                   <TableHead>{t('entityManagement.columns.role')}</TableHead>
+                  <TableHead>{t('entityManagement.columns.description')}</TableHead>
                   <TableHead>{t('entityManagement.columns.source')}</TableHead>
                   <TableHead>{t('entityManagement.columns.createdAt')}</TableHead>
                   <TableHead className="w-16">{t('entityManagement.columns.actions')}</TableHead>
@@ -419,6 +421,9 @@ export function EntityManagementPage() {
                       {entity.role
                         ? (ROLES.some((r) => r.value === entity.role) ? t(`entityManagement.role.${entity.role}` as string) : entity.role)
                         : '-'}
+                    </TableCell>
+                    <TableCell className="max-w-[200px] truncate text-muted-foreground">
+                      {entity.userDescription || '-'}
                     </TableCell>
                     <TableCell>{entity.source}</TableCell>
                     <TableCell>{formatDate(entity.createdAt)}</TableCell>

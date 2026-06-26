@@ -64,9 +64,9 @@ Each phase is an autonomous PR on the feature branch chain. Revert the PR for th
 
 ## Success Criteria
 
-- [ ] BankRulesPage local types include `conditions`, `debitGlAccountId`, `creditGlAccountId`
-- [ ] Zero `any` casts in `entity-context-crud-service.ts`
-- [ ] `handleSave()` payload in tests asserts V2 shape
-- [ ] EntityOnboardingModal fetches from `/api/learning/smart-classify`
-- [ ] No dead wizard code remains after Phase 3
-- [ ] All existing tests pass
+- [x] BankRulesPage local types include `conditions`, `debitGlAccountId`, `creditGlAccountId`
+- [x] Zero `any` casts in `entity-context-crud-service.ts`
+- [x] `handleSave()` payload in tests asserts V2 shape
+- [x] EntityOnboardingModal fetches from `/api/learning/smart-classify`
+- [x] No dead wizard code remains after Phase 3
+- [x] All existing tests pass

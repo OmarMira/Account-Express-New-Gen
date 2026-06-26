@@ -53,13 +53,13 @@ These tests MUST pass regardless of the backend implementation — they define b
 
 ### Acceptance Criteria
 
-- [ ] AC1.1: `BankRule` interface includes `conditions`, `debitGlAccountId`, `creditGlAccountId` as specified
-- [ ] AC1.2: `RuleForm` interface includes V2 fields; `defaultForm` initializes them
-- [ ] AC1.3: Zero `as any` casts remain in `entity-context-crud-service.ts`
-- [ ] AC1.4: V2 payload test asserts `conditions`, `debitGlAccountId`, `creditGlAccountId` in the fetch body
-- [ ] AC1.5: Direction mapping test asserts correct null/assigned values per direction
-- [ ] AC1.6: Conditions validation tests pass for empty, valid, invalid operators, and empty value
-- [ ] AC1.7: All existing tests still pass
+- [x] AC1.1: `BankRule` interface includes `conditions`, `debitGlAccountId`, `creditGlAccountId` as specified
+- [x] AC1.2: `RuleForm` interface includes V2 fields; `defaultForm` initializes them
+- [x] AC1.3: Zero `as any` casts remain in `entity-context-crud-service.ts`
+- [x] AC1.4: V2 payload test asserts `conditions`, `debitGlAccountId`, `creditGlAccountId` in the fetch body
+- [x] AC1.5: Direction mapping test asserts correct null/assigned values per direction
+- [x] AC1.6: Conditions validation tests pass for empty, valid, invalid operators, and empty value
+- [x] AC1.7: All existing tests still pass
 
 ### Files to Change
 
@@ -120,12 +120,12 @@ The `/api/learning/classify-entity` endpoint MUST NOT be removed or modified dur
 
 ### Acceptance Criteria
 
-- [ ] AC2.1: `EntityOnboardingModal` GET candidate fetch uses `/api/learning/smart-classify`
-- [ ] AC2.2: All 5 POST calls in `EntityOnboardingModal` still use `/api/learning/classify-entity`
-- [ ] AC2.3: Response shape from `smart-classify` is compatible with `EntityCandidate` (no consumer breakage)
-- [ ] AC2.4: Endpoint documentation exists and clearly distinguishes `/api/bank-rules` vs `/api/learning/rules` vs `/api/learning/smart-classify`
-- [ ] AC2.5: Old `classify-entity` endpoint still responds correctly to POST requests
-- [ ] AC2.6: All existing tests pass
+- [x] AC2.1: `EntityOnboardingModal` GET candidate fetch uses `/api/learning/smart-classify`
+- [x] AC2.2: All 5 POST calls in `EntityOnboardingModal` still use `/api/learning/classify-entity`
+- [x] AC2.3: Response shape from `smart-classify` is compatible with `EntityCandidate` (no consumer breakage)
+- [x] AC2.4: Endpoint documentation exists and clearly distinguishes `/api/bank-rules` vs `/api/learning/rules` vs `/api/learning/smart-classify`
+- [x] AC2.5: Old `classify-entity` endpoint still responds correctly to POST requests
+- [x] AC2.6: All existing tests pass
 
 ### Files to Change
 
@@ -191,13 +191,13 @@ After wizard removal, a manual or automated smoke test MUST verify that:
 
 ### Acceptance Criteria
 
-- [ ] AC3.1: `src/components/wizard/` directory no longer exists
-- [ ] AC3.2: `src/lib/stores/wizard-store.ts` no longer exists
-- [ ] AC3.3: `src/lib/services/wizard-service.ts` no longer exists
-- [ ] AC3.4: All wizard test files are deleted
-- [ ] AC3.5: Zero imports reference any deleted wizard file
-- [ ] AC3.6: All remaining tests pass (no import resolution failures)
-- [ ] AC3.7: EntityOnboardingModal and BankRulesPage work correctly after cleanup
+- [x] AC3.1: `src/components/wizard/` directory no longer exists
+- [x] AC3.2: `src/lib/stores/wizard-store.ts` no longer exists
+- [x] AC3.3: `src/lib/services/wizard-service.ts` no longer exists
+- [x] AC3.4: All wizard test files are deleted
+- [x] AC3.5: Zero imports reference any deleted wizard file
+- [x] AC3.6: All remaining tests pass (no import resolution failures)
+- [x] AC3.7: EntityOnboardingModal and BankRulesPage work correctly after cleanup
 
 ### Files to Remove
 
