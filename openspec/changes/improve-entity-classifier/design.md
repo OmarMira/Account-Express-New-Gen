@@ -184,5 +184,5 @@ interface SuggestRoleInput {
 
 ## Open Questions
 
-- [ ] OTRO review view: should it be a dedicated page or a modal extension? Spec says "MVP — simple list" — defer to UX decision.
-- [ ] Web search rate limit handling: if daily quota exhausted, should we log and silently skip or surface to user? Current design: log and skip.
+- [x] OTRO review view: should it be a dedicated page or a modal extension? **Resuelto:** ya existe EntityManagementPage que lista todas las entidades y permite re-clasificar. Se agregó columna `userDescription`.
+- [x] Web search rate limit handling: if daily quota exhausted, should we log and silently skip or surface to user? **Resuelto:** log and skip (implementado así en T-14).

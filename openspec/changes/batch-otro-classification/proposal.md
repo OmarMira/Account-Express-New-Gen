@@ -68,10 +68,10 @@ Ninguna.
 
 ## Criterios de éxito
 
-- [ ] Usuario escribe en OTRO sin que se dispare ninguna llamada AI
-- [ ] Botón "Pre clasificar entidades" aparece cuando hay OTRO con descripción
-- [ ] Al hacer clic, todas las OTRO se clasifican en paralelo
-- [ ] Cada entidad OTRO muestra un banner inline con la sugerencia
-- [ ] Usuario puede aceptar, descartar o ignorar cada sugerencia
-- [ ] Botón cambia a "Clasificar entidades" solo cuando no quedan OTRO sin resolver
-- [ ] No hay toasts de sugerencia ni auto-asignación en ningún flujo
+- [x] Usuario escribe en OTRO sin que se dispare ninguna llamada AI
+- [x] Botón "Pre clasificar entidades" aparece cuando hay OTRO con descripción
+- [x] Al hacer clic, todas las OTRO se clasifican en paralelo
+- [x] Cada entidad OTRO muestra un banner inline con la sugerencia
+- [x] Usuario puede aceptar, descartar o ignorar cada sugerencia
+- [x] Botón cambia a "Clasificar entidades" solo cuando no quedan OTRO sin resolver
+- [x] No hay toasts de sugerencia ni auto-asignación en ningún flujo

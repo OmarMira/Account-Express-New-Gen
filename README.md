@@ -13,7 +13,7 @@ Plataforma de contabilidad y conciliación bancaria para SMEs. Automatiza clasif
 | **UI** | Tailwind CSS 4 + shadcn/ui + Framer Motion |
 | **Estado** | Zustand |
 | **ORM** | Prisma 6 |
-| **Base de datos** | SQLite (dev) / PostgreSQL (prod) |
+| **Base de datos** | PostgreSQL |
 | **Testing** | Vitest + Testing Library + jsdom |
 | **AI** | OpenAI-compatible API (asistente conversacional, clasificación de entidades) |
 | **Monitoréo** | Sentry |
@@ -110,7 +110,7 @@ npx tsx prisma/seed.ts        # Poblar DB con datos iniciales
 3. **Configurar variables de entorno:**
    ```bash
    # .env — ver .env.example si existe
-   DATABASE_URL="file:./dev.db"
+   DATABASE_URL="postgresql://postgres:postgres@localhost:5432/account-express"
    ```
 4. **Inicializar base de datos:**
    ```bash

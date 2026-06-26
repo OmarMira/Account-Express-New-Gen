@@ -1277,6 +1277,7 @@ const en = {
     columns: {
       pattern: 'Pattern',
       role: 'Role',
+      description: 'Description',
       glAccount: 'GL Account',
       source: 'Source',
       createdAt: 'Created',

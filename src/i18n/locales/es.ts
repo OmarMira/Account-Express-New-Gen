@@ -1295,6 +1295,7 @@ const es = {
     columns: {
       pattern: 'Patrón',
       role: 'Rol',
+      description: 'Descripción',
       glAccount: 'Cuenta Contable',
       source: 'Origen',
       createdAt: 'Creado',

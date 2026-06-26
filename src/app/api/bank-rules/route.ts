@@ -117,35 +117,37 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
 
     // If conditions are provided, validate them. Otherwise fallback to legacy.
     if (conditions) {
-      if (!Array.isArray(conditions) || conditions.length === 0) {
+      if (!Array.isArray(conditions)) {
         return NextResponse.json(
-          { error: 'conditions must be a non-empty array' },
+          { error: 'conditions must be an array' },
           { status: 400 },
         );
       }
-      for (const cond of conditions) {
-        if (!cond.field || !['description', 'amount'].includes(cond.field.toLowerCase())) {
-          return NextResponse.json(
-            { error: "condition field must be 'description' or 'amount'" },
-            { status: 400 },
-          );
-        }
-        const validConditionTypes = [
-          'contains',
-          'starts_with',
-          'ends_with',
-          'equals',
-          'amount_greater',
-          'amount_less',
-          'greater_than',
-          'less_than',
-        ];
-        if (!cond.operator || !validConditionTypes.includes(cond.operator)) {
-          return NextResponse.json(
-            { error: `condition operator must be one of: ${validConditionTypes.join(', ')}` },
-            { status: 400 },
-          );
-        }
+      // Empty array is accepted (rule acts as a no-op matcher or placeholder)
+      if (conditions.length > 0) {
+        for (const cond of conditions) {
+          if (!cond.field || !['description', 'amount'].includes(cond.field.toLowerCase())) {
+            return NextResponse.json(
+              { error: "condition field must be 'description' or 'amount'" },
+              { status: 400 },
+            );
+          }
+          const validConditionTypes = [
+            'contains',
+            'starts_with',
+            'ends_with',
+            'equals',
+            'amount_greater',
+            'amount_less',
+            'greater_than',
+            'less_than',
+          ];
+          if (!cond.operator || !validConditionTypes.includes(cond.operator)) {
+            return NextResponse.json(
+              { error: `condition operator must be one of: ${validConditionTypes.join(', ')}` },
+              { status: 400 },
+            );
+          }
         if (
           cond.value === undefined ||
           cond.value === null ||
@@ -162,6 +164,7 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
             { error: 'condition value must be a number for amount conditions' },
             { status: 400 },
           );
+        }
         }
       }
     } else {
@@ -426,8 +429,8 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
         companyId,
         name: name.trim(),
         // V1 fields (for backwards compatibility)
-        conditionType: conditionType || conditions[0].operator,
-        conditionValue: conditionValue || conditions[0].value,
+        conditionType: conditionType || conditions[0]?.operator || null,
+        conditionValue: conditionValue || conditions[0]?.value || null,
         transactionDirection,
         glAccountId: glAccountId || debitGlAccountId || creditGlAccountId || null,
         // V2 fields

@@ -84,6 +84,10 @@ interface BankRule {
   updatedAt: string;
   glAccount: GlAccount;
   _matchCount: number;
+  // V2 fields (additive, no V1 removal)
+  conditions: { field: string; operator: string; value: string }[];
+  debitGlAccountId: string | null;
+  creditGlAccountId: string | null;
 }
 
 interface RuleForm {
@@ -94,6 +98,10 @@ interface RuleForm {
   glAccountId: string | null;
   priority: number;
   isActive: boolean;
+  // V2 fields (additive)
+  conditions: { field: string; operator: string; value: string }[];
+  debitGlAccountId: string | null;
+  creditGlAccountId: string | null;
 }
 
 const defaultForm: RuleForm = {
@@ -104,6 +112,10 @@ const defaultForm: RuleForm = {
   glAccountId: null,
   priority: 10,
   isActive: true,
+  // V2 fields (additive)
+  conditions: [],
+  debitGlAccountId: null,
+  creditGlAccountId: null,
 };
 
 const conditionTypes = [
@@ -333,6 +345,9 @@ export function BankRulesPage() {
       glAccountId: rule.glAccountId,
       priority: rule.priority,
       isActive: rule.isActive,
+      conditions: rule.conditions,
+      debitGlAccountId: rule.debitGlAccountId,
+      creditGlAccountId: rule.creditGlAccountId,
     });
     setModalOpen(true);
   };

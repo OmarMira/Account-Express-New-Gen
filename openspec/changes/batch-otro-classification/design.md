@@ -186,4 +186,4 @@ interface BannerProps {
 
 ## Open Questions
 
-- [ ] Ninguno — el diseño cubre todos los FRs y NFRs del spec.
+- [x] Ninguno — el diseño cubre todos los FRs y NFRs del spec.
