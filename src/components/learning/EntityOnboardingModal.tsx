@@ -303,9 +303,12 @@ export function EntityOnboardingModal({
       return;
     }
 
-    // 4. Fire parallel requests (FR-2) with per-entity AbortController
-    const settled = await Promise.allSettled(
-      eligible.map(async (name) => {
+    // 4. Process eligible entities with concurrency pool of max 3 (FR-2)
+    let poolIndex = 0;
+
+    async function worker(): Promise<void> {
+      while (poolIndex < eligible.length) {
+        const name = eligible[poolIndex++];
         const controller = new AbortController();
         abortControllers.current[name] = controller;
         loadingRef.current[name] = true;
@@ -324,50 +327,37 @@ export function EntityOnboardingModal({
           if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 
           const data = await resp.json();
-          return { name, ...data };
+          // Update UI progressively as each result resolves
+          setBatchResults((prev) => ({
+            ...prev,
+            [name]: {
+              suggestedRole: data.suggestedRole,
+              confidence: data.confidence,
+              explanation: data.explanation,
+              status: 'success',
+            },
+          }));
         } catch (err) {
-          // Re-throw with entity name so settlement processing can identify it
-          throw { name, error: err };
+          // Update UI immediately with error state
+          setBatchResults((prev) => ({
+            ...prev,
+            [name]: {
+              suggestedRole: '',
+              confidence: 0,
+              explanation: '',
+              status: 'error',
+            },
+          }));
+        } finally {
+          delete loadingRef.current[name];
+          delete abortControllers.current[name];
         }
-      }),
-    );
-
-    // 5. Process each settlement into batchResults
-    const updates: Record<string, BatchEntry | null> = {};
-    const cleanupNames: string[] = [];
-
-    for (const result of settled) {
-      let entityName: string;
-      if (result.status === 'fulfilled') {
-        const { name, suggestedRole, confidence, explanation } = result.value;
-        entityName = name;
-        updates[entityName] = {
-          suggestedRole,
-          confidence,
-          explanation,
-          status: 'success',
-        };
-      } else {
-        const reason = result.reason as { name: string; error: unknown };
-        entityName = reason.name;
-        updates[entityName] = {
-          suggestedRole: '',
-          confidence: 0,
-          explanation: '',
-          status: 'error',
-        };
       }
-      cleanupNames.push(entityName);
     }
 
-    // Clean up per-entity tracking after loop to avoid scoping issues
-    for (const name of cleanupNames) {
-      delete loadingRef.current[name];
-      delete abortControllers.current[name];
-    }
-
-    // 6. Apply all batch results at once
-    setBatchResults((prev) => ({ ...prev, ...updates }));
+    const workerCount = Math.min(3, eligible.length);
+    const workers = Array.from({ length: workerCount }, () => worker());
+    await Promise.allSettled(workers);
     setBatchInProgress(false);
   }
 
