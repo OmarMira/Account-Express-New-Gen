@@ -6,7 +6,7 @@ import type { EntityRole } from '@/lib/constants/entity-roles';
  * At or above this percentage, the direction profile is classified as
  * pure credit or pure debit (not "ambas").
  */
-export const DIRECTION_THRESHOLD = 80;
+export const DIRECTION_THRESHOLD = 0.8;
 
 type DirectionProfile = 'credit' | 'debit' | 'ambas';
 
