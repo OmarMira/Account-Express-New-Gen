@@ -2,9 +2,9 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { db } from '@/lib/db';
 import { generateTestUser } from '../helpers/test-data-factory';
 
-describe('SQLite WAL Concurrency', () => {
+describe('Concurrent database writes', () => {
   beforeAll(() => {
-    expect(process.env.DATABASE_URL).toContain('test.db');
+    expect(process.env.DATABASE_URL).toContain('postgresql');
   });
 
   it('debe soportar escrituras concurrentes sin bloqueos', async () => {

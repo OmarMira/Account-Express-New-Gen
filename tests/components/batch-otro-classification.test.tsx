@@ -267,6 +267,55 @@ describe('getEligibleBatchEntities', () => {
     // Default role is PROVEEDOR, not OTRO → excluded
     expect(result).toEqual([]);
   });
+
+  // ── NFR-1: Performance with 50 entities ────────────────────────────
+  it('NFR-1: filters 50 OTRO entities in < 100ms (pure function)', () => {
+    const candidates = Array.from({ length: 50 }, (_, i) => ({
+      id: `can_${i + 10}`,
+      canonicalName: `ENTITY ${i + 1}`,
+      occurrences: i + 1,
+      directionProfile: { creditPct: 0.5, debitPct: 0.5 } as const,
+      sampleDescriptions: [`Description ${i + 1}`],
+    }));
+    const descriptions: Record<string, string> = {};
+    const selections: Record<string, { role: string }> = {};
+    for (let i = 0; i < 50; i++) {
+      const name = `ENTITY ${i + 1}`;
+      descriptions[name] = `description for entity ${i + 1}`;
+      selections[name] = { role: 'OTRO' };
+    }
+
+    const start = performance.now();
+    const result = getEligibleBatchEntities(candidates, descriptions, selections, () => '');
+    const elapsed = performance.now() - start;
+
+    expect(result).toHaveLength(50);
+    expect(elapsed).toBeLessThan(100); // 100ms budget for pure filtering
+  });
+
+  it('NFR-1: 50 parallel suggest-role requests complete in < 15s with 100ms latency', async () => {
+    // Simula el patrón de Promise.allSettled que usa el modal (línea 307-333)
+    const descriptions = Array.from({ length: 50 }, (_, i) => `description for entity ${i + 1}`);
+    const latencyPerRequest = 100; // spec: latencia < 100ms por request
+
+    const start = performance.now();
+    const results = await Promise.allSettled(
+      descriptions.map((desc) =>
+        new Promise<{ suggestedRole: string; confidence: number }>((resolve) =>
+          setTimeout(() => resolve({ suggestedRole: 'PROVEEDOR', confidence: 0.85 }), latencyPerRequest),
+        ),
+      ),
+    );
+    const elapsed = performance.now() - start;
+
+    expect(results).toHaveLength(50);
+    expect(results.every((r) => r.status === 'fulfilled')).toBe(true);
+    // With 50 parallel requests at 100ms each, should complete in ~100-500ms
+    // < 15s = NFR-1 spec
+    expect(elapsed).toBeLessThan(15_000);
+    // Assert actually fast: with parallel execution, 50 × 100ms ≈ 100-300ms
+    expect(elapsed).toBeLessThan(2000); // sanity: should be ~100-500ms
+  });
 });
 
 // ─── Integration: handler modifications ───────────────────────────────

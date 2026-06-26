@@ -5,6 +5,9 @@
  */
 export function sanitizeInput(value: string): string {
   if (!value) return value;
-  // Solo remueve tags HTML, preserva el texto exacto
-  return value.replace(/<[^>]*>/g, '');
+  // 1. Remueve bloques <script>...</script> enteros (tags + contenido)
+  // 2. Remueve cualquier otro tag HTML individual, preservando el texto
+  return value
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, '')
+    .replace(/<[^>]*>/g, '');
 }

@@ -63,8 +63,8 @@ describe('ReconciliationService split validation', () => {
     expect(entries).toHaveLength(1);
     expect(entries[0].lines).toHaveLength(3); // bank + 2 splits
     // Entry must be balanced
-    const totalDebit = entries[0].lines.reduce((s, l) => s + l.debit, 0);
-    const totalCredit = entries[0].lines.reduce((s, l) => s + l.credit, 0);
+    const totalDebit = entries[0].lines.reduce((s, l) => s + Number(l.debit), 0);
+    const totalCredit = entries[0].lines.reduce((s, l) => s + Number(l.credit), 0);
     expect(Math.abs(totalDebit - totalCredit)).toBeLessThan(0.01);
   });
 
@@ -215,8 +215,8 @@ describe('ReconciliationService', () => {
     expect(journalEntries).toHaveLength(1);
     expect(journalEntries[0].lines).toHaveLength(2);
 
-    const debitLine = journalEntries[0].lines.find((l) => l.debit === 1100.0);
-    const creditLine = journalEntries[0].lines.find((l) => l.credit === 1100.0);
+    const debitLine = journalEntries[0].lines.find((l) => l.debit == 1100.0);
+    const creditLine = journalEntries[0].lines.find((l) => l.credit == 1100.0);
 
     expect(debitLine?.glAccountId).toBe(cashGl.id); // Débito a Caja
     expect(creditLine?.glAccountId).toBe(incomeGl.id); // Crédito a Ingresos

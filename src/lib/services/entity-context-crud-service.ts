@@ -18,6 +18,7 @@ export async function listEntityContexts(
   if (search && search.trim()) {
     where.pattern = {
       contains: search.trim(),
+      mode: 'insensitive',
     };
   }
 

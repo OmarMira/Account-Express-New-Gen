@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import type { checkRateLimit as CheckRateLimitFn } from '@/lib/security/rate-limiter';
 
 // ── Hoisted mock factories (must be before vi.mock) ─────────
 const { mockReadFileSync, mockAuditLogCreate, mockLoggerWarn, mockLoggerError } = vi.hoisted(() => ({
@@ -28,7 +29,8 @@ vi.mock('@/lib/logger', () => ({
   },
 }));
 
-import { checkRateLimit } from '@/lib/security/rate-limiter';
+// Se declara acá pero se asigna en beforeEach con módulo fresco
+let checkRateLimit: typeof CheckRateLimitFn;
 
 const VALID_CONFIG = {
   version: '1.0',
@@ -44,12 +46,16 @@ const VALID_CONFIG = {
 };
 
 describe('checkRateLimit', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     // Ensure NODE_ENV is 'test' so config is NOT cached forever
     vi.stubEnv('NODE_ENV', 'test');
     // Default: valid config file
     mockReadFileSync.mockReturnValue(JSON.stringify(VALID_CONFIG));
+    // Reset módulo para eliminar estado residual de cachedConfig y requestWindows
+    vi.resetModules();
+    const mod = await import('@/lib/security/rate-limiter');
+    checkRateLimit = mod.checkRateLimit;
   });
 
   afterEach(() => {

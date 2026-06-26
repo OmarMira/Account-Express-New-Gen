@@ -121,10 +121,21 @@ export const wizardService = {
           body: JSON.stringify({
             companyId,
             name: rule.entityName,
+            // V1 fields (backward compat)
             conditionType: rule.conditionType,
             conditionValue: rule.conditionValue,
             transactionDirection: rule.transactionDirection,
             glAccountCode: rule.debitGlAccountId ?? rule.creditGlAccountId,
+            // V2 fields
+            conditions: [{ field: 'description', operator: rule.conditionType, value: rule.conditionValue }],
+            debitGlAccountId:
+              rule.transactionDirection === 'debit' || rule.transactionDirection === 'any'
+                ? rule.debitGlAccountId
+                : null,
+            creditGlAccountId:
+              rule.transactionDirection === 'credit' || rule.transactionDirection === 'any'
+                ? rule.creditGlAccountId
+                : null,
           }),
         }),
       ),

@@ -345,9 +345,17 @@ export function BankRulesPage() {
     try {
       const url = editingRule ? `/api/bank-rules/${editingRule.id}` : '/api/bank-rules';
       const method = editingRule ? 'PUT' : 'POST';
+
+      // V2 fields (keep V1 for backward compat)
+      const conditions = [{ field: 'description', operator: form.conditionType, value: form.conditionValue.trim() }];
+      const debitGlAccountId =
+        form.transactionDirection === 'debit' || form.transactionDirection === 'any' ? form.glAccountId : null;
+      const creditGlAccountId =
+        form.transactionDirection === 'credit' || form.transactionDirection === 'any' ? form.glAccountId : null;
+
       const body = editingRule
-        ? { ...form, companyId: activeCompany.id }
-        : { companyId: activeCompany.id, ...form };
+        ? { ...form, companyId: activeCompany.id, conditions, debitGlAccountId, creditGlAccountId }
+        : { companyId: activeCompany.id, ...form, conditions, debitGlAccountId, creditGlAccountId };
 
       const res = await fetch(url, {
         method,

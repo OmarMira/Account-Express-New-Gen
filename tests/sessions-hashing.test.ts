@@ -53,7 +53,7 @@ describe('Session Token Hashing & Cookie Standardisation', () => {
     const rawToken = await createSession(userId);
     const request = new NextRequest('http://localhost/api/test', {
       headers: {
-        cookie: `session=${rawToken}`,
+        cookie: `session_token=${rawToken}`,
       },
     });
 

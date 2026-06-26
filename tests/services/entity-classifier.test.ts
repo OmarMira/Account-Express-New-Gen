@@ -144,6 +144,7 @@ describe('classifyEntity()', () => {
       pattern: 'UNKNOWN',
       role: 'OTRO',
       glAccountCode: '9999',
+      userDescription: 'test description',
     });
 
     expect(saveContext).toHaveBeenCalledWith(

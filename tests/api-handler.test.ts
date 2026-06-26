@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { NextRequest, NextResponse } from 'next/server';
+import { ValidationError } from '@/lib/api-error';
 import { apiHandler, type RouteContext } from '@/lib/api-handler';
 
 // ── Hoisted mock factories (must be before vi.mock) ─────────
@@ -58,6 +59,13 @@ describe('apiHandler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRequestContextRun.mockImplementation(async (_ctx: unknown, fn: () => unknown) => fn());
+    // Reset rate limit mock a default allow (tests que sobreescriben no contaminan a los siguientes)
+    mockCheckRateLimit.mockReturnValue({
+      allowed: true,
+      limit: 100,
+      remaining: 99,
+      resetAt: Math.ceil(Date.now() / 1000) + 60,
+    });
   });
 
   afterEach(() => {
