@@ -39,8 +39,7 @@ export async function listEntityContexts(
   ]);
 
   return {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    data: data as any,
+    data,
     pagination: {
       page,
       limit,
