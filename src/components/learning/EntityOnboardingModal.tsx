@@ -156,7 +156,7 @@ export function EntityOnboardingModal({
       setError(null);
       try {
         const candidatesRes = await fetch(
-          `/api/learning/classify-entity?companyId=${companyId}`,
+          `/api/learning/smart-classify?companyId=${companyId}`,
         );
 
         if (candidatesRes.ok) {
