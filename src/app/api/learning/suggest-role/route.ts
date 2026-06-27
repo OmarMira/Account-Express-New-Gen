@@ -90,11 +90,39 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
       }
     }
 
+    // Fetch company profile for richer AI context (if companyId provided)
+    let companyProfile: string | null = null;
+    if (companyId) {
+      try {
+        const company = await db.company.findUnique({
+          where: { id: companyId },
+          select: { legalName: true, entityType: true, taxId: true },
+        });
+        if (company) {
+          const parts: string[] = [`Company: ${company.legalName}`];
+          if (company.entityType !== 'BUSINESS') {
+            parts.push(`Entity type: ${company.entityType}`);
+          }
+          if (company.taxId) {
+            parts.push(`Tax ID: ${company.taxId}`);
+          }
+          companyProfile = parts.join(' | ');
+          logger.info('[SUGGEST_ROLE COMPANY_PROFILE]', { companyId, legalName: company.legalName });
+        }
+      } catch (err) {
+        logger.warn('[SUGGEST_ROLE COMPANY_PROFILE_FETCH_FAILED]', { companyId, error: String(err) });
+        // Non-fatal — proceed without profile
+      }
+    }
+
     // Build the focused prompt for role suggestion
     const rolesList = candidateRoles.map((r) => `- ${r}`).join('\n');
 
     // Rich context section
     const contextParts: string[] = [];
+    if (companyProfile) {
+      contextParts.push(companyProfile);
+    }
     contextParts.push(`Description: ${trimmedDesc}`);
     if (occurrences !== undefined && occurrences > 0) {
       contextParts.push(`Transactions: ${occurrences}`);
