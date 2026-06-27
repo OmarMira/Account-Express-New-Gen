@@ -109,9 +109,14 @@ npx tsx prisma/seed.ts        # Poblar DB con datos iniciales
    ```
 3. **Configurar variables de entorno:**
    ```bash
-   # .env — ver .env.example si existe
+   # .env
    DATABASE_URL="postgresql://postgres:postgres@localhost:5432/account-express"
+   SESSION_SECRET="<generá una clave de 256 bits con: openssl rand --hex 32>"
+   # Opcionales — la config de IA se puede setear desde la UI:
+   # AI_API_KEY="sk-..."
+   # AI_MODEL="gpt-4o"
    ```
+   > ⚠️ **`SESSION_SECRET` es obligatorio en producción.** Sin ella, la encriptación de sesiones y claves de IA no tiene una clave determinista. Generala con `openssl rand --hex 32` y nunca la compartas en el repo.
 4. **Inicializar base de datos:**
    ```bash
    npx prisma db push
