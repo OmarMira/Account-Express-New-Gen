@@ -11,6 +11,7 @@ import {
   Zap,
   Activity,
   Bot,
+  Sparkles,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLanguageStore } from '@/store/language-store';
@@ -26,6 +27,7 @@ import { FiscalPeriodsTab } from './settings/FiscalPeriodsTab';
 import { BackupTab } from './settings/BackupTab';
 import { DiagnosticsTab } from './settings/DiagnosticsTab';
 import AiConfigTab from './settings/AiConfigTab';
+import { EntityManagementPage } from '@/components/spa/EntityManagementPage';
 
 /* ─── Navigation Items ───────────────────────────────────────── */
 
@@ -40,6 +42,7 @@ const navItems: NavItem[] = [
   { id: 'company', labelKey: 'settings.companyData', icon: Building2 },
   { id: 'users', labelKey: 'settings.userManagement', icon: Users },
   { id: 'roles', labelKey: 'settings.rolesPermissions', icon: Shield },
+  { id: 'entity-management', labelKey: 'entityManagement.title', icon: Sparkles },
   { id: 'periods', labelKey: 'settings.fiscalPeriodsTab', icon: Calendar },
   { id: 'backup', labelKey: 'settings.systemBackup', icon: Database },
   { id: 'diagnostics', labelKey: 'settings.diagnosticsTab', icon: Activity },
@@ -84,6 +87,8 @@ export function SettingsPage() {
         return <UsersTab />;
       case 'roles':
         return <RolesTab />;
+      case 'entity-management':
+        return <EntityManagementPage />;
       case 'periods':
         return <FiscalPeriodsTab />;
       case 'backup':

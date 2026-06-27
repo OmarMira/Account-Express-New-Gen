@@ -10,7 +10,6 @@ import {
   Download,
   Settings,
   Activity,
-  Sparkles,
 } from 'lucide-react';
 import { type ViewName } from '@/store/auth-store';
 
@@ -83,12 +82,6 @@ export const navItems: NavItem[] = [
     icon: Download,
     labelKey: 'exportData.title',
     tooltipKey: 'sidebar.export',
-  },
-  {
-    view: 'entity-management',
-    icon: Sparkles,
-    labelKey: 'entityManagement.title',
-    tooltipKey: 'sidebar.entityManagement',
   },
 ];
 
