@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { apiHandler } from '@/lib/api-handler';
@@ -141,9 +142,11 @@ export const GET = apiHandler(async (request: NextRequest) => {
     nextCursor = hasMore ? transactions[transactions.length - 1].id : null;
   } else {
     // Original behavior: get all transactions for matching/export
+    // Paginated with a generous limit to prevent runaway queries
     transactions = await db.bankTransaction.findMany({
       where: txWhere,
       orderBy: { date: 'asc' },
+      take: 10000,
       include: {
         glAccount: {
           select: { id: true, code: true, name: true },
@@ -190,26 +193,25 @@ export const GET = apiHandler(async (request: NextRequest) => {
     include: { entry: { select: { date: true } } },
   });
 
-  let bookBalance = 0;
+  let bookBalance = new Prisma.Decimal(0);
   const isDebitNormal = bankAccount.glAccount.normalBalance === 'debit';
   for (const line of journalLines) {
     if (isDebitNormal) {
-      bookBalance += line.debit - line.credit;
+      bookBalance = bookBalance.add(new Prisma.Decimal(line.debit)).sub(new Prisma.Decimal(line.credit));
     } else {
-      bookBalance += line.credit - line.debit;
+      bookBalance = bookBalance.add(new Prisma.Decimal(line.credit)).sub(new Prisma.Decimal(line.debit));
     }
   }
-
   // Statement balance
   const statementBalance = activeStatement?.closingBalance ?? bankAccount.balance;
-  const difference = statementBalance - bookBalance;
+  const difference = Number(new Prisma.Decimal(statementBalance).sub(bookBalance).toFixed(2));
 
   // Categorize transactions
   const deposits = transactions.filter((tx) => tx.amount > 0);
   const payments = transactions.filter((tx) => tx.amount < 0);
 
-  const depositsTotal = deposits.reduce((sum, tx) => sum + tx.amount, 0);
-  const paymentsTotal = payments.reduce((sum, tx) => sum + tx.amount, 0);
+  const depositsTotal = deposits.reduce((sum, tx) => sum.add(new Prisma.Decimal(tx.amount)), new Prisma.Decimal(0)).toNumber();
+  const paymentsTotal = payments.reduce((sum, tx) => sum.add(new Prisma.Decimal(tx.amount)), new Prisma.Decimal(0)).toNumber();
 
   // Get current open reconciliation period
   const openPeriod = await db.reconciliationPeriod.findFirst({

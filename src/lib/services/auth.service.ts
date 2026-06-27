@@ -61,19 +61,19 @@ export class AuthService {
     const { email, password, firstName, lastName, companyName, taxId, entityType } = input;
     const normalizedEmail = email.toLowerCase().trim();
 
-    // Check if user already exists
-    const existingUser = await db.user.findUnique({
-      where: { email: normalizedEmail },
-    });
-    if (existingUser) {
-      throw new ValidationError('Ya existe una cuenta con este correo electrónico');
-    }
-
-    // Hash password
+    // Hash password (done before TX — pure function, no side effects on DB)
     const passwordHash = await hashPassword(password);
 
     // Create user and company in a transaction
     const result = await db.$transaction(async (tx) => {
+      // Check if user already exists (inside TX — prevents race conditions)
+      const existingUser = await tx.user.findUnique({
+        where: { email: normalizedEmail },
+      });
+      if (existingUser) {
+        throw new ValidationError('Ya existe una cuenta con este correo electrónico');
+      }
+
       // Create user
       const user = await tx.user.create({
         data: {

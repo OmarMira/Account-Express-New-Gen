@@ -120,6 +120,7 @@ export class JournalEntryService {
       where: {
         glAccountId: { not: null },
         journalEntryId: null,
+        statement: { companyId },
       },
       take: 500,
     });

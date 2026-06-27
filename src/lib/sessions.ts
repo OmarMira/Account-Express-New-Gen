@@ -55,8 +55,10 @@ export async function destroySession(rawToken: string): Promise<void> {
 }
 
 export function getSessionToken(request: NextRequest): string | null {
+  const isProd = process.env.NODE_ENV === 'production';
+  const cookieName = isProd ? '__Host-session' : 'session';
   return (
-    request.cookies.get('session_token')?.value ??
+    request.cookies.get(cookieName)?.value ??
     request.headers.get('authorization')?.replace('Bearer ', '') ??
     null
   );

@@ -10,9 +10,10 @@ export async function POST(request: NextRequest) {
 
   const response = NextResponse.json({ success: true });
 
-  response.cookies.set('session', '', {
+  const isProd = process.env.NODE_ENV === 'production';
+  response.cookies.set(isProd ? '__Host-session' : 'session', '', {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: isProd,
     sameSite: 'lax',
     path: '/',
     maxAge: 0,

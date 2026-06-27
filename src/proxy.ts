@@ -59,7 +59,10 @@ function corsHeaders(request: NextRequest): Headers | null {
     'Access-Control-Allow-Headers',
     'Content-Type, Authorization, X-Company-Id, x-company-id',
   );
-  headers.set('Access-Control-Allow-Credentials', 'true');
+  // Credentials only when origin is a specific domain, not wildcard
+  if (corsOrigin !== '*') {
+    headers.set('Access-Control-Allow-Credentials', 'true');
+  }
   headers.set('Access-Control-Max-Age', '86400');
   return headers;
 }
@@ -94,8 +97,10 @@ export async function proxy(request: NextRequest) {
 
   // 1. Session presence check for protected API routes
   if (isApi && !PUBLIC_API_ROUTES.includes(pathname)) {
+    const isProd = process.env.NODE_ENV === 'production';
+    const cookieName = isProd ? '__Host-session' : 'session';
     const sessionToken =
-      request.cookies.get('session')?.value ??
+      request.cookies.get(cookieName)?.value ??
       request.headers.get('authorization')?.replace('Bearer ', '') ??
       null;
 
@@ -118,8 +123,8 @@ export async function proxy(request: NextRequest) {
     response.headers.set(key, value);
   });
 
-  // 1. CSRF Protection for API Mutations (always in production)
-  if (!isDev && isApi && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+  // 1. CSRF Protection for API Mutations
+  if (isApi && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
     const origin = request.headers.get('origin');
     const referer = request.headers.get('referer');
     const host = request.headers.get('host');
@@ -138,9 +143,12 @@ export async function proxy(request: NextRequest) {
           return csrfErrorResponse(response.headers);
         }
       } catch {
-        // Invalid referer — allow through in relaxed mode
+        return csrfErrorResponse(response.headers);
       }
     }
+    // No origin AND no referer — likely a non-browser client (CLI, webhook, server-to-server).
+    // Browsers always send Origin or Referer on cross-origin requests, so absence means
+    // the request is not browser-initiated and CSRF is not applicable.
   }
 
   // Cache optimization for Next.js static assets

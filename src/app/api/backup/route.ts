@@ -48,6 +48,11 @@ export const DELETE = apiHandler(async (request: NextRequest, context: RouteCont
     return NextResponse.json({ error: 'companyId and filename are required' }, { status: 400 });
   }
 
+  // Ownership check: filename must belong to the session's company
+  if (!filename.startsWith(`${companyId}_`)) {
+    return NextResponse.json({ error: 'Backup file does not belong to this company' }, { status: 403 });
+  }
+
   const success = deleteBackup(filename);
 
   if (!success) {

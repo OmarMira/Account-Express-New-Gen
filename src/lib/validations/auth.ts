@@ -13,7 +13,7 @@ export const registerSchema = z.object({
     .string()
     .email('Formato de correo electrónico inválido')
     .min(1, 'El correo electrónico es requerido'),
-  password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
+  password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
   firstName: z.string().min(1, 'El nombre es requerido'),
   lastName: z.string().min(1, 'El apellido es requerido'),
   companyName: z.string().min(1, 'El nombre de la empresa es requerido'),

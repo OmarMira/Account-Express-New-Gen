@@ -14,18 +14,26 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
 export async function hasCompanyAccess(userId: string, companyId: string): Promise<boolean> {
   const user = await db.user.findUnique({
     where: { id: userId },
-    select: { role: true },
+    select: { role: true, isActive: true },
   });
 
-  if (user?.role === 'super_admin') {
+  if (!user?.isActive) return false;
+
+  if (user.role === 'super_admin') {
     return true;
   }
 
-  const membership = await db.companyMember.findUnique({
-    where: {
-      userId_companyId: { userId, companyId },
-    },
-  });
+  const [membership, company] = await Promise.all([
+    db.companyMember.findUnique({
+      where: {
+        userId_companyId: { userId, companyId },
+      },
+    }),
+    db.company.findUnique({
+      where: { id: companyId },
+      select: { isActive: true },
+    }),
+  ]);
 
-  return !!membership;
+  return !!membership && !!company?.isActive;
 }

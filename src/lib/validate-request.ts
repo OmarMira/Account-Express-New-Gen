@@ -23,17 +23,28 @@ export async function validateRequest<T>(
 
   const url = new URL(req.url);
   if (skipValidationPaths.includes(url.pathname)) {
-    // Return raw JSON body without schema validation
+    // Endpoints like logout may have no body — return empty rather than error
     try {
-      return (await req.json()) as unknown as T;
+      const body = await req.json();
+      return (body ?? {}) as unknown as T;
     } catch {
-      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+      return ({} as unknown as T);
     }
   }
 
   try {
     const json = await req.json();
-    // Recursive XSS sanitization in-place
+
+    // 1. Validate with Zod FIRST (shape + types)
+    const result = schema.safeParse(json);
+    if (!result.success) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: result.error.flatten() },
+        { status: 400 },
+      );
+    }
+
+    // 2. THEN sanitize strings in the validated data (XSS prevention)
     const sanitizeObj = (obj: unknown): unknown => {
       if (typeof obj === 'string') {
         return sanitizeInput(obj);
@@ -50,16 +61,8 @@ export async function validateRequest<T>(
       }
       return obj;
     };
-    
-    const sanitizedJson = sanitizeObj(json);
-    const result = schema.safeParse(sanitizedJson);
-    if (!result.success) {
-      return NextResponse.json(
-        { error: 'Validation failed', details: result.error.flatten() },
-        { status: 400 },
-      );
-    }
-    return result.data;
+
+    return sanitizeObj(result.data) as T;
   } catch (err: unknown) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }

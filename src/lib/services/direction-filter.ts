@@ -2,8 +2,8 @@ import { EXPECTED_DIRECTION } from '@/lib/constants/entity-roles';
 import type { EntityRole } from '@/lib/constants/entity-roles';
 
 /**
- * Minimum percentage threshold for a direction to be considered "pure".
- * At or above this percentage, the direction profile is classified as
+ * Minimum decimal threshold (0–1) for a direction to be considered "pure".
+ * At or above this threshold, the direction profile is classified as
  * pure credit or pure debit (not "ambas").
  */
 export const DIRECTION_THRESHOLD = 0.8;

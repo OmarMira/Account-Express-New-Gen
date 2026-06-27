@@ -832,6 +832,13 @@ export const POST = apiHandler(
         }
       }
 
+      if (!companyId) {
+        return NextResponse.json(
+          { error: 'No company context available. Select a company first.' },
+          { status: 400 },
+        );
+      }
+
       if (mode === 'create-rule') {
         return handleCreateRule(message, history, companyId, userId);
       }

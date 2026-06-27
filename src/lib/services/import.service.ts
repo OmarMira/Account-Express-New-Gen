@@ -111,7 +111,12 @@ export class ImportService {
       let holderDecision: 'auto_approved' | 'user_approved' | 'rejected' = 'auto_approved';
       let similarityScore = 1.0;
 
-      if (company && accountHolder) {
+      if (bypassHolderValidation) {
+        logger.info('Account holder validation skipped (bypass flag)', {
+          extractedHolder: accountHolder,
+          legalName: company?.legalName,
+        });
+      } else if (company && accountHolder) {
         const entityType = (company.entityType ?? 'BUSINESS') as 'INDIVIDUAL' | 'BUSINESS';
         const validation = validateAccountHolder(accountHolder, company.legalName, entityType);
         similarityScore = validation.score;
@@ -355,16 +360,6 @@ export class ImportService {
     const accountNumber = bankAccount?.accountNo || 'unknown';
     const statementMonth = toStatementMonth(startDate);
 
-    // ─── Validar statement duplicado ANTES de insertar ───────────────
-    const existingStatement = await db.bankStatement.findFirst({
-      where: { bankAccountId, startDate },
-    });
-    if (existingStatement) {
-      throw new ConflictError(
-        `Ya existe un extracto para el período que inicia el ${startDate.toISOString().split('T')[0]}. Elimine el anterior o use un período diferente.`,
-      );
-    }
-
     // ─── Deduplicación por importHash (SHA-256) ───────────────────────
     // Detecta reimportaciones del mismo extracto sin cargar todo en memoria.
     const hashList = sorted.map((txn) =>
@@ -400,10 +395,12 @@ export class ImportService {
 
     const totalCredits = uniqueTransactions
       .filter((t) => t.amount > 0)
-      .reduce((s, t) => s + t.amount, 0);
+      .reduce((s, t) => s.add(new Prisma.Decimal(t.amount)), new Prisma.Decimal(0))
+      .toNumber();
     const totalDebits = uniqueTransactions
       .filter((t) => t.amount < 0)
-      .reduce((s, t) => s + Math.abs(t.amount), 0);
+      .reduce((s, t) => s.add(new Prisma.Decimal(t.amount).abs()), new Prisma.Decimal(0))
+      .toNumber();
 
     const bankRules = await db.bankRule.findMany({
       where: { companyId, isActive: true },
@@ -416,6 +413,16 @@ export class ImportService {
     });
 
     const result = await db.$transaction(async (tx) => {
+      // Duplicate check inside TX (atomic — prevents race conditions)
+      const existingStatement = await tx.bankStatement.findFirst({
+        where: { bankAccountId, startDate, endDate },
+      });
+      if (existingStatement) {
+        throw new ConflictError(
+          `Ya existe un extracto para el período ${startDate.toISOString().split('T')[0]} – ${endDate.toISOString().split('T')[0]}. Elimine el anterior o use un período diferente.`,
+        );
+      }
+
       const statement = await tx.bankStatement.create({
         data: {
           companyId,

@@ -54,9 +54,10 @@ export const POST = apiHandler(
         ],
       });
 
-      response.cookies.set('session', token, {
+      const isProd = process.env.NODE_ENV === 'production';
+      response.cookies.set(isProd ? '__Host-session' : 'session', token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: isProd,
         sameSite: 'lax',
         path: '/',
         maxAge: 7 * 24 * 60 * 60,

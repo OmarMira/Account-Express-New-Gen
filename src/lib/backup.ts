@@ -92,7 +92,11 @@ function readManifest(): ManifestFile {
   try {
     const raw = fs.readFileSync(MANIFEST_PATH, 'utf-8');
     return JSON.parse(raw) as ManifestFile;
-  } catch {
+  } catch (err) {
+    logger.warn('[BACKUP MANIFEST] Parse error — resetting manifest', {
+      error: String(err),
+      path: MANIFEST_PATH,
+    });
     return { backups: [] };
   }
 }
@@ -648,10 +652,11 @@ export async function restoreBackup(
       restoredCounts,
     };
   } catch (error) {
-    logger.error('[BACKUP RESTORE ERROR]', { error: String(error) });
+    const errMsg = error instanceof Error ? `${error.name}: ${error.message}` : 'Unknown error';
+    logger.error('[BACKUP RESTORE ERROR]', { error: errMsg });
     return {
       success: false,
-      message: `Restore failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      message: `Restore failed. The database was rolled back to its previous state. Error: ${errMsg}`,
       restoredCounts: {},
     };
   }

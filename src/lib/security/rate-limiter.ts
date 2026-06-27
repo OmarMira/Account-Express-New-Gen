@@ -14,12 +14,27 @@ type RateLimitConfig = {
 const requestWindows = new Map<string, { count: number; resetAt: number }>();
 const CLEANUP_INTERVAL = 5 * 60 * 1000; // Limpieza cada 5 min para evitar memory leaks
 
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, window] of requestWindows.entries()) {
-    if (now >= window.resetAt) requestWindows.delete(key);
+let _cleanupTimer: ReturnType<typeof setInterval> | null = null;
+
+function _startCleanup(): void {
+  if (_cleanupTimer) return;
+  _cleanupTimer = setInterval(() => {
+    const now = Date.now();
+    for (const [key, window] of requestWindows.entries()) {
+      if (now >= window.resetAt) requestWindows.delete(key);
+    }
+  }, CLEANUP_INTERVAL);
+}
+
+/** Exposed for hot-reload scenarios — prevents duplicate intervals in dev. */
+export function stopRateLimitCleanup(): void {
+  if (_cleanupTimer) {
+    clearInterval(_cleanupTimer);
+    _cleanupTimer = null;
   }
-}, CLEANUP_INTERVAL);
+}
+
+_startCleanup();
 
 type SecurityConfig = {
   version: string;

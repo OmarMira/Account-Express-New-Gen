@@ -89,7 +89,7 @@ export function PlaceholderView({ view }: { view: ViewName }) {
     settings: 'settings.title',
     users: 'users.title',
     onboarding: 'onboarding.title',
-    'entity-management': 'entityManagement.title',
+    'entity-management': 'sidebar.entityManagement',
   };
 
   const title = t(viewKeyMap[view] ?? 'dashboard.title');

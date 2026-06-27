@@ -267,7 +267,15 @@ function parseDate(val: string): Date | null {
     }
   }
 
-  // Fallback: let JS parse
+  // Fallback: parse as UTC to avoid JS local-vs-UTC ambiguity
+  // Try ISO-ish format (YYYY-MM-DD) first
+  const isoMatch = val.match(/^\s*(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (isoMatch) {
+    const d = new Date(Date.UTC(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3])));
+    if (!isNaN(d.getTime())) return d;
+  }
+
+  // Last-resort: JS native parse (local-timezone dependent)
   const fallback = new Date(val);
   return isNaN(fallback.getTime()) ? null : fallback;
 }

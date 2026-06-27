@@ -14,7 +14,39 @@ export class RateLimiter {
     private ipWindowMs: number = 15 * 60 * 1000,
     private emailLimit: number = 10,
     private emailWindowMs: number = 60 * 60 * 1000,
-  ) {}
+  ) {
+    // Load persisted counters from DB silently (fire-and-forget)
+    this._loadFromDb();
+  }
+
+  /**
+   * Load existing rate-limit counters from the database.
+   * Ensures rate limits survive server restarts.
+   */
+  private _loadFromDb(): void {
+    const now = Date.now();
+    db.rateLimit
+      .findMany({
+        where: { resetAt: { gte: new Date(now) } },
+        take: 50000,
+      })
+      .then((records) => {
+        for (const r of records) {
+          const resetTime = r.resetAt.getTime();
+          if (now >= resetTime) continue; // Skip expired windows
+
+          if (r.key.startsWith('ip:')) {
+            this.ipHits.set(r.key.slice(3), { count: r.hits, resetTime });
+          } else if (r.key.startsWith('email:')) {
+            this.emailHits.set(r.key.slice(6), { count: r.hits, resetTime });
+          }
+        }
+      })
+      .catch((err) => {
+        console.warn('[RATE LIMITER] Failed to load persisted counters', String(err));
+        // In-memory default starts empty — safe fallback
+      });
+  }
 
   private persist(key: string, hits: number, windowMs: number, resetTime: number): void {
     const resetAt = new Date(resetTime);
