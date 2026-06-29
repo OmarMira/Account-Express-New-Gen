@@ -208,6 +208,137 @@ describe('POST /api/learning/suggest-role — prompt construction', () => {
     expect(body.suggestedRole).toBe('GASTO_OPERATIVO');
   });
 
+  describe('LLM confidence cap', () => {
+    beforeEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('caps confidence to 0.69 when LLM returns 0.95', async () => {
+      const { POST } = await import('@/app/api/learning/suggest-role/route');
+
+      const mockResponse = {
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              role: 'proveedor',
+              confidence: 0.95,
+              explanation: 'Test explanation',
+            }),
+          },
+        }],
+      };
+
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify(mockResponse), { status: 200 }),
+      );
+
+      const req = await makeRequest({
+        description: 'Servicios generales',
+        directionProfile: { creditPct: 0, debitPct: 1 },
+      }, token);
+
+      const res = await POST(req, { params: Promise.resolve({}) });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+
+      expect(body.confidence).toBe(0.69);
+      expect(body.suggestedRole).toBe('PROVEEDOR');
+    });
+
+    it('preserves confidence when LLM returns 0.45', async () => {
+      const { POST } = await import('@/app/api/learning/suggest-role/route');
+
+      const mockResponse = {
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              role: 'gasto_operativo',
+              confidence: 0.45,
+              explanation: 'Low confidence test',
+            }),
+          },
+        }],
+      };
+
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify(mockResponse), { status: 200 }),
+      );
+
+      const req = await makeRequest({
+        description: 'Gasto mensual',
+      }, token);
+
+      const res = await POST(req, { params: Promise.resolve({}) });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+
+      expect(body.confidence).toBe(0.45);
+      expect(body.suggestedRole).toBe('GASTO_OPERATIVO');
+    });
+
+    it('preserves confidence when LLM returns exactly 0.69', async () => {
+      const { POST } = await import('@/app/api/learning/suggest-role/route');
+
+      const mockResponse = {
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              role: 'cliente',
+              confidence: 0.69,
+              explanation: 'Already at cap',
+            }),
+          },
+        }],
+      };
+
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify(mockResponse), { status: 200 }),
+      );
+
+      const req = await makeRequest({
+        description: 'Cliente regular',
+      }, token);
+
+      const res = await POST(req, { params: Promise.resolve({}) });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+
+      expect(body.confidence).toBe(0.69);
+    });
+
+    it('includes reasoning field in the response', async () => {
+      const { POST } = await import('@/app/api/learning/suggest-role/route');
+
+      const mockResponse = {
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              role: 'proveedor',
+              confidence: 0.85,
+              explanation: 'Test',
+            }),
+          },
+        }],
+      };
+
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify(mockResponse), { status: 200 }),
+      );
+
+      const req = await makeRequest({
+        description: 'ACME SUPPLIES',
+      }, token);
+
+      const res = await POST(req, { params: Promise.resolve({}) });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+
+      expect(body.reasoning).toBeDefined();
+      expect(body.reasoning).toContain('PROVEEDOR');
+      expect(body.reasoning).toContain('pattern');
+    });
+  });
+
   describe('web search fallback', () => {
     const lowConfidenceResponse = {
       choices: [{
@@ -285,8 +416,8 @@ describe('POST /api/learning/suggest-role — prompt construction', () => {
       expect(rePromptBody).toContain('Web search result');
       expect(rePromptBody).toContain('Southeast Toyota Finance');
 
-      // Confidence should be 0.70 (capped)
-      expect(body.confidence).toBe(0.70);
+      // Confidence should be 0.69 (capped by the global LLM cap at 0.69)
+      expect(body.confidence).toBe(0.69);
       expect(body.suggestedRole).toBe('PROVEEDOR');
     });
 

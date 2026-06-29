@@ -1,11 +1,10 @@
-import { readFileSync } from 'fs';
-import { join } from 'path';
 import crypto from 'crypto';
 import { logger } from '../logger';
-import {
-  sanitizeDescriptionForDetection,
-  normalizePattern,
-} from '@/lib/services/pattern-normalizer';
+import { normalizePattern } from '@/lib/services/pattern-normalizer';
+
+// ========== RE-EXPORT FROM string-similarity ==========
+import { jaroWinkler } from '@/lib/utils/string-similarity';
+export { jaroWinkler, jaro } from '@/lib/utils/string-similarity';
 
 // ========== INTERFACES TIPIFICADAS (V3.0 Zero-Any) ==========
 export interface EntityDetectionConfig {
@@ -33,7 +32,6 @@ export interface EntityDetectionConfig {
   };
   validation: {
     minOccurrences: number;
-    directionLockThreshold: number;
     ignorePatterns: string[];
   };
 }
@@ -70,76 +68,82 @@ export interface EntityCandidate {
   frequency?: string;
   /** Average transaction amount */
   avgAmount?: number;
+  /** Whether this entity has an active FK-linked BankRule */
+  isCovered?: boolean;
 }
 
 // ========== CACHE DE CONFIGURACIÓN ==========
+// Config is now hardcoded (was loaded from rules/entity-detection.json).
+// The JSON file is deprecated — use DetectionConfig DB table for overrides.
 let cachedConfig: EntityDetectionConfig | null = null;
+
+const DEFAULT_ENTITY_DETECTION_CONFIG: EntityDetectionConfig = {
+  sanitization: {
+    stripPatterns: [
+      { name: 'remove_zelle_memos', regex: '\\bfor\\b.*', replacement: '', flags: 'gi' },
+      { name: 'remove_conf_ref_ids', regex: '(Conf#|Ref#|ID:|ID: Indn:|TRX)\\s*\\S*|\\b\\d{10,}\\b|\\$[\\d,]+\\.\\d{2}|\\b(?:[A-Za-z]+\\d+[A-Za-z0-9]*|\\d+[A-Za-z]+[A-Za-z0-9]*)\\b', replacement: '', flags: 'gi' },
+      { name: 'remove_dates', regex: '\\b\\d{1,2}[\\/\\-\\.]\\d{1,2}[\\/\\-\\.]\\d{2,4}\\b', replacement: '' },
+      { name: 'remove_banks_prefixes', regex: '\\b(BKOFAMERICA|DEPOSIT|MOBILE|PAYMENT|TRANSFER|Zelle payment)\\b', replacement: '', flags: 'gi' },
+      { name: 'remove_descriptors', regex: '(DES:|WEB|CCD|PMT INFO:[^\\s]+)', replacement: '', flags: 'gi' },
+    ],
+  },
+  extraction: {
+    strategies: [
+      { priority: 1, pattern: '^(RAISER\\s*\\d*|LYFT[\\*\\.]?COM|TURO\\s*\\d*|AMERICAN\\s*EXPRESS|SETOYOTA\\s*FIN[\\/\\w]*|HOME\\s*DEPOT|KMF[\\w\\.]*|UBER\\s*USA\\s*\\d*|RIDELYFT)\\b', description: 'Captura nombres de empresas con variantes numéricas y de formato al inicio de la descripción.' },
+      { priority: 2, pattern: '\\b(?:from|to|payee)\\s+([A-ZÀ-ÿ0-9\\s\\.&\\-\']{2,40})', description: 'Busca nombre tras from, to o payee.' },
+      { priority: 3, pattern: '\\bINDN:\\s*([A-ZÀ-ÿ0-9\\s\\.&\\-\']+?)(?=\\s+(?:CO ID:|ID:|CCD|WEB)|$)', description: 'Busca nombre tras INDN: hasta marcador técnico.' },
+      { priority: 1, pattern: '^([A-ZÀ-ÿ0-9\\s\\.\\,&\\-\']{2,40})(?=\\s+(DES:|ID:|\\d{2}\\/))', description: 'Fallback: Primera secuencia de texto largo antes de un descriptor técnico.' },
+    ],
+  },
+  clustering: {
+    algorithm: 'jaro-winkler',
+    threshold: 0.85,
+    canonicalSelection: 'most_frequent',
+    minLength: 3,
+    stopWords: ['LLC', 'INC', 'CORP', 'CO', 'PA', 'THE', 'AND', 'DES', 'PMNT'],
+  },
+  validation: {
+    minOccurrences: 2,
+    ignorePatterns: ['CASH', 'CHECK', 'FEE', 'INTEREST', 'BALANCE', 'MOBILE'],
+  },
+};
 
 export function loadConfig(): EntityDetectionConfig {
   if (cachedConfig) return cachedConfig;
-  const path = join(process.cwd(), 'rules/entity-detection.json');
-  cachedConfig = JSON.parse(readFileSync(path, 'utf-8')) as EntityDetectionConfig;
+  cachedConfig = { ...DEFAULT_ENTITY_DETECTION_CONFIG };
   return cachedConfig;
 }
 
-// ========== ALGORITMO JARO (Helper para Jaro-Winkler) ==========
-function jaro(s1: string, s2: string): number {
-  if (s1 === s2) return 1.0;
-  const len1 = s1.length;
-  const len2 = s2.length;
-  if (len1 === 0 || len2 === 0) return 0.0;
+// ========== PRE-PROCESSING + SANITIZACIÓN ==========
 
-  const matchWindow = Math.floor(Math.max(len1, len2) / 2) - 1;
-  const matches1 = new Array(len1).fill(false);
-  const matches2 = new Array(len2).fill(false);
-  let matches = 0;
-
-  for (let i = 0; i < len1; i++) {
-    const start = Math.max(0, i - matchWindow);
-    const end = Math.min(i + matchWindow + 1, len2);
-    for (let j = start; j < end; j++) {
-      if (matches2[j]) continue;
-      if (s1[i] === s2[j]) {
-        matches1[i] = true;
-        matches2[j] = true;
-        matches++;
-        break;
-      }
+/**
+ * Applies configured strip patterns for entity detection.
+ * This runs BEFORE name extraction — preserves case and most punctuation
+ * so that extraction regexes can match against the original text format.
+ * normalizePattern() is applied later for cluster key generation.
+ */
+export function preprocessForEntityDetection(desc: string, config: EntityDetectionConfig): string {
+  let cleaned = desc;
+  for (const pattern of config.sanitization.stripPatterns) {
+    try {
+      const flags = pattern.flags || 'gi';
+      const rx = new RegExp(pattern.regex, flags);
+      cleaned = cleaned.replace(rx, pattern.replacement ?? '');
+    } catch (err) {
+      logger.warn('ENTITY_DETECTOR_INVALID_REGEX', { pattern: pattern.name, error: String(err) });
     }
   }
-
-  if (matches === 0) return 0.0;
-
-  let k = 0;
-  let transpositions = 0;
-  for (let i = 0; i < len1; i++) {
-    if (!matches1[i]) continue;
-    while (!matches2[k]) k++;
-    if (s1[i] !== s2[k]) transpositions++;
-    k++;
-  }
-
-  return (matches / len1 + matches / len2 + (matches - transpositions / 2) / matches) / 3;
+  return cleaned.replace(/\s+/g, ' ').trim();
 }
 
-// ========== JARO-WINKLER ==========
-export function jaroWinkler(s1: string, s2: string): number {
-  const Jaro = jaro(s1, s2);
-  if (Jaro < 0.7) return Jaro;
-
-  let prefixLength = 0;
-  const maxPrefix = 4;
-  const minLen = Math.min(s1.length, s2.length, maxPrefix);
-  for (let i = 0; i < minLen; i++) {
-    if (s1[i] === s2[i]) prefixLength++;
-    else break;
-  }
-  return Jaro + prefixLength * 0.1 * (1 - Jaro);
-}
-
-// ========== SANITIZACIÓN CON REGEX SEGURO ==========
+/**
+ * Sanitizes a bank description for entity detection.
+ * Step 1: Pre-process with configured strip patterns (preserves case/punctuation).
+ * normalizePattern() is applied separately at the key-generation stage
+ * (see clusterExact) to avoid breaking regex-based extraction.
+ */
 export function sanitizeDescription(desc: string, config: EntityDetectionConfig): string {
-  return sanitizeDescriptionForDetection(desc, config);
+  return preprocessForEntityDetection(desc, config);
 }
 
 // ========== COMPONENTES DE EXTRACCIÓN (TODAS LAS ESTRATEGIAS) ==========
@@ -259,6 +263,8 @@ function clusterExact(
   >();
 
   for (const tx of transactions) {
+    // Skip zero-amount transactions (epsilon-safe for Prisma Decimal)
+    if (Math.abs(Number(tx.amount)) < 0.00001) continue;
     let cleaned = sanitizeDescription(tx.description, config);
 
     // Apply extraNumberStrip BEFORE extraction if enabled
@@ -275,12 +281,8 @@ function clusterExact(
     if (ignorePatterns.some((p) => new RegExp(`\\b${p}\\b`, 'i').test(nameUpper))) continue;
     if (stopWords.some((sw) => nameUpper === sw.toUpperCase())) continue;
 
-    // Normalized key for exact matching (numbers always stripped)
-    const key = name
-      .replace(/\b\d[\d.,\/-]*\b/g, '')
-      .replace(/\s{2,}/g, ' ')
-      .toLowerCase()
-      .trim();
+    // Normalized key for exact matching (numbers always stripped, then canonical normalization)
+    const key = normalizePattern(name.replace(/\b\d[\d.,\/-]*\b/g, ''));
 
     if (!key) continue; // skip if key is empty after stripping
 
@@ -330,6 +332,8 @@ function clusterFuzzy(
   const { minOccurrences, ignorePatterns } = config.validation;
 
   for (const tx of transactions) {
+    // Skip zero-amount transactions (epsilon-safe for Prisma Decimal)
+    if (Math.abs(Number(tx.amount)) < 0.00001) continue;
     const cleaned = sanitizeDescription(tx.description, config);
     const name = extractName(cleaned, config);
     if (!name) continue;

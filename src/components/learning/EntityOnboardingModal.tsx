@@ -31,6 +31,8 @@ import { logger } from '@/lib/logger';
 import entityRoles from '../../../rules/entity-roles.json';
 import { EXPECTED_DIRECTION } from '@/lib/constants/entity-roles';
 import type { EntityRole } from '@/lib/constants/entity-roles';
+import { TRANSACTION_INTENT_VALUES } from '@/lib/constants/transaction-intent';
+import type { TransactionIntent } from '@/lib/constants/transaction-intent';
 
 interface EntityCandidate {
   id: string;
@@ -55,6 +57,13 @@ interface EntityOnboardingModalProps {
   onClose: () => void;
   companyId: string;
   onComplete?: () => void;
+}
+
+/** Derive a human-readable direction hint from EXPECTED_DIRECTION for the Actor Type badge. */
+function getDirectionHint(role: string): string | null {
+  const expectedDir = EXPECTED_DIRECTION[role as EntityRole];
+  if (expectedDir === null || expectedDir === 'mixed' || expectedDir === undefined) return null;
+  return expectedDir === 'credit' ? 'Expected: Income' : 'Expected: Expense';
 }
 
 /** Check if a role's expected direction conflicts with the entity's direction profile. */
@@ -135,6 +144,11 @@ export function EntityOnboardingModal({
     Record<string, 'credit' | 'debit' | 'both' | null>
   >({});
 
+  // ── F1 — Per-entity intent selection state ─────────────────────────
+  const [intentSelections, setIntentSelections] = useState<
+    Record<string, TransactionIntent | null>
+  >({});
+
   // ── OTRO descriptions + Batch classification state ──────────────────
   const [descriptions, setDescriptions] = useState<Record<string, string>>({});
   const [batchResults, setBatchResults] = useState<
@@ -193,6 +207,7 @@ export function EntityOnboardingModal({
       setDescriptions({});
       setBatchResults({});
       setBatchInProgress(false);
+      setIntentSelections({});
     };
   }, [companyId, isOpen, t]);
 
@@ -235,6 +250,7 @@ export function EntityOnboardingModal({
               pattern: splitPattern,
               role: sel.role,
               transactionDirection: splitDir,
+              intent: intentSelections[name] ?? null,
             }),
           });
           if (res.ok) newlySaved.add(name);
@@ -257,6 +273,7 @@ export function EntityOnboardingModal({
             userInput: sel.userInput || name,
             role: sel.role,
             directionOverride: directionOverrides[name] || undefined,
+            intent: intentSelections[name] ?? null,
           }),
         });
         if (res.ok) {
@@ -566,6 +583,7 @@ export function EntityOnboardingModal({
               role: 'OTRO',
               source: 'user',
               userDescription: userDesc.trim(),
+              intent: intentSelections[pattern] ?? null,
             }),
           });
 
@@ -597,6 +615,7 @@ export function EntityOnboardingModal({
               pattern: splitPattern,
               role: finalRole,
               transactionDirection: splitDir,
+              intent: intentSelections[pattern] ?? null,
             }),
           });
 
@@ -626,6 +645,7 @@ export function EntityOnboardingModal({
             userInput: sel.userInput || pattern,
             role: finalRole,
             directionOverride: directionOverrides[pattern] || undefined,
+            intent: intentSelections[pattern] ?? null,
           }),
         });
 
@@ -855,6 +875,20 @@ export function EntityOnboardingModal({
                     </div>
                   )}
 
+                  {/* ── F2 — Actor Type badge + direction hint ───────────── */}
+                  {role && (
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className="text-xs text-muted-foreground font-medium">
+                        {t('learning.actorTypeLabel')}: {role}
+                      </span>
+                      {getDirectionHint(role) && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                          {getDirectionHint(role)}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
                   {/* Role dropdown */}
                   <div className="w-full">
                     <Select
@@ -905,6 +939,37 @@ export function EntityOnboardingModal({
                         </div>
                       </div>
                     )}
+
+                    {/* ── F3 — Intent dropdown ──────────────────────────── */}
+                    <div className="mt-1.5">
+                      <label className="text-xs text-muted-foreground mb-1 block">
+                        {t('learning.intentLabel')}
+                      </label>
+                      <Select
+                        value={intentSelections[name] ?? 'none'}
+                        onValueChange={(v) =>
+                          setIntentSelections((prev) => ({
+                            ...prev,
+                            [name]: v === 'none' ? null : (v as TransactionIntent),
+                          }))
+                        }
+                        disabled={saving}
+                      >
+                        <SelectTrigger className="h-8 text-sm" data-testid="intent-select">
+                          <SelectValue placeholder={t('learning.intentPlaceholder')} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">
+                            {t('learning.intentPlaceholder')}
+                          </SelectItem>
+                          {TRANSACTION_INTENT_VALUES.map((intent) => (
+                            <SelectItem key={intent} value={intent}>
+                              {t(`transactionIntent.${intent}`)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
                     {/* ── OTRO textarea ── */}
                     {isOtro && (

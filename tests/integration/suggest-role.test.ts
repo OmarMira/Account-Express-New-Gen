@@ -101,7 +101,7 @@ describe('POST /api/learning/suggest-role', () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.suggestedRole).toBe('PROVEEDOR');
-      expect(body.confidence).toBe(0.92);
+      expect(body.confidence).toBe(0.69); // Capped by LLM confidence guard
       expect(body.explanation).toBeDefined();
     });
 
@@ -126,7 +126,7 @@ describe('POST /api/learning/suggest-role', () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.suggestedRole).toBe('CLIENTE');
-      expect(body.confidence).toBe(0.85);
+      expect(body.confidence).toBe(0.69); // Capped by LLM confidence guard
     });
 
     it('rejects non-canonical role from AI with 502', async () => {
@@ -174,7 +174,7 @@ describe('POST /api/learning/suggest-role', () => {
       const body = await res.json();
       expect(body.suggestedRole).toBe('EMPLEADO');
       expect(typeof body.confidence).toBe('number');
-      expect(body.confidence).toBe(0.95);
+      expect(body.confidence).toBe(0.69); // Capped by LLM confidence guard
     });
 
     it('handles AI API network failure gracefully (502)', async () => {

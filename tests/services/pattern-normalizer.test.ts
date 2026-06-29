@@ -1,66 +1,73 @@
 import { describe, it, expect } from 'vitest';
-import {
-  normalizePattern,
-  sanitizeDescriptionForDetection,
-  sanitizeDescriptionForAdaptive,
-} from '@/lib/services/pattern-normalizer';
+import { normalizePattern } from '@/lib/services/pattern-normalizer';
 
-describe('Pattern Normalizer Service', () => {
-  describe('normalizePattern', () => {
-    it('should convert to lowercase and trim', () => {
-      expect(normalizePattern('  TEST PATTERN  ')).toBe('test pattern');
-    });
-
-    it('should strip common transaction prefixes', () => {
-      expect(normalizePattern('Zelle payment to John Doe')).toBe('john doe');
-      expect(normalizePattern('Payment from Jane Doe')).toBe('jane doe');
-      expect(normalizePattern('zelle transfer to Company A')).toBe('company a');
-      expect(normalizePattern('check to Vendor B')).toBe('vendor b');
-      expect(normalizePattern('withdrawal from account')).toBe('account');
-      expect(normalizePattern('deposit to fund')).toBe('fund');
-    });
-
-    it('should strip common transaction suffixes', () => {
-      expect(normalizePattern('Vendor C conf# 12345')).toBe('vendor c');
-      expect(normalizePattern('Vendor D for "services rendered"')).toBe('vendor d');
-      expect(normalizePattern('Vendor E; conf# abc987')).toBe('vendor e');
-    });
-
-    it('should normalize patterns with generic metadata (DES:/ID:/INDN:)', () => {
-      expect(normalizePattern('raiser 12345 des:edi paymnt id:999-888 indn:some')).toBe(
-        'raiser 12345 some',
-      );
-      expect(normalizePattern('lyft.com des:lyft 12-34 id:abc-123 indn:driver')).toBe(
-        'lyft.com driver',
-      );
-    });
+describe('normalizePattern — canonical pure function', () => {
+  it('1. trims and collapses whitespace', () => {
+    expect(normalizePattern('  INTERES  BANCARIO  ')).toBe('interes bancario');
   });
 
-  describe('sanitizeDescriptionForDetection', () => {
-    it('should apply configured regex patterns to strip noise', () => {
-      const config = {
-        sanitization: {
-          stripPatterns: [
-            { name: 'digits', regex: '\\d+', replacement: '' },
-            { name: 'zelle', regex: '^zelle\\s+from\\s+', replacement: '', flags: 'i' },
-          ],
-        },
-      };
-      expect(sanitizeDescriptionForDetection('Zelle from Vendor 12345', config)).toBe('Vendor');
-    });
+  it('2. collapses tabs and newlines', () => {
+    expect(normalizePattern('ACME\tCORP\nSA')).toBe('acme corp sa');
   });
 
-  describe('sanitizeDescriptionForAdaptive', () => {
-    it('should apply noise filters and remove stop words', () => {
-      const config = {
-        sanitizeNoise: {
-          digits: '\\d+',
-        },
-        patternGeneration: {
-          ignoreStopWords: ['from', 'the', 'to'],
-        },
-      };
-      expect(sanitizeDescriptionForAdaptive('Zelle from the Vendor 999', config)).toBe('zelle vendor');
-    });
+  it('3. strips punctuation', () => {
+    expect(normalizePattern('MERCADO LIBRE S.A. - (CUIT 30-...)')).toBe('mercado libre sa cuit 30');
+  });
+
+  it('4. preserves unicode characters', () => {
+    expect(normalizePattern('Café Martínez')).toBe('café martínez');
+  });
+
+  it('5. returns empty string for empty input', () => {
+    expect(normalizePattern('')).toBe('');
+  });
+
+  it('6. returns empty string when input is only punctuation', () => {
+    expect(normalizePattern('!@#$%^&*()')).toBe('');
+  });
+
+  it('7. strips punctuation from numeric strings', () => {
+    expect(normalizePattern('1234-5678/90')).toBe('1234567890');
+  });
+
+  it('8. does NOT strip bank metadata prefixes (pure function)', () => {
+    expect(normalizePattern('INDN: ACME CORP')).toBe('indn acme corp');
+  });
+
+  it('9. trims leading and trailing spaces', () => {
+    expect(normalizePattern('  hello world  ')).toBe('hello world');
+  });
+
+  it('10. collapses multiple internal spaces to one', () => {
+    expect(normalizePattern('a    b')).toBe('a b');
+  });
+
+  it('11. is a pure function — no global state mutation', () => {
+    const input = '  TEST  INPUT  ';
+    const first = normalizePattern(input);
+    const second = normalizePattern(input);
+    expect(first).toBe(second);
+    // Input unchanged
+    expect(input).toBe('  TEST  INPUT  ');
+  });
+
+  it('12. strips hyphens', () => {
+    expect(normalizePattern('well-known')).toBe('wellknown');
+  });
+
+  it('13. strips apostrophes', () => {
+    expect(normalizePattern("O'Brien")).toBe('obrien');
+  });
+
+  it('14. repeated collapse after punctuation removal', () => {
+    expect(normalizePattern('a , b')).toBe('a b');
+  });
+
+  it('15. returns empty string when input is only whitespace', () => {
+    expect(normalizePattern('   ')).toBe('');
+  });
+
+  it('16. handles mixed unicode and punctuation', () => {
+    expect(normalizePattern('Señor López, S.A. — ¡Hola!')).toBe('señor lópez sa hola');
   });
 });

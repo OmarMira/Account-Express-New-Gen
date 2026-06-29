@@ -6,6 +6,7 @@ import { parseConversationalContext } from '@/lib/services/conversational-servic
 import { safeAuditLog } from '@/lib/services/audit-service';
 import { db } from '@/lib/db';
 import { entityRoleSchema } from '@/lib/constants/entity-roles';
+import { transactionIntentSchema } from '@/lib/constants/transaction-intent';
 import { logger } from '@/lib/logger';
 import { serverT } from '@/lib/server-i18n';
 
@@ -15,13 +16,24 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
 
   try {
     const body = await request.json();
-    const { pattern, userInput, glAccountCode, role, transactionDirection, directionOverride, userDescription } = body;
+    const { pattern, userInput, glAccountCode, role, transactionDirection, directionOverride, userDescription, intent } = body;
 
     if (!pattern) {
       return NextResponse.json(
         { error: serverT(locale, 'learning.patternRequired') },
         { status: 400 },
       );
+    }
+
+    // Validate intent if provided
+    if (intent) {
+      const intentResult = transactionIntentSchema.safeParse(intent);
+      if (!intentResult.success) {
+        return NextResponse.json(
+          { error: 'Invalid intent value' },
+          { status: 400 },
+        );
+      }
     }
 
     // Log direction override for audit trail
@@ -63,7 +75,7 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
       }
     }
 
-    await classifyEntity({
+    const classifyResult = await classifyEntity({
       companyId,
       pattern,
       role: finalRole,
@@ -73,6 +85,7 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
       userId,
       transactionDirection: transactionDirection ?? undefined,
       userDescription: userDescription ?? null,
+      intent: intent ?? null,
     });
 
     await safeAuditLog({
@@ -85,12 +98,14 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
         role: finalRole,
         glAccountCode: finalGlAccountCode || null,
         directionOverride: directionOverride || undefined,
+        intent: intent ?? null,
       },
     });
 
     return NextResponse.json({
       success: true,
       data: { role: finalRole },
+      ...(classifyResult.warning ? { warning: classifyResult.warning } : {}),
     });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : serverT(locale, 'learning.serverError');

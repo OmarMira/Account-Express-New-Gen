@@ -2,15 +2,37 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ─── Mocks ─────────────────────────────────────────────────────────────
 
-vi.mock('@/lib/db', () => ({
-  db: {
-    glAccount: { findFirst: vi.fn() },
-    bankAccount: { findMany: vi.fn() },
-    bankTransaction: { findMany: vi.fn() },
-    entityContext: { findMany: vi.fn() },
-    bankRule: { findMany: vi.fn() },
-  },
-}));
+vi.mock('@/lib/db', () => {
+  const bankRuleFindFirst = vi.fn();
+  const bankRuleCreate = vi.fn();
+  const bankRuleUpdate = vi.fn();
+  const bankTransactionFindMany = vi.fn().mockResolvedValue([]);
+
+  return {
+    db: {
+      glAccount: { findFirst: vi.fn() },
+      bankAccount: { findMany: vi.fn() },
+      bankTransaction: { findMany: bankTransactionFindMany },
+      entityContext: { findMany: vi.fn() },
+      bankRule: {
+        findMany: vi.fn(),
+        findFirst: bankRuleFindFirst,
+        findUnique: vi.fn(),
+        create: bankRuleCreate,
+        update: bankRuleUpdate,
+      },
+      $transaction: vi.fn((cb: (tx: unknown) => unknown) =>
+        cb({
+          bankRule: {
+            findFirst: bankRuleFindFirst,
+            create: bankRuleCreate,
+            update: bankRuleUpdate,
+          },
+        }),
+      ),
+    },
+  };
+});
 
 vi.mock('@/lib/services/entity-detector', () => ({
   loadConfig: vi.fn(),
@@ -34,10 +56,12 @@ import { saveContext } from '@/lib/services/entity-context-service';
 import {
   classifyEntity,
   getEntityCandidates,
-  detectEntityConflict,
   getKnownSocioPatterns,
+  computeDirectionProfile,
+  autoCreateRule,
 } from '@/lib/services/entity-classifier';
 import { ENTITY_ROLES, entityRoleSchema, UI_ROLES } from '@/lib/constants/entity-roles';
+import type { EntityContext } from '@prisma/client';
 
 // ─── Helpers ───────────────────────────────────────────────────────────
 
@@ -46,7 +70,8 @@ const mockDb = db as unknown as {
   bankAccount: { findMany: ReturnType<typeof vi.fn> };
   bankTransaction: { findMany: ReturnType<typeof vi.fn> };
   entityContext: { findMany: ReturnType<typeof vi.fn> };
-  bankRule: { findMany: ReturnType<typeof vi.fn> };
+  bankRule: { findMany: ReturnType<typeof vi.fn>; findFirst: ReturnType<typeof vi.fn>; findUnique: ReturnType<typeof vi.fn>; create: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn> };
+  $transaction: ReturnType<typeof vi.fn>;
 };
 
 function makeCandidate(overrides: Partial<EntityCandidate> = {}): EntityCandidate {
@@ -308,67 +333,7 @@ describe('getEntityCandidates()', () => {
   });
 });
 
-// ═══════════════════════════════════════════════════════════════════════
-// detectEntityConflict (pure function — no mocks needed)
-// ═══════════════════════════════════════════════════════════════════════
 
-describe('detectEntityConflict()', () => {
-  it('detects merchant in description', () => {
-    (loadConfig as ReturnType<typeof vi.fn>).mockReturnValue({});
-    (extractComponents as ReturnType<typeof vi.fn>).mockReturnValue({
-      merchant: 'AMERICAN EXPRESS',
-      indnName: null,
-    });
-
-    const result = detectEntityConflict('AMERICAN EXPRESS payment', ['SOCIO PATTERN']);
-
-    expect(result.hasMerchant).toBe(true);
-    expect(result.hasSocioInIndn).toBe(false);
-    expect(result.merchantName).toBe('AMERICAN EXPRESS');
-  });
-
-  it('detects SOCIO in INDN', () => {
-    (loadConfig as ReturnType<typeof vi.fn>).mockReturnValue({});
-    (extractComponents as ReturnType<typeof vi.fn>).mockReturnValue({
-      merchant: null,
-      indnName: 'LAURA QUIJANO',
-    });
-
-    const result = detectEntityConflict('payment INDN:LAURA QUIJANO', ['laura quijano']);
-
-    expect(result.hasMerchant).toBe(false);
-    expect(result.hasSocioInIndn).toBe(true);
-    expect(result.socioIndnName).toBe('LAURA QUIJANO');
-  });
-
-  it('returns hasSocioInIndn false when known patterns do not match', () => {
-    (loadConfig as ReturnType<typeof vi.fn>).mockReturnValue({});
-    (extractComponents as ReturnType<typeof vi.fn>).mockReturnValue({
-      merchant: null,
-      indnName: 'MARIA GOMEZ',
-    });
-
-    const result = detectEntityConflict('payment INDN:MARIA GOMEZ', ['laura quijano', 'juan perez']);
-
-    expect(result.hasSocioInIndn).toBe(false);
-    expect(result.socioIndnName).toBe('MARIA GOMEZ');
-  });
-
-  it('returns empty conflict info when no merchant and no INDN', () => {
-    (loadConfig as ReturnType<typeof vi.fn>).mockReturnValue({});
-    (extractComponents as ReturnType<typeof vi.fn>).mockReturnValue({
-      merchant: null,
-      indnName: null,
-    });
-
-    const result = detectEntityConflict('plain description', []);
-
-    expect(result.hasMerchant).toBe(false);
-    expect(result.hasSocioInIndn).toBe(false);
-    expect(result.merchantName).toBeNull();
-    expect(result.socioIndnName).toBeNull();
-  });
-});
 
 // ═══════════════════════════════════════════════════════════════════════
 // getKnownSocioPatterns
@@ -410,6 +375,451 @@ describe('getKnownSocioPatterns()', () => {
     const result = await getKnownSocioPatterns('comp-1');
 
     expect(result).toEqual([]);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// computeDirectionProfile
+// ═══════════════════════════════════════════════════════════════════════
+
+describe('computeDirectionProfile()', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns "debit" when >80% transactions are debit (amount < 0)', async () => {
+    // 90% debit, 10% credit
+    const transactions = [
+      { amount: -100 },
+      { amount: -200 },
+      { amount: -150 },
+      { amount: -50 },
+      { amount: -75 },
+      { amount: -300 },
+      { amount: -250 },
+      { amount: -180 },
+      { amount: -90 },
+      { amount: 500 }, // 1 credit
+    ];
+    mockDb.bankTransaction.findMany.mockResolvedValue(transactions);
+
+    const result = await computeDirectionProfile('comp-1', 'ACME');
+
+    expect(result).toBe('debit');
+    expect(mockDb.bankTransaction.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          statement: { bankAccount: { companyId: 'comp-1' } },
+        }),
+        take: 200,
+      }),
+    );
+  });
+
+  it('returns "credit" when >80% transactions are credit (amount > 0)', async () => {
+    const transactions = [
+      { amount: 100 },
+      { amount: 200 },
+      { amount: 150 },
+      { amount: 50 },
+      { amount: 75 },
+      { amount: 300 },
+      { amount: 250 },
+      { amount: 180 },
+      { amount: 90 },
+      { amount: -500 }, // 1 debit
+    ];
+    mockDb.bankTransaction.findMany.mockResolvedValue(transactions);
+
+    const result = await computeDirectionProfile('comp-1', 'ACME');
+
+    expect(result).toBe('credit');
+  });
+
+  it('returns "any" when neither debit nor credit exceeds 80% threshold', async () => {
+    const transactions = [
+      { amount: -100 },
+      { amount: -200 },
+      { amount: -150 },
+      { amount: -50 },
+      { amount: 75 },
+      { amount: 300 },
+    ];
+    mockDb.bankTransaction.findMany.mockResolvedValue(transactions);
+
+    const result = await computeDirectionProfile('comp-1', 'ACME');
+
+    expect(result).toBe('any');
+  });
+
+  it('returns "any" when no transactions match the pattern', async () => {
+    mockDb.bankTransaction.findMany.mockResolvedValue([]);
+
+    const result = await computeDirectionProfile('comp-1', 'UNKNOWN');
+
+    expect(result).toBe('any');
+  });
+
+  it('skips zero-amount transactions in direction computation', async () => {
+    // 10 debit + 10 credit + 5 zero-amount → ratios based on 20 non-zero transactions
+    const transactions = [
+      ...Array.from({ length: 10 }, () => ({ amount: -100 })),
+      ...Array.from({ length: 10 }, () => ({ amount: 100 })),
+      ...Array.from({ length: 5 }, () => ({ amount: 0 })),
+    ];
+    mockDb.bankTransaction.findMany.mockResolvedValue(transactions);
+
+    const result = await computeDirectionProfile('comp-1', 'ACME');
+
+    // 50/50 split after skipping zeros
+    expect(result).toBe('any');
+  });
+
+  it('returns "any" when all transactions are zero-amount', async () => {
+    const transactions = [
+      { amount: 0 },
+      { amount: 0 },
+      { amount: 0 },
+    ];
+    mockDb.bankTransaction.findMany.mockResolvedValue(transactions);
+
+    const result = await computeDirectionProfile('comp-1', 'ACME');
+
+    expect(result).toBe('any');
+  });
+
+  it('computes correct ratio with mixed zero-amount and non-zero transactions', async () => {
+    // 9 debit, 1 credit, 5 zero-amount → ratio = 9/10 debit (0.9 > 0.8)
+    const transactions = [
+      ...Array.from({ length: 9 }, () => ({ amount: -100 })),
+      { amount: 100 },
+      { amount: 0 },
+      { amount: 0 },
+      { amount: 0 },
+    ];
+    mockDb.bankTransaction.findMany.mockResolvedValue(transactions);
+
+    const result = await computeDirectionProfile('comp-1', 'ACME');
+
+    expect(result).toBe('debit');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// autoCreateRule
+// ═══════════════════════════════════════════════════════════════════════
+
+describe('autoCreateRule()', () => {
+  const mockContext = { id: 'ctx-1', pattern: 'ACME', glAccountId: 'gl-001' };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('skips rule creation when an active rule with same entityContextId exists', async () => {
+    mockDb.bankRule.findFirst.mockResolvedValue({
+      id: 'rule-1',
+      entityContextId: 'ctx-1',
+      isActive: true,
+      pattern: 'ACME',
+      glAccountId: 'gl-001',
+    });
+
+    const result = await autoCreateRule('comp-1', mockContext, 'debit');
+
+    expect(result).toEqual({});
+    expect(mockDb.bankRule.create).not.toHaveBeenCalled();
+    expect(mockDb.bankRule.update).not.toHaveBeenCalled();
+  });
+
+  it('reactivates and updates an inactive rule with same entityContextId', async () => {
+    mockDb.bankRule.findFirst.mockResolvedValue({
+      id: 'rule-1',
+      entityContextId: 'ctx-1',
+      isActive: false,
+      pattern: 'OLD',
+      glAccountId: 'gl_old',
+    });
+
+    const result = await autoCreateRule('comp-1', mockContext, 'debit');
+
+    expect(result).toEqual({});
+    expect(mockDb.bankRule.update).toHaveBeenCalledWith({
+      where: { id: 'rule-1' },
+      data: expect.objectContaining({
+        isActive: true,
+        glAccountId: 'gl-001',
+        transactionDirection: 'debit',
+        conditionValue: 'acme',
+        conditionType: 'contains',
+      }),
+    });
+    expect(mockDb.bankRule.create).not.toHaveBeenCalled();
+  });
+
+  it('creates a new rule when no existing rule with entityContextId exists', async () => {
+    mockDb.bankRule.findFirst.mockResolvedValue(null);
+    mockDb.bankRule.create.mockResolvedValue({ id: 'new-rule-1' });
+
+    const result = await autoCreateRule('comp-1', mockContext, 'debit');
+
+    expect(result).toEqual({});
+    expect(mockDb.bankRule.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          companyId: 'comp-1',
+          conditionValue: 'acme',
+          conditionType: 'contains',
+          glAccountId: 'gl-001',
+          transactionDirection: 'debit',
+          priority: 5,
+          isActive: true,
+          entityContextId: 'ctx-1',
+        }),
+      }),
+    );
+  });
+
+  it('sets name to "Auto: {pattern}" on new rules', async () => {
+    mockDb.bankRule.findFirst.mockResolvedValue(null);
+    mockDb.bankRule.create.mockResolvedValue({ id: 'new-rule-1' });
+
+    await autoCreateRule('comp-1', { id: 'ctx-2', pattern: 'WAL-MART', glAccountId: 'gl-002' }, 'credit');
+
+    expect(mockDb.bankRule.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          name: 'Auto: WAL-MART',
+        }),
+      }),
+    );
+  });
+
+  it('returns warning when glAccountId is null and skips rule creation', async () => {
+    const result = await autoCreateRule('comp-1', { id: 'ctx-3', pattern: 'NOGL', glAccountId: null }, 'any');
+
+    expect(result).toEqual({ warning: 'No GL account linked — rule not created' });
+    expect(mockDb.bankRule.findFirst).not.toHaveBeenCalled();
+    expect(mockDb.bankRule.create).not.toHaveBeenCalled();
+  });
+
+  it('creates a new rule with intent when intent is provided', async () => {
+    mockDb.bankRule.findFirst.mockResolvedValue(null);
+    mockDb.bankRule.create.mockResolvedValue({ id: 'new-rule-1' });
+
+    await autoCreateRule('comp-1', mockContext, 'debit', 'RENT_PAYMENT');
+
+    expect(mockDb.bankRule.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          companyId: 'comp-1',
+          conditionValue: 'acme',
+          intent: 'RENT_PAYMENT',
+        }),
+      }),
+    );
+  });
+
+  it('creates a new rule with null intent when intent is not provided', async () => {
+    mockDb.bankRule.findFirst.mockResolvedValue(null);
+    mockDb.bankRule.create.mockResolvedValue({ id: 'new-rule-1' });
+
+    await autoCreateRule('comp-1', mockContext, 'debit');
+
+    expect(mockDb.bankRule.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          intent: null,
+        }),
+      }),
+    );
+  });
+
+  it('creates a new rule with null intent when intent is explicitly null', async () => {
+    mockDb.bankRule.findFirst.mockResolvedValue(null);
+    mockDb.bankRule.create.mockResolvedValue({ id: 'new-rule-1' });
+
+    await autoCreateRule('comp-1', mockContext, 'debit', null);
+
+    expect(mockDb.bankRule.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          intent: null,
+        }),
+      }),
+    );
+  });
+
+  it('updates intent on reactivated rule', async () => {
+    mockDb.bankRule.findFirst.mockResolvedValue({
+      id: 'rule-1',
+      entityContextId: 'ctx-1',
+      isActive: false,
+      pattern: 'OLD',
+      glAccountId: 'gl_old',
+    });
+    mockDb.bankRule.create.mockResolvedValue({ id: 'new-rule-1' });
+
+    await autoCreateRule('comp-1', mockContext, 'debit', 'LOAN_PAYMENT');
+
+    expect(mockDb.bankRule.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          intent: 'LOAN_PAYMENT',
+        }),
+      }),
+    );
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// classifyEntity — extended (auto-create side-effect)
+// ═══════════════════════════════════════════════════════════════════════
+
+describe('classifyEntity() — auto-create side-effect', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns { context, warning } when glAccountCode yields no match (GL not found)', async () => {
+    mockDb.glAccount.findFirst.mockResolvedValue(null);
+    (saveContext as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'ctx-no-gl', pattern: 'NOGL' });
+
+    const result =     await classifyEntity({
+      companyId: 'comp-1',
+      pattern: 'NOGL',
+      role: 'PROVEEDOR',
+      glAccountCode: '9999',
+      source: 'user',
+    });
+
+    expect(result.context).toBeDefined();
+    expect(result.context.id).toBe('ctx-no-gl');
+    expect(result.warning).toBe('No GL account linked — rule not created');
+  });
+
+  it('happy path: saves context and creates rule with correct direction & priority=5', async () => {
+    mockDb.glAccount.findFirst.mockResolvedValue({ id: 'gl-001', code: '4010' });
+    const savedCtx = { id: 'ctx-1', pattern: 'ACME', glAccountId: 'gl-001' } as EntityContext;
+    (saveContext as ReturnType<typeof vi.fn>).mockResolvedValue(savedCtx);
+    mockDb.bankTransaction.findMany.mockResolvedValue([
+      { amount: -100 },
+      { amount: -200 },
+      { amount: -150 },
+      { amount: -50 },
+      { amount: -75 },
+      { amount: -300 },
+      { amount: -250 },
+      { amount: -180 },
+      { amount: -90 },
+      { amount: 500 }, // 10% credit
+    ]);
+    mockDb.bankRule.findFirst.mockResolvedValue(null);
+    mockDb.bankRule.create.mockResolvedValue({ id: 'new-rule-1' });
+
+    const result = await classifyEntity({
+      companyId: 'comp-1',
+      pattern: 'ACME',
+      role: 'PROVEEDOR',
+      glAccountCode: '4010',
+      source: 'user',
+    });
+
+    expect(result.context.id).toBe('ctx-1');
+    expect(result.warning).toBeUndefined();
+    expect(mockDb.bankRule.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          companyId: 'comp-1',
+          conditionValue: 'acme',
+          conditionType: 'contains',
+          glAccountId: 'gl-001',
+          transactionDirection: 'debit',
+          priority: 5,
+          isActive: true,
+          entityContextId: 'ctx-1',
+        }),
+      }),
+    );
+  });
+
+  it('passes intent through to autoCreateRule when source is user', async () => {
+    mockDb.glAccount.findFirst.mockResolvedValue({ id: 'gl-001', code: '4010' });
+    const savedCtx = { id: 'ctx-1', pattern: 'ACME', glAccountId: 'gl-001' } as EntityContext;
+    (saveContext as ReturnType<typeof vi.fn>).mockResolvedValue(savedCtx);
+    mockDb.bankTransaction.findMany.mockResolvedValue([
+      { amount: -100 },
+      { amount: -200 },
+      { amount: -150 },
+    ]);
+    mockDb.bankRule.findFirst.mockResolvedValue(null);
+    mockDb.bankRule.create.mockResolvedValue({ id: 'new-rule-1' });
+
+    await classifyEntity({
+      companyId: 'comp-1',
+      pattern: 'ACME',
+      role: 'PROVEEDOR',
+      glAccountCode: '4010',
+      source: 'user',
+      intent: 'RENT_PAYMENT',
+    });
+
+    expect(mockDb.bankRule.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          intent: 'RENT_PAYMENT',
+        }),
+      }),
+    );
+  });
+
+  it('DOES NOT auto-create rule when source is "ai"', async () => {
+    mockDb.glAccount.findFirst.mockResolvedValue({ id: 'gl-001', code: '4010' });
+    const savedCtx = { id: 'ctx-1', pattern: 'ACME', glAccountId: 'gl-001' } as EntityContext;
+    (saveContext as ReturnType<typeof vi.fn>).mockResolvedValue(savedCtx);
+    mockDb.bankTransaction.findMany.mockResolvedValue([{ amount: -100 }]);
+    mockDb.bankRule.findFirst.mockResolvedValue(null);
+    mockDb.bankRule.create.mockResolvedValue({ id: 'new-rule-1' });
+
+    const result = await classifyEntity({
+      companyId: 'comp-1',
+      pattern: 'ACME',
+      role: 'PROVEEDOR',
+      glAccountCode: '4010',
+      source: 'ai',
+      intent: 'RENT_PAYMENT',
+    });
+
+    // Context should still be saved
+    expect(saveContext).toHaveBeenCalled();
+    // But no rule should be auto-created
+    expect(mockDb.bankRule.create).not.toHaveBeenCalled();
+    expect(mockDb.bankRule.update).not.toHaveBeenCalled();
+    // warning should be undefined (no autoCreateRule was called)
+    expect(result.warning).toBeUndefined();
+  });
+
+  it('DOES NOT auto-create rule when source is undefined', async () => {
+    mockDb.glAccount.findFirst.mockResolvedValue({ id: 'gl-001', code: '4010' });
+    const savedCtx = { id: 'ctx-1', pattern: 'ACME', glAccountId: 'gl-001' } as EntityContext;
+    (saveContext as ReturnType<typeof vi.fn>).mockResolvedValue(savedCtx);
+    mockDb.bankTransaction.findMany.mockResolvedValue([{ amount: -100 }]);
+    mockDb.bankRule.findFirst.mockResolvedValue(null);
+    mockDb.bankRule.create.mockResolvedValue({ id: 'new-rule-1' });
+
+    await classifyEntity({
+      companyId: 'comp-1',
+      pattern: 'ACME',
+      role: 'PROVEEDOR',
+      glAccountCode: '4010',
+      // source intentionally omitted
+    });
+
+    // Context should still be saved (defaults to 'user' for saveContext)
+    expect(saveContext).toHaveBeenCalled();
+    // saveContext gets source: 'user' default, but classifyEntity's source guard
+    // checks input.source directly — since it's undefined, autoCreateRule is NOT called
+    expect(mockDb.bankRule.create).not.toHaveBeenCalled();
   });
 });
 

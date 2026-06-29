@@ -283,6 +283,18 @@ export const PUT = apiHandler(async (request: NextRequest, context: RouteContext
   if (priority !== undefined) updateData.priority = Math.round(priority);
   if (isActive !== undefined) updateData.isActive = Boolean(isActive);
 
+  // ─── Manual edit detection ────────────────────────────────────────
+  // Any field change besides isActive flips isManuallyEdited=true
+  const nonIsActiveFields = ['name', 'conditionType', 'conditionValue', 'transactionDirection',
+    'glAccountId', 'conditions', 'debitGlAccountId', 'creditGlAccountId', 'priority'];
+  const hasNonIsActiveChange = nonIsActiveFields.some(
+    (f) => body[f] !== undefined && String(body[f]) !== String((existing as Record<string, unknown>)[f]),
+  );
+  if (hasNonIsActiveChange) {
+    updateData.isManuallyEdited = true;
+  }
+  // ──────────────────────────────────────────────────────────────────
+
   const rule = await db.bankRule.update({
     where: { id },
     data: updateData,

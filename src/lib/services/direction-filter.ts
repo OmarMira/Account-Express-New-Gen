@@ -8,7 +8,7 @@ import type { EntityRole } from '@/lib/constants/entity-roles';
  */
 export const DIRECTION_THRESHOLD = 0.8;
 
-type DirectionProfile = 'credit' | 'debit' | 'ambas';
+export type DirectionProfile = 'credit' | 'debit' | 'ambas';
 
 /**
  * Roles that bypass direction filtering entirely.
@@ -19,7 +19,7 @@ const BYPASS_ROLES = new Set<EntityRole>(['SOCIO', 'OTRO', 'IGNORADA']);
 /**
  * Classify a direction profile into one of three categories.
  */
-function classifyDirection(profile: { creditPct: number; debitPct: number }): DirectionProfile {
+export function classifyDirection(profile: { creditPct: number; debitPct: number }): DirectionProfile {
   if (profile.creditPct >= DIRECTION_THRESHOLD) return 'credit';
   if (profile.debitPct >= DIRECTION_THRESHOLD) return 'debit';
   return 'ambas';

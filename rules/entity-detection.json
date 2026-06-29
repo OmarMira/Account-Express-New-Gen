@@ -71,7 +71,7 @@
   "validation": {
     "description": "Umbrales para decidir si una entidad merece ser preguntada al usuario.",
     "minOccurrences": 2,
-    "directionLockThreshold": 0.90,
+
     "ignorePatterns": [
       "CASH",
       "CHECK",

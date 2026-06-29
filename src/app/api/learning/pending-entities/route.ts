@@ -9,7 +9,7 @@ export const GET = apiHandler(async (request: NextRequest, context: RouteContext
   const { userId, companyId } = requireCompanyContext();
 
   try {
-    // Cargar transacciones no reconciliadas ni imputadas
+    // Load un-reconciled, un-imputed transactions
     const transactions = await db.bankTransaction.findMany({
       where: {
         statement: {
@@ -36,19 +36,45 @@ export const GET = apiHandler(async (request: NextRequest, context: RouteContext
     const config = loadConfig();
     const candidates = clusterCandidates(rawTransactions, config);
 
-    // ── Filter out entities that already have a bank rule ──────────
-    const existingRules = await db.bankRule.findMany({
-      where: { companyId, isActive: true },
-      select: { conditionValue: true },
+    // ── FK-based coverage detection ──────────────────────────────────
+    // Load EntityContexts to map canonical names to context IDs.
+    // Then check which EntityContexts have active FK-linked BankRules.
+    const entityContexts = await db.entityContext.findMany({
+      where: { companyId },
+      select: { id: true, pattern: true },
     });
-    const ruleValues = existingRules.map((r) => r.conditionValue.toLowerCase());
 
-    const pending = candidates.filter(
-      (c) => !ruleValues.some((rv) => rv.includes(c.canonicalName.toLowerCase())),
+    // Build candidate name → EntityContext.id map
+    const contextByPattern = new Map<string, string>(
+      entityContexts.map((ctx) => [ctx.pattern.toLowerCase(), ctx.id]),
     );
 
-    // Ordenar por número de ocurrencias desc
-    const sorted = [...pending].sort((a, b) => b.occurrences - a.occurrences);
+    // Active BankRules with non-null entityContextId tell us which
+    // entities already have rules pointing to them.
+    const activeLinkedRules = await db.bankRule.findMany({
+      where: {
+        companyId,
+        isActive: true,
+        entityContextId: { not: null },
+      },
+      select: { entityContextId: true },
+    });
+
+    const coveredContextIds = new Set<string>(
+      activeLinkedRules.map((r) => r.entityContextId).filter(Boolean) as string[],
+    );
+
+    // Mark coverage without filtering — ALL entities remain visible
+    const candidatesWithCoverage = candidates.map((c) => {
+      const contextId = contextByPattern.get(c.canonicalName.toLowerCase());
+      return {
+        ...c,
+        isCovered: contextId ? coveredContextIds.has(contextId) : false,
+      };
+    });
+
+    // Sort by occurrences descending
+    const sorted = candidatesWithCoverage.sort((a, b) => b.occurrences - a.occurrences);
 
     return NextResponse.json({ success: true, candidates: sorted });
   } catch (error: unknown) {

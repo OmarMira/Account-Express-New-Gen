@@ -1,0 +1,5 @@
+-- CreateEnum
+CREATE TYPE "TransactionIntent" AS ENUM ('LOAN_PAYMENT', 'RENT_PAYMENT', 'OPERATING_EXPENSE', 'OWNER_CONTRIBUTION', 'CUSTOMER_PAYMENT', 'TRANSFER', 'TAX_PAYMENT', 'OTHER');
+
+-- AlterTable
+ALTER TABLE "BankRule" ADD COLUMN "intent" "TransactionIntent";

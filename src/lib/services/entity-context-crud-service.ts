@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { db } from '@/lib/db';
+import { createAuditLogWithRetry } from '@/lib/audit';
 import type { PaginatedResult, UpdateEntityInput, BulkDeleteInput, EntityContextWithGlAccount } from '@/lib/types/entity-context';
 
 export async function listEntityContexts(
@@ -101,13 +102,54 @@ export async function removeEntityContext(companyId: string, id: string): Promis
     return false;
   }
 
+  // Nullify FK on linked bank rules before delete
+  const linkedRules = await db.bankRule.findMany({
+    where: { entityContextId: id },
+    select: { id: true, name: true },
+  });
+
+  if (linkedRules.length > 0) {
+    await db.bankRule.updateMany({
+      where: { entityContextId: id },
+      data: { entityContextId: null },
+    });
+  }
+
   await db.entityContext.delete({ where: { id } });
+
+  // Audit log for affected rules
+  if (linkedRules.length > 0) {
+    await createAuditLogWithRetry({
+      companyId,
+      action: 'ENTITY_CONTEXT_DELETED',
+      entity: 'EntityContext',
+      entityId: id,
+      details: JSON.stringify({
+        affectedRuleIds: linkedRules.map((r) => r.id),
+        affectedRuleNames: linkedRules.map((r) => r.name),
+      }),
+    });
+  }
+
   return true;
 }
 
 export async function bulkRemoveEntityContexts(companyId: string, ids: string[]): Promise<number> {
   if (ids.length === 0) {
     throw new Error('EMPTY_IDS');
+  }
+
+  // Nullify FK on all linked bank rules before bulk delete
+  const affectedRules = await db.bankRule.findMany({
+    where: { entityContextId: { in: ids }, companyId },
+    select: { id: true, name: true },
+  });
+
+  if (affectedRules.length > 0) {
+    await db.bankRule.updateMany({
+      where: { entityContextId: { in: ids } },
+      data: { entityContextId: null },
+    });
   }
 
   // Only delete entities belonging to the company
@@ -117,6 +159,20 @@ export async function bulkRemoveEntityContexts(companyId: string, ids: string[])
       companyId,
     },
   });
+
+  // Single audit event for all affected rules
+  if (affectedRules.length > 0) {
+    await createAuditLogWithRetry({
+      companyId,
+      action: 'ENTITY_CONTEXTS_BULK_DELETED',
+      entity: 'EntityContext',
+      details: JSON.stringify({
+        deletedCount: result.count,
+        affectedRuleIds: affectedRules.map((r) => r.id),
+        affectedRuleNames: affectedRules.map((r) => r.name),
+      }),
+    });
+  }
 
   return result.count;
 }

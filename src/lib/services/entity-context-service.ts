@@ -2,8 +2,30 @@ import { db } from '@/lib/db';
 import { entityContextSchema } from '@/lib/validations/entity-context';
 import { normalizePattern } from '@/lib/services/pattern-normalizer';
 
+/**
+ * Strips common bank transaction prefixes from a pattern string.
+ * This is caller-specific pre-processing — normalizes raw user-provided
+ * patterns before canonical normalizePattern() is applied.
+ */
+function stripTransactionPrefixes(s: string): string {
+  let cleaned = s.trim();
+  // English patterns
+  cleaned = cleaned.replace(/^(zelle\s+)?(payment|transfer|deposit|check|withdrawal)\s+(to|from)\s+/gi, '');
+  cleaned = cleaned.replace(/^zelle\s+(to|from)\s+/gi, '');
+  // Spanish patterns
+  cleaned = cleaned.replace(/^(pago\s+)?zelle\s+(a|de)\s+/gi, '');
+  cleaned = cleaned.replace(/^(transferencia|cheque|retiro|depósito)\s+(a|de)\s+/gi, '');
+  // Bank metadata prefixes
+  cleaned = cleaned.replace(/des:[\w\s.-]+id:[\w-]+(indn:)?/gi, '');
+  cleaned = cleaned.replace(/indn:/gi, '');
+  // Common email/phone descriptors
+  cleaned = cleaned.replace(/\s+conf#\s*[\w\d]+/gi, '');
+  cleaned = cleaned.replace(/\s+for\s+"[^"]+"/g, '');
+  return cleaned.trim();
+}
+
 export async function findContext(companyId: string, description: string) {
-  const normalized = normalizePattern(description);
+  const normalized = normalizePattern(stripTransactionPrefixes(description));
   const contexts = await db.entityContext.findMany({
     where: { companyId },
     include: { glAccount: true },
@@ -22,7 +44,7 @@ export async function saveContext(data: {
   transactionDirection?: string | null;
   userDescription?: string | null;
 }) {
-  const normalized = normalizePattern(data.pattern);
+  const normalized = normalizePattern(stripTransactionPrefixes(data.pattern));
   const validated = entityContextSchema.parse({
     companyId: data.companyId,
     pattern: normalized,

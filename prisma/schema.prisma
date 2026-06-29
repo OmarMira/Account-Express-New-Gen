@@ -7,6 +7,17 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum TransactionIntent {
+  LOAN_PAYMENT
+  RENT_PAYMENT
+  OPERATING_EXPENSE
+  OWNER_CONTRIBUTION
+  CUSTOMER_PAYMENT
+  TRANSFER
+  TAX_PAYMENT
+  OTHER
+}
+
 model User {
   id                    String                 @id @default(cuid())
   email                 String                 @unique
@@ -61,6 +72,7 @@ model Company {
   journalEntries        JournalEntry[]
   reconciliationPeriods ReconciliationPeriod[]
   systemMemories        SystemMemory[]
+  detectionConfig       DetectionConfig?
 }
 
 model CompanyMember {
@@ -220,11 +232,15 @@ model BankRule {
   creditGlAccountId    String?
   priority             Int               @default(10)
   isActive             Boolean           @default(true)
+  entityContextId      String?
+  isManuallyEdited     Boolean           @default(false)
+  intent               TransactionIntent?
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
   creditGlAccount      GlAccount?        @relation("CreditRuleGlAccount", fields: [creditGlAccountId], references: [id], onDelete: SetNull)
   debitGlAccount       GlAccount?        @relation("DebitRuleGlAccount", fields: [debitGlAccountId], references: [id], onDelete: SetNull)
   glAccount            GlAccount?        @relation("LegacyRuleGlAccount", fields: [glAccountId], references: [id], onDelete: SetNull)
+  entityContext        EntityContext?    @relation(fields: [entityContextId], references: [id], onDelete: SetNull)
   company              Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
   transactions         BankTransaction[]
 
@@ -321,6 +337,7 @@ model EntityContext {
   updatedAt            DateTime   @updatedAt
   glAccount            GlAccount? @relation(fields: [glAccountId], references: [id], onDelete: SetNull)
   company              Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  bankRules            BankRule[]
 
   @@unique([companyId, pattern])
   @@index([companyId])
@@ -381,4 +398,14 @@ model SystemConfig {
   updatedAt DateTime @updatedAt
 
   @@index([key])
+}
+
+model DetectionConfig {
+  companyId      String   @id
+  threshold      Float?
+  clusterMode    String?
+  minOccurrences Int?
+  updatedAt      DateTime @updatedAt
+  updatedBy      String?
+  company        Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
 }

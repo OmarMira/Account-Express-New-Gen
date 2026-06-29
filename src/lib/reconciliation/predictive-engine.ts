@@ -1,22 +1,7 @@
 import { db } from '@/lib/db';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-
-// Levenshtein distance optimizado (cero deps)
-function levenshtein(a: string, b: string): number {
-  const m = a.length,
-    n = b.length;
-  const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
-  for (let i = 0; i <= m; i++) dp[i][0] = i;
-  for (let j = 0; j <= n; j++) dp[0][j] = j;
-  for (let i = 1; i <= m; i++)
-    for (let j = 1; j <= n; j++)
-      dp[i][j] =
-        a[i - 1] === b[j - 1]
-          ? dp[i - 1][j - 1]
-          : Math.min(dp[i - 1][j - 1], dp[i][j - 1], dp[i - 1][j]) + 1;
-  return dp[m][n];
-}
+import { jaroWinkler } from '@/lib/utils/string-similarity';
 
 export type PredictiveSuggestion = {
   bankTxId: string;
@@ -75,11 +60,10 @@ export async function generateSuggestions(
       const dayDiff = Math.abs(tx.date.getTime() - entry.date.getTime()) / 86400000;
       const dateScore = Math.max(0, 1 - dayDiff / dateWindowDays);
 
-      // c) Score Descripción (Levenshtein simplificado)
+      // c) Score Descripción (Jaro-Winkler)
       const desc1 = (tx.description || '').toLowerCase();
       const desc2 = (entry.description || '').toLowerCase();
-      const maxLen = Math.max(desc1.length, desc2.length);
-      const textScore = maxLen === 0 ? 1 : 1 - levenshtein(desc1, desc2) / maxLen;
+      const textScore = jaroWinkler(desc1, desc2);
 
       // d) Score Histórico
       const historyScore = 0.5;

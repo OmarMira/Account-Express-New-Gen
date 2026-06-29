@@ -74,6 +74,53 @@ EntityManagementPage MUST display an "Add Entity" button. Clicking it MUST open 
 - WHEN the form validates
 - THEN submit MUST be blocked and inline errors indicate which fields are required
 
+### Requirement: Actor Type and Transaction Intent in Entity Onboarding
+
+EntityOnboardingModal MUST show the entity's Actor Type (from entity-roles / EXPECTED_DIRECTION) as a read-only contextual label, and MUST include a TransactionIntent dropdown with bilingual labels (EN/ES) for optional intent selection.
+
+#### Scenario: Actor Type shown as read-only label
+
+- GIVEN an entity candidate with role `INQUILINO` (via dropdown selection)
+- WHEN the EntityOnboardingModal renders
+- THEN the entity card shows a read-only label/badge displaying `INQUILINO` (the Actor Type)
+- AND the label is visually distinct from editable controls (e.g., muted background, no border, no hover effect)
+- AND the label updates automatically when the user changes the role selection
+- AND when no role is yet selected, no Actor Type label is shown
+
+#### Scenario: Direction hint below badge
+
+- GIVEN an entity candidate with role `INQUILINO`
+- WHEN the Actor Type badge renders
+- THEN a direction hint is shown below the badge (e.g., "Expected: Income" or "Expected: Expense") derived from `EXPECTED_DIRECTION`
+- AND when a role has mixed direction or no expected direction, no hint is shown
+- AND no hint is shown for OTRO or IGNORADA roles
+
+#### Scenario: Intent dropdown present and bilingual
+
+- GIVEN the EntityOnboardingModal is open with at least one entity candidate
+- WHEN the user scrolls to an entity card
+- THEN there is a `<Select>` or equivalent dropdown labeled with the i18n key `learning.intentLabel`
+- AND the dropdown contains one option per TransactionIntent value
+- AND each option displays the bilingual label according to the current locale (e.g., "Rent Payment" in EN, "Pago de Renta" in ES)
+- AND the first option is an empty/unset placeholder (e.g., `learning.intentPlaceholder`)
+- AND the Select component uses the same pattern as the existing role `<Select>` (shadcn/ui Select)
+
+#### Scenario: Intent selection is optional
+
+- GIVEN the intent dropdown
+- WHEN the user does not select any intent value (remains unset/placeholder)
+- THEN the entity can still be classified and saved without intent
+- AND the auto-created rule (via autoCreateRule) has `intent = null`
+- AND the UI does not block or warn about the missing intent
+
+#### Scenario: Intent propagated to autoCreateRule
+
+- GIVEN the user selects an intent (e.g., `RENT_PAYMENT`) in the dropdown
+- WHEN they proceed to classify the entity (via Pre-classify or Classify All)
+- THEN the `classify-entity` API call includes the selected intent
+- AND `autoCreateRule()` creates the BankRule with `intent = "RENT_PAYMENT"`
+- AND the saved entity reflects the intent selection in subsequent views
+
 ### Requirement: Manual Entity Creation (API)
 
 POST `/api/learning/entities` MUST accept `{ pattern: string, role: string, glAccountId?: string }`. The endpoint MUST validate `role` against `ENTITY_ROLES` via the Zod schema. If a record with the same `pattern` and `companyId` already exists, the endpoint MUST return HTTP 409. On success, it MUST create an EntityContext record and return it as JSON with status 201.
@@ -183,6 +230,32 @@ When the user selects OTRO in EntityOnboardingModal, a free-text input appears (
 - WHEN POST /api/learning/suggest-role
 - THEN response `{ suggestedRole: "INQUILINO", confidence: 0.92, explanation: "Cobro recurrente de alquiler" }`
 
+#### Scenario: Server-side confidence capping at 0.69
+
+- GIVEN the `/api/learning/suggest-role` endpoint
+- WHEN the LLM returns a suggestion with confidence ≥ 0.7 (e.g., 0.92)
+- THEN the response `confidence` field is capped to `0.69`
+- AND the HTTP response body contains `"confidence": 0.69`
+- AND the original confidence value from the LLM is discarded (not exposed to the client)
+- AND when the LLM returns confidence < 0.7 (e.g., 0.45), the value is preserved as-is
+
+#### Scenario: Apply All excludes LOW confidence
+
+- GIVEN the Apply All endpoint for the suggestion/learning flow (not the deterministic rule matcher)
+- WHEN processing candidate suggestions
+- THEN any item with `confidence < 0.7` is skipped
+- AND the response summary reports the count of skipped items
+- AND no BankRule is created or modified for skipped items
+- AND the deterministic Apply All path (rule-matching-engine) is untouched — it has no confidence field
+
+#### Scenario: Frontend LOW confidence indicator
+
+- GIVEN a batch result banner with `confidence < 0.7`
+- WHEN the banner renders
+- THEN the confidence text uses muted/warning styling (e.g., `text-yellow-600`)
+- AND the label shows "Low confidence: {percent}%" instead of "Confidence: {percent}%"
+- AND the Accept button is still available (user can still manually confirm)
+
 #### Scenario: Assign sets canonical role
 
 - GIVEN user types "cobra alquiler" and toast suggests INQUILINO
@@ -192,18 +265,18 @@ When the user selects OTRO in EntityOnboardingModal, a free-text input appears (
 
 ### Requirement: Direction Mismatch Warning
 
-On role assignment (create or edit), the system MUST call `checkRoleDirectionMismatch()`. On mismatch, display a non-blocking yellow banner. The user may override via an explicitly labeled button. SOCIO (expectedDirection: mixed) MUST bypass the warning regardless of direction profile. Override events MUST be logged server-side.
+On role assignment (create or edit), the system MUST call `roleIsValidForDirection()` (canonical validator from `direction-filter.ts`). On mismatch (`{ valid: false }`), display a non-blocking yellow banner. The user may override via an explicitly labeled button. SOCIO (expectedDirection: mixed) MUST bypass the warning regardless of direction profile. Override events MUST be logged server-side.
 
 #### Scenario: Warning shown for mismatch
 
 - GIVEN user assigns CLIENTE to an entity with 100% debits
-- WHEN checkRoleDirectionMismatch returns mismatched=true
+- WHEN roleIsValidForDirection returns `{ valid: false, reason: "..." }`
 - THEN yellow banner is displayed and user must confirm override
 
 #### Scenario: SOCIO bypasses warning
 
 - GIVEN user assigns SOCIO to entity with any direction profile
-- WHEN checkRoleDirectionMismatch returns mismatched=false
+- WHEN roleIsValidForDirection returns `{ valid: true }`
 - THEN no warning shown
 
 #### Scenario: Warning logged on override
@@ -234,3 +307,148 @@ In EntityOnboardingModal, when a candidate has `creditPct >= 0.15 && debitPct >=
 - WHEN user splits keeping credits
 - THEN EntityContext `{ pattern: "OMAR MIRA - ingresos", transactionDirection: "credit" }` is created
 - AND debit transactions stay unclassified
+
+#### Scenario: Split suggestion includes reasoning
+
+- GIVEN an unmatched transaction is processed by the suggestion/detection flow
+- WHEN the system identifies a candidate for a new rule or split
+- THEN the suggestion card includes the proposed intent, GL account, direction, and entity pattern
+- AND the card includes a brief explanation of why no existing rule matched (e.g., "No rule matching pattern 'JOHN DOE' found")
+- AND the card displays "Confirm" and "Dismiss" buttons
+- AND no automatic rule creation occurs until the user clicks confirm
+
+#### Scenario: Split entity requires confirmation before rule creation
+
+- GIVEN a confirmation card is shown to the user with split suggestions
+- WHEN the user closes the modal or navigates away without clicking "Confirm"
+- THEN no BankRule is created
+- AND no side-effect mutations occur in the database
+- AND the unmatched transaction remains unmatched
+
+#### Scenario: Each split entity has independent intent
+
+- GIVEN a mixed-direction entity being split into credit-only and debit-only
+- WHEN the split entity cards are rendered
+- THEN each card has its own intent dropdown
+- AND the intent on one card can differ from the other
+- AND each split entity separately requires confirmation before rule creation
+
+### Requirement: Auto-Create BankRule on Classification
+
+After `classifyEntity()` saves the EntityContext, it MUST auto-create a BankRule with:
+- `pattern`, `glAccountId` from classification result
+- `transactionDirection` inferred from `directionProfile` using the canonical `classifyDirection()` (`>= 0.8` threshold → `debit`/`credit`, else `any`)
+- `priority=5`, `isActive=true`, `entityContextId` set to the new EntityContext id
+
+#### Scenario: Classification creates BankRule with inferred direction
+
+- GIVEN `classifyEntity()` returns `{ pattern: "ACME", glAccountId: "gl_001", directionProfile: { debitPct: 0.9, creditPct: 0.1 } }`
+- WHEN auto-create runs after `saveEntityContext`
+- THEN a BankRule is created with `pattern="ACME"`, `glAccountId="gl_001"`, `transactionDirection="debit"`, `entityContextId` set, `priority=5`, `isActive=true`
+
+#### Scenario: Direction inference — credit dominant
+
+- GIVEN `directionProfile` `debitPct=0.1, creditPct=0.9`
+- WHEN auto-create computes direction
+- THEN `transactionDirection = "credit"`
+
+#### Scenario: Direction inference — mixed
+
+- GIVEN `directionProfile` `debitPct=0.6, creditPct=0.4`
+- WHEN auto-create computes direction
+- THEN `transactionDirection = "any"`
+
+#### Scenario: GL account not found during auto-create — classification persists, warning returned
+
+- GIVEN `classifyEntity()` saves EntityContext first, THEN attempts auto-create with `glAccountId="gl_missing"`
+- WHEN `gl_missing` does not exist in the database
+- THEN the EntityContext IS persisted (no rollback)
+- AND no BankRule is created
+- AND the API response includes a `warning` field (not an error) informing that the rule was not created due to missing GL account
+
+#### Scenario: Active rule with same `entityContextId` → skip
+
+- GIVEN an active BankRule with `entityContextId="ctx_1"` exists
+- WHEN `classifyEntity()` for the same context triggers auto-create
+- THEN no new rule is created and the existing rule is unchanged
+
+#### Scenario: Inactive rule with same `entityContextId` → reactivate + update
+
+- GIVEN an inactive BankRule with `entityContextId="ctx_1"`, `pattern="OLD"`, `glAccountId="gl_old"`
+- WHEN `classifyEntity()` for context `"ctx_1"` returns `pattern="NEW"`, `glAccountId="gl_new"`
+- THEN the existing rule is set to `isActive=true`, `pattern="NEW"`, `glAccountId="gl_new"`
+
+#### Scenario: Manual rule with same pattern — no dedup by pattern (design decision)
+
+- GIVEN a manual BankRule with `entityContextId=null`, `pattern="ACME"`, `isManuallyEdited=true`
+- WHEN `classifyEntity()` returns `pattern="ACME"` for a new context `"ctx_new"`
+- THEN the manual rule is NOT modified
+- AND a new BankRule is created with `pattern="ACME"`, `entityContextId="ctx_new"` (dedup is by `entityContextId`, not pattern)
+
+#### Scenario: autoCreateRule includes intent value
+
+- GIVEN `autoCreateRule()` in `entity-classifier.ts` creates a new BankRule
+- WHEN the caller provides an intent value
+- THEN the new BankRule record includes the intent value
+- AND when no intent is provided, the rule is created with `intent = null`
+- AND the intent field does not affect the matching engine behavior
+
+#### Scenario: Source guard blocks autoCreateRule for AI suggestions
+
+- GIVEN an LLM-suggested role response with `confidence: 0.69`
+- WHEN the suggestion is presented to the user via the batch result banner
+- THEN no automatic call to `autoCreateRule()` occurs
+- AND the user must explicitly click "Accept" / "Confirm" before the rule is created
+- AND `classifyEntity()` only invokes `autoCreateRule()` when the source is `user`, not `ai`
+- AND when `source === 'user'`: `autoCreateRule()` is called with intent (pass-through)
+- AND when `source === 'ai'` or `source` is undefined/null: `autoCreateRule()` is NOT called
+- AND the entity context is still saved regardless of source
+
+### Requirement: Pending Entities Filter via FK
+
+The pending entities endpoint `GET /api/learning/pending-entities` MUST filter entities using the `entityContextId` foreign key on `BankRule` instead of pattern-matching against `BankRule.conditionValue`. An entity is considered **covered** when there is an active BankRule with `entityContextId` pointing to that entity's `EntityContext.id`.
+
+Covered entities MUST display a badge `"Ya cubierta"` in the UI. No entity MAY be hidden from the pending list — recall MUST be preferred over precision (all entities always visible, covered ones get the badge).
+
+An entity whose only matching rule is inactive (`isActive=false`) MUST be treated as **actionable** (not covered). Manually created rules with `entityContextId=null` do NOT count as covering any entity.
+
+#### Scenario: Entity with active rule shows with badge
+
+- GIVEN an EntityContext "ctx_1" with pattern "ACME CORP"
+- AND an active BankRule with `entityContextId="ctx_1"`
+- WHEN `GET /api/learning/pending-entities` is called for the company
+- THEN "ctx_1" appears in the response
+- AND the response includes `covered: true`
+- AND the UI renders a `"Ya cubierta"` badge
+
+#### Scenario: Entity without rule shows as actionable
+
+- GIVEN an EntityContext "ctx_2" with pattern "UNKNOWN VENDOR"
+- AND no BankRule has `entityContextId="ctx_2"`
+- WHEN the pending entities endpoint is called
+- THEN "ctx_2" appears in the response
+- AND `covered: false`
+- AND the UI does NOT show a badge
+
+#### Scenario: Entity with inactive rule shows as actionable
+
+- GIVEN an EntityContext "ctx_3" with pattern "OLD ENTITY"
+- AND a BankRule with `entityContextId="ctx_3"`, `isActive=false`
+- WHEN the pending entities endpoint is called
+- THEN "ctx_3" appears with `covered: false`
+- AND the entity is available for re-classification
+
+#### Scenario: No entity is hidden
+
+- GIVEN a company with 50 pending entities, 15 of which have active rules
+- WHEN the pending entities endpoint is called
+- THEN the response contains all 50 entities
+- AND exactly 15 have `covered: true`
+- AND the remaining 35 have `covered: false`
+
+#### Scenario: Manual rule with null entityContextId does not cover any entity
+
+- GIVEN a manually created BankRule with `entityContextId=null`, `pattern="ACME"`
+- AND no other rule references any entity with pattern "ACME"
+- WHEN the pending entities endpoint is called
+- THEN no entity is marked as covered for pattern "ACME"

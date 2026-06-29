@@ -83,7 +83,7 @@ vi.mock('fs', () => {
 
 // ─── Mock pattern-normalizer ───────────────────────────────────────────────────
 vi.mock('@/lib/services/pattern-normalizer', () => ({
-  sanitizeDescriptionForAdaptive: vi.fn((desc: string, _config: any) => {
+  normalizePattern: vi.fn((desc: string) => {
     return desc.toLowerCase().replace(/^(zelle\s+)?(payment|transfer)\s+(to|from)\s+/gi, '').trim();
   }),
 }));

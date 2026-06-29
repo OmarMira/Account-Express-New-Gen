@@ -1,11 +1,12 @@
 import { normalizePattern } from '@/lib/services/pattern-normalizer';
-import { loadConfig, extractComponents } from '@/lib/services/entity-detector';
+import { detectConflictSync } from '@/lib/services/entity-conflict-detector';
 import type { EntityCandidate } from '@/lib/services/entity-detector';
 import type { EntityContextWithGlAccount } from '@/lib/types/entity-context';
-import { ENTITY_ROLES, EXPECTED_DIRECTION, type EntityRole } from '@/lib/constants/entity-roles';
 import { ROLE_ACCOUNT_MAP } from '@/lib/constants/role-account-map';
+import type { EntityRole } from '@/lib/constants/entity-roles';
 import { toConfidenceLabel } from '@/lib/types/reasoning';
 import { serverT } from '@/lib/server-i18n';
+import { roleIsValidForDirection } from '@/lib/services/direction-filter';
 
 // ========== TYPES ==========
 
@@ -19,6 +20,8 @@ export interface EnrichmentInput {
   }>;
   rolePriorities?: Record<string, number>;
   knownSocioPatterns?: string[];
+  /** I9 fix: when true, entity-context (SOCIO) takes precedence over merchant on conflict */
+  entityFirstMode?: boolean;
   existingRules?: Array<{
     conditionValue: string | null;
     conditionType: string | null;
@@ -84,8 +87,14 @@ export function resolveContextRole(
   });
 
   // SOCIO conflict detection: exclude SOCIO contexts when merchant + SOCIO INDN conflict
-  if (input.knownSocioPatterns?.length && hasSocioConflict(description, input.knownSocioPatterns)) {
-    matchingContexts = matchingContexts.filter((ctx) => ctx.role.toUpperCase() !== 'SOCIO');
+  // I9 fix: old hasSocioConflict() ignored entityFirstMode — now we check it.
+  // When entityFirstMode=true, SOCIO wins (don't exclude). When false, merchant wins (exclude SOCIO).
+  if (input.knownSocioPatterns?.length) {
+    const syncResult = detectConflictSync(description, input.knownSocioPatterns, input.entityFirstMode ?? false);
+    if (syncResult.conflict && !syncResult.socioWins) {
+      // entityFirstMode is false (or not set) → rule-first → merchant wins → exclude SOCIO
+      matchingContexts = matchingContexts.filter((ctx) => ctx.role.toUpperCase() !== 'SOCIO');
+    }
   }
 
   if (matchingContexts.length === 0) return null;
@@ -98,28 +107,6 @@ export function resolveContextRole(
     const prioB = priorities[b.role.toUpperCase()] ?? 99;
     return prioA - prioB;
   })[0];
-}
-
-/**
- * Detect SOCIO conflict: merchant at P1 + SOCIO name at P3/INDN.
- * When both are present, the merchant is the entity, not the SOCIO.
- */
-function hasSocioConflict(
-  description: string,
-  knownSocioPatterns: string[],
-): boolean {
-  if (!knownSocioPatterns?.length) return false;
-
-  const config = loadConfig();
-  const components = extractComponents(description, config);
-
-  if (components.merchant && components.indnName) {
-    return knownSocioPatterns.some((p) =>
-      components.indnName!.toLowerCase().includes(p.toLowerCase()),
-    );
-  }
-
-  return false;
 }
 
 // ========== T5b: SUGGEST GL ACCOUNT ==========
@@ -173,9 +160,9 @@ export function suggestGlAccount(
   return null;
 }
 
-// ========== T5c: RESOLVE DIRECTION ==========
+// ========== T5c: MAJORITY DIRECTION ==========
 
-export function resolveDirection(
+export function majorityDirection(
   candidate: EntityCandidate,
 ): 'debit' | 'credit' | null {
   const { creditPct, debitPct } = candidate.directionProfile;
@@ -185,44 +172,7 @@ export function resolveDirection(
   return null;
 }
 
-// ========== DIRECTION MISMATCH CHECK ==========
 
-/**
- * Check if a role's expected transaction direction conflicts with the actual
- * direction profile of an entity candidate.
- *
- * - OTRO / IGNORADA (expectedDirection = null) → no warning
- * - SOCIO (expectedDirection = 'mixed') → no warning
- * - CLIENTE / INGRESO / INQUILINO (expected = 'credit') with debitPct > 0.5 → warning
- * - PROVEEDOR / EMPLEADO / GASTO_OPERATIVO / TARJETA_CREDITO / PRESTAMO (expected = 'debit') with creditPct > 0.5 → warning
- *
- * @returns `{ warning: string }` when a mismatch is detected, otherwise `null`.
- */
-export function checkRoleDirectionMismatch(
-  role: string,
-  debitPct: number,
-  creditPct: number,
-): { warning: string } | null {
-  const upperRole = role.toUpperCase();
-
-  // Only check canonical roles
-  if (!ENTITY_ROLES.includes(upperRole as EntityRole)) return null;
-
-  const expectedDirection = EXPECTED_DIRECTION[upperRole as EntityRole];
-
-  // OTRO / IGNORADA (null) and SOCIO (mixed) never warn
-  if (expectedDirection === null || expectedDirection === 'mixed') return null;
-
-  if (expectedDirection === 'credit' && debitPct > 0.5) {
-    return { warning: `Role ${upperRole} expects credits but most transactions are debits` };
-  }
-
-  if (expectedDirection === 'debit' && creditPct > 0.5) {
-    return { warning: `Role ${upperRole} expects debits but most transactions are credits` };
-  }
-
-  return null;
-}
 
 // ========== T5d: BUILD SCAN PATTERN ==========
 
@@ -280,7 +230,7 @@ export function enrichCandidates(
     if (candidate.occurrences < effectiveMinOccurrences) continue;
 
     // Step 3: suggest GL account
-    const direction = resolveDirection(candidate);
+    const direction = majorityDirection(candidate);
     const suggested = suggestGlAccount(context, direction, input.glAccounts);
 
     // Step 4: compute confidence
@@ -296,10 +246,14 @@ export function enrichCandidates(
     // Step 5: skip if an existing rule already covers this pattern
     if (hasExistingRule(candidate, description, input.existingRules)) continue;
 
-    // Step 6: check role ↔ direction mismatch
+    // Step 6: check role ↔ direction mismatch via canonical validator
     const roleToCheck = context?.role ?? '';
     const directionWarning = roleToCheck
-      ? checkRoleDirectionMismatch(roleToCheck, candidate.directionProfile.debitPct, candidate.directionProfile.creditPct)
+      ? (() => {
+          const result = roleIsValidForDirection(roleToCheck, candidate.directionProfile);
+          if (!result.valid) return { warning: result.reason ?? `Direction mismatch for role ${roleToCheck}` };
+          return null;
+        })()
       : null;
 
     result.push({

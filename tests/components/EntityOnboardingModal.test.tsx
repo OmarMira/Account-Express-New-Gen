@@ -14,21 +14,62 @@ vi.mock('@/components/ui/select', () => {
     'INQUILINO', 'PROVEEDOR', 'SOCIO', 'CLIENTE', 'EMPLEADO',
     'TARJETA_CREDITO', 'PRESTAMO', 'GASTO_OPERATIVO', 'INGRESO', 'OTRO', 'IGNORADA',
   ];
+  const ALL_INTENTS = [
+    'LOAN_PAYMENT', 'RENT_PAYMENT', 'OPERATING_EXPENSE', 'OWNER_CONTRIBUTION',
+    'CUSTOMER_PAYMENT', 'TRANSFER', 'TAX_PAYMENT', 'OTHER',
+  ];
+
+  function findPlaceholderValue(children: React.ReactNode): string {
+    const kids = React.Children.toArray(children);
+    for (const child of kids) {
+      if (React.isValidElement(child)) {
+        if (child.props.placeholder) return child.props.placeholder;
+        if (child.props.children) {
+          const nested = findPlaceholderValue(child.props.children);
+          if (nested) return nested;
+        }
+      }
+    }
+    return '';
+  }
+
   return {
-    Select: ({ value, onValueChange, disabled, children }: any) => (
-      <select
-        data-testid="mock-select"
-        value={value ?? ''}
-        onChange={(e) => onValueChange?.(e.target.value)}
-        disabled={disabled}
-      >
-        {ALL_ROLES.map((r) => (
-          <option key={r} value={r}>{r}</option>
-        ))}
-      </select>
-    ),
+    Select: ({ value, onValueChange, disabled, children }: any) => {
+      const placeholder = findPlaceholderValue(children);
+      const isIntentSelect =
+        placeholder === 'Select intent (optional)' ||
+        placeholder === 'Seleccionar intención (opcional)';
+
+      return (
+        <select
+          data-testid={isIntentSelect ? 'mock-intent-select' : 'mock-select'}
+          value={value ?? ''}
+          onChange={(e) => onValueChange?.(e.target.value)}
+          disabled={disabled}
+        >
+          {isIntentSelect ? (
+            <>
+              <option value="none">Select intent (optional)</option>
+              {ALL_INTENTS.map((intent) => (
+                <option key={intent} value={intent}>
+                  {intent}
+                </option>
+              ))}
+            </>
+          ) : (
+            ALL_ROLES.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))
+          )}
+        </select>
+      );
+    },
     SelectTrigger: ({ className, children, ...props }: any) => (
-      <div data-testid="mock-select-trigger" {...props}>{children}</div>
+      <div data-testid="mock-select-trigger" {...props}>
+        {children}
+      </div>
     ),
     SelectValue: ({ placeholder }: any) => (
       <span data-testid="mock-select-value">{placeholder}</span>
@@ -81,6 +122,17 @@ const tFn = vi.hoisted(() => vi.fn((key: string, params?: Record<string, any>) =
     'learning.loadError': 'Error loading data',
     'learning.suggestionError': 'Not available now',
     'learning.directionOverride': 'Assign anyway',
+    'learning.intentLabel': 'Transaction Intent',
+    'learning.intentPlaceholder': 'Select intent (optional)',
+    'learning.actorTypeLabel': 'Actor Type',
+    'transactionIntent.LOAN_PAYMENT': 'Loan Payment',
+    'transactionIntent.RENT_PAYMENT': 'Rent Payment',
+    'transactionIntent.OPERATING_EXPENSE': 'Operating Expense',
+    'transactionIntent.OWNER_CONTRIBUTION': 'Owner Contribution',
+    'transactionIntent.CUSTOMER_PAYMENT': 'Customer Payment',
+    'transactionIntent.TRANSFER': 'Transfer',
+    'transactionIntent.TAX_PAYMENT': 'Tax Payment',
+    'transactionIntent.OTHER': 'Other',
     'common.cancel': 'Cancel',
   };
   let value = map[key] ?? key;
@@ -98,6 +150,8 @@ vi.mock('@/store/language-store', () => ({
 const mockToast = vi.hoisted(() => ({
   info: vi.fn(),
   error: vi.fn(),
+  success: vi.fn(),
+  warning: vi.fn(),
   custom: vi.fn(),
   dismiss: vi.fn(),
 }));
@@ -990,6 +1044,169 @@ describe('EntityOnboardingModal', () => {
       await waitFor(() => {
         const btn = screen.getByRole('button', { name: 'Pre classify entities' });
         expect(btn).not.toBeDisabled();
+      });
+    });
+  });
+
+  // ── G3 — Actor Type badge + Intent dropdown ──────────────────────
+  describe('G3 — Actor Type badge and Intent dropdown', () => {
+    async function selectRole(
+      user: ReturnType<typeof userEvent.setup>,
+      entityIdx: number,
+      role: string,
+    ) {
+      const selects = screen.getAllByTestId('mock-select');
+      await user.selectOptions(selects[entityIdx], role);
+    }
+
+    it('shows Actor Type badge when a role is selected', async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      setupFetch([debitCandidate]);
+      render(<EntityOnboardingModal isOpen onClose={vi.fn()} companyId="comp_1" />);
+
+      await waitFor(() => {
+        expect(screen.getByText('DEBIT ENTITY')).toBeInTheDocument();
+      });
+
+      // Select a role
+      await selectRole(user, 0, 'PROVEEDOR');
+
+      // Actor Type badge should appear — use regex for partial text match
+      await waitFor(() => {
+        expect(screen.getByText(/Actor Type/)).toBeInTheDocument();
+      });
+
+      const badgeLabel = screen.getByText(/Actor Type/);
+      expect(badgeLabel.closest('.flex')?.textContent).toContain('PROVEEDOR');
+    });
+
+    it('hides Actor Type badge when no role has been selected', async () => {
+      // Use a candidate whose canonicalName doesn't match any default role pattern
+      const noMatchCandidate = { ...debitCandidate, canonicalName: 'UNKNOWN CORP' };
+      setupFetch([noMatchCandidate]);
+      render(<EntityOnboardingModal isOpen onClose={vi.fn()} companyId="comp_1" />);
+
+      await waitFor(() => {
+        expect(screen.getByText('UNKNOWN CORP')).toBeInTheDocument();
+      });
+
+      // No role matched — badge should not appear
+      expect(screen.queryByText('Actor Type')).not.toBeInTheDocument();
+      expect(screen.queryByText('Expected: Expense')).not.toBeInTheDocument();
+      expect(screen.queryByText('Expected: Income')).not.toBeInTheDocument();
+    });
+
+    it('shows direction hint text when role has a single expected direction', async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      setupFetch([debitCandidate]);
+      render(<EntityOnboardingModal isOpen onClose={vi.fn()} companyId="comp_1" />);
+
+      await waitFor(() => {
+        expect(screen.getByText('DEBIT ENTITY')).toBeInTheDocument();
+      });
+
+      // Select PROVEEDOR (expects debits → "Expected: Expense")
+      await selectRole(user, 0, 'PROVEEDOR');
+
+      await waitFor(() => {
+        expect(screen.getByText('Expected: Expense')).toBeInTheDocument();
+      });
+    });
+
+    it('renders intent dropdown with all 8 options', async () => {
+      setupFetch([debitCandidate]);
+      render(<EntityOnboardingModal isOpen onClose={vi.fn()} companyId="comp_1" />);
+
+      await waitFor(() => {
+        expect(screen.getByText('DEBIT ENTITY')).toBeInTheDocument();
+      });
+
+      // Intent dropdown should be present via its label
+      expect(screen.getByText('Transaction Intent')).toBeInTheDocument();
+      expect(screen.getByText('Select intent (optional)')).toBeInTheDocument();
+
+      // The intent select should exist
+      const intentSelect = screen.getByTestId('mock-intent-select');
+      expect(intentSelect).toBeInTheDocument();
+
+      // All 8 intent options should be available
+      const options = Array.from(intentSelect.querySelectorAll('option'));
+      // 8 intents + 1 empty placeholder
+      expect(options).toHaveLength(9);
+      expect(options[0]).toHaveValue('none');
+      expect(options[1]).toHaveValue('LOAN_PAYMENT');
+      expect(options[2]).toHaveValue('RENT_PAYMENT');
+      expect(options[3]).toHaveValue('OPERATING_EXPENSE');
+      expect(options[4]).toHaveValue('OWNER_CONTRIBUTION');
+      expect(options[5]).toHaveValue('CUSTOMER_PAYMENT');
+      expect(options[6]).toHaveValue('TRANSFER');
+      expect(options[7]).toHaveValue('TAX_PAYMENT');
+      expect(options[8]).toHaveValue('OTHER');
+    });
+
+    it('allows entity to be classified without selecting intent (optional)', async () => {
+      vi.useRealTimers();
+      const user = userEvent.setup();
+      setupFetch([debitCandidate]);
+      render(<EntityOnboardingModal isOpen onClose={vi.fn()} companyId="comp_1" />);
+
+      await waitFor(() => {
+        expect(screen.getByText('DEBIT ENTITY')).toBeInTheDocument();
+      });
+
+      // Select a role first so the entity is tracked in selectionsRef.current
+      await selectRole(user, 0, 'PROVEEDOR');
+
+      // Classify button should be enabled
+      const classifyBtn = screen.getByRole('button', { name: 'Classify entities' });
+      expect(classifyBtn).not.toBeDisabled();
+
+      // Click classify — should work without intent
+      await user.click(classifyBtn);
+
+      await waitFor(() => {
+        // Check that classify-entity was called with intent: null (since no intent selected)
+        const classifyCalls = mockFetch.mock.calls.filter(
+          ([url]: [string]) =>
+            typeof url === 'string' && url.includes('/api/learning/classify-entity'),
+        ) as [string, RequestInit][];
+        expect(classifyCalls.length).toBeGreaterThan(0);
+        const body = JSON.parse(classifyCalls[0][1].body as string);
+        // When no intent selected, the field should be null or absent
+        expect(body.intent).toBeNull();
+      });
+    });
+
+    it('passes intent to classify API when selected', async () => {
+      vi.useRealTimers();
+      const user = userEvent.setup();
+      setupFetch([debitCandidate]);
+      render(<EntityOnboardingModal isOpen onClose={vi.fn()} companyId="comp_1" />);
+
+      await waitFor(() => {
+        expect(screen.getByText('DEBIT ENTITY')).toBeInTheDocument();
+      });
+
+      // Select a role first so selectionsRef.current is populated
+      await selectRole(user, 0, 'PROVEEDOR');
+
+      // Select an intent
+      const intentSelect = screen.getByTestId('mock-intent-select');
+      await user.selectOptions(intentSelect, 'RENT_PAYMENT');
+
+      // Click classify
+      const classifyBtn = screen.getByRole('button', { name: 'Classify entities' });
+      await user.click(classifyBtn);
+
+      // Verify the API call includes intent
+      await waitFor(() => {
+        const classifyCalls = mockFetch.mock.calls.filter(
+          ([url]: [string]) =>
+            typeof url === 'string' && url.includes('/api/learning/classify-entity'),
+        ) as [string, RequestInit][];
+        expect(classifyCalls.length).toBeGreaterThan(0);
+        const body = JSON.parse(classifyCalls[0][1].body as string);
+        expect(body.intent).toBe('RENT_PAYMENT');
       });
     });
   });

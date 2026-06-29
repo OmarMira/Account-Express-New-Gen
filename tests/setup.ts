@@ -13,7 +13,7 @@ const workerPath = pathToFileURL(
 pdfjs.GlobalWorkerOptions.workerSrc = workerPath;
 
 // Mock the Z AI SDK globally in testing
-import { vi, beforeAll } from 'vitest';
+import { vi, beforeAll, afterAll } from 'vitest';
 vi.mock('z-ai-web-dev-sdk', () => {
   return {
     default: {
@@ -125,5 +125,15 @@ beforeAll(async () => {
         },
       });
     }
+  }
+});
+
+// Cleanup: stop the rate-limiter's setInterval to prevent Vitest from hanging
+afterAll(() => {
+  try {
+    const { stopRateLimitCleanup } = require('@/lib/security/rate-limiter');
+    stopRateLimitCleanup();
+  } catch (_) {
+    // Silencioso si el módulo no fue cargado en el test actual
   }
 });

@@ -196,140 +196,145 @@ Only return one of the canonical roles. Never return free text.`;
     let aiResult: { role: string; confidence: number; explanation: string } | null = null;
     let lastError: string | null = null;
 
-    // Try the configured model only — openrouter/free already handles
-    // internal routing/fallback across available free models.
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
+    let modelsToTry = [model];
+    if (model === 'openrouter/free') {
+      modelsToTry = ['google/gemma-4-31b-it:free', 'openrouter/free'];
+    }
 
-    try {
-      const response = await fetch(`${baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
-        },
-        body: JSON.stringify({
-          model,
-          temperature: 0.1,
-          max_tokens: 300,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt },
-          ],
-        }),
-        signal: controller.signal,
-      });
+    for (const currentModel of modelsToTry) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 12000);
 
-      clearTimeout(timeout);
-
-      if (!response.ok) {
-        throw new Error(`AI API returned status ${response.status}`);
-      }
-
-      const resData = await response.json();
-      const content: string | undefined = resData.choices?.[0]?.message?.content;
-      if (!content) {
-        throw new Error('AI response missing content');
-      }
-
-      // Two-pass parser:
-      // 1. Try strict JSON.parse first (fast path for well-formed responses)
-      // 2. Fall back to regex extraction (handles truncated/malformed JSON)
-      aiResult = parseSuggestion(content);
-
-      if (!aiResult) {
-        logger.warn('[SUGGEST_ROLE PARSE_FAILED]', {
-          preview: content.substring(0, 300),
-          length: content.length,
+      try {
+        const response = await fetch(`${baseUrl}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`,
+            'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+          },
+          body: JSON.stringify({
+            model: currentModel,
+            temperature: 0.1,
+            max_tokens: 1000,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userPrompt },
+            ],
+          }),
+          signal: controller.signal,
         });
-        throw new Error('Could not extract role from AI response');
-      }
 
-      // ── Phase 3: Web search fallback for low-confidence results ──
-      if (aiResult.confidence < 0.80 && process.env.WEB_SEARCH_ENABLED === 'true') {
-        const webResult = await searchEntity(trimmedDesc);
+        clearTimeout(timeout);
 
-        if (webResult) {
-          logger.info('[SUGGEST_ROLE WEB_SEARCH_REPROMPT]', {
-            entity: trimmedDesc,
-            title: webResult.title,
+        if (!response.ok) {
+          throw new Error(`AI API returned status ${response.status}`);
+        }
+
+        const resData = await response.json();
+        const content: string | undefined = resData.choices?.[0]?.message?.content;
+        if (!content) {
+          throw new Error('AI response missing content');
+        }
+
+        aiResult = parseSuggestion(content);
+
+        if (!aiResult) {
+          logger.warn('[SUGGEST_ROLE PARSE_FAILED]', {
+            preview: content.substring(0, 300),
+            length: content.length,
           });
+          throw new Error('Could not extract role from AI response');
+        }
 
-          const rePrompt = `Web search result for "${trimmedDesc}":
+        // Successfully resolved role suggestion, break out of loop
+        logger.info('[SUGGEST_ROLE SUCCESS]', { model: currentModel });
+        break;
+      } catch (err: unknown) {
+        clearTimeout(timeout);
+        lastError = err instanceof Error ? err.message : String(err);
+        logger.warn('[SUGGEST_ROLE MODEL_FAILED]', { model: currentModel, error: lastError });
+      }
+    }
+
+    // ── Phase 3: Web search fallback for low-confidence results ──
+    if (aiResult && aiResult.confidence < 0.80 && process.env.WEB_SEARCH_ENABLED === 'true') {
+      const webResult = await searchEntity(trimmedDesc);
+
+      if (webResult) {
+        logger.info('[SUGGEST_ROLE WEB_SEARCH_REPROMPT]', {
+          entity: trimmedDesc,
+          title: webResult.title,
+        });
+
+        const rePrompt = `Web search result for "${trimmedDesc}":
 Title: ${webResult.title}
 Snippet: ${webResult.snippet}
 Source: ${webResult.sourceUrl}
 
 Based on this additional context, re-evaluate the role.`;
 
-          const rePromptMessages = [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt },
-            { role: 'user', content: rePrompt },
-          ];
+        const rePromptMessages = [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+          { role: 'user', content: rePrompt },
+        ];
 
-          const reController = new AbortController();
-          const reTimeout = setTimeout(() => reController.abort(), 10000);
+        const reController = new AbortController();
+        const reTimeout = setTimeout(() => reController.abort(), 12000);
 
-          try {
-            const reResponse = await fetch(`${baseUrl}/chat/completions`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${apiKey}`,
-                'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
-              },
-              body: JSON.stringify({
-                model,
-                temperature: 0.1,
-                max_tokens: 300,
-                messages: rePromptMessages,
-              }),
-              signal: reController.signal,
-            });
+        try {
+          const reResponse = await fetch(`${baseUrl}/chat/completions`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${apiKey}`,
+              'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+            },
+            body: JSON.stringify({
+              model,
+              temperature: 0.1,
+              max_tokens: 1000,
+              messages: rePromptMessages,
+            }),
+            signal: reController.signal,
+          });
 
-            clearTimeout(reTimeout);
+          clearTimeout(reTimeout);
 
-            if (reResponse.ok) {
-              const reData = await reResponse.json();
-              const reContent: string | undefined = reData.choices?.[0]?.message?.content;
+          if (reResponse.ok) {
+            const reData = await reResponse.json();
+            const reContent: string | undefined = reData.choices?.[0]?.message?.content;
 
-              if (reContent) {
-                const reResult = parseSuggestion(reContent);
+            if (reContent) {
+              const reResult = parseSuggestion(reContent);
 
-                if (reResult && reResult.confidence > aiResult.confidence) {
-                  const previousConfidence = aiResult.confidence;
-                  const originalReConfidence = reResult.confidence;
+              if (reResult && reResult.confidence > aiResult.confidence) {
+                const previousConfidence = aiResult.confidence;
+                const originalReConfidence = reResult.confidence;
 
-                  // Cap web-search-driven confidence at 0.70
-                  reResult.confidence = Math.min(reResult.confidence, 0.70);
+                // Cap web-search-driven confidence at 0.70
+                reResult.confidence = Math.min(reResult.confidence, 0.70);
 
-                  aiResult = reResult;
+                aiResult = reResult;
 
-                  logger.info('[SUGGEST_ROLE WEB_SEARCH_IMPROVED]', {
-                    entity: trimmedDesc,
-                    previousConfidence,
-                    newRole: reResult.role,
-                    capApplied: originalReConfidence > 0.70,
-                  });
-                }
+                logger.info('[SUGGEST_ROLE WEB_SEARCH_IMPROVED]', {
+                  entity: trimmedDesc,
+                  previousConfidence,
+                  newRole: reResult.role,
+                  capApplied: originalReConfidence > 0.70,
+                });
               }
             }
-          } catch {
-            logger.warn('[SUGGEST_ROLE WEB_SEARCH_REPROMPT_FAILED]', {
-              entity: trimmedDesc,
-            });
-          } finally {
-            clearTimeout(reTimeout);
           }
+        } catch {
+          logger.warn('[SUGGEST_ROLE WEB_SEARCH_REPROMPT_FAILED]', {
+            entity: trimmedDesc,
+          });
+        } finally {
+          clearTimeout(reTimeout);
         }
       }
-    } catch (err: unknown) {
-      clearTimeout(timeout);
-      lastError = err instanceof Error ? err.message : String(err);
-
-      logger.warn('[SUGGEST_ROLE FAILED]', { error: lastError, model });
     }
 
     if (!aiResult) {
@@ -359,10 +364,16 @@ Based on this additional context, re-evaluate the role.`;
       );
     }
 
+    // ── LLM confidence cap ──────────────────────────────────────────────
+    // All LLM-generated suggestions are forced to max 0.69 confidence.
+    // This ensures they are treated as LOW by the frontend confidence gate.
+    aiResult.confidence = Math.min(aiResult.confidence, 0.69);
+
     return NextResponse.json({
       suggestedRole: aiResult.role,
       confidence: aiResult.confidence,
       explanation: aiResult.explanation,
+      reasoning: `No existing rule or entity context found for pattern. Suggested role: ${aiResult.role}.`,
     });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Unknown error';

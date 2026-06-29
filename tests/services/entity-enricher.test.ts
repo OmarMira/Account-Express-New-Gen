@@ -2,9 +2,8 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   resolveContextRole,
   suggestGlAccount,
-  resolveDirection,
+  majorityDirection,
   enrichCandidates,
-  checkRoleDirectionMismatch,
 } from '@/lib/services/entity-enricher';
 import type { EntityContextWithGlAccount } from '@/lib/types/entity-context';
 import type { EntityCandidate } from '@/lib/services/entity-detector';
@@ -202,84 +201,34 @@ describe('suggestGlAccount', () => {
   });
 });
 
-// ─── resolveDirection ─────────────────────────────────────────────
-describe('resolveDirection', () => {
+// ─── majorityDirection ────────────────────────────────────────────
+describe('majorityDirection', () => {
   it('returns "debit" when debitPct > 0.5', () => {
     const candidate = makeCandidate({
       directionProfile: { creditPct: 0.3, debitPct: 0.7 },
     });
-    expect(resolveDirection(candidate)).toBe('debit');
+    expect(majorityDirection(candidate)).toBe('debit');
   });
 
   it('returns "credit" when creditPct > 0.5', () => {
     const candidate = makeCandidate({
       directionProfile: { creditPct: 0.9, debitPct: 0.1 },
     });
-    expect(resolveDirection(candidate)).toBe('credit');
+    expect(majorityDirection(candidate)).toBe('credit');
   });
 
   it('returns null when ambiguous (50/50)', () => {
     const candidate = makeCandidate({
       directionProfile: { creditPct: 0.5, debitPct: 0.5 },
     });
-    expect(resolveDirection(candidate)).toBeNull();
+    expect(majorityDirection(candidate)).toBeNull();
   });
 
   it('returns null when both are 0', () => {
     const candidate = makeCandidate({
       directionProfile: { creditPct: 0, debitPct: 0 },
     });
-    expect(resolveDirection(candidate)).toBeNull();
-  });
-});
-
-// ─── checkRoleDirectionMismatch ────────────────────────────────────
-describe('checkRoleDirectionMismatch', () => {
-  // F1: CLIENTE expects credit → mostly credits = no warning
-  it('returns null when CLIENTE direction matches (mostly credits)', () => {
-    const result = checkRoleDirectionMismatch('CLIENTE', 0.2, 0.8);
-    expect(result).toBeNull();
-  });
-
-  // F2: CLIENTE expects credit but mostly debits → warning
-  it('returns warning when CLIENTE expects credit but most txns are debits', () => {
-    const result = checkRoleDirectionMismatch('CLIENTE', 0.8, 0.2);
-    expect(result).not.toBeNull();
-    expect(result!.warning).toContain('expects credits');
-    expect(result!.warning).toContain('debits');
-  });
-
-  // F3: SOCIO is 'mixed' → never warns
-  it('returns null for SOCIO regardless of direction (mixed)', () => {
-    expect(checkRoleDirectionMismatch('SOCIO', 0.9, 0.1)).toBeNull();
-    expect(checkRoleDirectionMismatch('SOCIO', 0.1, 0.9)).toBeNull();
-    expect(checkRoleDirectionMismatch('SOCIO', 0.5, 0.5)).toBeNull();
-  });
-
-  // F4: INGRESO expects credit but mostly debits → warning
-  it('returns warning when INGRESO expects credit but most txns are debits', () => {
-    const result = checkRoleDirectionMismatch('INGRESO', 0.8, 0.2);
-    expect(result).not.toBeNull();
-    expect(result!.warning).toContain('expects credits');
-  });
-
-  // F5: PROVEEDOR expects debit but mostly credits → warning
-  it('returns warning when PROVEEDOR expects debit but most txns are credits', () => {
-    const result = checkRoleDirectionMismatch('PROVEEDOR', 0.2, 0.8);
-    expect(result).not.toBeNull();
-    expect(result!.warning).toContain('expects debits');
-    expect(result!.warning).toContain('credits');
-  });
-
-  // F6: OTRO and IGNORADA have no expected direction → always null
-  it('returns null for OTRO and IGNORADA (no expected direction)', () => {
-    expect(checkRoleDirectionMismatch('OTRO', 0.9, 0.1)).toBeNull();
-    expect(checkRoleDirectionMismatch('OTRO', 0.1, 0.9)).toBeNull();
-    expect(checkRoleDirectionMismatch('IGNORADA', 0.9, 0.1)).toBeNull();
-  });
-
-  it('returns null for non-canonical role string', () => {
-    expect(checkRoleDirectionMismatch('CUALQUIER_COSA', 0.9, 0.1)).toBeNull();
+    expect(majorityDirection(candidate)).toBeNull();
   });
 });
 

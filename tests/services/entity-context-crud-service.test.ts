@@ -288,6 +288,65 @@ describe('removeEntityContext()', () => {
     const result = await removeEntityContext(companyId, entityId);
     expect(result).toBe(false);
   });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // FK nullification tests (entity-context-to-rule-link)
+  // ═══════════════════════════════════════════════════════════════════
+
+  it('nullifies entityContextId on linked bank rules before deleting context (4.5)', async () => {
+    const ctx = await saveContext({ companyId, pattern: 'RULE_LINK_TEST', role: 'GASTO_OPERATIVO' });
+    const gl = await createTestGlAccount({ companyId, code: '9998', name: 'Link Test GL' });
+
+    const rule = await db.bankRule.create({
+      data: {
+        companyId,
+        name: 'Test Rule Linked',
+        conditionType: 'contains',
+        conditionValue: 'RULE_LINK_TEST',
+        glAccountId: gl.id,
+        entityContextId: ctx.id,
+      },
+    });
+
+    expect(rule.entityContextId).toBe(ctx.id);
+
+    const result = await removeEntityContext(companyId, ctx.id);
+    expect(result).toBe(true);
+
+    // Entity should be deleted
+    const dbCtx = await db.entityContext.findUnique({ where: { id: ctx.id } });
+    expect(dbCtx).toBeNull();
+
+    // Rule's entityContextId should be null
+    const updatedRule = await db.bankRule.findUnique({ where: { id: rule.id } });
+    expect(updatedRule!.entityContextId).toBeNull();
+
+    // Audit log should exist for the deletion with affected rule
+    const auditLogs = await db.auditLog.findMany({
+      where: { action: 'ENTITY_CONTEXT_DELETED' },
+    });
+    expect(auditLogs.length).toBeGreaterThanOrEqual(1);
+    const details = JSON.parse(auditLogs[0].details!);
+    expect(details.affectedRuleIds).toContain(rule.id);
+  });
+
+  it('deletes context without linked rules successfully — no audit entry (4.7)', async () => {
+    const ctx = await saveContext({ companyId, pattern: 'NO_RULES', role: 'GASTO_OPERATIVO' });
+
+    const result = await removeEntityContext(companyId, ctx.id);
+    expect(result).toBe(true);
+
+    const dbCtx = await db.entityContext.findUnique({ where: { id: ctx.id } });
+    expect(dbCtx).toBeNull();
+
+    // No audit for ENTITY_CONTEXT_DELETED since no rules were affected
+    const auditLogs = await db.auditLog.findMany({
+      where: { action: 'ENTITY_CONTEXT_DELETED' },
+    });
+    // Find audit for THIS specific context
+    const ctxAudit = auditLogs.find((l) => l.entityId === ctx.id);
+    expect(ctxAudit).toBeUndefined();
+  });
 });
 
 describe('bulkRemoveEntityContexts()', () => {
@@ -346,5 +405,58 @@ describe('bulkRemoveEntityContexts()', () => {
   it('handles partial delete when some ids do not exist', async () => {
     const count = await bulkRemoveEntityContexts(companyId, [...ids, 'non-existent-1', 'non-existent-2']);
     expect(count).toBe(3);
+  });
+
+  it('nullifies multiple FKs and logs single audit event on bulk delete (4.6)', async () => {
+    // Create 2 entity contexts with linked rules
+    const ctx1 = await saveContext({ companyId, pattern: 'BULK_FK_1', role: 'PROVEEDOR' });
+    const ctx2 = await saveContext({ companyId, pattern: 'BULK_FK_2', role: 'GASTO_OPERATIVO' });
+    const gl = await createTestGlAccount({ companyId, code: '7777', name: 'Bulk Test GL' });
+
+    const rule1 = await db.bankRule.create({
+      data: {
+        companyId,
+        name: 'Bulk Rule 1',
+        conditionType: 'contains',
+        conditionValue: 'BULK_FK_1',
+        glAccountId: gl.id,
+        entityContextId: ctx1.id,
+      },
+    });
+
+    const rule2 = await db.bankRule.create({
+      data: {
+        companyId,
+        name: 'Bulk Rule 2',
+        conditionType: 'contains',
+        conditionValue: 'BULK_FK_2',
+        glAccountId: gl.id,
+        entityContextId: ctx2.id,
+      },
+    });
+
+    const count = await bulkRemoveEntityContexts(companyId, [ctx1.id, ctx2.id]);
+    expect(count).toBe(2);
+
+    // Both entities should be gone
+    const remaining = await db.entityContext.findMany({
+      where: { id: { in: [ctx1.id, ctx2.id] } },
+    });
+    expect(remaining).toHaveLength(0);
+
+    // Both rules should have null entityContextId
+    const updatedRule1 = await db.bankRule.findUnique({ where: { id: rule1.id } });
+    const updatedRule2 = await db.bankRule.findUnique({ where: { id: rule2.id } });
+    expect(updatedRule1!.entityContextId).toBeNull();
+    expect(updatedRule2!.entityContextId).toBeNull();
+
+    // Single audit event with all affected rule IDs
+    const auditLogs = await db.auditLog.findMany({
+      where: { action: 'ENTITY_CONTEXTS_BULK_DELETED' },
+    });
+    expect(auditLogs.length).toBe(1);
+    const details = JSON.parse(auditLogs[0].details!);
+    expect(details.affectedRuleIds).toContain(rule1.id);
+    expect(details.affectedRuleIds).toContain(rule2.id);
   });
 });

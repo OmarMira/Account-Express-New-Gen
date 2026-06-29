@@ -1,8 +1,11 @@
 import { db } from '@/lib/db';
 import { loadConfig, clusterCandidates, extractComponents } from '@/lib/services/entity-detector';
 import { saveContext } from '@/lib/services/entity-context-service';
+import { normalizePattern } from '@/lib/services/pattern-normalizer';
 import { logger } from '@/lib/logger';
 import type { EntityCandidate } from '@/lib/services/entity-detector';
+import type { EntityContext } from '@prisma/client';
+import type { TransactionIntent } from '@/lib/constants/transaction-intent';
 
 export interface ClassifyEntityInput {
   companyId: string;
@@ -14,10 +17,113 @@ export interface ClassifyEntityInput {
   userId?: string;
   transactionDirection?: string | null;
   userDescription?: string | null;
+  intent?: TransactionIntent | null;
 }
 
-export async function classifyEntity(input: ClassifyEntityInput): Promise<void> {
-  const { companyId, pattern, role, roles, glAccountCode, source, userId, transactionDirection, userDescription } = input;
+/**
+ * Infer transaction direction from historical transactions matching the pattern.
+ * Queries up to 200 BankTransactions using pattern normalization for contains match.
+ * Returns 'debit' if >80% are debits, 'credit' if >80% are credits, else 'any'.
+ */
+export async function computeDirectionProfile(
+  companyId: string,
+  pattern: string,
+): Promise<'debit' | 'credit' | 'any'> {
+  const transactions = await db.bankTransaction.findMany({
+    where: {
+      statement: { bankAccount: { companyId } },
+      description: { contains: normalizePattern(pattern), mode: 'insensitive' },
+    },
+    select: { amount: true },
+    take: 200,
+  });
+
+  if (transactions.length === 0) return 'any';
+
+  let debitCount = 0;
+  let validCount = 0;
+  for (const t of transactions) {
+    const amount = Number(t.amount);
+    if (Math.abs(amount) < 0.00001) continue;
+    validCount++;
+    if (amount < 0) debitCount++;
+  }
+  if (validCount === 0) return 'any';
+  const debitPct = debitCount / validCount;
+  const creditPct = 1 - debitPct;
+
+  if (debitPct > 0.8) return 'debit';
+  if (creditPct > 0.8) return 'credit';
+  return 'any';
+}
+
+/**
+ * Auto-create or reactivate a BankRule linked to the given EntityContext.
+ * Dedup logic:
+ *   - Active rule with same entityContextId → skip
+ *   - Inactive rule with same entityContextId → reactivate + update fields
+ *   - Manual rule with entityContextId=null and same pattern → skip
+ * Wraps the operation in a Prisma $transaction to prevent race conditions.
+ */
+export async function autoCreateRule(
+  companyId: string,
+  context: { id: string; pattern: string; glAccountId: string | null },
+  direction: 'debit' | 'credit' | 'any',
+  intent?: TransactionIntent | null,
+): Promise<{ warning?: string }> {
+  if (!context.glAccountId) {
+    return { warning: 'No GL account linked — rule not created' };
+  }
+
+  return db.$transaction(async (tx) => {
+    const existing = await tx.bankRule.findFirst({
+      where: { entityContextId: context.id },
+    });
+
+    if (existing) {
+      if (existing.isActive) {
+        // Active rule with same entityContextId → skip
+        return {};
+      }
+      // Inactive rule → reactivate and update
+      await tx.bankRule.update({
+        where: { id: existing.id },
+        data: {
+          isActive: true,
+          glAccountId: context.glAccountId,
+          transactionDirection: direction,
+          conditionValue: normalizePattern(context.pattern),
+          conditionType: 'contains',
+          intent: intent ?? null,
+        },
+      });
+      return {};
+    }
+
+    // No existing rule → create new
+    await tx.bankRule.create({
+      data: {
+        companyId,
+        name: `Auto: ${context.pattern}`,
+        conditionType: 'contains',
+        conditionValue: normalizePattern(context.pattern),
+        glAccountId: context.glAccountId,
+        transactionDirection: direction,
+        priority: 5,
+        isActive: true,
+        entityContextId: context.id,
+        intent: intent ?? null,
+      },
+    });
+
+    return {};
+  });
+}
+
+export async function classifyEntity(
+  input: ClassifyEntityInput,
+): Promise<{ context: EntityContext; warning?: string }> {
+  const { companyId, pattern, role, roles, glAccountCode, source, userId, transactionDirection, userDescription, intent } = input;
 
   if (role === 'OTRO' && !userDescription) {
     throw new Error('userDescription is required when role is OTRO');
@@ -31,7 +137,7 @@ export async function classifyEntity(input: ClassifyEntityInput): Promise<void> 
     if (acc) glAccountId = acc.id;
   }
 
-  await saveContext({
+  const context = await saveContext({
     companyId,
     pattern,
     role,
@@ -43,7 +149,18 @@ export async function classifyEntity(input: ClassifyEntityInput): Promise<void> 
     userDescription,
   });
 
-  logger.info('[ENTITY CLASSIFIED]', { companyId, pattern, role, roles });
+  const direction = await computeDirectionProfile(companyId, pattern);
+
+  // Only auto-create rule if user explicitly confirmed
+  let warning: string | undefined;
+  if (source === 'user') {
+    const result = await autoCreateRule(companyId, { id: context.id, pattern, glAccountId }, direction, intent);
+    warning = result.warning;
+  }
+
+  logger.info('[ENTITY CLASSIFIED]', { companyId, pattern, role, roles, warning });
+
+  return { context, warning };
 }
 
 export async function getEntityCandidates(companyId: string): Promise<EntityCandidate[]> {
@@ -113,35 +230,6 @@ export async function getEntityCandidates(companyId: string): Promise<EntityCand
       return c;
     })
     .filter((c): c is EntityCandidate => c !== null);
-}
-
-export interface ConflictInfo {
-  hasMerchant: boolean;
-  hasSocioInIndn: boolean;
-  merchantName: string | null;
-  socioIndnName: string | null;
-}
-
-export function detectEntityConflict(
-  description: string,
-  knownSocioPatterns: string[],
-): ConflictInfo {
-  const config = loadConfig();
-  const components = extractComponents(description, config);
-
-  const hasMerchant = components.merchant !== null;
-  const socioIndnName = components.indnName;
-
-  const hasSocioInIndn =
-    socioIndnName !== null &&
-    knownSocioPatterns.some((p) => socioIndnName!.toLowerCase().includes(p.toLowerCase()));
-
-  return {
-    hasMerchant,
-    hasSocioInIndn,
-    merchantName: components.merchant,
-    socioIndnName,
-  };
 }
 
 export async function getKnownSocioPatterns(companyId: string): Promise<string[]> {

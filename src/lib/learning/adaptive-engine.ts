@@ -1,16 +1,7 @@
-import {
-  readFileSync,
-  appendFileSync,
-  existsSync,
-  mkdirSync,
-  statSync,
-  renameSync,
-  writeFileSync,
-  readdirSync,
-} from 'fs';
+import { appendFileSync, existsSync, mkdirSync, statSync, renameSync, writeFileSync, readFileSync, readdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { createHash } from 'crypto';
-import { sanitizeDescriptionForAdaptive as sanitizeDescription } from '@/lib/services/pattern-normalizer';
+import { normalizePattern } from '@/lib/services/pattern-normalizer';
 import { logger } from '@/lib/logger';
 
 export type FeedbackEvent = {
@@ -32,9 +23,9 @@ export function computeDescriptionHash(description: string): string {
 }
 
 export async function recordFeedback(event: FeedbackEvent) {
-  const configPath = join(process.cwd(), 'rules/learning-engine.json');
-  const config = JSON.parse(readFileSync(configPath, 'utf-8'));
-  const logPath = join(process.cwd(), config.feedbackLogPath);
+  // Config was loaded from rules/learning-engine.json (deprecated).
+  // feedbackLogPath is now hardcoded. Use DetectionConfig DB table for overrides.
+  const logPath = join(process.cwd(), 'rules/learning-events.jsonl');
 
   mkdirSync(join(process.cwd(), 'rules'), { recursive: true });
 
@@ -85,9 +76,51 @@ export async function recordFeedback(event: FeedbackEvent) {
   appendFileSync(logPath, JSON.stringify(event) + '\n', 'utf-8');
 }
 
+/**
+ * Pre-processes a bank description for adaptive learning.
+ * Applies noise removal and stop word filtering BEFORE canonical normalization.
+ */
+function preprocessForAdaptive(
+  desc: string,
+  config: {
+    sanitizeNoise: Record<string, string>;
+    patternGeneration: { ignoreStopWords: string[] };
+  },
+): string {
+  let cleaned = desc.toLowerCase().trim();
+  if (config.sanitizeNoise) {
+    for (const pattern of Object.values(config.sanitizeNoise)) {
+      const rx = new RegExp(pattern as string, 'gi');
+      cleaned = cleaned.replace(rx, ' ');
+    }
+  }
+  const words = cleaned.split(/\s+/).filter(Boolean);
+  const filtered = words.filter((w) => !config.patternGeneration.ignoreStopWords.includes(w));
+  return filtered.join(' ').trim();
+}
+
 export function generateCandidateRules(companyId: string) {
-  const configPath = join(process.cwd(), 'rules/learning-engine.json');
-  const config = JSON.parse(readFileSync(configPath, 'utf-8'));
+  // Config was loaded from rules/learning-engine.json (deprecated).
+  // Using hardcoded defaults. Use DetectionConfig DB table for overrides.
+  const config: {
+    feedbackLogPath: string;
+    minOccurrencesToGenerateRule: number;
+    consistencyScoreThreshold: number;
+    sanitizeNoise: Record<string, string>;
+    patternGeneration: { ignoreStopWords: string[] };
+  } = {
+    feedbackLogPath: 'rules/learning-events.jsonl',
+    minOccurrencesToGenerateRule: 3,
+    consistencyScoreThreshold: 0.85,
+    sanitizeNoise: {
+      dates: '\\d{1,2}[\\/\\-\\.]\\d{1,2}[\\/\\-\\.]\\d{2,4}',
+      references: '(Ref|Conf|Trx|#)\\s*[\\w\\d]+',
+      amounts: '\\b\\d[\\d.,/\\-]*\\b',
+    },
+    patternGeneration: {
+      ignoreStopWords: ['to', 'from', 'payment', 'ach', 'zelle', 'conf', 'id'],
+    },
+  };
   const logPath = join(process.cwd(), config.feedbackLogPath);
 
   const allEvents: FeedbackEvent[] = [];
@@ -148,7 +181,8 @@ export function generateCandidateRules(companyId: string) {
   const patternGroups: Record<string, { events: FeedbackEvent[]; count: number }> = {};
 
   for (const e of companyEvents) {
-    const patternKey = sanitizeDescription(e.bankDescription, config);
+    const preprocessed = preprocessForAdaptive(e.bankDescription, config);
+    const patternKey = normalizePattern(preprocessed);
     if (patternKey.length < 3) continue;
 
     if (!patternGroups[patternKey]) {

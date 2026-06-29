@@ -6,18 +6,18 @@ Alert users when an assigned role conflicts with the entity's transaction direct
 
 ## Requirement: Warning on Role Assignment
 
-On create or edit, call `checkRoleDirectionMismatch()`. On mismatch, display yellow banner: "ⓘ El rol {role} espera transacciones de tipo {expected}, pero esta entidad tiene {actualPct}% de {actual}. ¿Asignar de todas formas?" User proceeds via explicitly labeled button.
+On create or edit, call `roleIsValidForDirection()` from `src/lib/services/direction-filter.ts` (the canonical validator). On mismatch, display yellow banner: "ⓘ El rol {role} espera transacciones de tipo {expected}, pero esta entidad tiene {actualPct}% de {actual}. ¿Asignar de todas formas?" User proceeds via explicitly labeled button.
 
 #### Scenario: Warning shown for mismatch
 
 - GIVEN user assigns CLIENTE to an entity with 100% debits
-- WHEN `checkRoleDirectionMismatch` returns mismatched=true
+- WHEN `roleIsValidForDirection` returns `{ valid: false, reason: ... }`
 - THEN yellow banner is displayed and user must confirm override
 
 #### Scenario: SOCIO bypasses warning
 
 - GIVEN user assigns SOCIO to entity with any direction profile
-- WHEN `checkRoleDirectionMismatch` returns mismatched=false
+- WHEN `roleIsValidForDirection` returns `{ valid: true }`
 - THEN no warning shown
 
 #### Scenario: Warning logged on override

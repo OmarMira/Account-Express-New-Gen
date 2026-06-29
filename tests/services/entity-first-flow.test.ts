@@ -7,9 +7,8 @@ import {
   createTestBankStatement,
   createTestBankTransaction,
 } from '../helpers/factories';
-import { classifyEntity, getEntityCandidates, getKnownSocioPatterns, detectEntityConflict } from '@/lib/services/entity-classifier';
-import { entityFirstCheck } from '@/lib/services/rule-matching-engine';
-import { extractComponents, loadConfig } from '@/lib/services/entity-detector';
+import { classifyEntity, getEntityCandidates, getKnownSocioPatterns } from '@/lib/services/entity-classifier';
+import { detectConflictSync } from '@/lib/services/entity-conflict-detector';
 import { db } from '@/lib/db';
 
 describe('Entity Classification Flow — Integration', () => {
@@ -176,54 +175,58 @@ describe('Entity Classification Flow — Integration', () => {
     });
   });
 
-  describe('entityFirstCheck()', () => {
-    it('debe detectar conflicto merchant+SOCIO y sugerir skip', () => {
-      const tx = {
-        description: 'AMERICAN EXPRESS DES:ACH PMT ID:123 INDN:LAURA QUIJANO CO ID:9876',
-        amount: -500,
-      };
+  describe('entityFirstCheck replacement — detectConflictSync()', () => {
+    it('debe detectar conflicto merchant+SOCIO y sugerir skip (entityFirstMode=true)', () => {
       const knownSocioPatterns = ['laura quijano'];
 
-      const result = entityFirstCheck(tx, knownSocioPatterns, true);
-      expect(result.skipSocioRules).toBe(true);
-      expect(result.reason).toContain('SOCIO');
+      const result = detectConflictSync(
+        'AMERICAN EXPRESS DES:ACH PMT ID:123 INDN:LAURA QUIJANO CO ID:9876',
+        knownSocioPatterns,
+        true,
+      );
+      // socioWins=true means SOCIO wins → trigger skip of SOCIO rules in rule-matching-engine
+      expect(result.conflict).toBe(true);
+      expect(result.socioWins).toBe(true);
+      expect(result.hasMerchant).toBe(true);
+      expect(result.hasSocioInIndn).toBe(true);
     });
 
-    it('NO debe skippear si no hay merchant en P1', () => {
-      const tx = {
-        description: 'Zelle payment to LAURA QUIJANO',
-        amount: -500,
-      };
+    it('NO debe marcar conflicto si no hay merchant en P1', () => {
       const knownSocioPatterns = ['laura quijano'];
 
-      const result = entityFirstCheck(tx, knownSocioPatterns, true);
-      expect(result.skipSocioRules).toBe(false);
+      const result = detectConflictSync('Zelle payment to LAURA QUIJANO', knownSocioPatterns, true);
+      expect(result.conflict).toBe(false);
+      expect(result.socioWins).toBe(false);
     });
 
-    it('NO debe skippear si entityFirstMode=false (legacy)', () => {
-      const tx = {
-        description: 'AMERICAN EXPRESS DES:ACH PMT ID:123 INDN:LAURA QUIJANO CO ID:9876',
-        amount: -500,
-      };
-      const result = entityFirstCheck(tx, ['laura quijano'], false);
-      expect(result.skipSocioRules).toBe(false);
+    it('NO debe tener socioWins=true si entityFirstMode=false', () => {
+      const result = detectConflictSync(
+        'AMERICAN EXPRESS DES:ACH PMT ID:123 INDN:LAURA QUIJANO CO ID:9876',
+        ['laura quijano'],
+        false,
+      );
+      // Conflict exists but entityFirstMode=false → merchant wins → socioWins=false
+      expect(result.conflict).toBe(true);
+      expect(result.socioWins).toBe(false);
     });
 
-    it('NO debe skippear si conocidoSOCIO est vacío', () => {
-      const tx = {
-        description: 'AMERICAN EXPRESS DES:ACH PMT ID:123 INDN:LAURA QUIJANO CO ID:9876',
-        amount: -500,
-      };
-      const result = entityFirstCheck(tx, [], true);
-      expect(result.skipSocioRules).toBe(false);
+    it('NO debe marcar conflicto si conocidoSOCIO está vacío', () => {
+      const result = detectConflictSync(
+        'AMERICAN EXPRESS DES:ACH PMT ID:123 INDN:LAURA QUIJANO CO ID:9876',
+        [],
+        true,
+      );
+      expect(result.conflict).toBe(false);
+      expect(result.socioWins).toBe(false);
     });
   });
 
-  describe('detectEntityConflict()', () => {
+  describe('detectConflictSync() — unified conflict detection', () => {
     it('debe detectar merchant + SOCIO en INDN', () => {
-      const result = detectEntityConflict(
+      const result = detectConflictSync(
         'KMF DES:KMFUSA.com ID:9876543210 INDN:OMAR MIRA CO ID:1234',
         ['omar mira'],
+        false,
       );
       expect(result.hasMerchant).toBe(true);
       expect(result.hasSocioInIndn).toBe(true);
@@ -232,19 +235,17 @@ describe('Entity Classification Flow — Integration', () => {
     });
 
     it('NO debe marcar conflicto si INDN no es SOCIO conocido', () => {
-      const result = detectEntityConflict(
+      const result = detectConflictSync(
         'KMF DES:KMFUSA.com ID:9876543210 INDN:UNKNOWN GUY CO ID:1234',
         ['omar mira'],
+        false,
       );
       expect(result.hasMerchant).toBe(true);
       expect(result.hasSocioInIndn).toBe(false);
     });
 
     it('NO debe marcar conflicto si no hay merchant (solo Zelle)', () => {
-      const result = detectEntityConflict(
-        'Zelle payment to LAURA QUIJANO',
-        ['laura quijano'],
-      );
+      const result = detectConflictSync('Zelle payment to LAURA QUIJANO', ['laura quijano'], false);
       expect(result.hasMerchant).toBe(false);
       expect(result.hasSocioInIndn).toBe(false);
     });

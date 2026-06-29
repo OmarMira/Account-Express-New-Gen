@@ -147,6 +147,7 @@ export async function clearDatabase() {
   await db.auditLog.deleteMany().catch(() => {});
   await db.journalEntry.deleteMany().catch(() => {});
   await db.bankTransaction.deleteMany().catch(() => {});
+  await db.bankRule.deleteMany().catch(() => {});
   await db.bankStatement.deleteMany().catch(() => {});
   await db.bankAccount.deleteMany().catch(() => {});
   await db.glAccount.deleteMany().catch(() => {});

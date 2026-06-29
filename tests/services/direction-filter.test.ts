@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { roleIsValidForDirection, DIRECTION_THRESHOLD } from '@/lib/services/direction-filter';
+import { roleIsValidForDirection, DIRECTION_THRESHOLD, classifyDirection } from '@/lib/services/direction-filter';
 
 describe('DIRECTION_THRESHOLD', () => {
   it('is set to 0.8 (80% in decimal)', () => {
@@ -162,6 +162,33 @@ describe('roleIsValidForDirection', () => {
 
     it('allows IGNORADA with pure debit', () => {
       expect(roleIsValidForDirection('IGNORADA', aggressiveDebit)).toEqual({ valid: true });
+    });
+  });
+
+  // ── classifyDirection export tests ───────────────────────────────
+  describe('classifyDirection', () => {
+    it('returns "credit" when creditPct >= 0.8', () => {
+      expect(classifyDirection({ creditPct: 0.8, debitPct: 0.2 })).toBe('credit');
+    });
+
+    it('returns "debit" when debitPct >= 0.8', () => {
+      expect(classifyDirection({ creditPct: 0.2, debitPct: 0.8 })).toBe('debit');
+    });
+
+    it('returns "ambas" when neither >= 0.8', () => {
+      expect(classifyDirection({ creditPct: 0.5, debitPct: 0.5 })).toBe('ambas');
+    });
+
+    it('returns "ambas" for zero profile', () => {
+      expect(classifyDirection({ creditPct: 0, debitPct: 0 })).toBe('ambas');
+    });
+
+    it('returns "credit" at exactly 0.8 boundary', () => {
+      expect(classifyDirection({ creditPct: 0.8, debitPct: 0.2 })).toBe('credit');
+    });
+
+    it('returns "debit" at exactly 0.8 boundary', () => {
+      expect(classifyDirection({ creditPct: 0.2, debitPct: 0.8 })).toBe('debit');
     });
   });
 
