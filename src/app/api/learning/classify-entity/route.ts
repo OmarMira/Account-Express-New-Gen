@@ -25,16 +25,15 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
       );
     }
 
-    // Validate intent if provided
-    if (intent) {
-      const intentResult = transactionIntentSchema.safeParse(intent);
-      if (!intentResult.success) {
-        return NextResponse.json(
-          { error: 'Invalid intent value' },
-          { status: 400 },
-        );
-      }
+    // Validate intent only when a concrete value is provided; null/undefined mean no intent.
+    const intentResult = intent == null ? null : transactionIntentSchema.safeParse(intent);
+    if (intentResult !== null && !intentResult.success) {
+      return NextResponse.json(
+        { error: 'Invalid intent value' },
+        { status: 400 },
+      );
     }
+    const parsedIntent = intentResult === null ? null : intentResult.data;
 
     // Log direction override for audit trail
     if (directionOverride) {
@@ -85,7 +84,7 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
       userId,
       transactionDirection: transactionDirection ?? undefined,
       userDescription: userDescription ?? null,
-      intent: intent ?? null,
+      intent: parsedIntent,
     });
 
     await safeAuditLog({
@@ -98,7 +97,7 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
         role: finalRole,
         glAccountCode: finalGlAccountCode || null,
         directionOverride: directionOverride || undefined,
-        intent: intent ?? null,
+        intent: parsedIntent,
       },
     });
 

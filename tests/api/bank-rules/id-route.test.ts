@@ -66,6 +66,7 @@ const EXISTING_RULE = {
   isActive: true,
   isManuallyEdited: false,
   entityContextId: null,
+  intent: null,
   conditions: [{ field: 'description', operator: 'contains', value: 'original' }],
   createdAt: new Date('2025-01-01'),
   updatedAt: new Date('2025-01-01'),
@@ -77,6 +78,16 @@ function makePutRequest(id: string, body: unknown): NextRequest {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
+}
+
+function makeParsedPutRequest(body: Record<string, unknown>): NextRequest {
+  const req = new NextRequest('http://localhost:3000/api/bank-rules/rule-1', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'x-company-id': 'c1' },
+    body: JSON.stringify({}),
+  });
+  vi.spyOn(req, 'json').mockResolvedValue(body);
+  return req;
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -153,5 +164,73 @@ describe('PUT /api/bank-rules/[id] — isManuallyEdited', () => {
         data: expect.objectContaining({ isManuallyEdited: true }),
       }),
     );
+  });
+
+  it('persists valid intent values', async () => {
+    const req = makePutRequest('rule-1', { companyId: 'c1', intent: 'RENT_PAYMENT' });
+    const res = await PUT(req, { params: Promise.resolve({ id: 'rule-1' }) });
+
+    expect(res.status).toBe(200);
+    expect(bankRuleUpdateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ intent: 'RENT_PAYMENT', isManuallyEdited: true }),
+      }),
+    );
+  });
+
+  it('preserves existing intent when intent is omitted', async () => {
+    bankRuleFindFirstMock.mockReset();
+    bankRuleFindFirstMock
+      .mockResolvedValueOnce({ ...EXISTING_RULE, intent: 'LOAN_PAYMENT' })
+      .mockResolvedValue(null);
+
+    const req = makePutRequest('rule-1', { companyId: 'c1', name: 'Updated Name' });
+    const res = await PUT(req, { params: Promise.resolve({ id: 'rule-1' }) });
+
+    expect(res.status).toBe(200);
+    const updateCall = bankRuleUpdateMock.mock.calls[0][0];
+    expect(updateCall.data).not.toHaveProperty('intent');
+  });
+
+  it('clears intent when intent is explicitly null', async () => {
+    bankRuleFindFirstMock.mockReset();
+    bankRuleFindFirstMock
+      .mockResolvedValueOnce({ ...EXISTING_RULE, intent: 'RENT_PAYMENT' })
+      .mockResolvedValue(null);
+
+    const req = makePutRequest('rule-1', { companyId: 'c1', intent: null });
+    const res = await PUT(req, { params: Promise.resolve({ id: 'rule-1' }) });
+
+    expect(res.status).toBe(200);
+    expect(bankRuleUpdateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ intent: null, isManuallyEdited: true }),
+      }),
+    );
+  });
+
+  it('clears intent when intent is explicitly undefined in parsed body', async () => {
+    bankRuleFindFirstMock.mockReset();
+    bankRuleFindFirstMock
+      .mockResolvedValueOnce({ ...EXISTING_RULE, intent: 'RENT_PAYMENT' })
+      .mockResolvedValue(null);
+
+    const req = makeParsedPutRequest({ companyId: 'c1', intent: undefined });
+    const res = await PUT(req, { params: Promise.resolve({ id: 'rule-1' }) });
+
+    expect(res.status).toBe(200);
+    expect(bankRuleUpdateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ intent: null, isManuallyEdited: true }),
+      }),
+    );
+  });
+
+  it.each(['', false, 0])('rejects invalid intent value %s before Prisma update', async (intent) => {
+    const req = makePutRequest('rule-1', { companyId: 'c1', intent });
+    const res = await PUT(req, { params: Promise.resolve({ id: 'rule-1' }) });
+
+    expect(res.status).toBe(400);
+    expect(bankRuleUpdateMock).not.toHaveBeenCalled();
   });
 });

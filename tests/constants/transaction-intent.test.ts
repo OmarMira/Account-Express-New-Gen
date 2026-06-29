@@ -1,3 +1,4 @@
+import { describe, it, expect } from 'vitest';
 import { TRANSACTION_INTENT_VALUES, transactionIntentSchema } from '@/lib/constants/transaction-intent';
 import { TransactionIntent } from '@prisma/client';
 

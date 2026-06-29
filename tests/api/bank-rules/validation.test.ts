@@ -128,4 +128,42 @@ describe('POST /api/bank-rules — conditions[] validation', () => {
     );
     expect(response.status).toBe(201);
   });
+
+  it('persists valid intent values on create', async () => {
+    const response = await POST(
+      makePostRequest({
+        companyId: 'c1',
+        name: 'Intent rule',
+        conditions: [{ field: 'description', operator: 'contains', value: 'RENT' }],
+        transactionDirection: 'any',
+        debitGlAccountId: 'acc-1',
+        intent: 'RENT_PAYMENT',
+      }),
+      { params: Promise.resolve({}) },
+    );
+
+    expect(response.status).toBe(201);
+    expect(db.bankRule.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ intent: 'RENT_PAYMENT' }),
+      }),
+    );
+  });
+
+  it('rejects invalid intent values before Prisma create', async () => {
+    const response = await POST(
+      makePostRequest({
+        companyId: 'c1',
+        name: 'Invalid intent rule',
+        conditions: [{ field: 'description', operator: 'contains', value: 'RENT' }],
+        transactionDirection: 'any',
+        debitGlAccountId: 'acc-1',
+        intent: '',
+      }),
+      { params: Promise.resolve({}) },
+    );
+
+    expect(response.status).toBe(400);
+    expect(db.bankRule.create).not.toHaveBeenCalled();
+  });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { Mocked } from 'vitest';
+import type { Mock } from 'vitest';
 
 // Mock db — apply-all-engine uses db for read-only matching queries
 vi.mock('@/lib/db', () => ({
@@ -45,7 +45,12 @@ import { JournalEntryService } from '@/lib/services/journal-entry.service';
 import { matchTransactions, executeApplyAll } from '@/lib/services/apply-all-engine';
 import type { MatchResult } from '@/lib/services/apply-all-engine';
 
-const mockDb = db as Mocked<typeof db>;
+const mockDb = db as unknown as {
+  bankRule: { findMany: Mock };
+  company: { findUnique: Mock };
+  bankStatement: { findMany: Mock };
+  bankTransaction: { findMany: Mock; updateMany: Mock };
+};
 
 const RULE_ID_1 = 'rule-1';
 const RULE_ID_2 = 'rule-2';

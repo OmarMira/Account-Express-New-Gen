@@ -5,6 +5,7 @@ import { requireCompanyContext } from '@/lib/context-storage';
 import { logger } from '@/lib/logger';
 import { createAuditLogWithRetry } from '@/lib/audit';
 import { validateDirectionProfile } from '@/lib/services/direction-validation';
+import { transactionIntentSchema } from '@/lib/constants/transaction-intent';
 
 // ─── GET /api/bank-rules ───────────────────────────────────────────
 // List bank rules for a company, sorted by priority. Includes GL account info.
@@ -102,6 +103,7 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
       priority = 10,
       isActive = true,
       directionProfile, // { creditPct, debitPct } — optional, sent by AI wizard
+      intent,
     } = body;
     // These are reassigned during GL account resolution and validation
     let glAccountId = body.glAccountId;
@@ -109,6 +111,12 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
     let creditGlAccountId = body.creditGlAccountId;
     let transactionDirection = body.transactionDirection;
     let conditions = body.conditions;
+
+    const intentResult = intent == null ? null : transactionIntentSchema.safeParse(intent);
+    if (intentResult !== null && !intentResult.success) {
+      return NextResponse.json({ error: 'Invalid intent value' }, { status: 400 });
+    }
+    const parsedIntent = intentResult === null ? null : intentResult.data;
 
     // Validate required fields
     if (!name?.trim()) {
@@ -432,6 +440,7 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
         conditionType: conditionType || conditions[0]?.operator || null,
         conditionValue: conditionValue || conditions[0]?.value || null,
         transactionDirection,
+        intent: parsedIntent,
         glAccountId: glAccountId || debitGlAccountId || creditGlAccountId || null,
         // V2 fields
         conditions: conditions,

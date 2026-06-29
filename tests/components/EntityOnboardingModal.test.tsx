@@ -23,9 +23,10 @@ vi.mock('@/components/ui/select', () => {
     const kids = React.Children.toArray(children);
     for (const child of kids) {
       if (React.isValidElement(child)) {
-        if (child.props.placeholder) return child.props.placeholder;
-        if (child.props.children) {
-          const nested = findPlaceholderValue(child.props.children);
+        const props = child.props as { placeholder?: string; children?: React.ReactNode };
+        if (props.placeholder) return props.placeholder;
+        if (props.children) {
+          const nested = findPlaceholderValue(props.children);
           if (nested) return nested;
         }
       }
@@ -1167,7 +1168,7 @@ describe('EntityOnboardingModal', () => {
       await waitFor(() => {
         // Check that classify-entity was called with intent: null (since no intent selected)
         const classifyCalls = mockFetch.mock.calls.filter(
-          ([url]: [string]) =>
+          ([url]) =>
             typeof url === 'string' && url.includes('/api/learning/classify-entity'),
         ) as [string, RequestInit][];
         expect(classifyCalls.length).toBeGreaterThan(0);
@@ -1201,7 +1202,7 @@ describe('EntityOnboardingModal', () => {
       // Verify the API call includes intent
       await waitFor(() => {
         const classifyCalls = mockFetch.mock.calls.filter(
-          ([url]: [string]) =>
+          ([url]) =>
             typeof url === 'string' && url.includes('/api/learning/classify-entity'),
         ) as [string, RequestInit][];
         expect(classifyCalls.length).toBeGreaterThan(0);

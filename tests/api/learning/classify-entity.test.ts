@@ -122,7 +122,7 @@ describe('POST /api/learning/classify-entity', () => {
     const req = await makeRequest({
       pattern: 'JOHN DOE',
       role: 'INQUILINO',
-      intent: 'RENT_PAYMENT',
+      intent: null,
       glAccountCode: '4010',
       source: 'user',
       companyId: 'comp-1',

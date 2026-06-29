@@ -5,6 +5,7 @@ import { requireCompanyContext } from '@/lib/context-storage';
 import { createAuditLogWithRetry } from '@/lib/audit';
 import { validateDirectionProfile } from '@/lib/services/direction-validation';
 import { serverT } from '@/lib/server-i18n';
+import { transactionIntentSchema } from '@/lib/constants/transaction-intent';
 
 import {
   transactionMatchesRule,
@@ -59,6 +60,7 @@ export const PUT = apiHandler(async (request: NextRequest, context: RouteContext
     conditions,
     debitGlAccountId,
     creditGlAccountId,
+    intent,
   } = body;
 
   // Find existing rule
@@ -95,6 +97,13 @@ export const PUT = apiHandler(async (request: NextRequest, context: RouteContext
       );
     }
   }
+
+  const hasIntent = Object.prototype.hasOwnProperty.call(body, 'intent');
+  const intentResult = !hasIntent || intent == null ? null : transactionIntentSchema.safeParse(intent);
+  if (intentResult !== null && !intentResult.success) {
+    return NextResponse.json({ error: 'Invalid intent value' }, { status: 400 });
+  }
+  const parsedIntent = intentResult === null ? null : intentResult.data;
 
   if (conditions !== undefined) {
     if (!Array.isArray(conditions) || conditions.length === 0) {
@@ -247,6 +256,7 @@ export const PUT = apiHandler(async (request: NextRequest, context: RouteContext
   if (glAccountId !== undefined) updateData.glAccountId = glAccountId;
   if (debitGlAccountId !== undefined) updateData.debitGlAccountId = debitGlAccountId;
   if (creditGlAccountId !== undefined) updateData.creditGlAccountId = creditGlAccountId;
+  if (hasIntent) updateData.intent = parsedIntent;
 
   const finalDebit = debitGlAccountId !== undefined ? debitGlAccountId : existing.debitGlAccountId;
   const finalCredit =
@@ -286,10 +296,13 @@ export const PUT = apiHandler(async (request: NextRequest, context: RouteContext
   // ─── Manual edit detection ────────────────────────────────────────
   // Any field change besides isActive flips isManuallyEdited=true
   const nonIsActiveFields = ['name', 'conditionType', 'conditionValue', 'transactionDirection',
-    'glAccountId', 'conditions', 'debitGlAccountId', 'creditGlAccountId', 'priority'];
-  const hasNonIsActiveChange = nonIsActiveFields.some(
-    (f) => body[f] !== undefined && String(body[f]) !== String((existing as Record<string, unknown>)[f]),
-  );
+    'glAccountId', 'conditions', 'debitGlAccountId', 'creditGlAccountId', 'priority', 'intent'];
+  const hasNonIsActiveChange = nonIsActiveFields.some((f) => {
+    if (!Object.prototype.hasOwnProperty.call(body, f)) return false;
+
+    const nextValue = f === 'intent' ? parsedIntent : body[f];
+    return String(nextValue) !== String((existing as Record<string, unknown>)[f]);
+  });
   if (hasNonIsActiveChange) {
     updateData.isManuallyEdited = true;
   }
