@@ -1084,7 +1084,7 @@ const en = {
     splitBoth: 'Both (no split)',
 
     // Batch classification
-    otroDescription: 'Describe what this entity is...',
+    otroDescription: 'Explain in your own words what this entity represents...',
     preClassify: 'Pre classify entities',
     classify: 'Classify entities',
     suggestionBanner: {
@@ -1104,7 +1104,7 @@ const en = {
       error: 'Error classifying some entities',
     },
     intentLabel: 'Transaction Intent',
-    intentPlaceholder: 'Select intent (optional)',
+    intentPlaceholder: 'Select transaction intent',
     actorTypeLabel: 'Actor Type',
     splitReasoning: 'No rule matching pattern "{pattern}" found. Suggested intent: {intent}.',
   },

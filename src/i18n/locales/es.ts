@@ -1101,7 +1101,7 @@ const es = {
     splitBoth: 'Ambos (no dividir)',
 
     // Batch classification
-    otroDescription: 'Describí qué es esta entidad...',
+    otroDescription: 'Explicá con tus palabras qué representa esta entidad...',
     preClassify: 'Pre clasificar entidades',
     classify: 'Clasificar entidades',
     suggestionBanner: {
@@ -1121,7 +1121,7 @@ const es = {
       error: 'Error al clasificar algunas entidades',
     },
     intentLabel: 'Intención de la Transacción',
-    intentPlaceholder: 'Seleccionar intención (opcional)',
+    intentPlaceholder: 'Seleccionar intención de transacción',
     actorTypeLabel: 'Tipo de Actor',
     splitReasoning: 'No se encontró regla para el patrón "{pattern}". Intención sugerida: {intent}.',
   },

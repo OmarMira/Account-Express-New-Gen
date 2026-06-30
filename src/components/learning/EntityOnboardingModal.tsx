@@ -28,11 +28,11 @@ import {
 import { useLanguageStore } from '@/store/language-store';
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
-import entityRoles from '../../../rules/entity-roles.json';
 import { EXPECTED_DIRECTION } from '@/lib/constants/entity-roles';
 import type { EntityRole } from '@/lib/constants/entity-roles';
 import { TRANSACTION_INTENT_VALUES } from '@/lib/constants/transaction-intent';
 import type { TransactionIntent } from '@/lib/constants/transaction-intent';
+import { classifyDirection } from '@/lib/services/direction-filter';
 
 interface EntityCandidate {
   id: string;
@@ -109,8 +109,6 @@ export function getEligibleBatchEntities(
     })
     .map((c) => c.canonicalName);
 }
-
-const ENTITY_ROLE_VALUES = entityRoles as EntityRole[];
 
 export function EntityOnboardingModal({
   isOpen,
@@ -233,11 +231,12 @@ export function EntityOnboardingModal({
       if (!sel.role || sel.role === 'OTRO') continue;
       if (newlySaved.has(name)) continue;
 
-      const splitDir = splitSelections[name];
-      const isSplit = splitDir === 'credit' || splitDir === 'debit';
+        const splitDir = splitSelections[name];
+        const isSplit = splitDir === 'credit' || splitDir === 'debit';
+        const intent = intentSelections[name] ?? null;
 
-      if (isSplit) {
-        const splitPattern =
+        if (isSplit) {
+          const splitPattern =
           splitDir === 'credit'
             ? `${name} - ingresos`
             : `${name} - retiros`;
@@ -248,9 +247,9 @@ export function EntityOnboardingModal({
             body: JSON.stringify({
               companyId,
               pattern: splitPattern,
-              role: sel.role,
               transactionDirection: splitDir,
-              intent: intentSelections[name] ?? null,
+              intent,
+              ...(!intent ? { role: sel.role } : {}),
             }),
           });
           if (res.ok) newlySaved.add(name);
@@ -267,15 +266,15 @@ export function EntityOnboardingModal({
         const res = await fetch('/api/learning/classify-entity', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            companyId,
-            pattern: name,
-            userInput: sel.userInput || name,
-            role: sel.role,
-            directionOverride: directionOverrides[name] || undefined,
-            intent: intentSelections[name] ?? null,
-          }),
-        });
+            body: JSON.stringify({
+              companyId,
+              pattern: name,
+              userInput: sel.userInput || name,
+              directionOverride: directionOverrides[name] || undefined,
+              intent,
+              ...(!intent ? { role: sel.role } : {}),
+            }),
+          });
         if (res.ok) {
           newlySaved.add(name);
         } else {
@@ -521,6 +520,15 @@ export function EntityOnboardingModal({
     }
   }
 
+  function handleIntentChange(canonicalName: string, value: string) {
+    const intent = value === 'none' ? null : (value as TransactionIntent);
+    setIntentSelections((prev) => ({ ...prev, [canonicalName]: intent }));
+
+    if (intent !== 'OTHER') {
+      setDescriptions((prev) => ({ ...prev, [canonicalName]: '' }));
+    }
+  }
+
   // ── Batch suggestion actions ──────────────────────────────────────────
   function handleAcceptSuggestion(canonicalName: string, role: string) {
     updateSelection(canonicalName, 'role', role);
@@ -550,27 +558,26 @@ export function EntityOnboardingModal({
 
   // ── Save all classifications ────────────────────────────────────────
   async function handleClassifyAll() {
-    // Read current selections from ref
-    const entries = Object.entries(selectionsRef.current);
-    if (entries.length === 0) return;
+    const pendingCandidates = candidates.filter(
+      (candidate) => !savedRef.current.has(candidate.canonicalName),
+    );
+    if (pendingCandidates.length === 0) return;
 
     setSaving(true);
     let count = 0;
 
-    for (const [pattern, sel] of entries) {
+    for (const candidate of pendingCandidates) {
+      const pattern = candidate.canonicalName;
       // Skip entities already auto-saved during pre-classify
       if (savedRef.current.has(pattern)) continue;
 
       const splitDir = splitSelections[pattern];
       const isSplit = splitDir === 'credit' || splitDir === 'debit';
+      const intent = intentSelections[pattern] ?? null;
+      if (!intent) continue;
 
-      // Determine the effective role
-      let finalRole = sel.role;
-      if (!finalRole) continue;
-
-      // Handle OTRO: save with userDescription if description >= 5 chars
-      if (finalRole === 'OTRO') {
-        const userDesc = descriptions[pattern] || descriptionsSnapshot.current[pattern] || '';
+      if (intent === 'OTHER') {
+        const userDesc = descriptions[pattern] || '';
         if (userDesc.trim().length < 5) continue; // Skip OTRO without enough description
 
         try {
@@ -580,10 +587,9 @@ export function EntityOnboardingModal({
             body: JSON.stringify({
               companyId,
               pattern,
-              role: 'OTRO',
               source: 'user',
               userDescription: userDesc.trim(),
-              intent: intentSelections[pattern] ?? null,
+              intent,
             }),
           });
 
@@ -613,9 +619,9 @@ export function EntityOnboardingModal({
             body: JSON.stringify({
               companyId,
               pattern: splitPattern,
-              role: finalRole,
+              source: 'user',
               transactionDirection: splitDir,
-              intent: intentSelections[pattern] ?? null,
+              intent,
             }),
           });
 
@@ -639,13 +645,13 @@ export function EntityOnboardingModal({
         const res = await fetch('/api/learning/classify-entity', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            companyId,
-            pattern,
-            userInput: sel.userInput || pattern,
-            role: finalRole,
-            directionOverride: directionOverrides[pattern] || undefined,
-            intent: intentSelections[pattern] ?? null,
+            body: JSON.stringify({
+              companyId,
+              pattern,
+              userInput: selectionsRef.current[pattern]?.userInput || pattern,
+              source: 'user',
+              directionOverride: directionOverrides[pattern] || undefined,
+              intent,
           }),
         });
 
@@ -661,7 +667,7 @@ export function EntityOnboardingModal({
     }
 
     setSavedCount(count);
-    const skipped = entries.length - count;
+    const skipped = pendingCandidates.length - count;
     if (skipped > 0) {
       toast.warning(
         t('learning.classifiedCount').replace('{count}', String(count)) +
@@ -679,72 +685,28 @@ export function EntityOnboardingModal({
     onClose();
   }
 
-  // ── Computed: block save ONLY if ALL selections are OTRO ──
-  // Individual OTRO entities are skipped during save (line ~390).
-  // The user should still be able to save entities they DID classify.
-  const allOtroOrEmpty = Object.values(selections).length === 0
-    ? true
-    : Object.values(selections).every((sel) => sel.role === 'OTRO' || !sel.role);
-
-  // ── 3.1 — Button text derivation (state machine) ─────────────────────
-  const hasOtro = candidates.some((c) => {
-    const sel = selections[c.canonicalName];
-    const role = sel?.role || getDefaultRole(c.canonicalName);
-    return role === 'OTRO';
-  });
-
-  const hasEligibleOtro = candidates.some((c) => {
-    const sel = selections[c.canonicalName];
-    const role = sel?.role || getDefaultRole(c.canonicalName);
-    const desc = descriptions[c.canonicalName];
-    return role === 'OTRO' && desc && desc.length >= 5;
-  });
-
-  /** "OTRO sin resolver" = entity has role OTRO AND batch result is NOT
-   *  in a terminal state (accepted, discarded, or error).
-   *  Error is terminal — the AI couldn't process it, the user sees the
-   *  error banner and can pick a role manually without being blocked.
-   */
-  const hasUnresolvedOtro = candidates.some((c) => {
-    const sel = selections[c.canonicalName];
-    const role = sel?.role || getDefaultRole(c.canonicalName);
-    if (role !== 'OTRO') return false;
-    const result = batchResults[c.canonicalName];
-    if (!result) return true;
-    return result.status !== 'accepted' && result.status !== 'discarded' && result.status !== 'error';
-  });
-
-  const batchRan = Object.keys(batchResults).length > 0;
-
-  const buttonState = (() => {
-    // Batch in progress → loading
-    if (batchInProgress) {
-      return { text: t('learning.batch.loading'), disabled: true, showSpinner: true, onClick: undefined as (() => void) | undefined };
-    }
-
-    if (hasOtro) {
-      // Batch completed + no OTRO unresolved → classify (allow save)
-      if (batchRan && !hasUnresolvedOtro) {
-        return { text: t('learning.classify'), disabled: false, showSpinner: false, onClick: handleClassifyAll };
-      }
-      // Has eligible OTRO descriptions → pre-classify enabled
-      if (hasEligibleOtro) {
-        return { text: t('learning.preClassify'), disabled: false, showSpinner: false, onClick: handlePreClassify };
-      }
-      // Has OTRO but no eligible descriptions → pre-classify disabled
-      return { text: t('learning.preClassify'), disabled: true, showSpinner: false, onClick: undefined };
-    }
-
-    // No OTRO → classify enabled
-    return { text: t('learning.classify'), disabled: false, showSpinner: false, onClick: handleClassifyAll };
-  })();
-
-  if (!isOpen) return null;
-
-  // ── Filter out entities that were auto-saved during pre-classify ─────
   const remainingCandidates = candidates.filter(
     (c) => !savedEntities.has(c.canonicalName),
   );
+
+  const hasValidIntentSelections = remainingCandidates.length > 0
+    && remainingCandidates.every((candidate) => {
+      const intent = intentSelections[candidate.canonicalName] ?? null;
+      if (!intent) return false;
+      if (intent !== 'OTHER') return true;
+      return (descriptions[candidate.canonicalName] ?? '').trim().length >= 5;
+    });
+
+  const buttonState = (() => {
+    return {
+      text: t('learning.classify'),
+      disabled: !hasValidIntentSelections,
+      showSpinner: false,
+      onClick: hasValidIntentSelections ? handleClassifyAll : undefined,
+    };
+  })();
+
+  if (!isOpen) return null;
 
   // ── Render ───────────────────────────────────────────────────────────
   return (
@@ -782,31 +744,24 @@ export function EntityOnboardingModal({
           <div className="flex-1 overflow-y-auto space-y-3 pr-1">
             {remainingCandidates.map((candidate) => {
               const sel = selections[candidate.canonicalName];
-              const role = sel?.role || getDefaultRole(candidate.canonicalName);
+              const selectedIntent = intentSelections[candidate.canonicalName] ?? null;
+              const role = sel?.role || '';
               const name = candidate.canonicalName;
-              const { creditPct, debitPct } = candidate.directionProfile;
 
               // Direction label
-              const directionLabel =
-                creditPct > 70
-                  ? t('learning.directionCredit')
-                  : debitPct > 70
-                    ? t('learning.directionDebit')
-                    : t('learning.directionMixed');
-
-              // 4.1 — Check direction mismatch for the selected role
-              const mismatch = role
-                ? checkRoleDirectionMismatch(role, debitPct, creditPct)
-                : null;
-              const isOverridden = directionOverrides[name] ?? false;
-              const showWarning = mismatch !== null && !isOverridden;
+              const directionLabel = (() => {
+                const profile = classifyDirection(candidate.directionProfile);
+                if (profile === 'credit') return t('learning.directionCredit');
+                if (profile === 'debit') return t('learning.directionDebit');
+                return t('learning.directionMixed');
+              })();
 
               // 4.2 — Detect mixed direction
               const mixed = isMixedDirection(candidate.directionProfile);
               const currentSplit = splitSelections[name] ?? null;
 
               // ── OTRO description handling ──
-              const isOtro = role === 'OTRO';
+              const isOtro = selectedIntent === 'OTHER';
               const descValue = descriptions[name] ?? '';
 
               return (
@@ -830,8 +785,8 @@ export function EntityOnboardingModal({
                   </div>
 
                   {/* ── 4.2 (F3) — Split UI for mixed direction ────────── */}
-                  {/* Only show split when a valid non-OTRO role is selected */}
-                  {mixed && role && role !== 'OTRO' && (
+                  {/* Intent-first flow does not derive or require role on the client. */}
+                  {mixed && selectedIntent && selectedIntent !== 'OTHER' && (
                     <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md p-3 space-y-2">
                       <p className="text-xs font-medium text-blue-700 dark:text-blue-300">
                         {t('learning.splitTitle')}
@@ -889,57 +844,8 @@ export function EntityOnboardingModal({
                     </div>
                   )}
 
-                  {/* Role dropdown */}
+                  {/* Intent-first controls */}
                   <div className="w-full">
-                    <Select
-                      value={role}
-                      onValueChange={(v) => handleRoleChange(name, v)}
-                      disabled={saving}
-                    >
-                      <SelectTrigger className="h-8 text-sm" data-candidate={name}>
-                        <SelectValue
-                          placeholder={t('learning.rolePlaceholder')}
-                        />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {ENTITY_ROLE_VALUES.map((r) => (
-                          <SelectItem key={r} value={r}>
-                            {r}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-
-                    {/* ── 4.1 (F2) — Direction warning banner ──────────── */}
-                    {showWarning && mismatch && (
-                      <div className="flex items-start gap-2 p-2 mt-1.5 text-sm bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 text-yellow-800 dark:text-yellow-200 rounded-md">
-                        <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs">
-                            {mismatch.expectedDirection === 'credit'
-                              ? t('learning.directionWarningCredit')
-                                  .replace('{entityName}', name)
-                                  .replace('{pct}', String(Math.round(debitPct * 100)))
-                                  .replace('{roleName}', role)
-                              : t('learning.directionWarningDebit')
-                                  .replace('{entityName}', name)
-                                  .replace('{pct}', String(Math.round(creditPct * 100)))
-                                  .replace('{roleName}', role)}
-                          </p>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="mt-1 h-7 text-xs border-yellow-300 dark:border-yellow-700"
-                            onClick={() =>
-                              handleDirectionOverride(name)
-                            }
-                          >
-                            {t('learning.directionOverride')}
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-
                     {/* ── F3 — Intent dropdown ──────────────────────────── */}
                     <div className="mt-1.5">
                       <label className="text-xs text-muted-foreground mb-1 block">
@@ -947,12 +853,7 @@ export function EntityOnboardingModal({
                       </label>
                       <Select
                         value={intentSelections[name] ?? 'none'}
-                        onValueChange={(v) =>
-                          setIntentSelections((prev) => ({
-                            ...prev,
-                            [name]: v === 'none' ? null : (v as TransactionIntent),
-                          }))
-                        }
+                        onValueChange={(v) => handleIntentChange(name, v)}
                         disabled={saving}
                       >
                         <SelectTrigger className="h-8 text-sm" data-testid="intent-select">
