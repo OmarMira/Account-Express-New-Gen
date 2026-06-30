@@ -56,6 +56,9 @@ export async function saveContext(data: {
   const rolesJson = data.roles?.length
     ? JSON.stringify(data.roles.map((r) => r.toUpperCase()))
     : null;
+  const trimmedUserDescription = typeof data.userDescription === 'string'
+    ? data.userDescription.trim()
+    : data.userDescription;
 
   const context = await db.entityContext.upsert({
     where: {
@@ -70,7 +73,7 @@ export async function saveContext(data: {
       glAccountId: validated.glAccountId,
       source: data.source ?? 'user',
       transactionDirection: validated.transactionDirection ?? null,
-      userDescription: data.userDescription ?? null,
+      userDescription: trimmedUserDescription ?? null,
     },
     create: {
       companyId: validated.companyId,
@@ -80,7 +83,7 @@ export async function saveContext(data: {
       glAccountId: validated.glAccountId,
       source: data.source ?? 'user',
       transactionDirection: validated.transactionDirection ?? null,
-      userDescription: data.userDescription ?? null,
+      userDescription: trimmedUserDescription ?? null,
     },
   });
 
@@ -99,6 +102,7 @@ export async function saveContext(data: {
           roles: data.roles,
           glAccountId: validated.glAccountId,
           source: data.source ?? 'user',
+          userDescription: trimmedUserDescription ?? null,
         }),
       },
     });

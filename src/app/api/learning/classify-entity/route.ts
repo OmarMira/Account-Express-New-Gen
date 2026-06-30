@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { apiHandler, type RouteContext } from '@/lib/api-handler';
 import { requireCompanyContext } from '@/lib/context-storage';
-import { classifyEntity, getEntityCandidates } from '@/lib/services/entity-classifier';
+import { classifyEntity, deriveRoleFromIntent, getEntityCandidates } from '@/lib/services/entity-classifier';
 import { parseConversationalContext } from '@/lib/services/conversational-service';
 import { safeAuditLog } from '@/lib/services/audit-service';
 import { db } from '@/lib/db';
@@ -35,12 +35,20 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
     }
     const parsedIntent = intentResult === null ? null : intentResult.data;
 
+    const trimmedUserDescription = typeof userDescription === 'string' ? userDescription.trim() : userDescription;
+    if (parsedIntent === 'OTHER' && !trimmedUserDescription) {
+      return NextResponse.json(
+        { error: 'userDescription is required when intent is OTHER' },
+        { status: 400 },
+      );
+    }
+
     // Log direction override for audit trail
     if (directionOverride) {
       logger.warn('[DIRECTION OVERRIDE]', { pattern, role, userId });
     }
 
-    let finalRole = role;
+    let finalRole = parsedIntent ? deriveRoleFromIntent(parsedIntent, role) : role;
     let finalGlAccountCode = glAccountCode;
 
     if (!finalRole) {
@@ -55,7 +63,7 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
         undefined,
         locale,
       );
-      finalRole = parseResult.role;
+      finalRole = deriveRoleFromIntent(parsedIntent, parseResult.role);
       finalGlAccountCode = finalGlAccountCode || parseResult.glAccountCode;
     }
 
@@ -83,9 +91,11 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
       source: 'user',
       userId,
       transactionDirection: transactionDirection ?? undefined,
-      userDescription: userDescription ?? null,
+      userDescription: trimmedUserDescription ?? null,
       intent: parsedIntent,
     });
+
+    const ruleCreationWarning = classifyResult.warning === 'No GL account linked — rule not created';
 
     await safeAuditLog({
       companyId,
@@ -98,13 +108,17 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
         glAccountCode: finalGlAccountCode || null,
         directionOverride: directionOverride || undefined,
         intent: parsedIntent,
+        userDescription: trimmedUserDescription ?? null,
+        ruleCreated: !ruleCreationWarning,
+        requiresReview: ruleCreationWarning,
       },
     });
 
     return NextResponse.json({
       success: true,
-      data: { role: finalRole },
+      data: { role: finalRole, entityContext: classifyResult.context },
       ...(classifyResult.warning ? { warning: classifyResult.warning } : {}),
+      ...(ruleCreationWarning ? { ruleCreated: false, requiresReview: true } : { ruleCreated: true }),
     });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : serverT(locale, 'learning.serverError');

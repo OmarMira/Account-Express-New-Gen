@@ -146,6 +146,34 @@ describe('saveContext()', () => {
     expect(ctx.transactionDirection).toBeNull();
   });
 
+  it('stores a trimmed userDescription when provided', async () => {
+    const ctx = await saveContext({
+      companyId,
+      pattern: 'OTHER ENTITY',
+      role: 'OTRO',
+      userDescription: '  Needs manual review  ',
+    });
+
+    expect(ctx.userDescription).toBe('Needs manual review');
+  });
+
+  it('includes userDescription in audit details when provided', async () => {
+    const ctx = await saveContext({
+      companyId,
+      pattern: 'AUDITED OTHER ENTITY',
+      role: 'OTRO',
+      userId,
+      userDescription: 'Manual context for audit',
+    });
+
+    const logs = await db.auditLog.findMany({
+      where: { entityId: ctx.id },
+    });
+    const details = JSON.parse(logs[0].details as string);
+
+    expect(details.userDescription).toBe('Manual context for audit');
+  });
+
   it('stores glAccountId when provided', async () => {
     const gl = await createTestGlAccount({ companyId, code: '4010', name: 'Ingresos Financieros' });
 

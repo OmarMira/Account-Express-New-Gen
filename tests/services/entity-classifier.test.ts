@@ -59,6 +59,7 @@ import {
   getKnownSocioPatterns,
   computeDirectionProfile,
   autoCreateRule,
+  deriveRoleFromIntent,
 } from '@/lib/services/entity-classifier';
 import { ENTITY_ROLES, entityRoleSchema, UI_ROLES } from '@/lib/constants/entity-roles';
 import type { EntityContext } from '@prisma/client';
@@ -436,6 +437,27 @@ describe('computeDirectionProfile()', () => {
     expect(result).toBe('credit');
   });
 
+  it('returns "credit" at the normalized 0.8 credit threshold', async () => {
+    mockDb.bankTransaction.findMany.mockResolvedValue([
+      ...Array.from({ length: 8 }, () => ({ amount: 100 })),
+      ...Array.from({ length: 2 }, () => ({ amount: -50 })),
+    ]);
+
+    const result = await computeDirectionProfile('comp-1', 'ACME');
+
+    expect(result).toBe('credit');
+  });
+
+  it('returns "credit" for 12 positive and 0 negative transactions', async () => {
+    mockDb.bankTransaction.findMany.mockResolvedValue(
+      Array.from({ length: 12 }, () => ({ amount: 100 })),
+    );
+
+    const result = await computeDirectionProfile('comp-1', 'RENT');
+
+    expect(result).toBe('credit');
+  });
+
   it('returns "any" when neither debit nor credit exceeds 80% threshold', async () => {
     const transactions = [
       { amount: -100 },
@@ -502,6 +524,29 @@ describe('computeDirectionProfile()', () => {
     const result = await computeDirectionProfile('comp-1', 'ACME');
 
     expect(result).toBe('debit');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// deriveRoleFromIntent
+// ═══════════════════════════════════════════════════════════════════════
+
+describe('deriveRoleFromIntent()', () => {
+  it('preserves a valid provided role only for legacy non-intent flows', () => {
+    const result = deriveRoleFromIntent(null, 'EMPLEADO');
+
+    expect(result).toBe('EMPLEADO');
+  });
+
+  it('ignores a provided role when intent is present and derives backend truth from intent', () => {
+    const result = deriveRoleFromIntent('OPERATING_EXPENSE', 'CLIENTE');
+
+    expect(result).toBe('GASTO_OPERATIVO');
+  });
+
+  it('derives CLIENTE for customer payments and OTRO for OTHER', () => {
+    expect(deriveRoleFromIntent('CUSTOMER_PAYMENT')).toBe('CLIENTE');
+    expect(deriveRoleFromIntent('OTHER')).toBe('OTRO');
   });
 });
 
@@ -820,6 +865,66 @@ describe('classifyEntity() — auto-create side-effect', () => {
     // saveContext gets source: 'user' default, but classifyEntity's source guard
     // checks input.source directly — since it's undefined, autoCreateRule is NOT called
     expect(mockDb.bankRule.create).not.toHaveBeenCalled();
+  });
+
+  it('saves trimmed OTHER userDescription before returning the no-account warning', async () => {
+    mockDb.glAccount.findFirst.mockResolvedValue(null);
+    const savedCtx = { id: 'ctx-1', pattern: 'MISC', glAccountId: null } as EntityContext;
+    (saveContext as ReturnType<typeof vi.fn>).mockResolvedValue(savedCtx);
+
+    const result = await classifyEntity({
+      companyId: 'comp-1',
+      pattern: 'MISC',
+      role: 'OTRO',
+      roles: ['OTRO'],
+      source: 'user',
+      intent: 'OTHER',
+      userDescription: '  Manual context  ',
+    });
+
+    expect(saveContext).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userDescription: 'Manual context',
+        role: 'OTRO',
+      }),
+    );
+    expect(result.warning).toBe('No GL account linked — rule not created');
+    expect(mockDb.bankRule.create).not.toHaveBeenCalled();
+  });
+
+  it('requires userDescription for legacy OTRO role even when intent is not OTHER', async () => {
+    const savedCtx = { id: 'ctx-1', pattern: 'MISC', glAccountId: null } as EntityContext;
+    (saveContext as ReturnType<typeof vi.fn>).mockResolvedValue(savedCtx);
+
+    await expect(classifyEntity({
+      companyId: 'comp-1',
+      pattern: 'MISC',
+      role: 'OTRO',
+      roles: ['OTRO'],
+      source: 'user',
+      intent: 'TRANSFER',
+    })).rejects.toThrow('userDescription is required when intent is OTHER or role is OTRO');
+    expect(saveContext).not.toHaveBeenCalled();
+  });
+
+  it('validates against the derived role when provided role is missing', async () => {
+    const savedCtx = { id: 'ctx-1', pattern: 'MISC', glAccountId: null } as EntityContext;
+    (saveContext as ReturnType<typeof vi.fn>).mockResolvedValue(savedCtx);
+
+    await expect(classifyEntity({
+      companyId: 'comp-1',
+      pattern: 'MISC',
+      source: 'user',
+      intent: 'OTHER',
+      userDescription: 'derived role explanation',
+    })).resolves.toMatchObject({ context: savedCtx });
+
+    expect(saveContext).toHaveBeenCalledWith(
+      expect.objectContaining({
+        role: 'OTRO',
+        userDescription: 'derived role explanation',
+      }),
+    );
   });
 });
 

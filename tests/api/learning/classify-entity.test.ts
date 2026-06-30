@@ -182,6 +182,116 @@ describe('POST /api/learning/classify-entity', () => {
     expect(body.error).toBe('Invalid intent value');
   });
 
+  it('returns 400 when OTHER intent has no meaningful userDescription', async () => {
+    const req = await makeRequest({
+      pattern: 'UNMAPPED ENTITY',
+      intent: 'OTHER',
+      userDescription: '   ',
+      source: 'user',
+      companyId: 'comp-1',
+    });
+
+    const res = await POST(req, { params: Promise.resolve({}) });
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toBe('userDescription is required when intent is OTHER');
+    expect(saveContext).not.toHaveBeenCalled();
+  });
+
+  it('persists trimmed OTHER description with an internally derived OTRO role', async () => {
+    mockDb.glAccount.findFirst.mockResolvedValue(null);
+
+    const req = await makeRequest({
+      pattern: 'UNMAPPED ENTITY',
+      intent: 'OTHER',
+      userDescription: '  Needs manual business classification  ',
+      source: 'user',
+      companyId: 'comp-1',
+    });
+
+    const res = await POST(req, { params: Promise.resolve({}) });
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(saveContext).toHaveBeenCalledWith(
+      expect.objectContaining({
+        role: 'OTRO',
+        roles: ['OTRO'],
+        userDescription: 'Needs manual business classification',
+      }),
+    );
+  });
+
+  it('returns review metadata and does not create a rule when GL account is unresolved', async () => {
+    mockDb.glAccount.findFirst.mockResolvedValue(null);
+
+    const req = await makeRequest({
+      pattern: 'CUSTOMER INC',
+      intent: 'CUSTOMER_PAYMENT',
+      glAccountCode: '9999',
+      source: 'user',
+      companyId: 'comp-1',
+    });
+
+    const res = await POST(req, { params: Promise.resolve({}) });
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(body.ruleCreated).toBe(false);
+    expect(body.requiresReview).toBe(true);
+    expect(body.warning).toBe('No GL account linked — rule not created');
+    expect(mockDb.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('does not block an explicit user confirmation because confidence is low', async () => {
+    const req = await makeRequest({
+      pattern: 'CUSTOMER INC',
+      intent: 'CUSTOMER_PAYMENT',
+      confidence: 0.1,
+      glAccountCode: '4010',
+      source: 'user',
+      companyId: 'comp-1',
+    });
+
+    const res = await POST(req, { params: Promise.resolve({}) });
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(saveContext).toHaveBeenCalledWith(
+      expect.objectContaining({
+        role: 'CLIENTE',
+        roles: ['CLIENTE'],
+      }),
+    );
+  });
+
+  it('derives role from intent even when the request provides a conflicting role', async () => {
+    const req = await makeRequest({
+      pattern: 'SUPPLIER LLC',
+      role: 'CLIENTE',
+      intent: 'OPERATING_EXPENSE',
+      glAccountCode: '4010',
+      source: 'user',
+      companyId: 'comp-1',
+    });
+
+    const res = await POST(req, { params: Promise.resolve({}) });
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(saveContext).toHaveBeenCalledWith(
+      expect.objectContaining({
+        role: 'GASTO_OPERATIVO',
+        roles: ['GASTO_OPERATIVO'],
+      }),
+    );
+  });
+
   it('creates rule with intent when source is user', async () => {
     mockDb.bankTransaction.findMany.mockResolvedValue([{ amount: -100 }]);
 

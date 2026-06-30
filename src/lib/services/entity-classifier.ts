@@ -6,11 +6,12 @@ import { logger } from '@/lib/logger';
 import type { EntityCandidate } from '@/lib/services/entity-detector';
 import type { EntityContext } from '@prisma/client';
 import type { TransactionIntent } from '@/lib/constants/transaction-intent';
+import { entityRoleSchema, type EntityRole } from '@/lib/constants/entity-roles';
 
 export interface ClassifyEntityInput {
   companyId: string;
   pattern: string;
-  role: string;
+  role?: string | null;
   roles?: string[];
   glAccountCode?: string;
   source?: 'user' | 'ai';
@@ -52,9 +53,39 @@ export async function computeDirectionProfile(
   const debitPct = debitCount / validCount;
   const creditPct = 1 - debitPct;
 
-  if (debitPct > 0.8) return 'debit';
-  if (creditPct > 0.8) return 'credit';
+  if (debitPct >= 0.8) return 'debit';
+  if (creditPct >= 0.8) return 'credit';
   return 'any';
+}
+
+export function deriveRoleFromIntent(
+  intent?: TransactionIntent | null,
+  providedRole?: string | null,
+): EntityRole {
+  if (intent == null) {
+    const parsedRole = providedRole ? entityRoleSchema.safeParse(providedRole) : null;
+    if (parsedRole?.success) return parsedRole.data;
+    return 'OTRO';
+  }
+
+  switch (intent) {
+    case 'CUSTOMER_PAYMENT':
+      return 'CLIENTE';
+    case 'RENT_PAYMENT':
+      return 'INQUILINO';
+    case 'OWNER_CONTRIBUTION':
+      return 'SOCIO';
+    case 'LOAN_PAYMENT':
+      return 'PRESTAMO';
+    case 'OPERATING_EXPENSE':
+    case 'TAX_PAYMENT':
+      return 'GASTO_OPERATIVO';
+    case 'OTHER':
+      return 'OTRO';
+    case 'TRANSFER':
+    default:
+      return 'OTRO';
+  }
 }
 
 /**
@@ -124,9 +155,12 @@ export async function classifyEntity(
   input: ClassifyEntityInput,
 ): Promise<{ context: EntityContext; warning?: string }> {
   const { companyId, pattern, role, roles, glAccountCode, source, userId, transactionDirection, userDescription, intent } = input;
+  const finalRole = deriveRoleFromIntent(intent, role);
+  const finalRoles = roles?.length ? roles : undefined;
+  const trimmedUserDescription = typeof userDescription === 'string' ? userDescription.trim() : userDescription;
 
-  if (role === 'OTRO' && !userDescription) {
-    throw new Error('userDescription is required when role is OTRO');
+  if ((intent === 'OTHER' || finalRole === 'OTRO') && !trimmedUserDescription) {
+    throw new Error('userDescription is required when intent is OTHER or role is OTRO');
   }
 
   let glAccountId: string | null = null;
@@ -140,13 +174,13 @@ export async function classifyEntity(
   const context = await saveContext({
     companyId,
     pattern,
-    role,
-    roles,
+    role: finalRole,
+    roles: finalRoles,
     glAccountId,
     source: source ?? 'user',
     userId,
-    transactionDirection,
-    userDescription,
+    ...(transactionDirection !== undefined ? { transactionDirection } : {}),
+    ...(trimmedUserDescription != null ? { userDescription: trimmedUserDescription } : {}),
   });
 
   const direction = await computeDirectionProfile(companyId, pattern);
@@ -158,7 +192,7 @@ export async function classifyEntity(
     warning = result.warning;
   }
 
-  logger.info('[ENTITY CLASSIFIED]', { companyId, pattern, role, roles, warning });
+  logger.info('[ENTITY CLASSIFIED]', { companyId, pattern, role: finalRole, roles: finalRoles, warning });
 
   return { context, warning };
 }
