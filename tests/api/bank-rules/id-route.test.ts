@@ -47,7 +47,7 @@ vi.mock('@/lib/server-i18n', () => ({
 
 // ─── Imports after mocks ───────────────────────────────────────────
 
-import { PUT } from '@/app/api/bank-rules/[id]/route';
+import { GET, PUT } from '@/app/api/bank-rules/[id]/route';
 import { NextRequest } from 'next/server';
 
 // ─── Helpers ───────────────────────────────────────────────────────
@@ -232,5 +232,49 @@ describe('PUT /api/bank-rules/[id] — isManuallyEdited', () => {
 
     expect(res.status).toBe(400);
     expect(bankRuleUpdateMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('GET /api/bank-rules/[id] — entity context audit exposure', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    bankRuleFindFirstMock.mockResolvedValue({
+      ...EXISTING_RULE,
+      entityContextId: 'entity-context-1',
+      entityContext: {
+        id: 'entity-context-1',
+        userDescription: 'Owner paid a one-off building assessment',
+        role: 'OTRO',
+        pattern: 'BUILDING ASSESSMENT',
+      },
+      glAccount: { id: 'acc-1', code: '5000', name: 'Expenses', accountType: 'expense' },
+      _count: { transactions: 2 },
+    });
+  });
+
+  it('returns linked entityContext.userDescription for rule inspection without a BankRule description field', async () => {
+    const response = await GET(
+      new NextRequest('http://localhost:3000/api/bank-rules/rule-1?companyId=c1'),
+      { params: Promise.resolve({ id: 'rule-1' }) },
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.entityContext).toEqual({
+      id: 'entity-context-1',
+      userDescription: 'Owner paid a one-off building assessment',
+      role: 'OTRO',
+      pattern: 'BUILDING ASSESSMENT',
+    });
+    expect(body).not.toHaveProperty('userDescription');
+    expect(bankRuleFindFirstMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({
+          entityContext: {
+            select: { id: true, userDescription: true, role: true, pattern: true },
+          },
+        }),
+      }),
+    );
   });
 });

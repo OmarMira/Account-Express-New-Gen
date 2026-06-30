@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { POST } from '@/app/api/bank-rules/route';
+import { GET, POST } from '@/app/api/bank-rules/route';
 import { NextRequest } from 'next/server';
 
 // Mock deps (sessions, db, audit, logger, direction-validation)
@@ -21,6 +21,7 @@ vi.mock('@/lib/db', () => ({
     },
     glAccount: { findMany: vi.fn().mockResolvedValue([{ id: 'acc-1' }]) },
     bankRule: {
+      count: vi.fn().mockResolvedValue(0),
       findMany: vi.fn().mockResolvedValue([]),
       create: vi.fn().mockResolvedValue({ id: 'rule-1', createdAt: new Date(), updatedAt: new Date() }),
     },
@@ -165,5 +166,77 @@ describe('POST /api/bank-rules — conditions[] validation', () => {
 
     expect(response.status).toBe(400);
     expect(db.bankRule.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('GET /api/bank-rules — entity context audit exposure', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(db.bankRule.findMany).mockResolvedValue([
+      {
+        id: 'rule-1',
+        companyId: 'c1',
+        name: 'Other merchant rule',
+        conditionType: 'contains',
+        conditionValue: 'OTHER MERCHANT',
+        transactionDirection: 'any',
+        priority: 10,
+        isActive: true,
+        createdAt: new Date('2025-01-01T00:00:00.000Z'),
+        updatedAt: new Date('2025-01-02T00:00:00.000Z'),
+        glAccount: { id: 'acc-1', code: '5000', name: 'Expenses', accountType: 'expense' },
+        entityContext: {
+          id: 'entity-context-1',
+          userDescription: 'Seasonal local market purchase',
+          role: 'OTRO',
+          pattern: 'OTHER MERCHANT',
+        },
+        _count: { transactions: 3 },
+      },
+    ] as never);
+  });
+
+  it('includes linked entityContext.userDescription in list responses without a BankRule description field', async () => {
+    const response = await GET(
+      new NextRequest('http://localhost:3000/api/bank-rules?companyId=c1'),
+      { params: Promise.resolve({}) },
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data[0]).toEqual(
+      expect.objectContaining({
+        entityContext: {
+          id: 'entity-context-1',
+          userDescription: 'Seasonal local market purchase',
+          role: 'OTRO',
+          pattern: 'OTHER MERCHANT',
+        },
+      }),
+    );
+    expect(body.data[0]).not.toHaveProperty('userDescription');
+    expect(db.bankRule.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({
+          entityContext: {
+            select: { id: true, userDescription: true, role: true, pattern: true },
+          },
+        }),
+      }),
+    );
+  });
+
+  it('includes linked entityContext.userDescription in paginated list responses', async () => {
+    vi.mocked(db.bankRule.count).mockResolvedValue(1 as never);
+
+    const response = await GET(
+      new NextRequest('http://localhost:3000/api/bank-rules?companyId=c1&page=1&limit=10'),
+      { params: Promise.resolve({}) },
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data[0].entityContext.userDescription).toBe('Seasonal local market purchase');
+    expect(body.pagination.total).toBe(1);
   });
 });

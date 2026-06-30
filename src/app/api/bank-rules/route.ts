@@ -7,6 +7,13 @@ import { createAuditLogWithRetry } from '@/lib/audit';
 import { validateDirectionProfile } from '@/lib/services/direction-validation';
 import { transactionIntentSchema } from '@/lib/constants/transaction-intent';
 
+const bankRuleEntityContextAuditSelect = {
+  id: true,
+  userDescription: true,
+  role: true,
+  pattern: true,
+} as const;
+
 // ─── GET /api/bank-rules ───────────────────────────────────────────
 // List bank rules for a company, sorted by priority. Includes GL account info.
 export const GET = apiHandler(async (request: NextRequest, context: RouteContext) => {
@@ -36,6 +43,9 @@ export const GET = apiHandler(async (request: NextRequest, context: RouteContext
       include: {
         glAccount: {
           select: { id: true, code: true, name: true, accountType: true },
+        },
+        entityContext: {
+          select: bankRuleEntityContextAuditSelect,
         },
         _count: {
           select: { transactions: true },
@@ -69,6 +79,9 @@ export const GET = apiHandler(async (request: NextRequest, context: RouteContext
       include: {
         glAccount: {
           select: { id: true, code: true, name: true, accountType: true },
+        },
+        entityContext: {
+          select: bankRuleEntityContextAuditSelect,
         },
         _count: {
           select: { transactions: true },

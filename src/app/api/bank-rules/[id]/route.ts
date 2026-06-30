@@ -14,6 +14,13 @@ import {
   type Rule,
 } from '@/lib/services/rule-matching-engine';
 
+const bankRuleEntityContextAuditSelect = {
+  id: true,
+  userDescription: true,
+  role: true,
+  pattern: true,
+} as const;
+
 // ─── GET /api/bank-rules/[id] ──────────────────────────────────────
 export const GET = apiHandler(async (request: NextRequest, context: RouteContext) => {
   const { userId, companyId } = requireCompanyContext();
@@ -24,6 +31,9 @@ export const GET = apiHandler(async (request: NextRequest, context: RouteContext
     include: {
       glAccount: {
         select: { id: true, code: true, name: true, accountType: true },
+      },
+      entityContext: {
+        select: bankRuleEntityContextAuditSelect,
       },
       _count: {
         select: { transactions: true },
@@ -320,6 +330,9 @@ export const PUT = apiHandler(async (request: NextRequest, context: RouteContext
       },
       creditGlAccount: {
         select: { id: true, code: true, name: true, accountType: true },
+      },
+      entityContext: {
+        select: bankRuleEntityContextAuditSelect,
       },
       _count: {
         select: { transactions: true },
