@@ -5,6 +5,7 @@ import {
   collectAISignal,
   collectSignals,
 } from '@/lib/services/signal-collector';
+import { decide } from '@/lib/services/decision-engine';
 import type { Signal } from '@/lib/types/reasoning';
 
 const mockHeuristicRules = [
@@ -19,6 +20,7 @@ describe('collectEntityContextSignal', () => {
       role: 'PROVEEDOR',
       glAccountId: 'gla_1',
       glAccount: { code: '6070', name: 'Costo de Ventas' },
+      classificationStatus: 'CONFIRMED' as const,
     };
     const signal = collectEntityContextSignal(ctx);
     expect(signal.source).toBe('entity_context');
@@ -33,6 +35,7 @@ describe('collectEntityContextSignal', () => {
       role: 'CLIENTE',
       glAccountId: null,
       glAccount: null,
+      classificationStatus: 'CONFIRMED' as const,
     };
     const signal = collectEntityContextSignal(ctx);
     expect(signal.source).toBe('entity_context');
@@ -47,6 +50,44 @@ describe('collectEntityContextSignal', () => {
     expect(signal.role).toBeNull();
     expect(signal.glAccountCode).toBeNull();
     expect(signal.confidence).toBe(0.0);
+  });
+
+  it('does not create a high-confidence signal for pending review context with a linked account', () => {
+    const ctx = {
+      role: null,
+      glAccountId: 'gla_pending',
+      glAccount: { code: '9999', name: 'Pending Review Account' },
+      classificationStatus: 'PENDING_REVIEW' as const,
+    };
+
+    const signal = collectEntityContextSignal(ctx);
+
+    expect(signal.source).toBe('entity_context');
+    expect(signal.role).toBeNull();
+    expect(signal.glAccountCode).toBeNull();
+    expect(signal.confidence).toBe(0);
+  });
+
+  it('only lets confirmed non-null contexts drive high-confidence decisions', () => {
+    const pendingSignal = collectEntityContextSignal({
+      role: null,
+      glAccountId: 'gla_pending',
+      glAccount: { code: '9999', name: 'Pending Review Account' },
+      classificationStatus: 'PENDING_REVIEW' as const,
+    });
+    const confirmedSignal = collectEntityContextSignal({
+      role: 'PROVEEDOR',
+      glAccountId: 'gla_confirmed',
+      glAccount: { code: '6070', name: 'Confirmed Account' },
+      classificationStatus: 'CONFIRMED' as const,
+    });
+
+    expect(decide([pendingSignal]).selected).toBeNull();
+    expect(decide([confirmedSignal]).selected).toMatchObject({
+      role: 'PROVEEDOR',
+      glAccountCode: '6070',
+      confidence: 0.95,
+    });
   });
 });
 
@@ -120,7 +161,7 @@ describe('collectSignals', () => {
 
   it('includes high-confidence entity context signal when available', () => {
     const signals = collectSignals({
-      entityContext: { role: 'PROVEEDOR', glAccountId: 'gla_1', glAccount: { code: '6070', name: 'Costo de Ventas' } },
+      entityContext: { role: 'PROVEEDOR', glAccountId: 'gla_1', glAccount: { code: '6070', name: 'Costo de Ventas' }, classificationStatus: 'CONFIRMED' },
       userInput: 'pago a proveedor',
       direction: 'debit',
       assistantConfig: { heuristics: mockHeuristicRules },

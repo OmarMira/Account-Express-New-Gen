@@ -82,10 +82,12 @@ export async function updateEntityContext(
   const updated = await db.entityContext.update({
     where: { id },
     data: {
-      role: input.role?.toUpperCase(),
+      role: input.role === undefined ? undefined : input.role?.toUpperCase() ?? null,
       glAccountId: input.glAccountId,
       roles: rolesJson,
       transactionDirection: input.transactionDirection ?? undefined,
+      classificationStatus: input.classificationStatus,
+      classificationConfidence: input.classificationConfidence,
     },
     include: { glAccount: true },
   });

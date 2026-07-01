@@ -264,7 +264,7 @@ export function evaluateWinningRule(
   tx: Transaction,
   companyId: string,
   rolePriorities: Record<string, number> = loadRolePrioritiesSync(),
-  contexts?: Array<{ pattern: string; role: string }>,
+  contexts?: Array<{ pattern: string; role: string | null }>,
 ): MatchingRule {
   if (matchingRules.length <= 1) return matchingRules[0];
 
@@ -286,6 +286,7 @@ export function evaluateWinningRule(
         const condValue = String(cond.value).toLowerCase();
         if (descLower.includes(condValue) && contexts) {
           for (const ctx of contexts) {
+            if (!ctx.role) continue;
             if (condValue.includes(ctx.pattern.toLowerCase())) {
               const prio = rolePrios[ctx.role.toUpperCase()] ?? 99;
               if (prio < highestRolePriority) {

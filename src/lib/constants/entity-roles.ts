@@ -22,6 +22,16 @@ export const UI_ROLES = ENTITY_ROLES.filter((r) => r !== 'IGNORADA');
 /** Zod enum helper for validating role fields. */
 export const entityRoleSchema = z.enum(ENTITY_ROLES);
 
+export const CLASSIFICATION_STATUSES = [
+  'UNCLASSIFIED',
+  'PENDING_REVIEW',
+  'CONFIRMED',
+] as const;
+
+export type ClassificationStatus = (typeof CLASSIFICATION_STATUSES)[number];
+
+export const classificationStatusSchema = z.enum(CLASSIFICATION_STATUSES);
+
 /**
  * Maps each role to the transaction direction it expects.
  * - 'credit': roles that typically receive money (CLIENTE, INGRESO, INQUILINO)

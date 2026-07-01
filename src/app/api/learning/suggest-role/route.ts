@@ -453,7 +453,7 @@ async function findLocalMatch(
   companyId: string,
 ): Promise<LocalMatchResult | null> {
   const contexts = await db.entityContext.findMany({
-    where: { companyId },
+    where: { companyId, role: { not: null }, classificationStatus: 'CONFIRMED' },
     select: { pattern: true, role: true },
   });
 
@@ -467,6 +467,7 @@ async function findLocalMatch(
   let bestMatch: { pattern: string; role: string } | null = null;
 
   for (const ctx of contexts) {
+    if (!ctx.role) continue;
     const patternTokens = tokenize(ctx.pattern);
     if (patternTokens.length === 0) continue;
 
