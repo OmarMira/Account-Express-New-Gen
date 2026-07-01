@@ -10,11 +10,13 @@
 | Suggested split | PR1 Foundation -> PR2 Aggregation + Classification -> PR3 Confirmation + Rules + UI |
 | Delivery strategy | force-chained / user-approved chained PRs |
 | Chain strategy | stacked-to-main; user-selected for this change |
+| PR2 size decision | `size:exception` maintainer-approved; PR2 is ~718 source/test lines, above the 400-line budget, but Aggregation + Classification remains one cohesive review unit because the classifier depends on the aggregator and splitting them would create artificial dependency overhead |
 
 Decision needed before apply: No
 Chained PRs recommended: Yes
 Chain strategy: stacked-to-main
 400-line budget risk: High
+PR2 size exception: Approved by maintainer for Aggregation + Classification; 126 focused tests passed, typecheck passed, and fresh verify found no CRITICALs. PR2 may proceed to commit/push with this exception documented.
 
 ### Chain Strategy
 
@@ -35,11 +37,11 @@ User chose `stacked-to-main`: PR1 branches from the current clean main/tracker b
 
 ## PR2: Aggregation + Classification
 
-- [ ] 2.1 Create `src/lib/services/entity-history-analyzer.ts` with transaction count, total, active months, direction percentages, recurrence, amount stats, descriptions, prior context/rules.
-- [ ] 2.2 Add tests for multi-transaction aggregation, single-transaction cold-start summaries, mixed direction, recurrence labels, and preserved legacy `userDescription` context.
-- [ ] 2.3 Create `src/lib/services/smart-entity-classifier.ts` with generic runtime prompt builder, heuristic role/intent suggestions, confidence scoring, and one review question on insufficient evidence.
-- [ ] 2.4 Test prompt construction contains runtime tenant/entity summary only; no hardcoded sample names, amounts, or documentation examples.
-- [ ] 2.5 Implement cold-start and re-evaluation lifecycle: history can suggest pending updates, but confirmed classifications remain authoritative.
+- [x] 2.1 Create `src/lib/services/entity-history-analyzer.ts` with transaction count, total, active months, direction percentages, recurrence, amount stats, descriptions, prior context/rules.
+- [x] 2.2 Add tests for multi-transaction aggregation, single-transaction cold-start summaries, mixed direction, recurrence labels, and preserved legacy `userDescription` context.
+- [x] 2.3 Create `src/lib/services/smart-entity-classifier.ts` with generic runtime prompt builder, heuristic role/intent suggestions, confidence scoring, and one review question on insufficient evidence.
+- [x] 2.4 Test prompt construction contains runtime tenant/entity summary only; no hardcoded sample names, amounts, or documentation examples.
+- [x] 2.5 Implement cold-start and re-evaluation lifecycle: history can suggest pending updates, but confirmed classifications remain authoritative.
 
 ## PR3: Confirmation + Rules + UI
 
