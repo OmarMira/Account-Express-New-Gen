@@ -384,6 +384,16 @@ export class ImportService {
 
     const duplicatesSkipped = sorted.length - uniqueTransactions.length;
 
+    // Duplicate check first (detects duplicate statement files even if all transactions are duplicates)
+    const existingStatement = await db.bankStatement.findFirst({
+      where: { bankAccountId, startDate, endDate },
+    });
+    if (existingStatement) {
+      throw new ConflictError(
+        `Ya existe un extracto para el período ${startDate.toISOString().split('T')[0]} – ${endDate.toISOString().split('T')[0]}. Elimine el anterior o use un período diferente.`,
+      );
+    }
+
     if (uniqueTransactions.length === 0) {
       return {
         statementId: '',

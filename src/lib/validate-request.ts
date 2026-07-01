@@ -25,10 +25,13 @@ export async function validateRequest<T>(
   if (skipValidationPaths.includes(url.pathname)) {
     // Endpoints like logout may have no body — return empty rather than error
     try {
-      const body = await req.json();
-      return (body ?? {}) as unknown as T;
+      const text = await req.clone().text();
+      if (!text.trim()) {
+        return ({} as unknown as T);
+      }
+      return JSON.parse(text) as T;
     } catch {
-      return ({} as unknown as T);
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 }) as unknown as T;
     }
   }
 

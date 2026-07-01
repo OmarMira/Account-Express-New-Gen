@@ -252,8 +252,8 @@ export const GET = apiHandler(async (request: NextRequest) => {
       completedAt: p.completedAt?.toISOString() ?? null,
     })),
     summary: {
-      statementBalance,
-      bookBalance,
+      statementBalance: Number(statementBalance),
+      bookBalance: bookBalance.toNumber(),
       difference,
       totalTransactions,
       reconciledCount,

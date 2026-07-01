@@ -53,7 +53,7 @@ describe('Session Token Hashing & Cookie Standardisation', () => {
     const rawToken = await createSession(userId);
     const request = new NextRequest('http://localhost/api/test', {
       headers: {
-        cookie: `session_token=${rawToken}`,
+        cookie: `session=${rawToken}`,
       },
     });
 
@@ -85,10 +85,10 @@ describe('Session Token Hashing & Cookie Standardisation', () => {
     expect(dbSession).toBeNull();
   });
 
-  it('extracts token from session_token cookie using getSessionToken', () => {
+  it('extracts token from session cookie using getSessionToken', () => {
     const reqWithCookie = new NextRequest('http://localhost/api/test', {
       headers: {
-        cookie: `session_token=test-raw-token-123`,
+        cookie: `session=test-raw-token-123`,
       },
     });
     expect(getSessionToken(reqWithCookie)).toBe('test-raw-token-123');
@@ -101,10 +101,10 @@ describe('Session Token Hashing & Cookie Standardisation', () => {
     });
     expect(getSessionToken(reqWithAuth)).toBe('test-raw-token-auth');
 
-    // session (old name) should NOT be used
+    // invalid cookie names should NOT be used
     const reqWithOldName = new NextRequest('http://localhost/api/test', {
       headers: {
-        cookie: `session=some-token`,
+        cookie: `session_token=some-token`,
       },
     });
     expect(getSessionToken(reqWithOldName)).toBeNull();
