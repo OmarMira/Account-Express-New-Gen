@@ -85,9 +85,8 @@ describe('POST /api/learning/suggest-role — prompt construction', () => {
       (m: { role: string }) => m.role === 'user',
     )?.content || '';
 
-    expect(userPrompt).toContain('money OUT');
-    expect(userPrompt).toContain('money IN');
-    expect(userPrompt).toContain('This entity has');
+    expect(userPrompt).toContain('debit');
+    expect(userPrompt).toContain('credit');
     expect(userPrompt).toContain('100% debit');
     expect(userPrompt).toContain('0% credit');
   });
@@ -173,8 +172,8 @@ describe('POST /api/learning/suggest-role — prompt construction', () => {
       (m: { role: string }) => m.role === 'user',
     )?.content || '';
 
-    expect(userPrompt).toContain('Description');
-    expect(userPrompt).toContain('Servicios generales');
+    expect(userPrompt).toContain('Entity: Servicios generales');
+    expect(userPrompt).toContain('History: 1 transactions');
   });
 
   it('works without directionProfile (backward compat)', async () => {

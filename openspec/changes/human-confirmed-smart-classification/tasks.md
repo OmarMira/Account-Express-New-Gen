@@ -45,10 +45,10 @@ User chose `stacked-to-main`: PR1 branches from the current clean main/tracker b
 
 ## PR3: Confirmation + Rules + UI
 
-- [ ] 3.1 Update `src/app/api/learning/smart-classify/route.ts` to return enriched suggestions for new and migrated pending entities.
-- [ ] 3.2 Reuse/retire `src/app/api/learning/suggest-role/route.ts` behind the smart classifier service without duplicating prompt/parsing logic.
-- [ ] 3.3 Update `src/lib/services/entity-classifier.ts` so only explicit confirmation with role, intent, and GL account can create/update BankRules.
-- [ ] 3.4 Update `src/components/learning/EntityOnboardingModal.tsx` only after coordinating dirty work; show pending-review badge/surfacing, confidence, explanation, linked rule/account warnings, and one plain-language question.
-- [ ] 3.5 Learn from confirmed corrections for future similar entities while keeping every future automation confirmation-gated.
-- [ ] 3.6 Extend integration/component tests for confirmation endpoint, safe rule creation, pending-review UI, legacy OTRO review, linked BankRule safety, and correction learning.
-- [ ] 3.7 Run strict TDD command: `bun x vitest --reporter=verbose --no-file-parallelism`; then type-check with `npx tsc --noEmit`.
+- [x] 3.1 Update `src/app/api/learning/smart-classify/route.ts` to return enriched suggestions for new and migrated pending entities.
+- [x] 3.2 Reuse/retire `src/app/api/learning/suggest-role/route.ts` behind the smart classifier service without duplicating prompt/parsing logic.
+- [x] 3.3 Update `src/lib/services/entity-classifier.ts` so only explicit confirmation with role, intent, and GL account can create/update BankRules.
+- [x] 3.4 Update `src/components/learning/EntityOnboardingModal.tsx` only after coordinating dirty work; show pending-review badge/surfacing, confidence, explanation, linked rule/account warnings, and one plain-language question.
+- [x] 3.5 Learn from confirmed corrections for future similar entities while keeping every future automation confirmation-gated.
+- [x] 3.6 Extend integration/component tests for confirmation endpoint, safe rule creation, pending-review UI, legacy OTRO review, linked BankRule safety, and correction learning.
+- [x] 3.7 Run strict TDD command: `bun x vitest --reporter=verbose --no-file-parallelism`; then type-check with `npx tsc --noEmit`.

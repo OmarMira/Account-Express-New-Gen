@@ -41,6 +41,19 @@ interface EntityCandidate {
     debitPct: number;
   };
   sampleDescriptions: string[];
+  // Smart classification enrichment (PR3)
+  classificationStatus?: string | null;
+  suggestedRole?: string | null;
+  suggestedIntent?: string | null;
+  confidence?: number | null;
+  confidenceLabel?: 'low' | 'medium' | 'high' | null;
+  requiresConfirmation?: boolean;
+  reviewQuestion?: string | null;
+  explanation?: string | null;
+  confirmedClassificationProtected?: boolean;
+  updateSuggestion?: { fromRole: string; toRole: string } | null;
+  linkedRuleId?: string | null;
+  glAccountId?: string | null;
 }
 
 interface BatchEntry {
@@ -799,12 +812,22 @@ export function EntityOnboardingModal({
               const isOtro = role === 'OTRO';
               const descValue = descriptions[name] ?? '';
 
+              // ── PR3: smart classification enrichment ──
+              const isPendingReview = candidate.classificationStatus === 'PENDING_REVIEW';
+              const smartConfidence = candidate.confidence;
+              const smartConfidenceLabel = candidate.confidenceLabel;
+              const smartExplanation = candidate.explanation;
+              const smartReviewQuestion = candidate.reviewQuestion;
+              const hasLinkedRule = Boolean(candidate.linkedRuleId);
+              const hasLinkedAccount = Boolean(candidate.glAccountId);
+              const isConfirmedProtected = candidate.confirmedClassificationProtected;
+
               return (
                 <div
                   key={candidate.id}
                   className="border rounded-lg p-4 space-y-3 bg-card shadow-sm"
                 >
-                  {/* Header: name + transaction count + direction */}
+                  {/* Header: name + transaction count + direction + pending-review badge */}
                   <div className="flex items-center justify-between">
                     <h4 className="font-bold text-base truncate text-primary">
                       {candidate.canonicalName}
@@ -817,7 +840,76 @@ export function EntityOnboardingModal({
                         {directionLabel}
                       </span>
                     </h4>
+                    {isPendingReview && (
+                      <span
+                        data-testid="pending-review-badge"
+                        className="ml-2 shrink-0 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-700"
+                      >
+                        {t('learning.pendingReview')}
+                      </span>
+                    )}
                   </div>
+
+                  {/* PR3: Confidence + explanation banner from smart classifier */}
+                  {smartConfidence !== null && smartConfidence !== undefined && (
+                    <div
+                      data-testid="smart-confidence-banner"
+                      className="flex flex-col gap-1 p-2.5 text-xs rounded-md bg-muted/40 border"
+                    >
+                      {smartExplanation && (
+                        <p className="text-muted-foreground leading-relaxed">{smartExplanation}</p>
+                      )}
+                      <span
+                        className={
+                          smartConfidenceLabel === 'high'
+                            ? 'text-green-600 font-medium'
+                            : smartConfidenceLabel === 'medium'
+                              ? 'text-yellow-600 font-medium'
+                              : 'text-red-500 font-medium'
+                        }
+                      >
+                        {t('learning.suggestionBanner.confidence', {
+                          percent: Math.round(smartConfidence * 100),
+                        })}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* PR3: Review question when evidence is insufficient */}
+                  {smartReviewQuestion && (
+                    <div
+                      data-testid="smart-review-question"
+                      className="p-2.5 text-xs text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md"
+                    >
+                      <p className="font-medium">{smartReviewQuestion}</p>
+                    </div>
+                  )}
+
+                  {/* PR3: Linked rule or account warning (preserving existing links for review) */}
+                  {(hasLinkedRule || hasLinkedAccount) && !isConfirmedProtected && (
+                    <div
+                      data-testid="linked-rule-warning"
+                      className="flex items-start gap-2 p-2 text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-md"
+                    >
+                      <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                      <span>
+                        {hasLinkedRule
+                          ? t('learning.linkedRuleWarning')
+                          : t('learning.linkedAccountWarning')}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* PR3: Confirmed classification protection notice */}
+                  {isConfirmedProtected && (
+                    <div
+                      data-testid="confirmed-protected-notice"
+                      className="flex items-center gap-2 p-2 text-xs text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-md"
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                      <span>{t('learning.confirmedProtected')}</span>
+                    </div>
+                  )}
 
                   {/* ── 4.2 (F3) — Split UI for mixed direction ────────── */}
                   {/* Only show split when a valid non-OTRO role is selected */}

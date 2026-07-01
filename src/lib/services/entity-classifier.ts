@@ -46,6 +46,191 @@ export async function classifyEntity(input: ClassifyEntityInput): Promise<void> 
   logger.info('[ENTITY CLASSIFIED]', { companyId, pattern, role, roles });
 }
 
+// ─── autoCreateRule ────────────────────────────────────────────────────
+//
+// Creates or updates a BankRule for a confirmed EntityContext.
+//
+// CONFIRMATION GATE: All three conditions must be met before any rule is
+// created or mutated:
+//   1. classificationStatus === 'CONFIRMED'
+//   2. non-null role
+//   3. non-null glAccountId
+//
+// If any condition is unmet, returns { warning } without touching rules.
+
+export interface AutoCreateRuleInput {
+  companyId: string;
+  pattern: string;
+  classificationStatus: string;
+  role: string | null;
+  glAccountId: string | null;
+  transactionDirection?: string | null;
+  intent?: string | null;
+  entityContextId?: string;
+}
+
+export interface AutoCreateRuleResult {
+  created?: boolean;
+  reactivated?: boolean;
+  skipped?: boolean;
+  warning?: string;
+  ruleId?: string;
+}
+
+export async function autoCreateRule(
+  input: AutoCreateRuleInput,
+): Promise<AutoCreateRuleResult> {
+  const { companyId, pattern, classificationStatus, role, glAccountId, transactionDirection, intent, entityContextId } = input;
+
+  // ── Confirmation gate ─────────────────────────────────────────────
+  if (classificationStatus !== 'CONFIRMED') {
+    return {
+      warning: `autoCreateRule skipped: classificationStatus is '${classificationStatus}', not 'CONFIRMED'`,
+    };
+  }
+
+  if (!role) {
+    return {
+      warning: 'autoCreateRule skipped: role is null',
+    };
+  }
+
+  if (!glAccountId) {
+    return {
+      warning: 'autoCreateRule skipped: glAccountId is null',
+    };
+  }
+
+  // Verify the GL account exists
+  const glAccount = await db.glAccount.findFirst({
+    where: { id: glAccountId, companyId, isActive: true },
+  });
+
+  if (!glAccount) {
+    logger.warn('[AUTO_CREATE_RULE] GL account not found or inactive', {
+      glAccountId,
+      companyId,
+    });
+    return {
+      warning: `GL account '${glAccountId}' not found or inactive — EntityContext persisted, no rule created`,
+    };
+  }
+
+  // ── Dedup by entityContextId ──────────────────────────────────────
+  if (entityContextId) {
+    const existing = await db.bankRule.findFirst({
+      where: { companyId, entityContextId },
+    });
+
+    if (existing) {
+      if (existing.isActive) {
+        // Active rule already exists for this EntityContext → skip
+        logger.info('[AUTO_CREATE_RULE] Active rule already exists', {
+          ruleId: existing.id,
+          entityContextId,
+        });
+        return { skipped: true, ruleId: existing.id };
+      }
+
+      // Inactive rule → reactivate and update from confirmed values
+      const updated = await db.bankRule.update({
+        where: { id: existing.id },
+        data: {
+          conditionValue: pattern,
+          glAccountId,
+          transactionDirection: transactionDirection ?? 'any',
+          isActive: true,
+          intent: (intent as any) ?? null,
+        },
+      });
+
+      logger.info('[AUTO_CREATE_RULE] Reactivated existing rule', {
+        ruleId: updated.id,
+        entityContextId,
+      });
+      return { reactivated: true, ruleId: updated.id };
+    }
+  }
+
+  // ── Create a new rule ─────────────────────────────────────────────
+  const rule = await db.bankRule.create({
+    data: {
+      companyId,
+      name: pattern,
+      conditionType: 'contains',
+      conditionValue: pattern,
+      glAccountId,
+      transactionDirection: transactionDirection ?? 'any',
+      priority: 5,
+      isActive: true,
+      entityContextId: entityContextId ?? null,
+      intent: (intent as any) ?? null,
+    },
+  });
+
+  logger.info('[AUTO_CREATE_RULE] Created rule', {
+    ruleId: rule.id,
+    pattern,
+    role,
+    glAccountId,
+  });
+
+  return { created: true, ruleId: rule.id };
+}
+
+// ─── correctionLearning ──────────────────────────────────────────────
+//
+// Records a correction learning signal when an operator confirms a role
+// that differs from the AI suggestion. Metadata only — no BankRule is
+// created automatically from this path.
+
+export interface CorrectionLearningInput {
+  companyId: string;
+  entityKey: string;
+  fromSuggested: string | null;
+  toConfirmed: string;
+  userId?: string;
+}
+
+export async function recordCorrectionLearning(
+  input: CorrectionLearningInput,
+): Promise<void> {
+  const { companyId, entityKey, fromSuggested, toConfirmed, userId } = input;
+
+  // Only record when there is an actual correction (suggestion ≠ confirmation)
+  if (!fromSuggested || fromSuggested === toConfirmed) {
+    return;
+  }
+
+  logger.info('[CORRECTION_LEARNING]', {
+    companyId,
+    entityKey,
+    fromSuggested,
+    toConfirmed,
+    userId,
+  });
+
+  // Persist correction as an AuditLog entry for future learning reference
+  if (userId) {
+    await db.auditLog.create({
+      data: {
+        companyId,
+        userId,
+        action: 'ENTITY_CORRECTION_LEARNING',
+        entity: 'EntityContext',
+        entityId: entityKey,
+        details: JSON.stringify({
+          correctionLearning: {
+            fromSuggested,
+            toConfirmed,
+            entityKey,
+          },
+        }),
+      },
+    });
+  }
+}
+
 export async function getEntityCandidates(companyId: string): Promise<EntityCandidate[]> {
   const bankAccounts = await db.bankAccount.findMany({
     where: { companyId, isActive: true },

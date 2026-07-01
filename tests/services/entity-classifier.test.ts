@@ -8,7 +8,15 @@ vi.mock('@/lib/db', () => ({
     bankAccount: { findMany: vi.fn() },
     bankTransaction: { findMany: vi.fn() },
     entityContext: { findMany: vi.fn() },
-    bankRule: { findMany: vi.fn() },
+    bankRule: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+    },
+    auditLog: {
+      create: vi.fn(),
+    },
   },
 }));
 
@@ -23,7 +31,7 @@ vi.mock('@/lib/services/entity-context-service', () => ({
 }));
 
 vi.mock('@/lib/logger', () => ({
-  logger: { info: vi.fn(), error: vi.fn() },
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
 // ─── Imports after mocks ──────────────────────────────────────────────
@@ -36,6 +44,8 @@ import {
   getEntityCandidates,
   detectEntityConflict,
   getKnownSocioPatterns,
+  autoCreateRule,
+  recordCorrectionLearning,
 } from '@/lib/services/entity-classifier';
 import { ENTITY_ROLES, entityRoleSchema, UI_ROLES } from '@/lib/constants/entity-roles';
 
@@ -46,7 +56,15 @@ const mockDb = db as unknown as {
   bankAccount: { findMany: ReturnType<typeof vi.fn> };
   bankTransaction: { findMany: ReturnType<typeof vi.fn> };
   entityContext: { findMany: ReturnType<typeof vi.fn> };
-  bankRule: { findMany: ReturnType<typeof vi.fn> };
+  bankRule: {
+    findMany: ReturnType<typeof vi.fn>;
+    findFirst: ReturnType<typeof vi.fn>;
+    create: ReturnType<typeof vi.fn>;
+    update: ReturnType<typeof vi.fn>;
+  };
+  auditLog: {
+    create: ReturnType<typeof vi.fn>;
+  };
 };
 
 function makeCandidate(overrides: Partial<EntityCandidate> = {}): EntityCandidate {
@@ -475,3 +493,209 @@ describe('EntityRole schema validation', () => {
     ]);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════
+// autoCreateRule
+// ═══════════════════════════════════════════════════════════════════════
+
+describe('autoCreateRule()', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('skips rule creation when classificationStatus is not CONFIRMED', async () => {
+    const result = await autoCreateRule({
+      companyId: 'comp-1',
+      pattern: 'TEST VENDOR',
+      classificationStatus: 'PENDING_REVIEW',
+      role: 'PROVEEDOR',
+      glAccountId: 'gl-001',
+    });
+
+    expect(result.warning).toContain("classificationStatus is 'PENDING_REVIEW', not 'CONFIRMED'");
+    expect(mockDb.bankRule.create).not.toHaveBeenCalled();
+  });
+
+  it('skips rule creation when role is null', async () => {
+    const result = await autoCreateRule({
+      companyId: 'comp-1',
+      pattern: 'TEST VENDOR',
+      classificationStatus: 'CONFIRMED',
+      role: null,
+      glAccountId: 'gl-001',
+    });
+
+    expect(result.warning).toContain('role is null');
+    expect(mockDb.bankRule.create).not.toHaveBeenCalled();
+  });
+
+  it('skips rule creation when glAccountId is null', async () => {
+    const result = await autoCreateRule({
+      companyId: 'comp-1',
+      pattern: 'TEST VENDOR',
+      classificationStatus: 'CONFIRMED',
+      role: 'PROVEEDOR',
+      glAccountId: null,
+    });
+
+    expect(result.warning).toContain('glAccountId is null');
+    expect(mockDb.bankRule.create).not.toHaveBeenCalled();
+  });
+
+  it('skips rule creation when GL account does not exist or is inactive', async () => {
+    mockDb.glAccount.findFirst.mockResolvedValue(null);
+
+    const result = await autoCreateRule({
+      companyId: 'comp-1',
+      pattern: 'TEST VENDOR',
+      classificationStatus: 'CONFIRMED',
+      role: 'PROVEEDOR',
+      glAccountId: 'gl-999',
+    });
+
+    expect(result.warning).toContain('not found or inactive');
+    expect(mockDb.bankRule.create).not.toHaveBeenCalled();
+  });
+
+  it('creates a new rule when all conditions are met', async () => {
+    mockDb.glAccount.findFirst.mockResolvedValue({ id: 'gl-001', companyId: 'comp-1', isActive: true });
+    mockDb.bankRule.findFirst.mockResolvedValue(null);
+    mockDb.bankRule.create.mockResolvedValue({ id: 'rule-new' });
+
+    const result = await autoCreateRule({
+      companyId: 'comp-1',
+      pattern: 'TEST VENDOR',
+      classificationStatus: 'CONFIRMED',
+      role: 'PROVEEDOR',
+      glAccountId: 'gl-001',
+      transactionDirection: 'debit',
+      intent: 'vendor-payment',
+      entityContextId: 'ctx-123',
+    });
+
+    expect(result.created).toBe(true);
+    expect(mockDb.bankRule.create).toHaveBeenCalledWith({
+      data: {
+        companyId: 'comp-1',
+        name: 'TEST VENDOR',
+        conditionType: 'contains',
+        conditionValue: 'TEST VENDOR',
+        glAccountId: 'gl-001',
+        transactionDirection: 'debit',
+        priority: 5,
+        isActive: true,
+        entityContextId: 'ctx-123',
+        intent: 'vendor-payment',
+      },
+    });
+  });
+
+  it('reactivates an inactive rule with confirmed values', async () => {
+    mockDb.glAccount.findFirst.mockResolvedValue({ id: 'gl-001', companyId: 'comp-1', isActive: true });
+    mockDb.bankRule.findFirst.mockResolvedValue({ id: 'rule-old', isActive: false });
+    mockDb.bankRule.update.mockResolvedValue({ id: 'rule-old' });
+
+    const result = await autoCreateRule({
+      companyId: 'comp-1',
+      pattern: 'TEST VENDOR',
+      classificationStatus: 'CONFIRMED',
+      role: 'PROVEEDOR',
+      glAccountId: 'gl-001',
+      transactionDirection: 'debit',
+      intent: 'vendor-payment',
+      entityContextId: 'ctx-123',
+    });
+
+    expect(result.reactivated).toBe(true);
+    expect(mockDb.bankRule.update).toHaveBeenCalledWith({
+      where: { id: 'rule-old' },
+      data: {
+        conditionValue: 'TEST VENDOR',
+        glAccountId: 'gl-001',
+        transactionDirection: 'debit',
+        isActive: true,
+        intent: 'vendor-payment',
+      },
+    });
+  });
+
+  it('skips rule creation when active rule already exists', async () => {
+    mockDb.glAccount.findFirst.mockResolvedValue({ id: 'gl-001', companyId: 'comp-1', isActive: true });
+    mockDb.bankRule.findFirst.mockResolvedValue({ id: 'rule-exists', isActive: true });
+
+    const result = await autoCreateRule({
+      companyId: 'comp-1',
+      pattern: 'TEST VENDOR',
+      classificationStatus: 'CONFIRMED',
+      role: 'PROVEEDOR',
+      glAccountId: 'gl-001',
+      entityContextId: 'ctx-123',
+    });
+
+    expect(result.skipped).toBe(true);
+    expect(mockDb.bankRule.create).not.toHaveBeenCalled();
+    expect(mockDb.bankRule.update).not.toHaveBeenCalled();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// recordCorrectionLearning
+// ═══════════════════════════════════════════════════════════════════════
+
+describe('recordCorrectionLearning()', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('does nothing when suggestion matches confirmation', async () => {
+    await recordCorrectionLearning({
+      companyId: 'comp-1',
+      entityKey: 'acme',
+      fromSuggested: 'PROVEEDOR',
+      toConfirmed: 'PROVEEDOR',
+      userId: 'user-1',
+    });
+
+    expect(mockDb.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it('does nothing when suggested role is null', async () => {
+    await recordCorrectionLearning({
+      companyId: 'comp-1',
+      entityKey: 'acme',
+      fromSuggested: null,
+      toConfirmed: 'PROVEEDOR',
+      userId: 'user-1',
+    });
+
+    expect(mockDb.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it('creates audit log learning record on mismatch when userId is provided', async () => {
+    await recordCorrectionLearning({
+      companyId: 'comp-1',
+      entityKey: 'acme',
+      fromSuggested: 'CLIENTE',
+      toConfirmed: 'PROVEEDOR',
+      userId: 'user-1',
+    });
+
+    expect(mockDb.auditLog.create).toHaveBeenCalledWith({
+      data: {
+        companyId: 'comp-1',
+        userId: 'user-1',
+        action: 'ENTITY_CORRECTION_LEARNING',
+        entity: 'EntityContext',
+        entityId: 'acme',
+        details: JSON.stringify({
+          correctionLearning: {
+            fromSuggested: 'CLIENTE',
+            toConfirmed: 'PROVEEDOR',
+            entityKey: 'acme',
+          },
+        }),
+      },
+    });
+  });
+});
+

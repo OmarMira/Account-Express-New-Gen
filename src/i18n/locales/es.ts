@@ -1120,6 +1120,10 @@ const es = {
       loading: 'Clasificando entidades...',
       error: 'Error al clasificar algunas entidades',
     },
+    pendingReview: 'Pendiente de Revisión',
+    confirmedProtected: 'Clasificación confirmada protegida contra sobreescritura.',
+    linkedRuleWarning: 'Esta entidad está vinculada a una regla bancaria activa. Modificarla actualizará la regla.',
+    linkedAccountWarning: 'Esta entidad tiene una cuenta contable vinculada pero aún no tiene una regla activa.',
   },
   ruleBuilder: {
     title: 'Asistente de Clasificación Inteligente',

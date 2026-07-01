@@ -1185,4 +1185,60 @@ describe('EntityOnboardingModal', () => {
       expect(screen.getAllByTestId('mock-select')[0]).toHaveValue('CLIENTE');
     });
   });
+
+  // ── PR3 Onboarding UI elements ─────────────────────────────────────
+  describe('PR3 Onboarding UI elements', () => {
+    it('renders PR3 pending review elements correctly', async () => {
+      const pr3Candidate = {
+        id: 'can_pr3',
+        canonicalName: 'PR3 ENTITY',
+        occurrences: 3,
+        directionProfile: { creditPct: 0.1, debitPct: 0.9 },
+        sampleDescriptions: ['Rent payment'],
+        classificationStatus: 'PENDING_REVIEW',
+        confidence: 0.82,
+        confidenceLabel: 'high',
+        explanation: 'Strong rental pattern detected',
+        reviewQuestion: 'Is this a monthly rental expense?',
+        glAccountId: 'gl-001',
+      };
+
+      setupFetch([pr3Candidate]);
+      render(<EntityOnboardingModal isOpen onClose={vi.fn()} companyId="comp_1" />);
+
+      await waitFor(() => {
+        expect(screen.getByText('PR3 ENTITY')).toBeInTheDocument();
+      });
+
+      expect(screen.getByTestId('pending-review-badge')).toBeInTheDocument();
+      expect(screen.getByTestId('smart-confidence-banner')).toBeInTheDocument();
+      expect(screen.getByText('Strong rental pattern detected')).toBeInTheDocument();
+      expect(screen.getByText('Confidence: 82%')).toBeInTheDocument();
+      expect(screen.getByTestId('smart-review-question')).toBeInTheDocument();
+      expect(screen.getByText('Is this a monthly rental expense?')).toBeInTheDocument();
+      expect(screen.getByTestId('linked-rule-warning')).toBeInTheDocument();
+    });
+
+    it('renders confirmed protection notice for protected candidates', async () => {
+      const protectedCandidate = {
+        id: 'can_protected',
+        canonicalName: 'PROTECTED ENTITY',
+        occurrences: 5,
+        directionProfile: { creditPct: 0.1, debitPct: 0.9 },
+        sampleDescriptions: ['Utility payment'],
+        classificationStatus: 'CONFIRMED',
+        confirmedClassificationProtected: true,
+      };
+
+      setupFetch([protectedCandidate]);
+      render(<EntityOnboardingModal isOpen onClose={vi.fn()} companyId="comp_1" />);
+
+      await waitFor(() => {
+        expect(screen.getByText('PROTECTED ENTITY')).toBeInTheDocument();
+      });
+
+      expect(screen.getByTestId('confirmed-protected-notice')).toBeInTheDocument();
+    });
+  });
 });
+

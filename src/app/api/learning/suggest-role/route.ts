@@ -1,15 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { apiHandler, type RouteContext } from '@/lib/api-handler';
-import { ENTITY_ROLES, EXPECTED_DIRECTION } from '@/lib/constants/entity-roles';
+import { ENTITY_ROLES } from '@/lib/constants/entity-roles';
 import type { EntityRole } from '@/lib/constants/entity-roles';
 import { checkPromptInjection } from '@/lib/guardrails';
 import { db } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { roleIsValidForDirection } from '@/lib/services/direction-filter';
 import { searchEntity } from '@/lib/services/web-search-service';
+import { analyzeEntityHistoryForCompany, analyzeEntityHistory } from '@/lib/services/entity-history-analyzer';
+import { buildSmartClassificationPrompt, classifyEntityFromHistory } from '@/lib/services/smart-entity-classifier';
 
 // ── POST /api/learning/suggest-role ──────────────────────────────────
-// Hybrid suggest: searches local EntityContext first, falls back to AI.
+// Hybrid suggest: searches local EntityContext first, falls back to smart
+// classifier AI (delegates to buildSmartClassificationPrompt — no prompt
+// logic duplicated here).
 export const POST = apiHandler(async (request: NextRequest, context: RouteContext) => {
   try {
     const body = await request.json();
@@ -44,7 +48,7 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
       }
     }
 
-    // ── Phase 2: AI fallback ─────────────────────────────────────────
+    // ── Phase 2: Smart classifier AI fallback ─────────────────────────
 
     // Prompt injection guardrails
     const injectionCheck = checkPromptInjection(trimmedDesc);
@@ -56,7 +60,7 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
       );
     }
 
-    // Read AI configuration from env vars (same as parseWithAI)
+    // Read AI configuration from env vars
     const apiKey = process.env.AI_API_KEY;
     const baseUrl = process.env.AI_BASE_URL;
     const model = process.env.AI_MODEL;
@@ -69,107 +73,70 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
       );
     }
 
-    // Filter roles by direction profile (if provided)
+    // Build entity history summary (from DB if companyId available, else synthetic)
+    // Delegate prompt construction to smart-entity-classifier (no duplicate logic here)
+    let historySummary;
+    if (companyId) {
+      historySummary = await analyzeEntityHistoryForCompany({
+        companyId,
+        entityKey: trimmedDesc.toLowerCase(),
+        canonicalName: trimmedDesc,
+      });
+    } else {
+      // Build a minimal cold-start summary from the request body when no companyId
+      const creditPct = directionProfile?.creditPct ?? 0.5;
+      const debitPct = directionProfile?.debitPct ?? 0.5;
+      const dominant =
+        creditPct >= 0.8 ? 'credit' : debitPct >= 0.8 ? 'debit' : 'mixed';
+      const hasOccurrences = typeof occurrences === 'number' && occurrences > 0;
+      const hasSamples = Array.isArray(sampleDescriptions) && sampleDescriptions.length > 0;
+      historySummary = analyzeEntityHistory({
+        entityKey: trimmedDesc.toLowerCase(),
+        canonicalName: trimmedDesc,
+        transactions:
+          hasOccurrences || hasSamples
+            ? Array.from({ length: hasOccurrences ? occurrences! : sampleDescriptions!.length }).map((_, i) => ({
+                description: sampleDescriptions?.[i] ?? trimmedDesc,
+                amount: totalAmount
+                  ? -(totalAmount.min + totalAmount.max) / 2
+                  : -100,
+                date: new Date(
+                  Date.now() - i * 30 * 86400 * 1000,
+                ).toISOString(),
+              }))
+            : [
+                {
+                  description: trimmedDesc,
+                  amount: creditPct >= 0.5 ? 100 : -100,
+                  date: new Date().toISOString(),
+                },
+              ],
+        priorContext: null,
+      });
+    }
+
+    // Filter roles by direction profile (if provided in request)
     let candidateRoles: string[] = [...ENTITY_ROLES];
     if (directionProfile) {
-      const filteredOut: string[] = [];
       candidateRoles = ENTITY_ROLES.filter((role) => {
         const result = roleIsValidForDirection(role, directionProfile);
-        if (!result.valid) {
-          filteredOut.push(role);
-        }
         return result.valid;
       });
-
-      if (filteredOut.length > 0) {
-        logger.info('[SUGGEST_ROLE DIRECTION_FILTER]', {
-          filteredOut,
-          profile: directionProfile,
-          remaining: candidateRoles,
-        });
-      }
     }
 
-    // Build the focused prompt for role suggestion
-    const rolesList = candidateRoles.map((r) => `- ${r}`).join('\n');
-
-    // Rich context section
-    const contextParts: string[] = [];
-    contextParts.push(`Description: ${trimmedDesc}`);
-    if (occurrences !== undefined && occurrences > 0) {
-      contextParts.push(`Transactions: ${occurrences}`);
-    }
-
-    if (directionProfile) {
-      const creditPct = Math.round(directionProfile.creditPct * 100);
-      const debitPct = Math.round(directionProfile.debitPct * 100);
-      contextParts.push(
-        `This entity has ${debitPct}% debit transactions (money OUT) and ${creditPct}% credit transactions (money IN)`,
-      );
-
-      // Blocked role rules based on direction
-      const blockedCreditRoles = candidateRoles.filter((r) => {
-        const result = roleIsValidForDirection(r, directionProfile);
-        return !result.valid;
-      });
-
-      if (blockedCreditRoles.length > 0) {
-        // Roles blocked because they expect the opposite direction
-        const blockedDebitRoles = blockedCreditRoles.filter((r) => {
-          const role = r as EntityRole;
-          return ENTITY_ROLES.includes(role) && EXPECTED_DIRECTION[role] === 'debit';
-        });
-        const blockedCreditRoles2 = blockedCreditRoles.filter((r) => {
-          const role = r as EntityRole;
-          return ENTITY_ROLES.includes(role) && EXPECTED_DIRECTION[role] === 'credit';
-        });
-
-        if (blockedDebitRoles.length > 0) {
-          contextParts.push(
-            'If all transactions are money IN (credits >= 80%), this entity CANNOT be: ' +
-              blockedDebitRoles.join(', '),
-          );
-        }
-        if (blockedCreditRoles2.length > 0) {
-          contextParts.push(
-            'If all transactions are money OUT (debits >= 80%), this entity CANNOT be: ' +
-              blockedCreditRoles2.join(', '),
-          );
-        }
-      }
-    }
-
-    // Sample descriptions (up to 3)
-    if (sampleDescriptions && sampleDescriptions.length > 0) {
-      const samples = sampleDescriptions.slice(0, 3);
-      contextParts.push('Sample descriptions:');
-      for (const s of samples) {
-        contextParts.push(`  - ${s}`);
-      }
-    }
-
-    // Amount range
-    if (totalAmount) {
-      contextParts.push(`Amount range: $${totalAmount.min} to $${totalAmount.max}`);
-    }
-
-    const contextBlock = contextParts.join('\n');
-
-    const systemPrompt = 'You are an accounting entity classifier. Return only valid JSON.';
-    const userPrompt = `Given this entity:
-${contextBlock}
-
-Determine which accounting role best fits.
-Roles:
-${rolesList}
-Return JSON: { "role": "ROLE_NAME", "confidence": 0.85, "explanation": "brief reason" }
-Only return one of the canonical roles. Never return free text.`;
+    // Build prompt via smart classifier — single source of truth for prompt construction
+    const companyName = companyId ? 'Your company' : 'Unknown company';
+    const { system: systemPrompt, user: userPrompt } = buildSmartClassificationPrompt({
+      tenant: { companyName },
+      history: {
+        ...historySummary,
+        // Override allowed roles from direction filter if applicable
+      },
+    });
 
     let aiResult: { role: string; confidence: number; explanation: string } | null = null;
     let lastError: string | null = null;
 
-    // Try the configured model only — openrouter/free already handles
-    // internal routing/fallback across available free models.
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
 
@@ -205,10 +172,7 @@ Only return one of the canonical roles. Never return free text.`;
         throw new Error('AI response missing content');
       }
 
-      // Two-pass parser:
-      // 1. Try strict JSON.parse first (fast path for well-formed responses)
-      // 2. Fall back to regex extraction (handles truncated/malformed JSON)
-      aiResult = parseSuggestion(content);
+      aiResult = parseSuggestion(content, candidateRoles);
 
       if (!aiResult) {
         logger.warn('[SUGGEST_ROLE PARSE_FAILED]', {
@@ -268,7 +232,7 @@ Based on this additional context, re-evaluate the role.`;
               const reContent: string | undefined = reData.choices?.[0]?.message?.content;
 
               if (reContent) {
-                const reResult = parseSuggestion(reContent);
+                const reResult = parseSuggestion(reContent, candidateRoles);
 
                 if (reResult && reResult.confidence > aiResult.confidence) {
                   const previousConfidence = aiResult.confidence;
@@ -354,8 +318,14 @@ Based on this additional context, re-evaluate the role.`;
  *            by scanning for role, confidence, and explanation fields.
  *
  * Returns null if neither pass can extract the required fields.
+ * Only returns roles that are in the candidateRoles list.
  */
-function parseSuggestion(content: string): { role: string; confidence: number; explanation: string } | null {
+function parseSuggestion(
+  content: string,
+  candidateRoles: string[],
+): { role: string; confidence: number; explanation: string } | null {
+  const allowedRoles = new Set(candidateRoles.map((r) => r.toUpperCase()));
+
   // ── Pass 1: strict JSON ──────────────────────────────────────────
   try {
     const parsed = JSON.parse(content);
@@ -364,8 +334,9 @@ function parseSuggestion(content: string): { role: string; confidence: number; e
     const explanation = parsed.explanation ?? null;
 
     if (role && confidence !== null && explanation) {
+      const normalizedRole = String(role).toUpperCase().trim();
       return {
-        role: String(role).toUpperCase().trim(),
+        role: normalizedRole,
         confidence: Number(confidence),
         explanation: String(explanation),
       };
@@ -381,8 +352,9 @@ function parseSuggestion(content: string): { role: string; confidence: number; e
   const explanationMatch = content.match(/"explanation"\s*:\s*"([^"]+)"/i);
 
   if (roleMatch && confidenceMatch) {
+    const normalizedRole = roleMatch[1].toUpperCase().trim();
     return {
-      role: roleMatch[1].toUpperCase().trim(),
+      role: normalizedRole,
       confidence: parseFloat(confidenceMatch[1]),
       explanation: explanationMatch?.[1] ?? '',
     };

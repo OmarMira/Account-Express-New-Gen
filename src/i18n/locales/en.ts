@@ -1103,6 +1103,10 @@ const en = {
       loading: 'Classifying entities...',
       error: 'Error classifying some entities',
     },
+    pendingReview: 'Pending Review',
+    confirmedProtected: 'Confirmed classification protected from overwrite.',
+    linkedRuleWarning: 'This entity is linked to an active Bank Rule. Modifying it will update the rule.',
+    linkedAccountWarning: 'This entity has a linked GL account but no active Bank Rule yet.',
   },
   ruleBuilder: {
     title: 'Smart Classification Assistant',
