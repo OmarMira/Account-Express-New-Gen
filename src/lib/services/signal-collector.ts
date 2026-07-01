@@ -2,10 +2,15 @@ import type { Signal, HeuristicSignal, AISignal } from '@/lib/types/reasoning';
 import { serverT } from '@/lib/server-i18n';
 
 export function collectEntityContextSignal(
-  entityContext: { role: string | null; glAccountId: string | null; glAccount?: { code: string; name: string } | null } | null,
+  entityContext: {
+    role: string | null;
+    glAccountId: string | null;
+    glAccount?: { code: string; name: string } | null;
+    classificationStatus?: string;
+  } | null,
   locale?: string,
 ): Signal {
-  if (!entityContext) {
+  if (!entityContext || !entityContext.role || entityContext.classificationStatus !== 'CONFIRMED') {
     return {
       source: 'entity_context',
       role: null,
@@ -93,7 +98,12 @@ export function collectAISignal(
 
 export function collectSignals(
   sources: {
-    entityContext: { role: string | null; glAccountId: string | null; glAccount?: { code: string; name: string } | null } | null
+    entityContext: {
+      role: string | null;
+      glAccountId: string | null;
+      glAccount?: { code: string; name: string } | null;
+      classificationStatus?: string;
+    } | null
     userInput: string
     direction: 'debit' | 'credit' | 'mixed'
     assistantConfig: { heuristics: Array<{ keywords: string[]; role: string; glAccountCode: string; direction: string }> }

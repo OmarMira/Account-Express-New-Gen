@@ -311,11 +311,13 @@ model EntityContext {
   id                   String     @id @default(cuid())
   companyId            String
   pattern              String
-  role                 String
+  role                 String?
   roles                String?
   userDescription      String?
   transactionDirection String?
   glAccountId          String?
+  classificationStatus String     @default("CONFIRMED")
+  classificationConfidence Float?
   source               String     @default("user")
   createdAt            DateTime   @default(now())
   updatedAt            DateTime   @updatedAt
@@ -324,6 +326,7 @@ model EntityContext {
 
   @@unique([companyId, pattern])
   @@index([companyId])
+  @@index([companyId, classificationStatus])
 }
 
 model SystemMemory {

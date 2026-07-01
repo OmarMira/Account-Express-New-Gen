@@ -48,6 +48,7 @@ describe('parseConversationalContext — full contract integration', () => {
       companyId: 'comp_1',
       pattern: 'gastos oficina',
       role: 'GASTO_OPERATIVO',
+      classificationStatus: 'CONFIRMED',
       glAccountId: 'gl-5000',
       glAccount: { code: '5000', name: 'Gastos Operativos' },
     });
@@ -157,6 +158,7 @@ describe('parseConversationalContext — full contract integration', () => {
       companyId: 'comp_1',
       pattern: 'gastos oficina',
       role: 'GASTO_OPERATIVO',
+      classificationStatus: 'CONFIRMED',
       glAccountId: 'gl-5000',
       glAccount: { code: '5000', name: 'Gastos Operativos' },
     });

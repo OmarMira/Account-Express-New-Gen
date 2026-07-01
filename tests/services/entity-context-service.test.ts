@@ -251,4 +251,30 @@ describe('findContext()', () => {
     expect(ctx!.glAccount!.code).toBe('5010');
     expect(ctx!.glAccount!.name).toBe('Proveedores');
   });
+
+  it('does not return pending review contexts even when the pattern and account match', async () => {
+    const gl = await createTestGlAccount({ companyId, code: '9999', name: 'Pending Account' });
+    await saveContext({
+      companyId,
+      pattern: 'PENDING VENDOR',
+      role: null,
+      glAccountId: gl.id,
+      classificationStatus: 'PENDING_REVIEW',
+    });
+
+    const ctx = await findContext(companyId, 'Payment to PENDING VENDOR');
+    expect(ctx).toBeNull();
+  });
+
+  it('does not return unclassified contexts with a null role', async () => {
+    await saveContext({
+      companyId,
+      pattern: 'UNCLASSIFIED ENTITY',
+      role: null,
+      classificationStatus: 'UNCLASSIFIED',
+    });
+
+    const ctx = await findContext(companyId, 'UNCLASSIFIED ENTITY');
+    expect(ctx).toBeNull();
+  });
 });

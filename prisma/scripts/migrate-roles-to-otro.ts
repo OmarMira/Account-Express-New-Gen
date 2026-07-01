@@ -57,7 +57,8 @@ async function main() {
   // Count distinct old roles for reporting
   const oldRoles = new Map<string, number>();
   for (const r of invalidRecords) {
-    oldRoles.set(r.role, (oldRoles.get(r.role) ?? 0) + 1);
+    const role = r.role ?? '(null)';
+    oldRoles.set(role, (oldRoles.get(role) ?? 0) + 1);
   }
 
   console.log('  Original roles found:');

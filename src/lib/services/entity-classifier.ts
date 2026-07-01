@@ -146,7 +146,7 @@ export function detectEntityConflict(
 
 export async function getKnownSocioPatterns(companyId: string): Promise<string[]> {
   const contexts = await db.entityContext.findMany({
-    where: { companyId },
+    where: { companyId, role: { not: null }, classificationStatus: 'CONFIRMED' },
     select: { pattern: true, role: true, roles: true },
   });
 

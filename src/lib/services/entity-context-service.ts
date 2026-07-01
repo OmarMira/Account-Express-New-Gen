@@ -5,7 +5,7 @@ import { normalizePattern } from '@/lib/services/pattern-normalizer';
 export async function findContext(companyId: string, description: string) {
   const normalized = normalizePattern(description);
   const contexts = await db.entityContext.findMany({
-    where: { companyId },
+    where: { companyId, role: { not: null }, classificationStatus: 'CONFIRMED' },
     include: { glAccount: true },
   });
   return contexts.find((ctx) => normalized.includes(ctx.pattern.toLowerCase())) || null;
@@ -14,21 +14,27 @@ export async function findContext(companyId: string, description: string) {
 export async function saveContext(data: {
   companyId: string;
   pattern: string;
-  role: string;
+  role: string | null;
   roles?: string[];
   glAccountId?: string | null;
   source?: 'user' | 'ai';
   userId?: string;
   transactionDirection?: string | null;
   userDescription?: string | null;
+  classificationStatus?: 'UNCLASSIFIED' | 'PENDING_REVIEW' | 'CONFIRMED';
+  classificationConfidence?: number | null;
 }) {
   const normalized = normalizePattern(data.pattern);
+  const normalizedRole = data.role ? data.role.toUpperCase() : null;
+  const classificationStatus = data.classificationStatus ?? (normalizedRole ? 'CONFIRMED' : 'PENDING_REVIEW');
   const validated = entityContextSchema.parse({
     companyId: data.companyId,
     pattern: normalized,
-    role: data.role.toUpperCase(),
+    role: normalizedRole,
     glAccountId: data.glAccountId,
     transactionDirection: data.transactionDirection,
+    classificationStatus,
+    classificationConfidence: data.classificationConfidence ?? null,
   });
 
   const rolesJson = data.roles?.length
@@ -49,6 +55,8 @@ export async function saveContext(data: {
       source: data.source ?? 'user',
       transactionDirection: validated.transactionDirection ?? null,
       userDescription: data.userDescription ?? null,
+      classificationStatus: validated.classificationStatus ?? classificationStatus,
+      classificationConfidence: validated.classificationConfidence ?? null,
     },
     create: {
       companyId: validated.companyId,
@@ -59,6 +67,8 @@ export async function saveContext(data: {
       source: data.source ?? 'user',
       transactionDirection: validated.transactionDirection ?? null,
       userDescription: data.userDescription ?? null,
+      classificationStatus: validated.classificationStatus ?? classificationStatus,
+      classificationConfidence: validated.classificationConfidence ?? null,
     },
   });
 
@@ -76,6 +86,8 @@ export async function saveContext(data: {
           role: validated.role,
           roles: data.roles,
           glAccountId: validated.glAccountId,
+          classificationStatus: validated.classificationStatus ?? classificationStatus,
+          classificationConfidence: validated.classificationConfidence ?? null,
           source: data.source ?? 'user',
         }),
       },

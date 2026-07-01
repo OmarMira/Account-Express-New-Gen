@@ -1,12 +1,15 @@
 import { EntityContext } from '@prisma/client';
 
-export interface EntityContextWithGlAccount extends EntityContext {
+export type EntityContextWithGlAccount = Omit<
+  EntityContext,
+  'classificationStatus' | 'classificationConfidence'
+> & Partial<Pick<EntityContext, 'classificationStatus' | 'classificationConfidence'>> & {
   glAccount: {
     id: string;
     code: string;
     name: string;
   } | null;
-}
+};
 
 export interface PaginatedResult<T> {
   data: T[];
@@ -19,10 +22,12 @@ export interface PaginatedResult<T> {
 }
 
 export interface UpdateEntityInput {
-  role?: string;
+  role?: string | null;
   glAccountId?: string | null;
   roles?: string[];
   transactionDirection?: string | null;
+  classificationStatus?: 'UNCLASSIFIED' | 'PENDING_REVIEW' | 'CONFIRMED';
+  classificationConfidence?: number | null;
 }
 
 export interface BulkDeleteInput {

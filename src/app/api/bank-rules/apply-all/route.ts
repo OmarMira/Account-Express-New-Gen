@@ -91,7 +91,7 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
 
   const rolePriorities = await loadRolePriorities();
   const entityContexts = await db.entityContext.findMany({
-    where: { companyId },
+    where: { companyId, role: { not: null }, classificationStatus: 'CONFIRMED' },
     select: { pattern: true, role: true },
   });
 

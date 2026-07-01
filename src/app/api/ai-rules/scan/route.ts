@@ -77,7 +77,7 @@ export const POST = apiHandler(async (request: NextRequest, context: RouteContex
   });
 
   const knownSocioPatterns = contexts
-    .filter((ctx) => ctx.role.toUpperCase() === 'SOCIO')
+    .filter((ctx) => ctx.role?.toUpperCase() === 'SOCIO' && ctx.classificationStatus === 'CONFIRMED')
     .map((ctx) => ctx.pattern.toLowerCase());
 
   // ── 5. Build descriptions map (entityKey → raw sample) ─────────

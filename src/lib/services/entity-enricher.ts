@@ -75,6 +75,9 @@ export function resolveContextRole(
 
   // Filter matching contexts
   let matchingContexts = input.contexts.filter((ctx) => {
+    if (!ctx.role || ctx.classificationStatus === 'PENDING_REVIEW' || ctx.classificationStatus === 'UNCLASSIFIED') {
+      return false;
+    }
     const patternLower = ctx.pattern.toLowerCase();
     return (
       normalizedDesc.includes(patternLower) ||
@@ -85,7 +88,7 @@ export function resolveContextRole(
 
   // SOCIO conflict detection: exclude SOCIO contexts when merchant + SOCIO INDN conflict
   if (input.knownSocioPatterns?.length && hasSocioConflict(description, input.knownSocioPatterns)) {
-    matchingContexts = matchingContexts.filter((ctx) => ctx.role.toUpperCase() !== 'SOCIO');
+    matchingContexts = matchingContexts.filter((ctx) => ctx.role?.toUpperCase() !== 'SOCIO');
   }
 
   if (matchingContexts.length === 0) return null;
@@ -94,8 +97,8 @@ export function resolveContextRole(
   // Multiple matches: sort by role priority (lower number = higher priority)
   const priorities = input.rolePriorities ?? {};
   return [...matchingContexts].sort((a, b) => {
-    const prioA = priorities[a.role.toUpperCase()] ?? 99;
-    const prioB = priorities[b.role.toUpperCase()] ?? 99;
+    const prioA = priorities[a.role?.toUpperCase() ?? ''] ?? 99;
+    const prioB = priorities[b.role?.toUpperCase() ?? ''] ?? 99;
     return prioA - prioB;
   })[0];
 }
@@ -139,6 +142,8 @@ export function suggestGlAccount(
       id: context.glAccount.id,
     };
   }
+
+  if (!context.role) return null;
 
   // Priority 2: resolve via ROLE_ACCOUNT_MAP
   const role = context.role.toUpperCase();
@@ -288,7 +293,7 @@ export function enrichCandidates(
     const confidenceLabel = toConfidenceLabel(confidence);
     const explanation = context
       ? serverT(locale, 'reasoning.entityContextHigh')
-          .replace('{role}', context.role)
+          .replace('{role}', context.role ?? '')
           .replace('{confidence}', String(Math.round(confidence * 100)))
       : serverT(locale, 'reasoning.sinClasificar')
           .replace('{reasons}', serverT(locale, 'reasoning.uncertaintyNoContext'));

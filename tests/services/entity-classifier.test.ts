@@ -401,6 +401,19 @@ describe('getKnownSocioPatterns()', () => {
     expect(result).toEqual(['multi-role entity']);
   });
 
+  it('queries only confirmed contexts for SOCIO conflict helper patterns', async () => {
+    mockDb.entityContext.findMany.mockResolvedValue([
+      { pattern: 'CONFIRMED SOCIO', role: 'SOCIO', roles: null },
+    ]);
+
+    await getKnownSocioPatterns('comp-1');
+
+    expect(mockDb.entityContext.findMany).toHaveBeenCalledWith({
+      where: { companyId: 'comp-1', role: { not: null }, classificationStatus: 'CONFIRMED' },
+      select: { pattern: true, role: true, roles: true },
+    });
+  });
+
   it('returns empty array when no SOCIO contexts exist', async () => {
     mockDb.entityContext.findMany.mockResolvedValue([
       { pattern: 'CLIENTE A', role: 'CLIENTE', roles: null },
