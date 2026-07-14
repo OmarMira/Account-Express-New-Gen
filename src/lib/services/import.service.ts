@@ -452,12 +452,12 @@ export class ImportService {
 
         if (isRuleEngineV2Enabled()) {
           const v2txn: V2ParsedTransaction = {
-            id: `pending-${idx}`,
+            id: uniqueHashes[idx]!,
             date: txn.date,
             description: txn.description,
             amount: txn.amount,
             bankAccountId,
-            reference: (txn as { reference?: string }).reference,
+            reference: txn.reference,
           }
           const result = await runRuleEngineV2(
             v2txn,

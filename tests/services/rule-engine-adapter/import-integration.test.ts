@@ -8,10 +8,20 @@ import {
 } from '../../helpers/factories'
 import { db } from '@/lib/db'
 
-const mockRunRuleEngineV2 = vi.fn()
+const { mockRunRuleEngineV2, mockFindMatchingRule } = vi.hoisted(() => ({
+  mockRunRuleEngineV2: vi.fn(),
+  mockFindMatchingRule: vi.fn(),
+}))
+
 vi.mock('@/lib/services/rule-engine-adapter', () => ({
   runRuleEngineV2: (...args: unknown[]) => mockRunRuleEngineV2(...args),
 }))
+
+vi.mock('@/lib/services/rule-matching-engine', async (importOriginal) => {
+  const actual = await importOriginal() as typeof import('@/lib/services/rule-matching-engine')
+  mockFindMatchingRule.mockImplementation(actual.findMatchingRule as (...args: unknown[]) => unknown)
+  return { ...actual, findMatchingRule: mockFindMatchingRule }
+})
 
 describe('ImportService — V2 flag integration', () => {
   let company: Awaited<ReturnType<typeof createTestCompany>>
@@ -58,6 +68,7 @@ describe('ImportService — V2 flag integration', () => {
 
       expect(result.autoCategorizedCount).toBe(1)
       expect(result.transactionCount).toBe(1)
+      expect(mockFindMatchingRule).toHaveBeenCalled()
 
       const txs = await db.bankTransaction.findMany({
         where: { statement: { companyId: company.id } },
@@ -80,6 +91,7 @@ describe('ImportService — V2 flag integration', () => {
       })
 
       expect(result.autoCategorizedCount).toBe(0)
+      expect(mockFindMatchingRule).toHaveBeenCalled()
 
       const txs = await db.bankTransaction.findMany({
         where: { statement: { companyId: company.id } },
@@ -136,6 +148,68 @@ describe('ImportService — V2 flag integration', () => {
       expect(txs[0]!.matchedRuleId).toBe(rule.id)
     })
 
+    it('sends uniqueHashes[idx] as transaction.id (SHA-256, not pending-N)', async () => {
+      mockRunRuleEngineV2.mockResolvedValue({ outcome: 'pending' })
+
+      const csvContent = 'date,description,amount\n2025-06-01,AMAZON PURCHASE,-45.99'
+      await ImportService.importFile({
+        companyId: company.id,
+        bankAccountId: bankAccount.id,
+        fileName: 'test.csv',
+        extension: 'csv',
+        buffer: Buffer.from(''),
+        content: csvContent,
+      })
+
+      const args = mockRunRuleEngineV2.mock.calls[0]!
+      const txId = args[0].id
+
+      expect(txId).not.toMatch(/^pending-\d+$/)
+      expect(txId).toEqual(expect.any(String))
+      expect(txId.length).toBeGreaterThan(0)
+
+      const txs = await db.bankTransaction.findMany({
+        where: { statement: { companyId: company.id } },
+        select: { importHash: true },
+      })
+      expect(txs[0]!.importHash).toBe(txId)
+    })
+
+    it('produces different transaction.id for different transactions in same import', async () => {
+      mockRunRuleEngineV2.mockResolvedValue({ outcome: 'pending' })
+
+      const csvContent = 'date,description,amount\n2025-06-01,AMAZON,-45.99\n2025-06-02,UBER,-12.50'
+      await ImportService.importFile({
+        companyId: company.id,
+        bankAccountId: bankAccount.id,
+        fileName: 'test.csv',
+        extension: 'csv',
+        buffer: Buffer.from(''),
+        content: csvContent,
+      })
+
+      const ids = mockRunRuleEngineV2.mock.calls.map((c: unknown[]) => c[0].id)
+      expect(ids[0]).not.toBe(ids[1])
+      expect(ids[0]).not.toMatch(/^pending-\d+$/)
+      expect(ids[1]).not.toMatch(/^pending-\d+$/)
+    })
+
+    it('does not call findMatchingRule when flag is ON', async () => {
+      mockRunRuleEngineV2.mockResolvedValue({ outcome: 'pending' })
+
+      const csvContent = 'date,description,amount\n2025-06-01,COFFEE SHOP,-5.00'
+      await ImportService.importFile({
+        companyId: company.id,
+        bankAccountId: bankAccount.id,
+        fileName: 'test.csv',
+        extension: 'csv',
+        buffer: Buffer.from(''),
+        content: csvContent,
+      })
+
+      expect(mockFindMatchingRule).not.toHaveBeenCalled()
+    })
+
     it('maps pending outcome as null glAccountId and matchedRuleId', async () => {
       mockRunRuleEngineV2.mockResolvedValue({ outcome: 'pending' })
 
@@ -156,6 +230,49 @@ describe('ImportService — V2 flag integration', () => {
         select: { glAccountId: true, matchedRuleId: true },
       })
       expect(txs).toHaveLength(1)
+      expect(txs[0]!.glAccountId).toBeNull()
+      expect(txs[0]!.matchedRuleId).toBeNull()
+    })
+
+    it('pending outcome does not create journal entry', async () => {
+      mockRunRuleEngineV2.mockResolvedValue({ outcome: 'pending' })
+
+      const csvContent = 'date,description,amount\n2025-06-01,AMAZON PURCHASE,-45.99'
+      await ImportService.importFile({
+        companyId: company.id,
+        bankAccountId: bankAccount.id,
+        fileName: 'test.csv',
+        extension: 'csv',
+        buffer: Buffer.from(''),
+        content: csvContent,
+      })
+
+      const journals = await db.journalEntry.findMany({
+        where: { companyId: company.id },
+      })
+      expect(journals).toHaveLength(0)
+    })
+
+    it('pending + errorCode same as plain pending (no legacy fallback)', async () => {
+      mockRunRuleEngineV2.mockResolvedValue({ outcome: 'pending', errorCode: 'engine_execution_error' })
+
+      const csvContent = 'date,description,amount\n2025-06-01,AMAZON PURCHASE,-45.99'
+      const result = await ImportService.importFile({
+        companyId: company.id,
+        bankAccountId: bankAccount.id,
+        fileName: 'test.csv',
+        extension: 'csv',
+        buffer: Buffer.from(''),
+        content: csvContent,
+      })
+
+      expect(result.autoCategorizedCount).toBe(0)
+      expect(mockFindMatchingRule).not.toHaveBeenCalled()
+
+      const txs = await db.bankTransaction.findMany({
+        where: { statement: { companyId: company.id } },
+        select: { glAccountId: true, matchedRuleId: true },
+      })
       expect(txs[0]!.glAccountId).toBeNull()
       expect(txs[0]!.matchedRuleId).toBeNull()
     })
