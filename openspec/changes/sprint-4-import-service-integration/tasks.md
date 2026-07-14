@@ -8,21 +8,19 @@
 | 400-line budget risk | High |
 | Chained PRs recommended | Yes |
 | Suggested split | PR 1: Foundation → PR 2: Adapter → PR 3: Integration |
-| Delivery strategy | ask-on-risk |
-| Chain strategy | feature-branch-chain |
+| Delivery strategy | sequential-prs-to-main |
+| Chain strategy | sequential-prs-to-main |
 
 Decision needed before apply: Yes
-Chained PRs recommended: Yes
-Chain strategy: feature-branch-chain
 400-line budget risk: High
 
-### Suggested Work Units (Feature Branch Chain)
+### Suggested Work Units (Sequential PRs to Main)
 
-| Unit | Goal | Branch | Merges to |
-|------|------|--------|-----------|
-| 1 | Foundation (types + normalizer + tests) | `sprint4/foundation` from `main` | PR 1 → `sprint4/foundation` |
-| 2 | Adapter (runRuleEngineV2 + tests) | `sprint4/adapter` from `sprint4/foundation` | PR 2 → `sprint4/foundation` |
-| 3 | Integration (import.service.ts + E2E tests) | `sprint4/integration` from `sprint4/adapter` | PR 3 → `main` |
+| Unit | Goal | Branch | PR → |
+|------|------|--------|------|
+| 1 | Foundation (types + normalizer + tests) | `sprint4/foundation` | **→ main** ✅ done |
+| 2 | Adapter (runRuleEngineV2 + tests) | `sprint4/adapter` | **→ main** |
+| 3 | Integration (import.service.ts + E2E tests) | `sprint4/integration` | **→ main** |
 
 ## Phase 1: Pre-work & Foundation
 
@@ -58,11 +56,11 @@ Foundation (types + normalizer) → Adapter → Integration → Verification. Ea
 
 ## Operating Rules
 
-### Worktree Chain Sync
-Worktrees NO se sincronizan automáticamente. Después de cada fase:
+### Sequential PRs to Main
+Cada fase mergea directamente a `main`. Después del merge de una fase:
 
-- Foundation commit + push → `git -C ../sprint4-adapter merge --ff-only sprint4/foundation`
-- Adapter commit + push → `git -C ../sprint4-integration merge --ff-only sprint4/adapter`
+- `git fetch origin main`
+- `git -C ../<next-phase-worktree> merge --ff-only origin/main`
 
 Verificar siempre `git rev-parse HEAD` y `git status --short` antes de trabajar.
 
