@@ -27,6 +27,9 @@ import {
   type Transaction,
   type MatchingRule,
 } from '@/lib/services/rule-matching-engine';
+import { isRuleEngineV2Enabled } from '@/lib/rule-engine/flag';
+import { runRuleEngineV2 } from '@/lib/services/rule-engine-adapter';
+import type { ParsedTransaction as V2ParsedTransaction, PrismaBankRule as V2PrismaBankRule } from '@/lib/services/rule-engine-adapter';
 
 export interface ImportResult {
   statementId: string;
@@ -443,11 +446,42 @@ export class ImportService {
 
       for (let idx = 0; idx < uniqueTransactions.length; idx++) {
         const txn = uniqueTransactions[idx]!;
-        const { matchedRuleId, glAccountId } = await findMatchingRule(
-          { description: txn.description, amount: txn.amount } as Transaction,
-          bankRules as unknown as MatchingRule[],
-          companyId,
-        );
+
+        let matchedRuleId: string | null;
+        let glAccountId: string | null;
+
+        if (isRuleEngineV2Enabled()) {
+          const v2txn: V2ParsedTransaction = {
+            id: `pending-${idx}`,
+            date: txn.date,
+            description: txn.description,
+            amount: txn.amount,
+            bankAccountId,
+            reference: (txn as { reference?: string }).reference,
+          }
+          const result = await runRuleEngineV2(
+            v2txn,
+            bankRules as V2PrismaBankRule[],
+            { status: 'not_run' },
+            companyId,
+          )
+
+          if (result.outcome === 'matched') {
+            matchedRuleId = result.matchedRuleId
+            glAccountId = result.classification.glAccountId
+          } else {
+            matchedRuleId = null
+            glAccountId = null
+          }
+        } else {
+          const legacyResult = await findMatchingRule(
+            { description: txn.description, amount: txn.amount } as Transaction,
+            bankRules as unknown as MatchingRule[],
+            companyId,
+          )
+          matchedRuleId = legacyResult.matchedRuleId
+          glAccountId = legacyResult.glAccountId
+        }
 
         if (matchedRuleId) autoCategorizedCount++;
 
