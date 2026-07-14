@@ -12,14 +12,17 @@ export type RuleEngineErrorCode =
   | 'engine_execution_error'
 
 export interface ParsedTransaction {
+  id: string
   date: Date
   description: string
   amount: number
+  bankAccountId: string
   reference?: string
 }
 
 export interface PrismaBankRule {
   id: string
+  companyId: string
   priority: number
   conditions: unknown
   glAccountId: string | null

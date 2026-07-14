@@ -8,7 +8,7 @@ function buildEngineRule(rule: PrismaBankRule): BankRule {
 
   return {
     id: rule.id,
-    companyId: '',
+    companyId: rule.companyId,
     priority: rule.priority,
     conditions,
     action: {
@@ -27,7 +27,7 @@ function mapDecisionToResult(execution: RuleEngineExecution): MatchResult {
   }
 
   if (decision.result === 'winner') {
-    if (decision.classification?.glAccountId) {
+    if (decision.classification?.glAccountId && decision.ruleId) {
       return {
         outcome: 'matched',
         classification: {
@@ -35,7 +35,7 @@ function mapDecisionToResult(execution: RuleEngineExecution): MatchResult {
           entityId: decision.classification.entityId,
           category: decision.classification.category,
         },
-        matchedRuleId: decision.ruleId!,
+        matchedRuleId: decision.ruleId,
       }
     }
 
@@ -63,11 +63,11 @@ export async function runRuleEngineV2(
 
     const input: RuleInput = {
       transaction: {
-        id: '',
+        id: txn.id,
         date: txn.date,
         description: txn.description,
         amount: txn.amount,
-        bankAccountId: '',
+        bankAccountId: txn.bankAccountId,
         companyId,
       },
       context: {

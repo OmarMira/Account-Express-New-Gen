@@ -12,9 +12,11 @@ import type { ParsedTransaction, PrismaBankRule, MatchResult } from '@/lib/servi
 
 function makeTxn(overrides: Partial<ParsedTransaction> = {}): ParsedTransaction {
   return {
+    id: 'txn-1',
     date: new Date('2026-07-14'),
     description: 'Test transaction',
     amount: -500,
+    bankAccountId: 'acct-001',
     ...overrides,
   }
 }
@@ -22,6 +24,7 @@ function makeTxn(overrides: Partial<ParsedTransaction> = {}): ParsedTransaction 
 function makeRule(overrides: Partial<PrismaBankRule> = {}): PrismaBankRule {
   return {
     id: 'rule-1',
+    companyId: 'company-1',
     priority: 10,
     conditions: [{ field: 'description', operator: 'contains', value: 'test' }],
     glAccountId: 'gl-001',
@@ -154,6 +157,18 @@ describe('runRuleEngineV2', () => {
       }
     })
 
+    it('returns pending when winner has glAccountId but no ruleId', async () => {
+      mockEvaluateRules.mockReturnValueOnce({
+        output: {
+          candidates: [],
+          decision: makeEngineDecision({ ruleId: undefined, classification: { glAccountId: 'gl-001' } }),
+        },
+      })
+
+      const result = await runRuleEngineV2(makeTxn(), [makeRule()], defaultEntityResolution, 'company-1')
+      expect(result.outcome).toBe('pending')
+    })
+
     it('preserves classification on pending when winner has no glAccountId', async () => {
       mockEvaluateRules.mockReturnValueOnce({
         output: {
@@ -173,8 +188,55 @@ describe('runRuleEngineV2', () => {
     })
   })
 
+  describe('identifier mapping', () => {
+    it('maps transaction id to engine input', async () => {
+      mockEvaluateRules.mockReturnValueOnce({
+        output: { candidates: [], decision: makeEngineDecision({ result: 'no_match' }) },
+      })
+
+      await runRuleEngineV2(makeTxn({ id: 'txn-real-1' }), [makeRule()], defaultEntityResolution, 'company-1')
+
+      const callArg = mockEvaluateRules.mock.calls[0][0] as { transaction: { id: string; bankAccountId: string; companyId: string } }
+      expect(callArg.transaction.id).toBe('txn-real-1')
+    })
+
+    it('maps bankAccountId to engine input', async () => {
+      mockEvaluateRules.mockReturnValueOnce({
+        output: { candidates: [], decision: makeEngineDecision({ result: 'no_match' }) },
+      })
+
+      await runRuleEngineV2(makeTxn({ bankAccountId: 'acct-real-1' }), [makeRule()], defaultEntityResolution, 'company-1')
+
+      const callArg = mockEvaluateRules.mock.calls[0][0] as { transaction: { bankAccountId: string } }
+      expect(callArg.transaction.bankAccountId).toBe('acct-real-1')
+    })
+
+    it('maps companyId to each engine rule', async () => {
+      mockEvaluateRules.mockReturnValueOnce({
+        output: { candidates: [], decision: makeEngineDecision({ result: 'no_match' }) },
+      })
+
+      await runRuleEngineV2(makeTxn(), [makeRule({ id: 'r1', companyId: 'c1' }), makeRule({ id: 'r2', companyId: 'c2' })], defaultEntityResolution, 'company-1')
+
+      const callArg = mockEvaluateRules.mock.calls[0][0] as { context: { availableRules: Array<{ id: string; companyId: string }> } }
+      expect(callArg.context.availableRules[0].companyId).toBe('c1')
+      expect(callArg.context.availableRules[1].companyId).toBe('c2')
+    })
+
+    it('maps companyId to engine transaction', async () => {
+      mockEvaluateRules.mockReturnValueOnce({
+        output: { candidates: [], decision: makeEngineDecision({ result: 'no_match' }) },
+      })
+
+      await runRuleEngineV2(makeTxn(), [makeRule()], defaultEntityResolution, 'my-company')
+
+      const callArg = mockEvaluateRules.mock.calls[0][0] as { transaction: { companyId: string } }
+      expect(callArg.transaction.companyId).toBe('my-company')
+    })
+  })
+
   describe('adapter purity', () => {
-    it('does not call findMatchingRule (no legacy fallback)', async () => {
+    it('calls evaluateRules exactly once per invocation', async () => {
       mockEvaluateRules.mockReturnValueOnce({
         output: { candidates: [], decision: makeEngineDecision() },
       })
