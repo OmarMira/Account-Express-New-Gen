@@ -470,6 +470,14 @@ export class ImportService {
             matchedRuleId = result.matchedRuleId
             glAccountId = result.classification.glAccountId
           } else {
+            if (result.outcome === 'pending' && result.errorCode) {
+              logger.warn('Rule Engine v2 import evaluation failed', {
+                errorCode: result.errorCode,
+                companyId,
+                bankAccountId,
+                transactionId: uniqueHashes[idx],
+              })
+            }
             matchedRuleId = null
             glAccountId = null
           }

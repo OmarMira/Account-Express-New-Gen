@@ -7,6 +7,7 @@ import {
   clearDatabase,
 } from '../../helpers/factories'
 import { db } from '@/lib/db'
+import { logger } from '@/lib/logger'
 
 const { mockRunRuleEngineV2, mockFindMatchingRule } = vi.hoisted(() => ({
   mockRunRuleEngineV2: vi.fn(),
@@ -275,6 +276,50 @@ describe('ImportService — V2 flag integration', () => {
       })
       expect(txs[0]!.glAccountId).toBeNull()
       expect(txs[0]!.matchedRuleId).toBeNull()
+    })
+
+    it('pending + errorCode logs a warning with errorCode, companyId, bankAccountId, transactionId', async () => {
+      const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {})
+      mockRunRuleEngineV2.mockResolvedValue({ outcome: 'pending', errorCode: 'engine_execution_error' })
+
+      const csvContent = 'date,description,amount\n2025-06-01,AMAZON PURCHASE,-45.99'
+      await ImportService.importFile({
+        companyId: company.id,
+        bankAccountId: bankAccount.id,
+        fileName: 'test.csv',
+        extension: 'csv',
+        buffer: Buffer.from(''),
+        content: csvContent,
+      })
+
+      expect(warnSpy).toHaveBeenCalledTimes(1)
+      const callArgs = warnSpy.mock.calls[0]!
+      expect(callArgs[0]).toBe('Rule Engine v2 import evaluation failed')
+      const data = callArgs[1] as Record<string, unknown>
+      expect(data.errorCode).toBe('engine_execution_error')
+      expect(data.companyId).toBe(company.id)
+      expect(data.bankAccountId).toBe(bankAccount.id)
+      expect(data.transactionId).toEqual(expect.any(String))
+
+      warnSpy.mockRestore()
+    })
+
+    it('pending without errorCode does not log a warning', async () => {
+      const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {})
+      mockRunRuleEngineV2.mockResolvedValue({ outcome: 'pending' })
+
+      const csvContent = 'date,description,amount\n2025-06-01,AMAZON PURCHASE,-45.99'
+      await ImportService.importFile({
+        companyId: company.id,
+        bankAccountId: bankAccount.id,
+        fileName: 'test.csv',
+        extension: 'csv',
+        buffer: Buffer.from(''),
+        content: csvContent,
+      })
+
+      expect(warnSpy).not.toHaveBeenCalled()
+      warnSpy.mockRestore()
     })
 
     it('passes bankAccountId and companyId to runRuleEngineV2', async () => {

@@ -54,7 +54,7 @@ Decision needed before apply: No — resolved: sequential PRs to main
 > This decision is scoped to `import.service.ts`. Downstream consumers
 > (apply-all, reconciliation, manual categorization) operate on persisted transactions and
 > MUST evaluate invariants before calling the engine.
-- [ ] 3.3 `vitest && tsc --noEmit && npm run build` — all green; atomic commit with revert hash
+- [x] 3.3 `vitest && tsc --noEmit && npm run build` — all green; atomic commit with revert hash
 
 ## Phase 4: Verification Tests
 
