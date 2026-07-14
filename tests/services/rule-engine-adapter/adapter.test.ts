@@ -1,0 +1,213 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import type { EngineDecision, EntityResolution } from '@/lib/rule-engine/types'
+
+const mockEvaluateRules = vi.fn()
+
+vi.mock('@/lib/rule-engine', () => ({
+  evaluateRules: (...args: unknown[]) => mockEvaluateRules(...args),
+}))
+
+import { runRuleEngineV2 } from '@/lib/services/rule-engine-adapter'
+import type { ParsedTransaction, PrismaBankRule, MatchResult } from '@/lib/services/rule-engine-adapter'
+
+function makeTxn(overrides: Partial<ParsedTransaction> = {}): ParsedTransaction {
+  return {
+    date: new Date('2026-07-14'),
+    description: 'Test transaction',
+    amount: -500,
+    ...overrides,
+  }
+}
+
+function makeRule(overrides: Partial<PrismaBankRule> = {}): PrismaBankRule {
+  return {
+    id: 'rule-1',
+    priority: 10,
+    conditions: [{ field: 'description', operator: 'contains', value: 'test' }],
+    glAccountId: 'gl-001',
+    debitGlAccountId: null,
+    creditGlAccountId: null,
+    isActive: true,
+    ...overrides,
+  }
+}
+
+const defaultEntityResolution: EntityResolution = { status: 'not_run' }
+
+function makeEngineDecision(overrides: Partial<EngineDecision> = {}): EngineDecision {
+  return {
+    type: 'rule',
+    result: 'winner',
+    ruleId: 'rule-1',
+    candidateList: [],
+    classification: { glAccountId: 'gl-001' },
+    explanation: 'matched by rule-1',
+    ...overrides,
+  }
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+})
+
+describe('runRuleEngineV2', () => {
+  describe('outcome: matched', () => {
+    it('returns matched when engine returns winner with glAccountId', async () => {
+      mockEvaluateRules.mockReturnValueOnce({
+        output: {
+          candidates: [],
+          decision: makeEngineDecision(),
+        },
+      })
+
+      const result = await runRuleEngineV2(makeTxn(), [makeRule()], defaultEntityResolution, 'company-1')
+
+      expect(result.outcome).toBe('matched')
+      if (result.outcome === 'matched') {
+        expect(result.classification.glAccountId).toBe('gl-001')
+        expect(result.matchedRuleId).toBe('rule-1')
+      }
+    })
+
+    it('includes entityId and category from classification', async () => {
+      mockEvaluateRules.mockReturnValueOnce({
+        output: {
+          candidates: [],
+          decision: makeEngineDecision({
+            classification: { glAccountId: 'gl-001', entityId: 'ent-1', category: 'income' },
+          }),
+        },
+      })
+
+      const result = await runRuleEngineV2(makeTxn(), [makeRule()], defaultEntityResolution, 'company-1')
+      expect(result.outcome).toBe('matched')
+      if (result.outcome === 'matched') {
+        expect(result.classification.entityId).toBe('ent-1')
+        expect(result.classification.category).toBe('income')
+      }
+    })
+  })
+
+  describe('outcome: pending', () => {
+    it('returns pending when engine returns winner without glAccountId', async () => {
+      mockEvaluateRules.mockReturnValueOnce({
+        output: {
+          candidates: [],
+          decision: makeEngineDecision({ classification: {} }),
+        },
+      })
+
+      const result = await runRuleEngineV2(makeTxn(), [makeRule()], defaultEntityResolution, 'company-1')
+      expect(result.outcome).toBe('pending')
+    })
+
+    it('returns pending when engine returns ambiguous', async () => {
+      mockEvaluateRules.mockReturnValueOnce({
+        output: {
+          candidates: [],
+          decision: makeEngineDecision({ result: 'ambiguous', ruleId: undefined, classification: undefined }),
+        },
+      })
+
+      const result = await runRuleEngineV2(makeTxn(), [makeRule()], defaultEntityResolution, 'company-1')
+      expect(result.outcome).toBe('pending')
+    })
+
+    it('returns pending when engine returns no_match', async () => {
+      mockEvaluateRules.mockReturnValueOnce({
+        output: {
+          candidates: [],
+          decision: makeEngineDecision({ result: 'no_match', ruleId: undefined, classification: undefined }),
+        },
+      })
+
+      const result = await runRuleEngineV2(makeTxn(), [makeRule()], defaultEntityResolution, 'company-1')
+      expect(result.outcome).toBe('pending')
+    })
+
+    it('returns pending when engine output has no decision', async () => {
+      mockEvaluateRules.mockReturnValueOnce({
+        output: { candidates: [], decision: undefined },
+      })
+
+      const result = await runRuleEngineV2(makeTxn(), [makeRule()], defaultEntityResolution, 'company-1')
+      expect(result.outcome).toBe('pending')
+    })
+
+    it('returns pending with engine_execution_error when engine throws', async () => {
+      mockEvaluateRules.mockImplementationOnce(() => { throw new Error('engine failure') })
+
+      const result = await runRuleEngineV2(makeTxn(), [makeRule()], defaultEntityResolution, 'company-1')
+      expect(result.outcome).toBe('pending')
+      if (result.outcome === 'pending') {
+        expect(result.errorCode).toBe('engine_execution_error')
+      }
+    })
+
+    it('returns pending with conditions_normalization_failed when rule has corrupt conditions', async () => {
+      const corruptRule = makeRule({ conditions: 'not-an-array' })
+
+      const result = await runRuleEngineV2(makeTxn(), [corruptRule], defaultEntityResolution, 'company-1')
+      expect(result.outcome).toBe('pending')
+      if (result.outcome === 'pending') {
+        expect(result.errorCode).toBe('conditions_normalization_failed')
+      }
+    })
+
+    it('preserves classification on pending when winner has no glAccountId', async () => {
+      mockEvaluateRules.mockReturnValueOnce({
+        output: {
+          candidates: [],
+          decision: makeEngineDecision({
+            classification: { entityId: 'ent-1', category: 'expense' },
+          }),
+        },
+      })
+
+      const result = await runRuleEngineV2(makeTxn(), [makeRule()], defaultEntityResolution, 'company-1')
+      expect(result.outcome).toBe('pending')
+      if (result.outcome === 'pending') {
+        expect(result.classification?.entityId).toBe('ent-1')
+        expect(result.classification?.category).toBe('expense')
+      }
+    })
+  })
+
+  describe('adapter purity', () => {
+    it('does not call findMatchingRule (no legacy fallback)', async () => {
+      mockEvaluateRules.mockReturnValueOnce({
+        output: { candidates: [], decision: makeEngineDecision() },
+      })
+
+      await runRuleEngineV2(makeTxn(), [makeRule()], defaultEntityResolution, 'company-1')
+      expect(mockEvaluateRules).toHaveBeenCalledTimes(1)
+    })
+
+    it('filters out inactive rules', async () => {
+      mockEvaluateRules.mockReturnValueOnce({
+        output: { candidates: [], decision: makeEngineDecision({ result: 'no_match' }) },
+      })
+
+      const activeRule = makeRule({ id: 'active-1', isActive: true })
+      const inactiveRule = makeRule({ id: 'inactive-1', isActive: false, glAccountId: null })
+
+      const result = await runRuleEngineV2(makeTxn(), [activeRule, inactiveRule], defaultEntityResolution, 'company-1')
+
+      const callArg = mockEvaluateRules.mock.calls[0][0] as { context: { availableRules: Array<{ id: string }> } }
+      const ruleIds = callArg.context.availableRules.map((r: { id: string }) => r.id)
+      expect(ruleIds).toContain('active-1')
+      expect(ruleIds).not.toContain('inactive-1')
+    })
+
+    it('maps rule glAccountId to engine action', async () => {
+      mockEvaluateRules.mockReturnValueOnce({
+        output: { candidates: [], decision: makeEngineDecision({ result: 'no_match' }) },
+      })
+
+      await runRuleEngineV2(makeTxn(), [makeRule({ glAccountId: 'gl-099' })], defaultEntityResolution, 'company-1')
+
+      const callArg = mockEvaluateRules.mock.calls[0][0] as { context: { availableRules: Array<{ action: { glAccountId: string } }> } }
+      expect(callArg.context.availableRules[0].action.glAccountId).toBe('gl-099')
+    })
+  })
+})

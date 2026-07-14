@@ -34,9 +34,9 @@ Chain strategy: feature-branch-chain
 
 ## Phase 2: Adapter Implementation
 
-- [ ] 2.1 TDD: write adapter unit tests first (`tests/services/rule-engine-adapter/adapter.test.ts`) — mock engine, verify outcome mapping for matched, pending (winner-no-gl, ambiguous, no_match), engine_error; confirm zero Prisma calls
-- [ ] 2.2 Implement `src/lib/services/rule-engine-adapter/index.ts` — `runRuleEngineV2()`: normalize conditions, build `RuleInput`, call `evaluateRules()`, map `EngineDecision` → `MatchResult`
-- [ ] 2.3 `vitest && tsc --noEmit && npm run build` — all green; atomic commit with revert hash
+- [x] 2.1 TDD: write adapter unit tests first (`tests/services/rule-engine-adapter/adapter.test.ts`) — mock engine, verify outcome mapping for matched, pending (winner-no-gl, ambiguous, no_match), engine_error; confirm zero Prisma calls
+- [x] 2.2 Implement `src/lib/services/rule-engine-adapter/index.ts` — `runRuleEngineV2()`: normalize conditions, build `RuleInput`, call `evaluateRules()`, map `EngineDecision` → `MatchResult`
+- [x] 2.3 `vitest && tsc --noEmit && npm run build` — all green; atomic commit with revert hash
 
 ## Phase 3: Integration into Import Service
 
