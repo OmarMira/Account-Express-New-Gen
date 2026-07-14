@@ -271,5 +271,49 @@ describe('runRuleEngineV2', () => {
       const callArg = mockEvaluateRules.mock.calls[0][0] as { context: { availableRules: Array<{ action: { glAccountId: string } }> } }
       expect(callArg.context.availableRules[0].action.glAccountId).toBe('gl-099')
     })
+
+    it('falls back to debitGlAccountId when glAccountId is null', async () => {
+      mockEvaluateRules.mockReturnValueOnce({
+        output: { candidates: [], decision: makeEngineDecision({ result: 'no_match' }) },
+      })
+
+      await runRuleEngineV2(makeTxn(), [makeRule({ glAccountId: null, debitGlAccountId: 'debit-1' })], defaultEntityResolution, 'company-1')
+
+      const callArg = mockEvaluateRules.mock.calls[0][0] as { context: { availableRules: Array<{ action: { glAccountId: string } }> } }
+      expect(callArg.context.availableRules[0].action.glAccountId).toBe('debit-1')
+    })
+
+    it('falls back to creditGlAccountId when both glAccountId and debitGlAccountId are null', async () => {
+      mockEvaluateRules.mockReturnValueOnce({
+        output: { candidates: [], decision: makeEngineDecision({ result: 'no_match' }) },
+      })
+
+      await runRuleEngineV2(makeTxn(), [makeRule({ glAccountId: null, debitGlAccountId: null, creditGlAccountId: 'credit-1' })], defaultEntityResolution, 'company-1')
+
+      const callArg = mockEvaluateRules.mock.calls[0][0] as { context: { availableRules: Array<{ action: { glAccountId: string } }> } }
+      expect(callArg.context.availableRules[0].action.glAccountId).toBe('credit-1')
+    })
+
+    it('prioritizes glAccountId over debitGlAccountId and creditGlAccountId', async () => {
+      mockEvaluateRules.mockReturnValueOnce({
+        output: { candidates: [], decision: makeEngineDecision({ result: 'no_match' }) },
+      })
+
+      await runRuleEngineV2(makeTxn(), [makeRule({ glAccountId: 'gl-1', debitGlAccountId: 'debit-1', creditGlAccountId: 'credit-1' })], defaultEntityResolution, 'company-1')
+
+      const callArg = mockEvaluateRules.mock.calls[0][0] as { context: { availableRules: Array<{ action: { glAccountId: string } }> } }
+      expect(callArg.context.availableRules[0].action.glAccountId).toBe('gl-1')
+    })
+
+    it('sets glAccountId to undefined when all gl account fields are null', async () => {
+      mockEvaluateRules.mockReturnValueOnce({
+        output: { candidates: [], decision: makeEngineDecision({ result: 'no_match' }) },
+      })
+
+      await runRuleEngineV2(makeTxn(), [makeRule({ glAccountId: null, debitGlAccountId: null, creditGlAccountId: null })], defaultEntityResolution, 'company-1')
+
+      const callArg = mockEvaluateRules.mock.calls[0][0] as { context: { availableRules: Array<{ action: { glAccountId: string | undefined } }> } }
+      expect(callArg.context.availableRules[0].action.glAccountId).toBeUndefined()
+    })
   })
 })

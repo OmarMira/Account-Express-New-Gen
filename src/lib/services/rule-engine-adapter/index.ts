@@ -12,7 +12,7 @@ function buildEngineRule(rule: PrismaBankRule): BankRule {
     priority: rule.priority,
     conditions,
     action: {
-      glAccountId: rule.glAccountId ?? undefined,
+      glAccountId: rule.glAccountId ?? rule.debitGlAccountId ?? rule.creditGlAccountId ?? undefined,
     },
     isActive: rule.isActive,
     lifecycleStatus: rule.isActive ? 'active' : 'archived',
