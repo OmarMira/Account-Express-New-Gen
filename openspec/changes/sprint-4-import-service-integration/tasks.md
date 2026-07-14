@@ -6,12 +6,12 @@
 |-------|-------|
 | Estimated changed lines | 500–650 |
 | 400-line budget risk | High |
-| Chained PRs recommended | Yes |
+| Chained PRs recommended | No (resolved → sequential) |
 | Suggested split | PR 1: Foundation → PR 2: Adapter → PR 3: Integration |
 | Delivery strategy | sequential-prs-to-main |
 | Chain strategy | sequential-prs-to-main |
 
-Decision needed before apply: Yes
+Decision needed before apply: No — resolved: sequential PRs to main
 400-line budget risk: High
 
 ### Suggested Work Units (Sequential PRs to Main)
