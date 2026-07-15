@@ -182,11 +182,11 @@ Estas son las instrucciones y roles del sistema que Gentle AI carga automáticam
 
 ## Configuración
 
-Gentle AI se configura desde dos lugares:
+Gentle AI puede recibir configuración desde estas ubicaciones:
 
 | Archivo / Ubicación | Qué define |
 |---------|------------|
-| `~/.config/opencode/opencode.json` | Agentes, herramientas, MCP, permisos |
+| `~/.config/opencode/opencode.json` | MCP y reglas locales de permisos |
 | Configuración interna del orquestador | Persona, protocolo Engram e instrucciones SDD; su ubicación depende de la instalación |
 | `./AGENTS.md` (project root, optional) | Overrides específicos del proyecto |
 
@@ -223,7 +223,7 @@ Gentle AI se configura desde dos lugares:
 7. sdd-design → arquitectura con mitigaciones
 8. sdd-tasks → 27 tareas en 5 fases
 9. sdd-apply (x6) → implementación por batches
-10. sdd-verify → suite completa (1014 tests al momento del ejemplo), 6/6 criterios OK
+10. sdd-verify → suite completa, criterios de éxito verificados
 11. sdd-archive → artefactos movidos a archive/
 12. Commit + push → GitHub
 ```
