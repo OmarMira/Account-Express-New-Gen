@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Define the adapter between Import Service and Rule Engine v2, gated by `RULE_ENGINE_V2_ENABLED`. The adapter handles type mapping, engine invocation, and decision mapping — returning `RuleEngineMatchResult` for the Import Service. It contains zero accounting logic.
+Define the adapter between Import Service and Rule Engine v2, gated by `RULE_ENGINE_V2_ENABLED`. The adapter handles type mapping, engine invocation, and decision mapping — returning `MatchResult` for the Import Service. It contains zero accounting logic.
 
 ## Requirements
 
@@ -15,7 +15,7 @@ When the flag is off, MUST delegate to `findMatchingRule()` with behavior identi
 - THEN `findMatchingRule()` is invoked and the legacy path executes unchanged
 
 ### Requirement: Winner auto-applies with valid glAccountId
-Engine returns `winner` with a valid `classification.glAccountId` — adapter MUST return the `RuleEngineMatchResult`; Import Service creates the journal entry.
+Engine returns `winner` with a valid `classification.glAccountId` — adapter MUST return the `MatchResult`; Import Service creates the journal entry.
 
 #### Scenario: Winner with valid glAccountId
 - GIVEN `RULE_ENGINE_V2_ENABLED=true` and engine returns `winner` with a valid `classification.glAccountId`
@@ -61,26 +61,6 @@ Engine throws — adapter MUST catch, log warning, return `outcome: 'pending'`, 
 - GIVEN `RULE_ENGINE_V2_ENABLED=true` and engine throws an exception
 - WHEN the adapter processes the result
 - THEN warning logged, adapter returns `outcome: 'pending'`; Import Service persists (`glAccountId=null`, `matchedRuleId=null`), and `findMatchingRule()` is called exactly zero times
-
-### Requirement: Protected transactions are skipped
-> **DEFERRED — S5-01**: This requirement applies to downstream consumers of persisted transactions (apply-all, reconciliation, manual categorization). The import flow receives only new, unpersisted transactions, so the invariant check is structurally inapplicable at this boundary. Implementation deferred to Sprint 5.
-
-Transactions that are reconciled, journal-linked, classified, ignored, or manually-edited MUST be skipped before engine invocation.
-
-#### Scenario: Already-processed skipped
-- GIVEN a transaction already reconciled, journal-linked, classified, ignored, or manually edited
-- WHEN the adapter runs invariant checks
-- THEN the transaction is skipped and the engine is not invoked
-
-### Requirement: Full classification preserved for review
-> **DEFERRED — S5-02**: The adapter returns `classification` in `MatchResult`, but the Import Service only persists `glAccountId=null` and `matchedRuleId=null` for pending outcomes. Full classification is available at the adapter return boundary (in-memory) but not persisted or exposed downstream. Persistence and exposure require a new DB field and UI work — deferred to Sprint 5.
-
-Adapter MUST return the full `classification` object in the result — not just `glAccountId` — making fields like `entityId`, `category` available downstream. If `glAccountId` is absent, the outcome MUST be `pending` and the full classification is preserved for manual review.
-
-#### Scenario: Classification without glAccountId
-- GIVEN engine returns `classification` containing `entityId` and `category` but no `glAccountId`
-- WHEN the adapter maps the decision
-- THEN the adapter returns `outcome: 'pending'` with the full `classification` preserved in the result and available for manual review
 
 ### Requirement: Valid BankRule conditions transform
 `BankRule.conditions` in a recognized v1-compatible format — adapter MUST normalize into the Rule Engine v2 input contract. If already in v2 format, MUST pass through unchanged.
@@ -129,3 +109,25 @@ Adapter MUST contain only mapping, invariants, orchestration, and error handling
 - GIVEN the adapter codebase
 - WHEN reviewed for business logic
 - THEN it contains zero accounting rules, classification algorithms, or journal entry business rules — only mapping, invariants, orchestration, error handling
+
+## Deferred Requirements
+
+The following requirements are part of the long-term contract but are not yet implemented. They remain in this spec as future scope and will be activated when implemented in Sprint 5.
+
+### S5-01: Protected persisted transaction invariants
+
+Status: Deferred — not implemented.
+
+Transactions that are reconciled, journal-linked, classified, ignored, or manually-edited MUST be skipped before engine invocation. The import flow receives only new, unpersisted transactions, so this invariant is structurally inapplicable at the current boundary. Applies to downstream consumers (apply-all, reconciliation, manual categorization) that operate on persisted records.
+
+No scenario defined — deferred until implementation.
+
+### S5-02: Pending classification persistence and exposure
+
+Status: Deferred — not implemented.
+
+The adapter returns the full `classification` object in `MatchResult` (this is already implemented and covered by the active requirements above). However, the Import Service only persists `glAccountId=null` and `matchedRuleId=null` for pending outcomes. The classification is available at the adapter return boundary (in-memory) but is not persisted or exposed downstream to UI for manual review.
+
+Persistence requires a new DB field. Exposure requires UI work. Both deferred to Sprint 5.
+
+No scenario defined — deferred until implementation.
