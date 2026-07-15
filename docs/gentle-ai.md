@@ -1,6 +1,6 @@
 # Gentle AI — Sistema de Desarrollo Asistido
 
-Gentle AI es un agente orquestador basado en OpenCode que coordina equipos de sub-agentes especializados para desarrollar features complejas mediante SDD (Spec-Driven Development). Está configurado con personalidad de arquitecto senior, memoria persistente (Engram), y un workflow estructurado de 7 fases.
+Gentle AI es un agente orquestador basado en OpenCode que coordina equipos de sub-agentes especializados para desarrollar features complejas mediante SDD (Spec-Driven Development). Está configurado con personalidad de arquitecto senior, memoria persistente (Engram), y un workflow estructurado de 8 fases operativas.
 
 ---
 <!-- TABLE_OF_CONTENTS -->
@@ -60,12 +60,10 @@ Usuario
 
 ## Workflow SDD
 
-Cada cambio sigue 7 fases en orden:
+Flujo de trabajo de 8 fases operativas. La inicialización (`sdd-init`) ocurre previamente al primer cambio:
 
 ```
-proposal → spec → tasks → apply → verify → archive
-              ↑
-            design
+explore → propose → spec → design → tasks → apply → verify → archive
 ```
 
 ### Fases
@@ -177,7 +175,6 @@ Estas son las instrucciones y roles del sistema que Gentle AI carga automáticam
 | `judgment-day` | Revisión adversarial dual |
 | `comment-writer` | Comentarios en PRs/issues |
 | `issue-creation` | Crear issues |
-
 | `skill-creator` / `skill-improver` | Crear/mejorar skills |
 | `skill-registry` | Indexar skills |
 
@@ -187,10 +184,10 @@ Estas son las instrucciones y roles del sistema que Gentle AI carga automáticam
 
 Gentle AI se configura desde dos lugares:
 
-| Archivo | Qué define |
+| Archivo / Ubicación | Qué define |
 |---------|------------|
 | `~/.config/opencode/opencode.json` | Agentes, herramientas, MCP, permisos |
-| `~/.config/opencode/AGENTS.md` | Instrucciones del orchestrator, persona, engram protocol, SDD |
+| Configuración interna del orquestador | Persona, protocolo Engram e instrucciones SDD; su ubicación depende de la instalación |
 | `./AGENTS.md` (project root, optional) | Overrides específicos del proyecto |
 
 ### Modelos asignados
@@ -219,14 +216,14 @@ Gentle AI se configura desde dos lugares:
 ```
 1. Usuario: "haceme un SDD para migrar a PostgreSQL"
 2. Orchestrator: preflight (modo, artifact store, estrategia)
-3. sdd-init → detecta stack (TypeScript, Vitest, Prisma)
+3. sdd-init (preliminar) → detecta stack (TypeScript, Vitest, Prisma)
 4. sdd-explore → mapea ~25 archivos
 5. sdd-propose → 6 criterios de éxito
 6. sdd-spec → 3 specs delta
 7. sdd-design → arquitectura con mitigaciones
 8. sdd-tasks → 27 tareas en 5 fases
 9. sdd-apply (x6) → implementación por batches
-10. sdd-verify → 959 tests, 6/6 criterios OK
+10. sdd-verify → suite completa (1014 tests al momento del ejemplo), 6/6 criterios OK
 11. sdd-archive → artefactos movidos a archive/
 12. Commit + push → GitHub
 ```

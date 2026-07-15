@@ -1,7 +1,7 @@
 # Diseño del Proceso de Onboarding de Entidades
 
 > **Referencia histórica de arquitectura.** Rescatado de `feat/entities-bank-rules`.
-> Some implementation details may no longer match `main` (Jul 2026).
+> Algunos detalles de implementación pueden ya no coincidir con `main` (Jul 2026).
 
 > **Propósito**: Guiar al usuario en la clasificación correcta de entidades para que el generador de reglas bancarias produzca resultados precisos.
 
